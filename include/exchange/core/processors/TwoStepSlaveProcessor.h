@@ -19,11 +19,11 @@
 #include "DisruptorExceptionHandler.h"
 #include "SimpleEventHandler.h"
 #include "WaitSpinningHelper.h"
+#include <atomic>
+#include <cstdint>
 #include <disruptor/MultiProducerSequencer.h>
 #include <disruptor/ProcessingSequenceBarrier.h>
 #include <disruptor/RingBuffer.h>
-#include <atomic>
-#include <cstdint>
 #include <string>
 
 namespace exchange {
@@ -79,7 +79,8 @@ private:
   std::atomic<int32_t> running_;
   void *ringBuffer_;      // Type-erased RingBuffer pointer
   void *sequenceBarrier_; // Type-erased SequenceBarrier pointer
-  WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT> *waitSpinningHelper_;
+  WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>
+      *waitSpinningHelper_;
   SimpleEventHandler *eventHandler_;
   DisruptorExceptionHandler<common::cmd::OrderCommand> *exceptionHandler_;
   std::string name_;
@@ -87,6 +88,7 @@ private:
   int64_t nextSequence_;
 
   void ProcessEvents();
+  void HandlingCycle(int64_t processUpToSequence);
 };
 
 } // namespace processors

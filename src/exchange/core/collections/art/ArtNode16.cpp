@@ -429,6 +429,10 @@ ArtNode16<V>::GetObjectsPool() {
 // Explicit template instantiations
 template class ArtNode16<void>;
 
+// Explicit template instantiations for testing
+template class ArtNode16<std::string>;
+template class ArtNode16<int64_t>;
+
 } // namespace art
 } // namespace collections
 } // namespace core

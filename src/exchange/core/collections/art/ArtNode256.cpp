@@ -362,6 +362,10 @@ template <typename V> std::vector<int16_t> ArtNode256<V>::CreateKeysArray() {
 // Explicit template instantiations
 template class ArtNode256<void>;
 
+// Explicit template instantiations for testing
+template class ArtNode256<std::string>;
+template class ArtNode256<int64_t>;
+
 } // namespace art
 } // namespace collections
 } // namespace core

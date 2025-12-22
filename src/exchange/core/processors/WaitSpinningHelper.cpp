@@ -19,6 +19,7 @@
 #include <disruptor/BusySpinWaitStrategy.h>
 #include <disruptor/YieldingWaitStrategy.h>
 #include <exchange/core/common/CoreWaitStrategy.h>
+#include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
 #include <thread>
 

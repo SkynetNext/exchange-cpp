@@ -441,6 +441,10 @@ ArtNode4<V>::GetObjectsPool() {
 // Explicit template instantiations
 template class ArtNode4<void>; // For Bucket* and DirectOrder*
 
+// Explicit template instantiations for testing
+template class ArtNode4<std::string>;
+template class ArtNode4<int64_t>;
+
 } // namespace art
 } // namespace collections
 } // namespace core

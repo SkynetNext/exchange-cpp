@@ -335,6 +335,10 @@ void LongAdaptiveRadixTreeMap<V>::RecycleNodeToPool(IArtNode<V> *oldNode) {
 // These will be used in OrderBookDirectImpl
 template class LongAdaptiveRadixTreeMap<void>; // For Bucket* and DirectOrder*
 
+// Explicit template instantiations for testing
+template class LongAdaptiveRadixTreeMap<std::string>;
+template class LongAdaptiveRadixTreeMap<int64_t>;
+
 } // namespace art
 } // namespace collections
 } // namespace core

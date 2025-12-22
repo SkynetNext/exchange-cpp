@@ -14,10 +14,13 @@
  * limitations under the License.
  */
 
+#include <disruptor/AlertException.h>
+#include <disruptor/BlockingWaitStrategy.h>
+#include <disruptor/BusySpinWaitStrategy.h>
+#include <disruptor/YieldingWaitStrategy.h>
+#include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/processors/TwoStepSlaveProcessor.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
-#include <exchange/core/common/cmd/OrderCommand.h>
-#include <disruptor/AlertException.h>
 
 namespace exchange {
 namespace core {
@@ -25,30 +28,27 @@ namespace processors {
 
 template <typename WaitStrategyT>
 TwoStepSlaveProcessor<WaitStrategyT>::TwoStepSlaveProcessor(
-    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand,
-                                       WaitStrategyT> *ringBuffer,
+    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>
+        *ringBuffer,
     disruptor::ProcessingSequenceBarrier<
         disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT>
         *sequenceBarrier,
     SimpleEventHandler *eventHandler,
     DisruptorExceptionHandler<common::cmd::OrderCommand> *exceptionHandler,
     const std::string &name)
-    : running_(IDLE),
-      ringBuffer_(ringBuffer),
+    : running_(IDLE), ringBuffer_(ringBuffer),
       sequenceBarrier_(sequenceBarrier),
-      waitSpinningHelper_(new WaitSpinningHelper<common::cmd::OrderCommand,
-                                                  WaitStrategyT>(
-          ringBuffer, sequenceBarrier, 0,
-          common::CoreWaitStrategy::SECOND_STEP_NO_WAIT)),
-      eventHandler_(eventHandler),
-      exceptionHandler_(exceptionHandler),
+      waitSpinningHelper_(
+          new WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>(
+              ringBuffer, sequenceBarrier, 0,
+              common::CoreWaitStrategy::SECOND_STEP_NO_WAIT)),
+      eventHandler_(eventHandler), exceptionHandler_(exceptionHandler),
       name_(name),
       sequence_(new disruptor::Sequence(disruptor::Sequence::INITIAL_VALUE)),
       nextSequence_(-1) {}
 
 template <typename WaitStrategyT>
-disruptor::Sequence *
-TwoStepSlaveProcessor<WaitStrategyT>::GetSequence() {
+disruptor::Sequence *TwoStepSlaveProcessor<WaitStrategyT>::GetSequence() {
   return sequence_;
 }
 
@@ -68,8 +68,7 @@ bool TwoStepSlaveProcessor<WaitStrategyT>::IsRunning() const {
 
 template <typename WaitStrategyT>
 void TwoStepSlaveProcessor<WaitStrategyT>::Run() {
-  if (running_.compare_exchange_strong(
-          const_cast<int32_t &>(IDLE), RUNNING)) {
+  if (running_.compare_exchange_strong(const_cast<int32_t &>(IDLE), RUNNING)) {
     auto *barrier = static_cast<disruptor::ProcessingSequenceBarrier<
         disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT> *>(
         sequenceBarrier_);
@@ -94,11 +93,11 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
   while (true) {
     common::cmd::OrderCommand *event = nullptr;
     try {
-      auto *ringBuffer =
-          static_cast<disruptor::MultiProducerRingBuffer<
-              common::cmd::OrderCommand, WaitStrategyT> *>(ringBuffer_);
+      auto *ringBuffer = static_cast<disruptor::MultiProducerRingBuffer<
+          common::cmd::OrderCommand, WaitStrategyT> *>(ringBuffer_);
 
-      int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence_);
+      int64_t availableSequence =
+          waitSpinningHelper_->TryWaitFor(nextSequence_);
 
       // process batch
       while (nextSequence_ <= availableSequence &&
@@ -148,4 +147,3 @@ template class TwoStepSlaveProcessor<disruptor::BusySpinWaitStrategy>;
 } // namespace processors
 } // namespace core
 } // namespace exchange
-

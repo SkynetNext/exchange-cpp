@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "BinaryCommandType.h"
 #include "BinaryDataCommand.h"
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
@@ -52,4 +53,3 @@ public:
 } // namespace common
 } // namespace core
 } // namespace exchange
-

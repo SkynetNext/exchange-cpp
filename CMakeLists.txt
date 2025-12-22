@@ -33,8 +33,13 @@ option(BUILD_EXAMPLES "Build examples" ON)
 # disruptor-cpp: High-performance inter-thread communication
 # Note: disruptor-cpp may add googletest and benchmark as submodules if BUILD_BENCHMARKS is ON
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/disruptor-cpp/CMakeLists.txt)
+    # Temporarily disable disruptor-cpp's own tests to avoid build errors
+    # We only need the library, not its tests
+    set(BUILD_TESTING_OLD ${BUILD_TESTING})
+    set(BUILD_TESTING OFF)
     add_subdirectory(third_party/disruptor-cpp)
-    message(STATUS "Using disruptor-cpp from submodule")
+    set(BUILD_TESTING ${BUILD_TESTING_OLD})
+    message(STATUS "Using disruptor-cpp from submodule (tests disabled)")
 else()
     message(FATAL_ERROR "disruptor-cpp submodule not found. Please run: git submodule update --init --recursive")
 endif()
@@ -81,6 +86,7 @@ file(GLOB_RECURSE EXCHANGE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/common/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/orderbook/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/processors/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/collections/*.cpp"
     # Add more patterns as development progresses:
     # "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/utils/*.cpp"
 )

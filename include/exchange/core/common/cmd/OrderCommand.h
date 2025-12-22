@@ -17,9 +17,7 @@
 #pragma once
 
 #include <cstdint>
-#include <functional>
 #include <memory>
-#include <new> // for alignas
 #include <stdexcept>
 #include <vector>
 
@@ -109,7 +107,8 @@ struct alignas(64) OrderCommand : public IOrder, public StateHash {
   /**
    * Handles full MatcherTradeEvent chain, without removing/revoking them
    */
-  template <typename Handler> void ProcessMatcherEvents(Handler &&handler) {
+  template <typename Handler>
+  void ProcessMatcherEvents(Handler &&handler) const {
     MatcherTradeEvent *mte = this->matcherEvent;
     while (mte != nullptr) {
       handler(mte);
@@ -120,7 +119,7 @@ struct alignas(64) OrderCommand : public IOrder, public StateHash {
   /**
    * Produces garbage - For testing only !!!
    */
-  std::vector<MatcherTradeEvent *> ExtractEvents();
+  std::vector<MatcherTradeEvent *> ExtractEvents() const;
 
   /**
    * Write only command data, not status or events

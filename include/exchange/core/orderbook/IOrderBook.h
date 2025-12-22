@@ -18,15 +18,12 @@
 
 #include "../common/IOrder.h"
 #include "../common/L2MarketData.h"
-#include "../common/Order.h"
 #include "../common/OrderAction.h"
 #include "../common/StateHash.h"
 #include "../common/cmd/CommandResultCode.h"
 #include "../common/cmd/OrderCommand.h"
-#include "../common/cmd/OrderCommandType.h"
 #include <cstdint>
 #include <memory>
-#include <vector>
 
 namespace exchange {
 namespace core {

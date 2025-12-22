@@ -70,7 +70,7 @@ OrderCommand OrderCommand::Update(int64_t orderId, int64_t uid, int64_t price) {
   return cmd;
 }
 
-std::vector<MatcherTradeEvent *> OrderCommand::ExtractEvents() {
+std::vector<MatcherTradeEvent *> OrderCommand::ExtractEvents() const {
   std::vector<MatcherTradeEvent *> list;
   ProcessMatcherEvents(
       [&list](MatcherTradeEvent *event) { list.push_back(event); });
