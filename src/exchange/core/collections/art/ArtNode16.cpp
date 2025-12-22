@@ -406,7 +406,7 @@ std::string ArtNode16<V>::PrintDiagram(const std::string &prefix, int level) {
 
 template <typename V>
 std::list<std::pair<int64_t, V *>> ArtNode16<V>::Entries() {
-  const int64_t keyPrefix = nodeKey_ & (-1LL << 8);
+  const int64_t keyPrefix = (nodeKey_ >> 8) << 8;
   std::list<std::pair<int64_t, V *>> list;
   for (int i = 0; i < numChildren_; i++) {
     if (nodeLevel_ == 0) {
