@@ -22,6 +22,7 @@
 ### Phase 1: 项目初始化与依赖集成 ✅
 
 - [x] 创建项目结构
+- [x] 添加 exchange-core Java 实现到 reference/ 目录（作为子模块，方便对比）
 - [ ] 集成 disruptor-cpp 作为子模块
 - [ ] 配置 CMake 构建系统
 - [ ] 设置测试框架 (Google Test)
@@ -154,7 +155,26 @@
 
 ## 参考资料
 
-- [exchange-core 源码](https://github.com/exchange-core/exchange-core)
+- **本地参考实现**: `reference/exchange-core/` - 原始 Java 实现（git 子模块）
+- [exchange-core 源码](https://github.com/exchange-core/exchange-core) - GitHub 仓库
 - [disruptor-cpp 文档](https://github.com/SkynetNext/disruptor-cpp)
 - [LMAX Disruptor 论文](https://lmax-exchange.github.io/disruptor/files/Disruptor-1.0.pdf)
+
+## 参考实现使用说明
+
+原始 Java 实现在 `reference/exchange-core/` 目录中，作为 git 子模块：
+
+```bash
+# 初始化子模块（如果还没有）
+git submodule update --init --recursive
+
+# 更新到最新版本
+cd reference/exchange-core
+git pull origin master
+cd ../..
+
+# 查看 Java 实现的具体代码，用于对比和参考
+```
+
+在开发过程中，可以随时参考 `reference/exchange-core/src/` 中的 Java 代码来确保 C++ 实现的正确性和完整性。
 

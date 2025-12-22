@@ -1,0 +1,3 @@
+[submodule "reference/exchange-core"]
+	path = reference/exchange-core
+	url = https://github.com/exchange-core/exchange-core.git

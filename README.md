@@ -34,6 +34,8 @@ exchange-cpp/
 ├── CMakeLists.txt          # Main CMake configuration
 ├── README.md               # This file
 ├── PLAN.md                 # Development plan
+├── reference/              # Reference implementations
+│   └── exchange-core/      # Original Java implementation (git submodule)
 ├── include/                # Public headers
 │   └── exchange/
 │       ├── core/          # Core matching engine
@@ -51,9 +53,12 @@ exchange-cpp/
 ## Building
 
 ```bash
-# Clone with submodules
+# Clone with submodules (includes reference/exchange-core)
 git clone --recursive https://github.com/your-org/exchange-cpp.git
 cd exchange-cpp
+
+# If you already cloned without --recursive, initialize submodules:
+git submodule update --init --recursive
 
 # Build
 mkdir build && cd build
