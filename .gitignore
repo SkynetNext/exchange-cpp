@@ -1,26 +1,15 @@
 # Build directories
 build/
+_build/
 cmake-build-*/
-out/
-bin/
-lib/
 
 # CMake
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
-install_manifest.txt
-compile_commands.json
-CTestTestfile.cmake
-_deps/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
+*.cmake
+!CMakeLists.txt
+!CMakePresets.json
 
 # Compiled files
 *.o
@@ -32,23 +21,25 @@ _deps/
 *.a
 *.lib
 
-# Test outputs
-*.gcov
-*.gcda
-*.gcno
-coverage/
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
 
-# Benchmark outputs
-*.json
-benchmark_*.json
-comparison_report.md
+# Test and benchmark outputs
+*.log
+test_results/
+benchmark_results/
 
 # Documentation
+docs/_build/
 docs/html/
 docs/latex/
 
 # Temporary files
 *.tmp
-*.log
+*.bak
 *.cache
-

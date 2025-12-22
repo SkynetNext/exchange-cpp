@@ -4,6 +4,27 @@
 
 使用 C++ 1:1 重写 exchange-core，保持相同的功能和性能特性。
 
+### 目录结构映射策略
+
+为了便于移植时对照 Java 源码，C++ 版的目录结构**与 Java 版保持逻辑对应**（去除了版本号 `core2`）：
+
+| Java 包路径 | C++ 头文件路径 | 说明 |
+| :--- | :--- | :--- |
+| `exchange.core2.core.common.*` | `include/exchange/core/common/*` | 通用数据模型 |
+| `exchange.core2.core.orderbook.*` | `include/exchange/core/orderbook/*` | 订单簿实现 |
+| `exchange.core2.core.processors.*` | `include/exchange/core/processors/*` | 流水线处理器 |
+| `exchange.core2.core.utils.*` | `include/exchange/core/utils/*` | 工具函数 |
+
+**设计决策：**
+- **简化命名空间**：去除了 Java 包名中的版本号 `core2`，使用更简洁的 `exchange::core::*`
+- **保持逻辑对应**：子目录结构（common, orderbook, processors, utils）与 Java 版完全一致
+- **便于对照**：移植时可以通过目录名快速定位对应的 Java 文件
+
+**优势：**
+- 移植时可以直接对照 Java 文件位置（只需忽略 `core2` 这一层）
+- 减少查找对应代码的时间
+- C++ 命名空间更简洁：`exchange::core::common::cmd::OrderCommand`
+
 ## 核心依赖映射
 
 ### Java → C++ 技术栈映射
@@ -23,10 +44,11 @@
 
 - [x] 创建项目结构
 - [x] 添加 exchange-core Java 实现到 reference/ 目录（作为子模块，方便对比）
-- [ ] 集成 disruptor-cpp 作为子模块
-- [ ] 配置 CMake 构建系统
-- [ ] 设置测试框架 (Google Test)
-- [ ] 设置基准测试框架 (Google Benchmark)
+- [x] 集成 disruptor-cpp 作为子模块 (`third_party/disruptor-cpp`)
+- [x] 配置 CMake 构建系统
+- [x] 创建基础目录结构 (include, src, tests, benchmarks, examples)
+- [ ] 设置测试框架 (Google Test) - 需要安装 GTest
+- [ ] 设置基准测试框架 (Google Benchmark) - 需要安装 Google Benchmark
 
 ### Phase 2: 核心数据模型
 
@@ -45,28 +67,39 @@
 - [ ] **价格索引**: 高效的价格查找结构
 - [ ] **订单匹配逻辑**: 价格优先、时间优先
 
-### Phase 4: 撮合引擎核心
+### Phase 4: 撮合引擎核心 (ME - M Threads)
 
-- [ ] **Matching Engine**:
-  - 订单接收与验证
-  - 撮合算法实现
-  - 成交生成
-  - 订单状态管理
-- [ ] **事件处理**: 基于 disruptor-cpp 的事件流
-- [ ] **并发控制**: 多线程安全设计
+- [ ] **Matching Engine Router**:
+  - 根据 `SymbolID` 进行命令路由
+  - 撮合逻辑线程绑定 (Thread Affinity)
+- [ ] **OrderBook 实现**:
+  - 价格优先、时间优先匹配算法
+  - 成交事件 (MatcherTradeEvent) 生成与池化管理
+- [ ] **多线程并行**:
+  - 不同 Symbol 运行在独立的 ME 线程中
 
-### Phase 5: 风险管理
+### Phase 5: 风险管理 (R1/R2 - N Threads)
 
-- [ ] **余额检查**: 账户余额验证
-- [ ] **保证金计算**: 杠杆交易支持
-- [ ] **仓位限制**: 单用户/全局限制
-- [ ] **风险控制规则**: 各种风控策略
+- [ ] **Risk Engine (R1 - Pre-hold)**:
+  - 根据 `UID` 进行账户分片
+  - 余额检查与预扣逻辑 (Place Order Check)
+- [ ] **Risk Engine (R2 - Release)**:
+  - 处理 ME 生成的成交事件
+  - 资金结算、盈亏计算与释放
+- [ ] **UserProfile 管理**:
+  - 线程安全的账户状态维护 (利用单线程分片保证)
 
-### Phase 6: API 层
+### Phase 6: API 层与 Gateway (Ingress - K Threads)
 
-- [ ] **命令接口**: 下单、撤单、查询等
-- [ ] **查询接口**: 订单状态、账户信息、市场数据
-- [ ] **报告接口**: 交易报告、余额报告等
+- [ ] **Exchange API**:
+  - `OrderCommand` 的发布接口封装
+  - 使用 `disruptor-cpp` 的 `MultiProducerSequencer` 实现多线程并发写入
+- [ ] **Gateway 模块**:
+  - 基础协议接入 (TCP/WebSocket)
+  - 集成 **Aeron** 或 **ENet** 用于低延迟外部接入
+  - 身份验证与初步权限校验
+- [ ] **零拷贝发布**:
+  - 实现从网卡缓冲区到 RingBuffer 的最小拷贝路径
 
 ### Phase 7: 持久化与恢复
 
@@ -97,10 +130,14 @@
 - 考虑使用 `std::pmr` (C++17) 或自定义分配器
 - 避免频繁的堆分配
 
-### 2. 并发模型
-- 使用 disruptor-cpp 的 ring buffer 作为核心通信机制
-- 单生产者多消费者模式 (SPMC) 用于订单处理
-- 多生产者单消费者模式 (MPSC) 用于结果聚合
+### 2. 并发模型 (Disruptor Pipeline)
+- **核心架构**: 基于单 RingBuffer 的多阶段异步流水线 (G -> J/R1 -> ME -> R2 -> E)。
+- **线程分片**:
+    - **Grouping (G)**: 单线程预处理。
+    - **Risk Engine (R1/R2)**: 按 `UserID` 分片，保证用户维度操作的原子性。
+    - **Matching Engine (ME)**: 按 `SymbolID` 分片，保证订单簿操作的原子性。
+    - **Journaling (J)**: 旁路顺序持久化。
+- **通信机制**: 使用 `disruptor-cpp` 实现内存屏障和线程间的高效通知，消除锁竞争。
 
 ### 3. 数据结构选择
 - OrderBook: 考虑使用 `std::map` 或自定义红黑树
