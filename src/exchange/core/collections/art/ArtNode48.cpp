@@ -41,8 +41,11 @@ ArtNode48<V>::ArtNode48(
 template <typename V>
 void ArtNode48<V>::InitFromNode16(ArtNode16<V> *node16, int16_t subKey,
                                   void *newElement) {
-  const int8_t sourceSize = 16;
+  // Clear this node first (it may be from object pool with old data)
   std::memset(indexes_, -1, sizeof(indexes_));
+  std::memset(nodes_, 0, sizeof(nodes_));
+
+  const int8_t sourceSize = node16->numChildren_;
   numChildren_ = sourceSize + 1;
   nodeLevel_ = node16->nodeLevel_;
   nodeKey_ = node16->nodeKey_;
@@ -63,7 +66,10 @@ void ArtNode48<V>::InitFromNode16(ArtNode16<V> *node16, int16_t subKey,
 
 template <typename V>
 void ArtNode48<V>::InitFromNode256(ArtNode256<V> *node256) {
+  // Clear this node first (it may be from object pool with old data)
   std::memset(indexes_, -1, sizeof(indexes_));
+  std::memset(nodes_, 0, sizeof(nodes_));
+
   numChildren_ = static_cast<int8_t>(node256->numChildren_);
   nodeLevel_ = node256->nodeLevel_;
   nodeKey_ = node256->nodeKey_;
@@ -387,6 +393,14 @@ template <typename V> void ArtNode48<V>::ValidateInternalState(int level) {
     throw std::runtime_error("wrong numChildren");
   if (numChildren_ > 48 || numChildren_ <= NODE16_SWITCH_THRESHOLD)
     throw std::runtime_error("unexpected numChildren");
+  // Validate child nodes recursively
+  for (int i = 0; i < 256; i++) {
+    int8_t idx = indexes_[i];
+    if (idx != -1 && nodeLevel_ != 0) {
+      IArtNode<V> *artNode = static_cast<IArtNode<V> *>(nodes_[idx]);
+      artNode->ValidateInternalState(nodeLevel_ - 8);
+    }
+  }
 }
 
 template <typename V>

@@ -37,16 +37,29 @@ ArtNode4<V>::ArtNode4(
 }
 
 template <typename V> void ArtNode4<V>::InitFirstKey(int64_t key, V *value) {
+  // Clear this node first (it may be from object pool with old data)
+  std::memset(keys_, 0, sizeof(keys_));
+  std::memset(nodes_, 0, sizeof(nodes_));
+
   numChildren_ = 1;
   keys_[0] = static_cast<int16_t>(key & 0xFF);
   nodes_[0] = value;
   nodeKey_ = key;
   nodeLevel_ = 0;
+
+  // Clear unused nodes
+  nodes_[1] = nullptr;
+  nodes_[2] = nullptr;
+  nodes_[3] = nullptr;
 }
 
 template <typename V>
 void ArtNode4<V>::InitTwoKeys(int64_t key1, void *value1, int64_t key2,
                               void *value2, int level) {
+  // Clear this node first (it may be from object pool with old data)
+  std::memset(keys_, 0, sizeof(keys_));
+  std::memset(nodes_, 0, sizeof(nodes_));
+
   numChildren_ = 2;
   const int16_t idx1 = static_cast<int16_t>((key1 >> level) & 0xFF);
   const int16_t idx2 = static_cast<int16_t>((key2 >> level) & 0xFF);
@@ -64,9 +77,17 @@ void ArtNode4<V>::InitTwoKeys(int64_t key1, void *value1, int64_t key2,
   }
   nodeKey_ = key1; // Leading part the same for both keys
   nodeLevel_ = level;
+
+  // Clear unused nodes
+  nodes_[2] = nullptr;
+  nodes_[3] = nullptr;
 }
 
 template <typename V> void ArtNode4<V>::InitFromNode16(ArtNode16<V> *node16) {
+  // Clear this node first (it may be from object pool with old data)
+  std::memset(keys_, 0, sizeof(keys_));
+  std::memset(nodes_, 0, sizeof(nodes_));
+
   // Put original node back into pool
   objectsPool_->Put(
       ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_16, node16);
@@ -76,6 +97,11 @@ template <typename V> void ArtNode4<V>::InitFromNode16(ArtNode16<V> *node16) {
   std::memcpy(nodes_, node16->nodes_, numChildren_ * sizeof(void *));
   nodeLevel_ = node16->nodeLevel_;
   nodeKey_ = node16->nodeKey_;
+
+  // Clear unused nodes in this node
+  for (int i = numChildren_; i < 4; i++) {
+    nodes_[i] = nullptr;
+  }
 
   std::memset(node16->nodes_, 0, sizeof(node16->nodes_));
 }

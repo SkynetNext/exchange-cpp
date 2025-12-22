@@ -40,6 +40,10 @@ ArtNode16<V>::ArtNode16(
 template <typename V>
 void ArtNode16<V>::InitFromNode4(ArtNode4<V> *node4, int16_t subKey,
                                  void *newElement) {
+  // Clear this node first (it may be from object pool with old data)
+  std::memset(keys_, 0, sizeof(keys_));
+  std::memset(nodes_, 0, sizeof(nodes_));
+
   const int8_t sourceSize = node4->numChildren_;
   nodeLevel_ = node4->nodeLevel_;
   nodeKey_ = node4->nodeKey_;
@@ -67,6 +71,10 @@ void ArtNode16<V>::InitFromNode4(ArtNode4<V> *node4, int16_t subKey,
 }
 
 template <typename V> void ArtNode16<V>::InitFromNode48(ArtNode48<V> *node48) {
+  // Clear this node first (it may be from object pool with old data)
+  std::memset(keys_, 0, sizeof(keys_));
+  std::memset(nodes_, 0, sizeof(nodes_));
+
   numChildren_ = node48->numChildren_;
   nodeLevel_ = node48->nodeLevel_;
   nodeKey_ = node48->nodeKey_;
@@ -81,6 +89,11 @@ template <typename V> void ArtNode16<V>::InitFromNode48(ArtNode48<V> *node48) {
     if (idx == numChildren_) {
       break;
     }
+  }
+
+  // Clear unused nodes in this node
+  for (int i = numChildren_; i < 16; i++) {
+    nodes_[i] = nullptr;
   }
 
   std::memset(node48->nodes_, 0, sizeof(node48->nodes_));

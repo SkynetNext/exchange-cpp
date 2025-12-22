@@ -38,9 +38,12 @@ ArtNode256<V>::ArtNode256(
 template <typename V>
 void ArtNode256<V>::InitFromNode48(ArtNode48<V> *artNode48, int16_t subKey,
                                    void *newElement) {
+  // Clear this node first (it may be from object pool with old data)
+  std::memset(nodes_, 0, sizeof(nodes_));
+
   nodeLevel_ = artNode48->nodeLevel_;
   nodeKey_ = artNode48->nodeKey_;
-  const int sourceSize = 48;
+  const int sourceSize = artNode48->numChildren_;
   for (int16_t i = 0; i < 256; i++) {
     const int8_t index = artNode48->indexes_[i];
     if (index != -1) {

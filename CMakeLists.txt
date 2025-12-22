@@ -23,6 +23,9 @@ endif()
 # Find dependencies
 find_package(Threads REQUIRED)
 
+# Enable testing support (required for CTest)
+enable_testing()
+
 # Build options
 option(BUILD_TESTING "Build tests" ON)
 option(BUILD_BENCHMARKS "Build benchmarks" ON)
@@ -46,7 +49,6 @@ endif()
 
 # Enable testing (check if GTest is already available from disruptor-cpp)
 if(BUILD_TESTING)
-    enable_testing()
     # Check if GTest is already available (e.g., from disruptor-cpp)
     if(TARGET gtest AND TARGET gtest_main)
         set(GTest_FOUND TRUE)
