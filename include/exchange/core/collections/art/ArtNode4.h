@@ -101,7 +101,7 @@ public:
     numChildren_ = 2;
     const int16_t idx1 = static_cast<int16_t>((key1 >> level) & 0xFF);
     const int16_t idx2 = static_cast<int16_t>((key2 >> level) & 0xFF);
-    if (key1 < key2) {
+    if (idx1 < idx2) {
       keys_[0] = idx1;
       nodes_[0] = value1;
       keys_[1] = idx2;
@@ -112,7 +112,7 @@ public:
       keys_[1] = idx1;
       nodes_[1] = value1;
     }
-    nodeKey_ = key1;
+    nodeKey_ = key1 & (-1LL << level);
     nodeLevel_ = level;
   }
 
@@ -126,7 +126,7 @@ public:
     nodeKey_ = node16->nodeKey_;
     for (int i = numChildren_; i < 4; i++)
       nodes_[i] = nullptr;
-    std::memset(node16->nodes_, 0, sizeof(node16->nodes_));
+    // node16 should be recycled by the caller
   }
 
   template <typename U> friend class ArtNode16;
@@ -386,7 +386,8 @@ std::list<std::pair<int64_t, V *>> ArtNode4<V>::Entries() {
   std::list<std::pair<int64_t, V *>> list;
   for (int i = 0; i < numChildren_; i++) {
     if (nodeLevel_ == 0)
-      list.push_back({keyPrefix + keys_[i], static_cast<V *>(nodes_[i])});
+      list.push_back(
+          {keyPrefix + (keys_[i] & 0xFF), static_cast<V *>(nodes_[i])});
     else {
       auto sub = static_cast<IArtNode<V> *>(nodes_[i])->Entries();
       list.splice(list.end(), sub);

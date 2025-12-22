@@ -115,9 +115,6 @@ void ArtNode256<V>::InitFromNode48(ArtNode48<V> *node48, int16_t subKey,
     if (node48->indexes_[i] != -1)
       nodes_[i] = node48->nodes_[node48->indexes_[i]];
   nodes_[subKey] = newElement;
-  std::memset(node48->nodes_, 0, sizeof(node48->nodes_));
-  objectsPool_->Put(
-      ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_48, node48);
 }
 
 template <typename V>
@@ -179,6 +176,7 @@ IArtNode<V> *ArtNode256<V>::Remove(int64_t key, int level) {
         ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_48,
         [this]() { return new ArtNode48<V>(objectsPool_); });
     node48->InitFromNode256(this);
+    RecycleNodeToPool<V>(this);
     return node48;
   }
   return this;

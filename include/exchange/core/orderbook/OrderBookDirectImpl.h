@@ -16,12 +16,12 @@
 
 #pragma once
 
+#include "../collections/art/LongAdaptiveRadixTreeMap.h"
 #include "../common/CoreSymbolSpecification.h"
 #include "../common/Order.h"
 #include "../common/config/LoggingConfiguration.h"
 #include "IOrderBook.h"
 #include "OrderBookEventsHelper.h"
-#include <ankerl/unordered_dense.h>
 #include <cstdint>
 #include <vector>
 
@@ -38,15 +38,34 @@ class ObjectsPool;
  */
 class OrderBookDirectImpl : public IOrderBook {
 public:
-  struct DirectOrder; // Forward declaration
-  struct Bucket;      // Forward declaration
+  struct DirectOrder {
+    int64_t orderId;
+    int64_t price;
+    int64_t size;
+    int64_t filled;
+    int64_t uid;
+    common::OrderAction action;
+    int64_t timestamp;
+
+    DirectOrder *next;
+    DirectOrder *prev;
+    struct Bucket *bucket;
+  };
+
+  struct Bucket {
+    int64_t price;
+    DirectOrder *firstOrder;
+    DirectOrder *lastOrder;
+    int64_t totalVolume;
+    int32_t numOrders;
+  };
 
   OrderBookDirectImpl(const common::CoreSymbolSpecification *symbolSpec,
                       ObjectsPool *objectsPool,
                       OrderBookEventsHelper *eventsHelper,
                       const common::config::LoggingConfiguration *loggingCfg);
 
-  // IOrderBook interface
+  // ... (rest of public interface remains same)
   const common::CoreSymbolSpecification *GetSymbolSpec() const override;
   void NewOrder(common::cmd::OrderCommand *cmd) override;
   common::cmd::CommandResultCode
@@ -70,15 +89,15 @@ public:
   void Reset();
 
 private:
-  // Price buckets (using ART tree - simplified to map for now)
-  ankerl::unordered_dense::map<int64_t, Bucket *> askPriceBuckets_;
-  ankerl::unordered_dense::map<int64_t, Bucket *> bidPriceBuckets_;
+  // Price buckets using ART tree
+  collections::art::LongAdaptiveRadixTreeMap<Bucket> askPriceBuckets_;
+  collections::art::LongAdaptiveRadixTreeMap<Bucket> bidPriceBuckets_;
 
   const common::CoreSymbolSpecification *symbolSpec_;
   ObjectsPool *objectsPool_;
 
-  // Order ID index
-  ankerl::unordered_dense::map<int64_t, DirectOrder *> orderIdIndex_;
+  // Order ID index using ART tree for consistency and performance
+  collections::art::LongAdaptiveRadixTreeMap<DirectOrder> orderIdIndex_;
 
   // Best orders
   DirectOrder *bestAskOrder_;

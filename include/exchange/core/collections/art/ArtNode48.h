@@ -128,9 +128,6 @@ void ArtNode48<V>::InitFromNode16(ArtNode16<V> *node16, int16_t subKey,
   indexes_[subKey] = node16->numChildren_;
   nodes_[node16->numChildren_] = newElement;
   freeBitMask_ = (1LL << numChildren_) - 1;
-  std::memset(node16->nodes_, 0, sizeof(node16->nodes_));
-  objectsPool_->Put(
-      ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_16, node16);
 }
 
 template <typename V>
@@ -149,10 +146,6 @@ void ArtNode48<V>::InitFromNode256(ArtNode256<V> *node256) {
     }
   }
   freeBitMask_ = (1LL << numChildren_) - 1;
-  std::memset(node256->nodes_, 0, sizeof(node256->nodes_));
-  objectsPool_->Put(
-      ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_256,
-      node256);
 }
 
 template <typename V>
@@ -207,6 +200,7 @@ IArtNode<V> *ArtNode48<V>::Put(int64_t key, int level, V *value) {
         ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_256,
         [this]() { return new ArtNode256<V>(objectsPool_); });
     node256->InitFromNode48(this, subKey, newElement);
+    RecycleNodeToPool<V>(this);
     return node256;
   }
 }
@@ -242,6 +236,7 @@ IArtNode<V> *ArtNode48<V>::Remove(int64_t key, int level) {
         ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_16,
         [this]() { return new ArtNode16<V>(objectsPool_); });
     node16->InitFromNode48(this);
+    RecycleNodeToPool<V>(this);
     return node16;
   }
   return this;
