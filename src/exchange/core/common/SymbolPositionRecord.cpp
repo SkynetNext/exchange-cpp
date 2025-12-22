@@ -15,7 +15,6 @@
  */
 
 #include <algorithm>
-#include <climits>
 #include <exchange/core/common/CoreSymbolSpecification.h>
 #include <exchange/core/common/PositionDirection.h>
 #include <exchange/core/common/SymbolPositionRecord.h>
