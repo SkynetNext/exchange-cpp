@@ -145,11 +145,13 @@ exchange-cpp/
 ### Build Steps
 
 ```bash
-# Clone with submodules (includes reference/exchange-core and third_party/disruptor-cpp)
+# Method 1: Clone with submodules (recommended)
 git clone --recursive https://github.com/your-org/exchange-cpp.git
 cd exchange-cpp
 
-# If you already cloned without --recursive, initialize submodules:
+# Method 2: If you already cloned without --recursive, initialize submodules:
+git clone https://github.com/your-org/exchange-cpp.git
+cd exchange-cpp
 git submodule update --init --recursive
 
 # Build

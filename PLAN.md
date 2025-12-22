@@ -29,14 +29,17 @@
 
 ### Java → C++ 技术栈映射
 
-| Java (exchange-core) | C++ (exchange-cpp) | 说明 |
-|---------------------|-------------------|------|
-| LMAX Disruptor | disruptor-cpp | 无锁环形缓冲区，线程间通信 |
-| Eclipse Collections | C++ STL + 自定义集合 | 高效集合数据结构 |
-| Real Logic Agrona | 自定义实现 | 内存布局、缓存行对齐 |
-| OpenHFT Chronicle | 待定 | 持久化、序列化 |
-| LZ4 Java | lz4 (C库) | 压缩算法 |
-| Adaptive Radix Trees | 自定义实现或第三方 | 高效索引结构 |
+| Java (exchange-core) | C++ (exchange-cpp) | 说明 | 优先级 |
+|---------------------|-------------------|------|:---:|
+| LMAX Disruptor | disruptor-cpp | 无锁环形缓冲区，线程间通信 | ✅ 已完成 |
+| Eclipse Collections (`IntObjectHashMap`, `IntLongHashMap`) | **自定义实现** | 原始类型哈希映射，避免装箱开销 | **P0** |
+| Adaptive Radix Tree (`LongAdaptiveRadixTreeMap`) | **自定义实现** | 价格索引，比 `std::map` 快 3-5 倍 | **P0** |
+| Objects Pool | **自定义实现** | 线程局部对象池，零分配 | **P0** |
+| Real Logic Agrona | 自定义实现 | 内存布局、缓存行对齐 | P1 |
+| OpenHFT Chronicle | 待定 | 持久化、序列化 | P2 |
+| LZ4 Java | lz4 (C库) | 压缩算法 | P2 |
+
+**注意**: 标记为 **P0** 的数据结构必须在实现核心业务逻辑之前完成，否则性能无法达到要求。
 
 ## 开发阶段
 
@@ -50,13 +53,43 @@
 - [ ] 设置测试框架 (Google Test) - 需要安装 GTest
 - [ ] 设置基准测试框架 (Google Benchmark) - 需要安装 Google Benchmark
 
-### Phase 2: 核心数据模型
+### Phase 2: 第三方依赖集成与数据模型
 
-- [ ] **Order 模型**: 订单数据结构 (限价单、市价单、止损单等)
-- [ ] **Trade 模型**: 成交记录
-- [ ] **OrderBook 模型**: 订单簿数据结构
+#### 2.1 第三方高性能库集成（无需自定义实现）
+
+经重新评估，**所有数据结构均可使用成熟开源库**，无需从零实现：
+
+- [ ] **ankerl::unordered_dense**: 高性能哈希表（Header-only）
+  - 替代：`IntObjectHashMap`, `IntLongHashMap`
+  - 性能：比 `std::unordered_map` 快 2-3 倍
+  - 集成：`git submodule add https://github.com/martinus/unordered_dense.git third_party/unordered_dense`
+
+- [ ] **自定义 ART 树** (`LongAdaptiveRadixTreeMap`): 价格索引
+  - 替代：exchange-core 的 `LongAdaptiveRadixTreeMap`（直接翻译 Java 实现）
+  - 性能：比 `absl::btree_map` 快 20-30%（固定 8 字节键，O(k) 常数时间）
+  - 实现：参考 `exchange.core2.collections.art.LongAdaptiveRadixTreeMap` 的 Java 实现
+  - 预计工作量：5-7 天
+
+- [ ] **Boost.Intrusive**: 侵入式链表
+  - 替代：订单链（同价格订单队列）
+  - 性能：零额外内存分配
+  - 集成：Header-only
+
+- [ ] **C++17 PMR** + **mimalloc**: 内存池与高性能分配器
+  - 替代：`ObjectsPool`
+  - 性能：减少 50%+ 内存分配开销
+  - 集成：`find_package(mimalloc REQUIRED)`
+
+**详细分析**: 参见 [docs/CUSTOM_DATA_STRUCTURES.md](docs/CUSTOM_DATA_STRUCTURES.md)
+
+#### 2.2 核心数据模型
+
+- [ ] **OrderCommand**: Disruptor 事件核心结构（缓存行对齐）
+- [ ] **Order 模型**: 订单数据结构 (限价单、市价单、IOC、FOK 等)
+- [ ] **Trade 模型**: 成交记录（MatcherTradeEvent）
+- [ ] **OrderBook 模型**: 订单簿（使用 `flat_map` + `Intrusive List`）
 - [ ] **Symbol 模型**: 交易对定义
-- [ ] **User 模型**: 用户账户信息
+- [ ] **UserProfile 模型**: 用户账户信息
 
 ### Phase 3: 订单簿管理
 

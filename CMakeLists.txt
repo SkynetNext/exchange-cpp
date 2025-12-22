@@ -23,6 +23,9 @@ endif()
 # Find dependencies
 find_package(Threads REQUIRED)
 
+# mimalloc (high-performance global allocator)
+find_package(mimalloc REQUIRED)
+
 # Build options
 option(BUILD_TESTING "Build tests" ON)
 option(BUILD_BENCHMARKS "Build benchmarks" ON)
@@ -39,6 +42,7 @@ if(BUILD_TESTING)
 endif()
 
 # Include third-party dependencies
+
 # disruptor-cpp: High-performance inter-thread communication
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/disruptor-cpp/CMakeLists.txt)
     add_subdirectory(third_party/disruptor-cpp)
@@ -47,11 +51,20 @@ else()
     message(FATAL_ERROR "disruptor-cpp submodule not found. Please run: git submodule update --init --recursive")
 endif()
 
+# ankerl::unordered_dense: Fastest hash map (header-only)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/unordered_dense/include/ankerl/unordered_dense.h)
+    message(STATUS "Using ankerl::unordered_dense from submodule")
+else()
+    message(WARNING "ankerl::unordered_dense not found. Please run: git submodule add https://github.com/martinus/unordered_dense.git third_party/unordered_dense")
+endif()
+
 # Include directories
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     # Simplified structure: exchange.core.* (removed core2 version suffix)
     ${CMAKE_CURRENT_SOURCE_DIR}/include/exchange/core
+    # Third-party header-only libraries
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/unordered_dense/include
 )
 
 # Source directories (will be populated as development progresses)
@@ -70,6 +83,8 @@ target_link_libraries(exchange-cpp
     PUBLIC
         disruptor-cpp
         Threads::Threads
+        mimalloc             # High-performance global allocator
+        # ART tree is custom implementation, no external dependency
 )
 
 target_compile_features(exchange-cpp PUBLIC cxx_std_17)
