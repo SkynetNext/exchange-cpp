@@ -28,6 +28,9 @@
 using namespace exchange::core::collections::art;
 using namespace exchange::core::collections::objpool;
 
+// Default iterations for benchmarks
+constexpr int kNumIterations = 10;
+
 // Helper class to collect key-value pairs for int64_t
 class TestConsumerInt64 : public LongObjConsumer<int64_t> {
 public:
@@ -131,16 +134,19 @@ void ExecuteInRandomOrder(std::mt19937 &rng, std::function<void()> a,
 }
 
 // Helper functions
-static float NanoToMs(int64_t nano) {
-  return static_cast<float>(nano) / 1000000.0f;
+static double NanoToMs(int64_t nano) {
+  return static_cast<double>(nano) / 1000000.0;
 }
 
-static int PercentImprovement(int64_t oldTime, int64_t newTime) {
+static double PercentImprovement(int64_t oldTime, int64_t newTime) {
   if (newTime == 0)
-    return 0;
-  return static_cast<int>(
-      100.0f *
-      (static_cast<float>(oldTime) / static_cast<float>(newTime) - 1.0f));
+    return 0.0;
+  // Calculate: 100 * (oldTime / newTime - 1)
+  // This gives the percentage improvement (positive = new is faster)
+  // Example: oldTime=680M, newTime=123M -> 100 * (680/123 - 1) = 100 * 4.51 =
+  // 451%
+  double ratio = static_cast<double>(oldTime) / static_cast<double>(newTime);
+  return 100.0 * (ratio - 1.0);
 }
 
 // Benchmark: PUT
@@ -180,12 +186,14 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Put)(benchmark::State &state) {
         benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["bst_ns"] =
         benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
-    state.counters["improvement"] =
-        benchmark::Counter(PercentImprovement(bstTime, artTime),
-                           benchmark::Counter::kAvgIterations);
+    // improvement: kAvgIterations will divide by kNumIterations, so multiply by
+    // it to compensate
+    state.counters["improvement"] = benchmark::Counter(
+        PercentImprovement(bstTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
   }
 }
-BENCHMARK_REGISTER_F(ArtTreeBenchmark, Put)->Iterations(10);
+BENCHMARK_REGISTER_F(ArtTreeBenchmark, Put)->Iterations(kNumIterations);
 
 // Benchmark: GET_HIT
 BENCHMARK_DEFINE_F(ArtTreeBenchmark, GetHit)(benchmark::State &state) {
@@ -232,16 +240,18 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, GetHit)(benchmark::State &state) {
         benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["bst_ns"] =
         benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
-    state.counters["improvement"] =
-        benchmark::Counter(PercentImprovement(bstTime, artTime),
-                           benchmark::Counter::kAvgIterations);
+    // improvement: kAvgIterations will divide by kNumIterations, so multiply by
+    // it to compensate
+    state.counters["improvement"] = benchmark::Counter(
+        PercentImprovement(bstTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
     state.counters["art_sum"] =
         benchmark::Counter(artSum, benchmark::Counter::kAvgIterations);
     state.counters["bst_sum"] =
         benchmark::Counter(bstSum, benchmark::Counter::kAvgIterations);
   }
 }
-BENCHMARK_REGISTER_F(ArtTreeBenchmark, GetHit)->Iterations(10);
+BENCHMARK_REGISTER_F(ArtTreeBenchmark, GetHit)->Iterations(kNumIterations);
 
 // Benchmark: REMOVE
 BENCHMARK_DEFINE_F(ArtTreeBenchmark, Remove)(benchmark::State &state) {
@@ -284,12 +294,14 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Remove)(benchmark::State &state) {
         benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["bst_ns"] =
         benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
-    state.counters["improvement"] =
-        benchmark::Counter(PercentImprovement(bstTime, artTime),
-                           benchmark::Counter::kAvgIterations);
+    // improvement: kAvgIterations will divide by kNumIterations, so multiply by
+    // it to compensate
+    state.counters["improvement"] = benchmark::Counter(
+        PercentImprovement(bstTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
   }
 }
-BENCHMARK_REGISTER_F(ArtTreeBenchmark, Remove)->Iterations(10);
+BENCHMARK_REGISTER_F(ArtTreeBenchmark, Remove)->Iterations(kNumIterations);
 
 // Benchmark: FOREACH
 BENCHMARK_DEFINE_F(ArtTreeBenchmark, ForEach)(benchmark::State &state) {
@@ -334,16 +346,18 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, ForEach)(benchmark::State &state) {
         benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["bst_ns"] =
         benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
-    state.counters["improvement"] =
-        benchmark::Counter(PercentImprovement(bstTime, artTime),
-                           benchmark::Counter::kAvgIterations);
+    // improvement: kAvgIterations will divide by kNumIterations, so multiply by
+    // it to compensate
+    state.counters["improvement"] = benchmark::Counter(
+        PercentImprovement(bstTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
     state.counters["art_count"] = benchmark::Counter(
         artConsumer.keys.size(), benchmark::Counter::kAvgIterations);
     state.counters["bst_count"] =
         benchmark::Counter(bstKeys.size(), benchmark::Counter::kAvgIterations);
   }
 }
-BENCHMARK_REGISTER_F(ArtTreeBenchmark, ForEach)->Iterations(10);
+BENCHMARK_REGISTER_F(ArtTreeBenchmark, ForEach)->Iterations(kNumIterations);
 
 // Benchmark: FOREACH_DESC
 BENCHMARK_DEFINE_F(ArtTreeBenchmark, ForEachDesc)(benchmark::State &state) {
@@ -387,12 +401,14 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, ForEachDesc)(benchmark::State &state) {
         benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["bst_ns"] =
         benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
-    state.counters["improvement"] =
-        benchmark::Counter(PercentImprovement(bstTime, artTime),
-                           benchmark::Counter::kAvgIterations);
+    // improvement: kAvgIterations will divide by kNumIterations, so multiply by
+    // it to compensate
+    state.counters["improvement"] = benchmark::Counter(
+        PercentImprovement(bstTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
   }
 }
-BENCHMARK_REGISTER_F(ArtTreeBenchmark, ForEachDesc)->Iterations(10);
+BENCHMARK_REGISTER_F(ArtTreeBenchmark, ForEachDesc)->Iterations(kNumIterations);
 
 // Benchmark: HIGHER
 BENCHMARK_DEFINE_F(ArtTreeBenchmark, Higher)(benchmark::State &state) {
@@ -439,16 +455,18 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Higher)(benchmark::State &state) {
         benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["bst_ns"] =
         benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
-    state.counters["improvement"] =
-        benchmark::Counter(PercentImprovement(bstTime, artTime),
-                           benchmark::Counter::kAvgIterations);
+    // improvement: kAvgIterations will divide by kNumIterations, so multiply by
+    // it to compensate
+    state.counters["improvement"] = benchmark::Counter(
+        PercentImprovement(bstTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
     state.counters["art_sum"] =
         benchmark::Counter(artSum, benchmark::Counter::kAvgIterations);
     state.counters["bst_sum"] =
         benchmark::Counter(bstSum, benchmark::Counter::kAvgIterations);
   }
 }
-BENCHMARK_REGISTER_F(ArtTreeBenchmark, Higher)->Iterations(10);
+BENCHMARK_REGISTER_F(ArtTreeBenchmark, Higher)->Iterations(kNumIterations);
 
 // Benchmark: LOWER
 BENCHMARK_DEFINE_F(ArtTreeBenchmark, Lower)(benchmark::State &state) {
@@ -497,15 +515,17 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Lower)(benchmark::State &state) {
         benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["bst_ns"] =
         benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
-    state.counters["improvement"] =
-        benchmark::Counter(PercentImprovement(bstTime, artTime),
-                           benchmark::Counter::kAvgIterations);
+    // improvement: kAvgIterations will divide by kNumIterations, so multiply by
+    // it to compensate
+    state.counters["improvement"] = benchmark::Counter(
+        PercentImprovement(bstTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
     state.counters["art_sum"] =
         benchmark::Counter(artSum, benchmark::Counter::kAvgIterations);
     state.counters["bst_sum"] =
         benchmark::Counter(bstSum, benchmark::Counter::kAvgIterations);
   }
 }
-BENCHMARK_REGISTER_F(ArtTreeBenchmark, Lower)->Iterations(10);
+BENCHMARK_REGISTER_F(ArtTreeBenchmark, Lower)->Iterations(kNumIterations);
 
 BENCHMARK_MAIN();
