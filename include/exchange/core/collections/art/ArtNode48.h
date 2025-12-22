@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <list>
 #include <string>
+#include <vector>
 
 namespace exchange {
 namespace core {
@@ -50,7 +51,8 @@ template <typename V> class ArtNode48 : public IArtNode<V> {
 public:
   static constexpr int NODE16_SWITCH_THRESHOLD = 12;
 
-  explicit ArtNode48(objpool::ObjectsPool *objectsPool);
+  explicit ArtNode48(
+      ::exchange::core::collections::objpool::ObjectsPool *objectsPool);
 
   // IArtNode interface
   V *GetValue(int64_t key, int level) override;
@@ -64,7 +66,8 @@ public:
   void ValidateInternalState(int level) override;
   std::string PrintDiagram(const std::string &prefix, int level) override;
   std::list<std::pair<int64_t, V *>> Entries() override;
-  objpool::ObjectsPool *GetObjectsPool() override;
+  ::exchange::core::collections::objpool::ObjectsPool *
+  GetObjectsPool() override;
 
   /**
    * Initialize from Node16 (upsize 16->48)
@@ -76,19 +79,22 @@ public:
    */
   void InitFromNode256(ArtNode256<V> *node256);
 
+  template <typename U> friend class ArtNode16;
+  template <typename U> friend class ArtNode256;
+
 private:
   // Index mapping: key byte -> child index (0-47), -1 if not present
   int8_t indexes_[256];
   void *nodes_[48]; // IArtNode<V>* or V* (if nodeLevel == 0)
 
-  objpool::ObjectsPool *objectsPool_;
+  ::exchange::core::collections::objpool::ObjectsPool *objectsPool_;
 
   int64_t nodeKey_;
   int nodeLevel_;
   uint8_t numChildren_;
   int64_t freeBitMask_; // Bit mask for free positions
 
-  int16_t *CreateKeysArray();
+  std::vector<int16_t> CreateKeysArray();
 };
 
 } // namespace art

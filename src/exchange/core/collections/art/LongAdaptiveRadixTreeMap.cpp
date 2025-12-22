@@ -15,10 +15,14 @@
  */
 
 #include <algorithm>
-#include <climits>
+#include <exchange/core/collections/art/ArtNode16.h>
+#include <exchange/core/collections/art/ArtNode256.h>
 #include <exchange/core/collections/art/ArtNode4.h>
+#include <exchange/core/collections/art/ArtNode48.h>
 #include <exchange/core/collections/art/LongAdaptiveRadixTreeMap.h>
 #include <exchange/core/collections/objpool/ObjectsPool.h>
+#include <iomanip>
+#include <sstream>
 #include <stdexcept>
 
 namespace exchange {
@@ -75,15 +79,16 @@ template <typename V> V *LongAdaptiveRadixTreeMap<V>::Get(int64_t key) const {
 template <typename V>
 void LongAdaptiveRadixTreeMap<V>::Put(int64_t key, V *value) {
   if (root_ == nullptr) {
-    auto *node = objectsPool_->Get(
+    auto *node = objectsPool_->Get<ArtNode4<V>>(
         ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4,
         [this]() { return new ArtNode4<V>(objectsPool_); });
     node->InitFirstKey(key, value);
     root_ = node;
   } else {
+    IArtNode<V> *oldRoot = root_;
     IArtNode<V> *upSizedNode = root_->Put(key, INITIAL_LEVEL, value);
     if (upSizedNode != nullptr) {
-      // TODO: Put old node into pool
+      RecycleNodeToPool(oldRoot);
       root_ = upSizedNode;
     }
   }
@@ -92,7 +97,6 @@ void LongAdaptiveRadixTreeMap<V>::Put(int64_t key, V *value) {
 template <typename V>
 V *LongAdaptiveRadixTreeMap<V>::GetOrInsert(int64_t key,
                                             std::function<V *()> supplier) {
-  // TODO: Implement
   V *value = Get(key);
   if (value == nullptr) {
     value = supplier();
@@ -103,10 +107,11 @@ V *LongAdaptiveRadixTreeMap<V>::GetOrInsert(int64_t key,
 
 template <typename V> void LongAdaptiveRadixTreeMap<V>::Remove(int64_t key) {
   if (root_ != nullptr) {
+    IArtNode<V> *oldRoot = root_;
     IArtNode<V> *downSizeNode = root_->Remove(key, INITIAL_LEVEL);
     // Ignore null because can not remove root
     if (downSizeNode != root_) {
-      // TODO: Put old node into pool
+      RecycleNodeToPool(oldRoot);
       root_ = downSizeNode;
     }
   }
@@ -217,17 +222,113 @@ LongAdaptiveRadixTreeMap<V>::BranchIfRequired(int64_t key, V *value,
 
   ::exchange::core::collections::objpool::ObjectsPool *objectsPool =
       caller->GetObjectsPool();
-  auto *newSubNode = objectsPool->Get(
+  auto *newSubNode = objectsPool->Get<ArtNode4<V>>(
       ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4,
       [objectsPool]() { return new ArtNode4<V>(objectsPool); });
   newSubNode->InitFirstKey(key, value);
 
-  auto *newNode = objectsPool->Get(
+  auto *newNode = objectsPool->Get<ArtNode4<V>>(
       ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4,
       [objectsPool]() { return new ArtNode4<V>(objectsPool); });
   newNode->InitTwoKeys(nodeKey, caller, key, newSubNode, newLevel);
 
   return newNode;
+}
+
+template <typename V>
+std::string LongAdaptiveRadixTreeMap<V>::PrintDiagram(
+    const std::string &prefix, int level, int nodeLevel, int64_t nodeKey,
+    int numChildren, std::function<int16_t(int)> getSubKey,
+    std::function<void *(int)> getNode) {
+  std::string baseKeyPrefix;
+  std::string baseKeyPrefix1;
+  const int lvlDiff = level - nodeLevel;
+
+  if (lvlDiff != 0) {
+    int chars = lvlDiff >> 2;
+    int64_t mask = ((1LL << lvlDiff) - 1LL);
+    int64_t keyPart = (nodeKey >> (nodeLevel + 8)) & mask;
+
+    std::ostringstream oss;
+    // Use string literal for Unicode character (U+2500: BOX DRAWINGS LIGHT
+    // HORIZONTAL)
+    for (int j = 0; j < chars - 2; j++) {
+      oss << "─";
+    }
+    oss << "[";
+    oss << std::hex << std::uppercase << std::setfill('0') << std::setw(chars)
+        << keyPart;
+    oss << "]";
+    baseKeyPrefix = oss.str();
+    baseKeyPrefix1 = std::string(chars * 2, ' ');
+  } else {
+    baseKeyPrefix = "";
+    baseKeyPrefix1 = "";
+  }
+
+  std::ostringstream sb;
+  for (int i = 0; i < numChildren; i++) {
+    void *node = getNode(i);
+    int16_t subKey = getSubKey(i);
+
+    std::ostringstream keyStream;
+    keyStream << baseKeyPrefix << std::hex << std::uppercase
+              << std::setfill('0') << std::setw(2) << subKey;
+    std::string key = keyStream.str();
+
+    std::string x;
+    if (i == 0) {
+      x = (numChildren == 1 ? "──" : "┬─");
+    } else {
+      std::string prefixPart = (i + 1 == numChildren ? "└─" : "├─");
+      x = prefix + prefixPart;
+    }
+
+    if (nodeLevel == 0) {
+      sb << x << key << " = " << node;
+    } else {
+      std::string nextPrefix =
+          prefix + (i + 1 == numChildren ? "    " : "│   ") + baseKeyPrefix1;
+      IArtNode<V> *artNode = static_cast<IArtNode<V> *>(node);
+      sb << x << key << artNode->PrintDiagram(nextPrefix, nodeLevel - 8);
+    }
+    if (i < numChildren - 1) {
+      sb << "\n";
+    } else if (nodeLevel == 0) {
+      sb << "\n" << prefix;
+    }
+  }
+  return sb.str();
+}
+
+template <typename V>
+void LongAdaptiveRadixTreeMap<V>::RecycleNodeToPool(IArtNode<V> *oldNode) {
+  if (oldNode == nullptr) {
+    return;
+  }
+
+  ::exchange::core::collections::objpool::ObjectsPool *pool =
+      oldNode->GetObjectsPool();
+  if (pool == nullptr) {
+    return;
+  }
+
+  // Try to identify node type using dynamic_cast
+  // Note: This requires RTTI, but it's acceptable for node recycling
+  if (dynamic_cast<ArtNode4<V> *>(oldNode) != nullptr) {
+    pool->Put(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4,
+              oldNode);
+  } else if (dynamic_cast<ArtNode16<V> *>(oldNode) != nullptr) {
+    pool->Put(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_16,
+              oldNode);
+  } else if (dynamic_cast<ArtNode48<V> *>(oldNode) != nullptr) {
+    pool->Put(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_48,
+              oldNode);
+  } else if (dynamic_cast<ArtNode256<V> *>(oldNode) != nullptr) {
+    pool->Put(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_256,
+              oldNode);
+  }
+  // If type is unknown, just delete it (shouldn't happen in practice)
 }
 
 // Explicit template instantiations for common types

@@ -45,7 +45,8 @@ template <typename V> class ArtNode16 : public IArtNode<V> {
 public:
   static constexpr int NODE4_SWITCH_THRESHOLD = 3;
 
-  explicit ArtNode16(objpool::ObjectsPool *objectsPool);
+  explicit ArtNode16(
+      ::exchange::core::collections::objpool::ObjectsPool *objectsPool);
 
   // IArtNode interface
   V *GetValue(int64_t key, int level) override;
@@ -59,7 +60,8 @@ public:
   void ValidateInternalState(int level) override;
   std::string PrintDiagram(const std::string &prefix, int level) override;
   std::list<std::pair<int64_t, V *>> Entries() override;
-  objpool::ObjectsPool *GetObjectsPool() override;
+  ::exchange::core::collections::objpool::ObjectsPool *
+  GetObjectsPool() override;
 
   // Friend declarations for access to private members
   template <typename U> friend class ArtNode4;
@@ -80,7 +82,7 @@ private:
   int16_t keys_[16];
   void *nodes_[16]; // IArtNode<V>* or V* (if nodeLevel == 0)
 
-  objpool::ObjectsPool *objectsPool_;
+  ::exchange::core::collections::objpool::ObjectsPool *objectsPool_;
 
   int64_t nodeKey_;
   int nodeLevel_;

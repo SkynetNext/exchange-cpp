@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <list>
 #include <string>
+#include <vector>
 
 namespace exchange {
 namespace core {
@@ -47,7 +48,8 @@ template <typename V> class ArtNode256 : public IArtNode<V> {
 public:
   static constexpr int NODE48_SWITCH_THRESHOLD = 37;
 
-  explicit ArtNode256(objpool::ObjectsPool *objectsPool);
+  explicit ArtNode256(
+      ::exchange::core::collections::objpool::ObjectsPool *objectsPool);
 
   // IArtNode interface
   V *GetValue(int64_t key, int level) override;
@@ -61,24 +63,27 @@ public:
   void ValidateInternalState(int level) override;
   std::string PrintDiagram(const std::string &prefix, int level) override;
   std::list<std::pair<int64_t, V *>> Entries() override;
-  objpool::ObjectsPool *GetObjectsPool() override;
+  ::exchange::core::collections::objpool::ObjectsPool *
+  GetObjectsPool() override;
 
   /**
    * Initialize from Node48 (upsize 48->256)
    */
   void InitFromNode48(ArtNode48<V> *node48, int16_t subKey, void *newElement);
 
+  template <typename U> friend class ArtNode48;
+
 private:
   // Direct addressing - 256 pointers
   void *nodes_[256]; // IArtNode<V>* or V* (if nodeLevel == 0)
 
-  objpool::ObjectsPool *objectsPool_;
+  ::exchange::core::collections::objpool::ObjectsPool *objectsPool_;
 
   int64_t nodeKey_;
   int nodeLevel_;
   int16_t numChildren_;
 
-  int16_t *CreateKeysArray();
+  std::vector<int16_t> CreateKeysArray();
 };
 
 } // namespace art

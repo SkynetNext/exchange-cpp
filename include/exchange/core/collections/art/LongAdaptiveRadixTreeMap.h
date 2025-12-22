@@ -60,7 +60,8 @@ public:
    * Constructor with object pool
    * @param objectsPool Object pool for node allocation
    */
-  explicit LongAdaptiveRadixTreeMap(objpool::ObjectsPool *objectsPool);
+  explicit LongAdaptiveRadixTreeMap(
+      ::exchange::core::collections::objpool::ObjectsPool *objectsPool);
 
   /**
    * Default constructor (creates default test pool)
@@ -191,12 +192,22 @@ public:
   static IArtNode<V> *BranchIfRequired(int64_t key, V *value, int64_t nodeKey,
                                        int nodeLevel, IArtNode<V> *caller);
 
+  // Helper method for printing diagram (used by all node types)
+  static std::string PrintDiagram(const std::string &prefix, int level,
+                                  int nodeLevel, int64_t nodeKey,
+                                  int numChildren,
+                                  std::function<int16_t(int)> getSubKey,
+                                  std::function<void *(int)> getNode);
+
+  // Helper method to recycle old node to pool
+  static void RecycleNodeToPool(IArtNode<V> *oldNode);
+
 private:
   // Root node
   IArtNode<V> *root_;
 
   // Object pool
-  objpool::ObjectsPool *objectsPool_;
+  ::exchange::core::collections::objpool::ObjectsPool *objectsPool_;
 };
 
 } // namespace art

@@ -16,9 +16,7 @@
 
 #pragma once
 
-#include <functional>
-#include <map>
-#include <memory>
+#include <unordered_map>
 #include <vector>
 
 namespace exchange {
@@ -51,7 +49,7 @@ public:
    * Constructor with size configuration
    * @param sizesConfig Map of pool type -> size
    */
-  explicit ObjectsPool(const std::map<int, int> &sizesConfig);
+  explicit ObjectsPool(const std::unordered_map<int, int> &sizesConfig);
 
   /**
    * Destructor
@@ -70,7 +68,7 @@ public:
    * @param supplier Function to create new object if pool is empty
    * @return Object from pool or newly created
    */
-  template <typename T> T *Get(int type, std::function<T *()> supplier) {
+  template <typename T, typename Supplier> T *Get(int type, Supplier supplier) {
     T *obj = static_cast<T *>(Pop(type));
     if (obj == nullptr) {
       return supplier();
@@ -92,14 +90,15 @@ private:
     ~ArrayStack();
 
     void *Pop();
-    void Push(void *element);
+    void Add(void *element);
 
   private:
     int count_;
-    std::vector<void *> objects_;
+    void **objects_;
+    int capacity_;
   };
 
-  std::vector<std::unique_ptr<ArrayStack>> pools_;
+  std::vector<ArrayStack *> pools_;
 
   void *Pop(int type);
 };

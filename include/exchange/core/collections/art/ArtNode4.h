@@ -42,7 +42,8 @@ template <typename V> class ArtNode16;
  */
 template <typename V> class ArtNode4 : public IArtNode<V> {
 public:
-  explicit ArtNode4(objpool::ObjectsPool *objectsPool);
+  explicit ArtNode4(
+      ::exchange::core::collections::objpool::ObjectsPool *objectsPool);
 
   // IArtNode interface
   V *GetValue(int64_t key, int level) override;
@@ -56,7 +57,8 @@ public:
   void ValidateInternalState(int level) override;
   std::string PrintDiagram(const std::string &prefix, int level) override;
   std::list<std::pair<int64_t, V *>> Entries() override;
-  objpool::ObjectsPool *GetObjectsPool() override;
+  ::exchange::core::collections::objpool::ObjectsPool *
+  GetObjectsPool() override;
 
   /**
    * Initialize with first key (terminal node, nodeLevel=0)
@@ -82,7 +84,7 @@ private:
   int16_t keys_[4];
   void *nodes_[4]; // IArtNode<V>* or V* (if nodeLevel == 0)
 
-  objpool::ObjectsPool *objectsPool_;
+  ::exchange::core::collections::objpool::ObjectsPool *objectsPool_;
 
   int64_t nodeKey_;
   int nodeLevel_;
