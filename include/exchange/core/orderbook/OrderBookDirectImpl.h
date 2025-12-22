@@ -29,16 +29,24 @@ namespace exchange {
 namespace core {
 namespace orderbook {
 
-// Forward declarations
-class ObjectsPool;
-
 /**
  * OrderBookDirectImpl - direct order book implementation using ART tree
  * High-performance implementation with custom data structures
  */
 class OrderBookDirectImpl : public IOrderBook {
 public:
-  struct DirectOrder {
+  // Forward declaration
+  struct DirectOrder;
+
+  struct Bucket {
+    int64_t price;
+    OrderBookDirectImpl::DirectOrder
+        *lastOrder; // tail order (worst priority in this price level)
+    int64_t totalVolume;
+    int32_t numOrders;
+  };
+
+  struct DirectOrder : public common::IOrder {
     int64_t orderId;
     int64_t price;
     int64_t size;
@@ -49,21 +57,24 @@ public:
 
     DirectOrder *next;
     DirectOrder *prev;
-    struct Bucket *bucket;
+    Bucket *bucket;
+
+    // IOrder interface
+    int64_t GetOrderId() const override { return orderId; }
+    int64_t GetPrice() const override { return price; }
+    int64_t GetSize() const override { return size; }
+    int64_t GetFilled() const override { return filled; }
+    int64_t GetReserveBidPrice() const override { return 0; }
+    common::OrderAction GetAction() const override { return action; }
+    int64_t GetUid() const override { return uid; }
+    int64_t GetTimestamp() const override { return timestamp; }
   };
 
-  struct Bucket {
-    int64_t price;
-    DirectOrder *firstOrder;
-    DirectOrder *lastOrder;
-    int64_t totalVolume;
-    int32_t numOrders;
-  };
-
-  OrderBookDirectImpl(const common::CoreSymbolSpecification *symbolSpec,
-                      ObjectsPool *objectsPool,
-                      OrderBookEventsHelper *eventsHelper,
-                      const common::config::LoggingConfiguration *loggingCfg);
+  OrderBookDirectImpl(
+      const common::CoreSymbolSpecification *symbolSpec,
+      ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
+      OrderBookEventsHelper *eventsHelper,
+      const common::config::LoggingConfiguration *loggingCfg);
 
   // ... (rest of public interface remains same)
   const common::CoreSymbolSpecification *GetSymbolSpec() const override;
@@ -90,14 +101,17 @@ public:
 
 private:
   // Price buckets using ART tree
-  collections::art::LongAdaptiveRadixTreeMap<Bucket> askPriceBuckets_;
-  collections::art::LongAdaptiveRadixTreeMap<Bucket> bidPriceBuckets_;
+  ::exchange::core::collections::art::LongAdaptiveRadixTreeMap<Bucket>
+      askPriceBuckets_;
+  ::exchange::core::collections::art::LongAdaptiveRadixTreeMap<Bucket>
+      bidPriceBuckets_;
 
   const common::CoreSymbolSpecification *symbolSpec_;
-  ObjectsPool *objectsPool_;
+  ::exchange::core::collections::objpool::ObjectsPool *objectsPool_;
 
   // Order ID index using ART tree for consistency and performance
-  collections::art::LongAdaptiveRadixTreeMap<DirectOrder> orderIdIndex_;
+  ::exchange::core::collections::art::LongAdaptiveRadixTreeMap<DirectOrder>
+      orderIdIndex_;
 
   // Best orders
   DirectOrder *bestAskOrder_;
@@ -109,7 +123,10 @@ private:
   // Internal methods
   DirectOrder *FindOrder(int64_t orderId);
   Bucket *GetOrCreateBucket(int64_t price, bool isAsk);
-  void RemoveOrder(DirectOrder *order);
+  Bucket *RemoveOrder(DirectOrder *order);
+  void insertOrder(DirectOrder *order, Bucket *freeBucket);
+  int64_t tryMatchInstantly(common::IOrder *takerOrder,
+                            common::cmd::OrderCommand *triggerCmd);
 };
 
 } // namespace orderbook

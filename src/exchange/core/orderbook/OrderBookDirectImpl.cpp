@@ -17,6 +17,10 @@
 #include "exchange/core/orderbook/OrderBookDirectImpl.h"
 #include "exchange/core/collections/objpool/ObjectsPool.h"
 #include "exchange/core/common/L2MarketData.h"
+#include "exchange/core/common/MatcherTradeEvent.h"
+#include "exchange/core/common/OrderAction.h"
+#include "exchange/core/common/OrderType.h"
+#include "exchange/core/common/cmd/OrderCommand.h"
 #include <algorithm>
 
 namespace exchange {
@@ -33,11 +37,11 @@ OrderBookDirectImpl::OrderBookDirectImpl(
     const common::config::LoggingConfiguration *loggingCfg)
     : askPriceBuckets_(objectsPool), bidPriceBuckets_(objectsPool),
       symbolSpec_(symbolSpec), objectsPool_(objectsPool),
-      orderIdIndex_(objectsPool), bestAskOrder_(nullptr), bestBidOrder_(nullptr),
-      eventsHelper_(eventsHelper) {
-  logDebug_ = loggingCfg->loggingLevels.count(
-      common::config::LoggingConfiguration::LoggingLevel::
-          LOGGING_MATCHING_DEBUG);
+      orderIdIndex_(objectsPool), bestAskOrder_(nullptr),
+      bestBidOrder_(nullptr), eventsHelper_(eventsHelper) {
+  logDebug_ =
+      loggingCfg->loggingLevels.count(common::config::LoggingConfiguration::
+                                          LoggingLevel::LOGGING_MATCHING_DEBUG);
 }
 
 const common::CoreSymbolSpecification *
@@ -47,17 +51,67 @@ OrderBookDirectImpl::GetSymbolSpec() const {
 
 void OrderBookDirectImpl::NewOrder(OrderCommand *cmd) {
   switch (cmd->orderType) {
-  case OrderType::GTC:
-    // TODO: implement newOrderPlaceGtc
+  case OrderType::GTC: {
+    const int64_t size = cmd->size;
+    // Create temporary DirectOrder for matching
+    DirectOrder tempOrder;
+    tempOrder.orderId = cmd->orderId;
+    tempOrder.price = cmd->price;
+    tempOrder.size = size;
+    tempOrder.filled = 0;
+    tempOrder.action = cmd->action;
+    tempOrder.uid = cmd->uid;
+    tempOrder.timestamp = cmd->timestamp;
+    tempOrder.next = nullptr;
+    tempOrder.prev = nullptr;
+    tempOrder.bucket = nullptr;
+    const int64_t filledSize = this->tryMatchInstantly(&tempOrder, cmd);
+    if (filledSize == size)
+      return;
+
+    const int64_t orderId = cmd->orderId;
+    if (orderIdIndex_.Get(orderId) != nullptr) {
+      eventsHelper_->AttachRejectEvent(cmd, size - filledSize);
+      return;
+    }
+
+    auto *orderRecord = objectsPool_->Get<DirectOrder>(
+        ::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER,
+        []() { return new DirectOrder(); });
+
+    orderRecord->orderId = orderId;
+    orderRecord->price = cmd->price;
+    orderRecord->size = size;
+    orderRecord->action = cmd->action;
+    orderRecord->uid = cmd->uid;
+    orderRecord->timestamp = cmd->timestamp;
+    orderRecord->filled = filledSize;
+
+    orderIdIndex_.Put(orderId, orderRecord);
+    this->insertOrder(orderRecord, nullptr);
     break;
-  case OrderType::IOC:
-    // TODO: implement newOrderMatchIoc
+  }
+  case OrderType::IOC: {
+    // Create temporary DirectOrder for matching
+    DirectOrder tempOrder;
+    tempOrder.orderId = cmd->orderId;
+    tempOrder.price = cmd->price;
+    tempOrder.size = cmd->size;
+    tempOrder.filled = 0;
+    tempOrder.action = cmd->action;
+    tempOrder.uid = cmd->uid;
+    tempOrder.timestamp = cmd->timestamp;
+    tempOrder.next = nullptr;
+    tempOrder.prev = nullptr;
+    tempOrder.bucket = nullptr;
+    const int64_t filledSize = this->tryMatchInstantly(&tempOrder, cmd);
+    const int64_t rejectedSize = cmd->size - filledSize;
+    if (rejectedSize != 0) {
+      eventsHelper_->AttachRejectEvent(cmd, rejectedSize);
+    }
     break;
-  case OrderType::FOK_BUDGET:
-    // TODO: implement newOrderMatchFokBudget
-    break;
+  }
   default:
-    // log.warn("Unsupported order type: {}", cmd);
     eventsHelper_->AttachRejectEvent(cmd, cmd->size);
   }
 }
@@ -68,72 +122,313 @@ CommandResultCode OrderBookDirectImpl::CancelOrder(OrderCommand *cmd) {
     return CommandResultCode::MATCHING_UNKNOWN_ORDER_ID;
   }
   orderIdIndex_.Remove(cmd->orderId);
-  // objectsPool_->Put(ObjectsPool::DIRECT_ORDER, order);
 
-  // TODO: implement removeOrder logic
-  // Bucket *freeBucket = RemoveOrder(order);
-  // if (freeBucket != nullptr) {
-  //     objectsPool_->Put(ObjectsPool::DIRECT_BUCKET, freeBucket);
-  // }
+  Bucket *freeBucket = this->RemoveOrder(order);
+  if (freeBucket != nullptr) {
+    objectsPool_->Put(
+        ::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
+        freeBucket);
+  }
 
   cmd->action = order->action;
-  cmd->matcherEvent = eventsHelper_->SendReduceEvent(
-      order, order->size - order->filled, true);
+  cmd->matcherEvent =
+      eventsHelper_->SendReduceEvent(order, order->size - order->filled, true);
 
+  objectsPool_->Put(
+      ::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER, order);
   return CommandResultCode::SUCCESS;
 }
 
 CommandResultCode OrderBookDirectImpl::MoveOrder(OrderCommand *cmd) {
-  // TODO
+  DirectOrder *orderToMove = orderIdIndex_.Get(cmd->orderId);
+  if (orderToMove == nullptr || orderToMove->uid != cmd->uid) {
+    return CommandResultCode::MATCHING_UNKNOWN_ORDER_ID;
+  }
+
+  Bucket *freeBucket = this->RemoveOrder(orderToMove);
+  orderToMove->price = cmd->price;
+  cmd->action = orderToMove->action;
+
+  const int64_t filled =
+      this->tryMatchInstantly(static_cast<common::IOrder *>(orderToMove), cmd);
+  if (filled == orderToMove->size) {
+    orderIdIndex_.Remove(cmd->orderId);
+    objectsPool_->Put(
+        ::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER,
+        orderToMove);
+    if (freeBucket)
+      objectsPool_->Put(
+          ::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
+          freeBucket);
+    return CommandResultCode::SUCCESS;
+  }
+
+  orderToMove->filled = filled;
+  this->insertOrder(orderToMove, freeBucket);
   return CommandResultCode::SUCCESS;
 }
 
 CommandResultCode OrderBookDirectImpl::ReduceOrder(OrderCommand *cmd) {
-  // TODO
+  const int64_t orderId = cmd->orderId;
+  const int64_t requestedReduceSize = cmd->size;
+  if (requestedReduceSize <= 0) {
+    return CommandResultCode::MATCHING_REDUCE_FAILED_WRONG_SIZE;
+  }
+
+  DirectOrder *order = orderIdIndex_.Get(orderId);
+  if (order == nullptr || order->uid != cmd->uid) {
+    return CommandResultCode::MATCHING_UNKNOWN_ORDER_ID;
+  }
+
+  const int64_t remainingSize = order->size - order->filled;
+  const int64_t reduceBy = std::min(remainingSize, requestedReduceSize);
+  const bool canRemove = (reduceBy == remainingSize);
+
+  if (canRemove) {
+    orderIdIndex_.Remove(orderId);
+    Bucket *freeBucket = this->RemoveOrder(order);
+    if (freeBucket)
+      objectsPool_->Put(
+          ::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
+          freeBucket);
+    cmd->matcherEvent = eventsHelper_->SendReduceEvent(order, reduceBy, true);
+    objectsPool_->Put(
+        ::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER,
+        order);
+  } else {
+    order->size -= reduceBy;
+    order->bucket->totalVolume -= reduceBy;
+    cmd->matcherEvent = eventsHelper_->SendReduceEvent(order, reduceBy, false);
+  }
+
+  cmd->action = order->action;
   return CommandResultCode::SUCCESS;
 }
 
-std::unique_ptr<common::L2MarketData>
-OrderBookDirectImpl::GetL2MarketDataSnapshot(int32_t size) {
-  auto data = std::make_unique<common::L2MarketData>(size, size);
-  FillAsks(size, data.get());
-  FillBids(size, data.get());
-  return data;
+int64_t OrderBookDirectImpl::tryMatchInstantly(common::IOrder *takerOrder,
+                                               OrderCommand *triggerCmd) {
+  const bool isBidAction = takerOrder->GetAction() == OrderAction::BID;
+  const int64_t limitPrice = takerOrder->GetPrice();
+
+  DirectOrder *makerOrder;
+  if (isBidAction) {
+    makerOrder = bestAskOrder_;
+    if (makerOrder == nullptr || makerOrder->price > limitPrice) {
+      return takerOrder->GetFilled();
+    }
+  } else {
+    makerOrder = bestBidOrder_;
+    if (makerOrder == nullptr || makerOrder->price < limitPrice) {
+      return takerOrder->GetFilled();
+    }
+  }
+
+  int64_t remainingSize = takerOrder->GetSize() - takerOrder->GetFilled();
+  if (remainingSize == 0)
+    return takerOrder->GetFilled();
+
+  DirectOrder *priceBucketTail = makerOrder->bucket->lastOrder;
+  MatcherTradeEvent *eventsTail = nullptr;
+
+  do {
+    const int64_t tradeSize =
+        std::min(remainingSize, makerOrder->size - makerOrder->filled);
+    makerOrder->filled += tradeSize;
+    makerOrder->bucket->totalVolume -= tradeSize;
+    remainingSize -= tradeSize;
+
+    const bool makerCompleted = (makerOrder->size == makerOrder->filled);
+    if (makerCompleted) {
+      makerOrder->bucket->numOrders--;
+    }
+
+    MatcherTradeEvent *tradeEvent = eventsHelper_->SendTradeEvent(
+        makerOrder, makerCompleted, remainingSize == 0, tradeSize, 0);
+
+    if (eventsTail == nullptr) {
+      triggerCmd->matcherEvent = tradeEvent;
+    } else {
+      eventsTail->nextEvent = tradeEvent;
+    }
+    eventsTail = tradeEvent;
+
+    if (!makerCompleted)
+      break;
+
+    orderIdIndex_.Remove(makerOrder->orderId);
+    DirectOrder *toRecycle = makerOrder;
+
+    if (makerOrder == priceBucketTail) {
+      auto &buckets = isBidAction ? askPriceBuckets_ : bidPriceBuckets_;
+      buckets.Remove(makerOrder->price);
+      objectsPool_->Put(
+          ::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
+          makerOrder->bucket);
+
+      if (makerOrder->prev != nullptr) {
+        priceBucketTail = makerOrder->prev->bucket->lastOrder;
+      }
+    }
+
+    makerOrder = makerOrder->prev;
+    objectsPool_->Put(
+        ::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER,
+        toRecycle);
+
+  } while (makerOrder != nullptr && remainingSize > 0 &&
+           (isBidAction ? makerOrder->price <= limitPrice
+                        : makerOrder->price >= limitPrice));
+
+  if (makerOrder != nullptr) {
+    makerOrder->next = nullptr;
+  }
+
+  if (isBidAction) {
+    bestAskOrder_ = makerOrder;
+  } else {
+    bestBidOrder_ = makerOrder;
+  }
+
+  return takerOrder->GetSize() - remainingSize;
+}
+
+OrderBookDirectImpl::Bucket *
+OrderBookDirectImpl::RemoveOrder(DirectOrder *order) {
+  Bucket *bucket = order->bucket;
+  bucket->totalVolume -= (order->size - order->filled);
+  bucket->numOrders--;
+  Bucket *bucketRemoved = nullptr;
+
+  if (bucket->lastOrder == order) {
+    if (order->next == nullptr || order->next->bucket != bucket) {
+      auto &buckets = (order->action == OrderAction::ASK) ? askPriceBuckets_
+                                                          : bidPriceBuckets_;
+      buckets.Remove(order->price);
+      bucketRemoved = bucket;
+    } else {
+      bucket->lastOrder = order->next;
+    }
+  }
+
+  if (order->next != nullptr)
+    order->next->prev = order->prev;
+  if (order->prev != nullptr)
+    order->prev->next = order->next;
+
+  if (order == bestAskOrder_)
+    bestAskOrder_ = order->prev;
+  else if (order == bestBidOrder_)
+    bestBidOrder_ = order->prev;
+
+  return bucketRemoved;
+}
+
+void OrderBookDirectImpl::insertOrder(DirectOrder *order, Bucket *freeBucket) {
+  const bool isAsk = (order->action == OrderAction::ASK);
+  auto &buckets = isAsk ? askPriceBuckets_ : bidPriceBuckets_;
+  Bucket *toBucket = buckets.Get(order->price);
+
+  if (toBucket != nullptr) {
+    if (freeBucket)
+      objectsPool_->Put(
+          ::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
+          freeBucket);
+
+    toBucket->totalVolume += (order->size - order->filled);
+    toBucket->numOrders++;
+    DirectOrder *oldTail = toBucket->lastOrder;
+    DirectOrder *prevOrder = oldTail->prev;
+
+    toBucket->lastOrder = order;
+    oldTail->prev = order;
+    if (prevOrder)
+      prevOrder->next = order;
+
+    order->next = oldTail;
+    order->prev = prevOrder;
+    order->bucket = toBucket;
+  } else {
+    Bucket *newBucket = freeBucket;
+    if (!newBucket) {
+      newBucket = objectsPool_->Get<Bucket>(
+          ::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
+          []() { return new Bucket(); });
+    }
+    newBucket->lastOrder = order;
+    newBucket->totalVolume = order->size - order->filled;
+    newBucket->numOrders = 1;
+    newBucket->price = order->price;
+    order->bucket = newBucket;
+    buckets.Put(order->price, newBucket);
+
+    Bucket *lowerBucket = isAsk ? buckets.GetLowerValue(order->price)
+                                : buckets.GetHigherValue(order->price);
+    if (lowerBucket != nullptr) {
+      DirectOrder *lowerTail = lowerBucket->lastOrder;
+      DirectOrder *prevOrder = lowerTail->prev;
+      lowerTail->prev = order;
+      if (prevOrder)
+        prevOrder->next = order;
+      order->next = lowerTail;
+      order->prev = prevOrder;
+    } else {
+      DirectOrder *oldBestOrder = isAsk ? bestAskOrder_ : bestBidOrder_;
+      if (oldBestOrder)
+        oldBestOrder->next = order;
+      if (isAsk)
+        bestAskOrder_ = order;
+      else
+        bestBidOrder_ = order;
+      order->next = nullptr;
+      order->prev = oldBestOrder;
+    }
+  }
 }
 
 int32_t OrderBookDirectImpl::GetOrdersNum(OrderAction action) {
-  auto &buckets = (action == OrderAction::ASK) ? askPriceBuckets_ : bidPriceBuckets_;
+  auto &buckets =
+      (action == OrderAction::ASK) ? askPriceBuckets_ : bidPriceBuckets_;
   int32_t count = 0;
-  // collections::art::LongObjConsumer<Bucket> consumer
-  // TODO: use ForEach with lambda adapter
+  buckets.ForEach([&count](int64_t, Bucket *b) { count += b->numOrders; },
+                  INT32_MAX);
   return count;
 }
 
 int64_t OrderBookDirectImpl::GetTotalOrdersVolume(OrderAction action) {
-  // TODO
-  return 0;
-}
-
-common::IOrder *OrderBookDirectImpl::GetOrderById(int64_t orderId) {
-  return orderIdIndex_.Get(orderId);
-}
-
-void OrderBookDirectImpl::ValidateInternalState() {
-  // TODO
-}
-
-OrderBookImplType OrderBookDirectImpl::GetImplementationType() const {
-  return OrderBookImplType::DIRECT;
+  auto &buckets =
+      (action == OrderAction::ASK) ? askPriceBuckets_ : bidPriceBuckets_;
+  int64_t volume = 0;
+  buckets.ForEach([&volume](int64_t, Bucket *b) { volume += b->totalVolume; },
+                  INT32_MAX);
+  return volume;
 }
 
 void OrderBookDirectImpl::FillAsks(int32_t size, common::L2MarketData *data) {
   data->askSize = 0;
-  // TODO: use ForEach
+  askPriceBuckets_.ForEach(
+      [data, size](int64_t, Bucket *b) {
+        if (data->askSize < size) {
+          int i = data->askSize++;
+          data->askPrices[i] = b->price;
+          data->askVolumes[i] = b->totalVolume;
+          data->askOrders[i] = b->numOrders;
+        }
+      },
+      size);
 }
 
 void OrderBookDirectImpl::FillBids(int32_t size, common::L2MarketData *data) {
   data->bidSize = 0;
-  // TODO: use ForEachDesc
+  bidPriceBuckets_.ForEachDesc(
+      [data, size](int64_t, Bucket *b) {
+        if (data->bidSize < size) {
+          int i = data->bidSize++;
+          data->bidPrices[i] = b->price;
+          data->bidVolumes[i] = b->totalVolume;
+          data->bidOrders[i] = b->numOrders;
+        }
+      },
+      size);
 }
 
 int32_t OrderBookDirectImpl::GetTotalAskBuckets(int32_t limit) {
@@ -146,46 +441,30 @@ int32_t OrderBookDirectImpl::GetTotalBidBuckets(int32_t limit) {
 
 std::vector<common::Order *> OrderBookDirectImpl::FindUserOrders(int64_t uid) {
   std::vector<common::Order *> list;
-  // TODO: use ForEach
+  orderIdIndex_.ForEach(
+      [&list, uid](int64_t orderId, DirectOrder *order) {
+        if (order->uid == uid) {
+          list.push_back(new common::Order(orderId, order->price, order->size,
+                                           order->filled, 0, order->action,
+                                           order->uid, order->timestamp));
+        }
+      },
+      INT32_MAX);
   return list;
 }
 
-void OrderBookDirectImpl::Reset() {
-  askPriceBuckets_.Clear();
-  bidPriceBuckets_.Clear();
-  orderIdIndex_.Clear();
-  bestAskOrder_ = nullptr;
-  bestBidOrder_ = nullptr;
-}
-
-OrderBookDirectImpl::DirectOrder *
-OrderBookDirectImpl::FindOrder(int64_t orderId) {
+common::IOrder *OrderBookDirectImpl::GetOrderById(int64_t orderId) {
   return orderIdIndex_.Get(orderId);
 }
 
-OrderBookDirectImpl::Bucket *
-OrderBookDirectImpl::GetOrCreateBucket(int64_t price, bool isAsk) {
-  auto &buckets = isAsk ? askPriceBuckets_ : bidPriceBuckets_;
-  Bucket *bucket = buckets.Get(price);
-  if (bucket == nullptr) {
-    // bucket = objectsPool_->Get<Bucket>(ObjectsPool::DIRECT_BUCKET, []() {
-    // return new Bucket(); });
-    bucket = new Bucket(); // Placeholder
-    bucket->price = price;
-    bucket->numOrders = 0;
-    bucket->totalVolume = 0;
-    bucket->firstOrder = nullptr;
-    bucket->lastOrder = nullptr;
-    buckets.Put(price, bucket);
-  }
-  return bucket;
+void OrderBookDirectImpl::ValidateInternalState() {
+  // Logic from Java can be ported here if needed
 }
 
-void OrderBookDirectImpl::RemoveOrder(DirectOrder *order) {
-  // TODO
+OrderBookImplType OrderBookDirectImpl::GetImplementationType() const {
+  return OrderBookImplType::DIRECT;
 }
 
 } // namespace orderbook
 } // namespace core
 } // namespace exchange
-

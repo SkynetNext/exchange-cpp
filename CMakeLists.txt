@@ -77,8 +77,13 @@ endif()
 
 # mimalloc: High-performance memory allocator
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mimalloc/CMakeLists.txt)
+    # Disable mimalloc tests and examples to avoid ctest conflicts
+    set(MI_BUILD_TESTS OFF CACHE BOOL "Build mimalloc tests" FORCE)
+    set(MI_BUILD_EXAMPLES OFF CACHE BOOL "Build mimalloc examples" FORCE)
+    set(MI_BUILD_SHARED OFF CACHE BOOL "Build shared library" FORCE)
+    set(MI_BUILD_STATIC ON CACHE BOOL "Build static library" FORCE)
     add_subdirectory(third_party/mimalloc)
-    message(STATUS "Using mimalloc from submodule")
+    message(STATUS "Using mimalloc from submodule (tests disabled)")
 else()
     message(WARNING "mimalloc submodule not found. Please run: git submodule add https://github.com/microsoft/mimalloc.git third_party/mimalloc")
 endif()

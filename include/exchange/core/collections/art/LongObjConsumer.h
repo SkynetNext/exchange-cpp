@@ -39,6 +39,19 @@ public:
   virtual void Accept(int64_t key, V *value) = 0;
 };
 
+/**
+ * LambdaConsumer - utility to wrap lambda as LongObjConsumer
+ */
+template <typename V, typename F>
+class LambdaConsumer : public LongObjConsumer<V> {
+public:
+  explicit LambdaConsumer(F f) : f_(f) {}
+  void Accept(int64_t key, V *value) override { f_(key, value); }
+
+private:
+  F f_;
+};
+
 } // namespace art
 } // namespace collections
 } // namespace core

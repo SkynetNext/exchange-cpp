@@ -26,6 +26,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 
 namespace exchange {
 namespace core {
@@ -88,6 +89,20 @@ public:
 
   int ForEach(LongObjConsumer<V> *consumer, int limit);
   int ForEachDesc(LongObjConsumer<V> *consumer, int limit);
+
+  template <typename F>
+    requires(!std::is_convertible_v<F, LongObjConsumer<V> *>)
+  int ForEach(F f, int limit) {
+    LambdaConsumer<V, F> consumer(f);
+    return ForEach(static_cast<LongObjConsumer<V> *>(&consumer), limit);
+  }
+
+  template <typename F>
+    requires(!std::is_convertible_v<F, LongObjConsumer<V> *>)
+  int ForEachDesc(F f, int limit) {
+    LambdaConsumer<V, F> consumer(f);
+    return ForEachDesc(static_cast<LongObjConsumer<V> *>(&consumer), limit);
+  }
 
   int Size(int limit) const;
   std::list<std::pair<int64_t, V *>> EntriesList() const;
