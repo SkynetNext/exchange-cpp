@@ -1,0 +1,96 @@
+/*
+ * Copyright 2019 Maksim Zheravin
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <exchange/core/common/MatcherEventType.h>
+#include <exchange/core/common/MatcherTradeEvent.h>
+#include <exchange/core/orderbook/OrderBookEventsHelper.h>
+
+namespace exchange {
+namespace core {
+namespace orderbook {
+
+OrderBookEventsHelper::OrderBookEventsHelper(EventFactory factory)
+    : eventFactory_(std::move(factory)) {}
+
+common::MatcherTradeEvent *
+OrderBookEventsHelper::SendTradeEvent(const common::IOrder *matchingOrder,
+                                      bool makerCompleted, bool takerCompleted,
+                                      int64_t size, int64_t bidderHoldPrice) {
+
+  common::MatcherTradeEvent *event = NewMatcherEvent();
+
+  event->eventType = common::MatcherEventType::TRADE;
+  event->section = 0;
+  event->activeOrderCompleted = takerCompleted;
+  event->matchedOrderId = matchingOrder->GetOrderId();
+  event->matchedOrderUid = matchingOrder->GetUid();
+  event->matchedOrderCompleted = makerCompleted;
+  event->price = matchingOrder->GetPrice();
+  event->size = size;
+  event->bidderHoldPrice = bidderHoldPrice;
+
+  return event;
+}
+
+common::MatcherTradeEvent *
+OrderBookEventsHelper::SendReduceEvent(const common::IOrder *order,
+                                       int64_t reduceSize, bool completed) {
+
+  common::MatcherTradeEvent *event = NewMatcherEvent();
+  event->eventType = common::MatcherEventType::REDUCE;
+  event->section = 0;
+  event->activeOrderCompleted = completed;
+  event->matchedOrderId = 0;
+  event->matchedOrderCompleted = false;
+  event->price = order->GetPrice();
+  event->size = reduceSize;
+  event->bidderHoldPrice = order->GetReserveBidPrice();
+
+  return event;
+}
+
+void OrderBookEventsHelper::AttachRejectEvent(common::cmd::OrderCommand *cmd,
+                                              int64_t rejectedSize) {
+
+  common::MatcherTradeEvent *event = NewMatcherEvent();
+
+  event->eventType = common::MatcherEventType::REJECT;
+  event->section = 0;
+  event->activeOrderCompleted = true;
+  event->matchedOrderId = 0;
+  event->matchedOrderCompleted = false;
+  event->price = cmd->price;
+  event->size = rejectedSize;
+  event->bidderHoldPrice = cmd->reserveBidPrice;
+
+  // Insert event at the head of the chain
+  event->nextEvent = cmd->matcherEvent;
+  cmd->matcherEvent = event;
+}
+
+::exchange::core::common::MatcherTradeEvent *
+OrderBookEventsHelper::NewMatcherEvent() {
+  return eventFactory_();
+}
+
+OrderBookEventsHelper *OrderBookEventsHelper::NonPooledEventsHelper() {
+  static OrderBookEventsHelper instance;
+  return &instance;
+}
+
+} // namespace orderbook
+} // namespace core
+} // namespace exchange

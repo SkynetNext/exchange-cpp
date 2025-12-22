@@ -1,0 +1,168 @@
+/*
+ * Copyright 2019 Maksim Zheravin
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <cstring>
+#include <exchange/core/common/cmd/CommandResultCode.h>
+#include <exchange/core/common/cmd/OrderCommand.h>
+#include <exchange/core/common/cmd/OrderCommandType.h>
+#include <exchange/core/processors/BinaryCommandsProcessor.h>
+#include <exchange/core/utils/HashingUtils.h>
+#include <stdexcept>
+#include <vector>
+
+namespace exchange {
+namespace core {
+namespace processors {
+
+// TransferRecord - internal class for storing binary frame data
+class TransferRecord {
+public:
+  std::vector<int64_t> dataArray;
+  int wordsTransferred;
+
+  TransferRecord(int expectedLength)
+      : wordsTransferred(0), dataArray(expectedLength, 0) {}
+
+  void AddWord(int64_t word) {
+    if (wordsTransferred >= static_cast<int>(dataArray.size())) {
+      // Resize if needed
+      dataArray.resize(dataArray.size() * 2);
+    }
+    dataArray[wordsTransferred++] = word;
+  }
+};
+
+// Helper function to calculate required long array size
+static int RequiredLongArraySize(int bytesLength, int longsPerMessage) {
+  // Each message carries longsPerMessage longs
+  // We need to calculate how many longs are needed for bytesLength bytes
+  int longsNeeded = (bytesLength + 7) / 8; // Round up to nearest long
+  // Round up to nearest multiple of longsPerMessage
+  return ((longsNeeded + longsPerMessage - 1) / longsPerMessage) *
+         longsPerMessage;
+}
+
+BinaryCommandsProcessor::BinaryCommandsProcessor(
+    CompleteMessagesHandler completeMessagesHandler,
+    common::api::reports::ReportQueriesHandler *reportQueriesHandler,
+    SharedPool *sharedPool,
+    const common::config::ReportsQueriesConfiguration *queriesConfiguration,
+    int32_t section)
+    : completeMessagesHandler_(std::move(completeMessagesHandler)),
+      reportQueriesHandler_(reportQueriesHandler),
+      queriesConfiguration_(queriesConfiguration), section_(section) {
+  if (sharedPool != nullptr) {
+    eventsHelper_ = std::make_unique<orderbook::OrderBookEventsHelper>(
+        [sharedPool]() { return sharedPool->GetChain(); });
+  } else {
+    eventsHelper_ = std::make_unique<orderbook::OrderBookEventsHelper>();
+  }
+}
+
+common::cmd::CommandResultCode
+BinaryCommandsProcessor::AcceptBinaryFrame(common::cmd::OrderCommand *cmd) {
+  const int32_t transferId = cmd->userCookie;
+
+  // Get or create transfer record
+  auto it = incomingData_.find(transferId);
+  TransferRecord *record = nullptr;
+
+  if (it == incomingData_.end()) {
+    // First frame - extract expected length from orderId
+    // Format: (bytesLength << 32) | other_data
+    const int bytesLength = static_cast<int>((cmd->orderId >> 32) & 0x7FFFFFFF);
+    const int longsPerMessage = 5; // Each OrderCommand carries 5 longs
+    const int longArraySize =
+        RequiredLongArraySize(bytesLength, longsPerMessage);
+    record = new TransferRecord(longArraySize);
+    incomingData_[transferId] = record;
+  } else {
+    record = static_cast<TransferRecord *>(it->second);
+  }
+
+  // Add words from this frame
+  record->AddWord(cmd->orderId);
+  record->AddWord(cmd->price);
+  record->AddWord(cmd->reserveBidPrice);
+  record->AddWord(cmd->size);
+  record->AddWord(cmd->uid);
+
+  // Check if this is the last frame (symbol == -1 indicates last frame)
+  if (cmd->symbol == -1) {
+    // All frames received - process complete message
+    incomingData_.erase(transferId);
+
+    // TODO: Implement proper deserialization with LZ4 decompression
+    // For now, this is a placeholder that indicates the structure
+    // In full implementation:
+    // 1. Convert long array to bytes
+    // 2. Decompress with LZ4
+    // 3. Deserialize based on command type
+
+    if (cmd->command == common::cmd::OrderCommandType::BINARY_DATA_QUERY) {
+      // Handle report query
+      // TODO: Deserialize query and process
+      // auto query = DeserializeQuery(bytes);
+      // if (query && reportQueriesHandler_) {
+      //   auto result = reportQueriesHandler_->HandleReport(query.get());
+      //   if (result) {
+      //     // Create binary events chain and append to cmd
+      //     auto binaryEventsChain = eventsHelper_->CreateBinaryEventsChain(
+      //         cmd->timestamp, section_, resultBytes);
+      //     // Append events to cmd->matcherEvent
+      //   }
+      // }
+    } else if (cmd->command ==
+               common::cmd::OrderCommandType::BINARY_DATA_COMMAND) {
+      // Handle binary data command
+      // TODO: Deserialize binary command and call handler
+      // auto binaryCommand = DeserializeBinaryCommand(bytes);
+      // if (completeMessagesHandler_) {
+      //   completeMessagesHandler_(binaryCommand.get());
+      // }
+    } else {
+      throw std::runtime_error("Invalid binary command type");
+    }
+
+    delete record;
+    return common::cmd::CommandResultCode::SUCCESS;
+  } else {
+    // More frames expected
+    return common::cmd::CommandResultCode::ACCEPTED;
+  }
+}
+
+void BinaryCommandsProcessor::Reset() {
+  // Clean up all transfer records
+  for (auto &pair : incomingData_) {
+    delete static_cast<TransferRecord *>(pair.second);
+  }
+  incomingData_.clear();
+}
+
+int32_t BinaryCommandsProcessor::GetStateHash() const {
+  // Calculate hash based on incoming data
+  // For now, use a simple hash of transfer IDs
+  std::size_t hash = 0;
+  for (const auto &pair : incomingData_) {
+    hash ^= std::hash<int64_t>{}(pair.first) << 1;
+  }
+  return static_cast<int32_t>(hash);
+}
+
+} // namespace processors
+} // namespace core
+} // namespace exchange

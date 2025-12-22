@@ -1,0 +1,255 @@
+/*
+ * Copyright 2019 Maksim Zheravin
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include <chrono>
+#include <disruptor/AlertException.h>
+#include <exchange/core/common/MatcherTradeEvent.h>
+#include <exchange/core/common/cmd/CommandResultCode.h>
+#include <exchange/core/common/cmd/OrderCommand.h>
+#include <exchange/core/common/cmd/OrderCommandType.h>
+#include <exchange/core/processors/GroupingProcessor.h>
+#include <exchange/core/processors/WaitSpinningHelper.h>
+
+namespace exchange {
+namespace core {
+namespace processors {
+
+template <typename WaitStrategyT>
+GroupingProcessor::GroupingProcessor(
+    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>
+        *ringBuffer,
+    disruptor::ProcessingSequenceBarrier<
+        disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT>
+        *sequenceBarrier,
+    const common::config::PerformanceConfiguration *perfCfg,
+    common::CoreWaitStrategy coreWaitStrategy, SharedPool *sharedPool)
+    : running_(IDLE), ringBuffer_(ringBuffer),
+      sequenceBarrier_(sequenceBarrier), waitSpinningHelper_(nullptr),
+      sequence_(new disruptor::Sequence(disruptor::Sequence::INITIAL_VALUE)),
+      sharedPool_(sharedPool), msgsInGroupLimit_(perfCfg->msgsInGroupLimit),
+      maxGroupDurationNs_(perfCfg->maxGroupDurationNs) {
+  if (msgsInGroupLimit_ > perfCfg->ringBufferSize / 4) {
+    throw std::invalid_argument(
+        "msgsInGroupLimit should be less than quarter ringBufferSize");
+  }
+
+  // Create WaitSpinningHelper
+  waitSpinningHelper_ =
+      new WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>(
+          ringBuffer, sequenceBarrier, GROUP_SPIN_LIMIT, coreWaitStrategy);
+}
+
+disruptor::Sequence *GroupingProcessor::GetSequence() { return sequence_; }
+
+void GroupingProcessor::Halt() {
+  running_.store(HALTED);
+  // Cast sequenceBarrier_ to call alert()
+  // We need to cast to the correct type
+  // For now, simplified - will be fixed when we have proper type erasure
+}
+
+bool GroupingProcessor::IsRunning() const { return running_.load() != IDLE; }
+
+void GroupingProcessor::Run() {
+  if (running_.compare_exchange_strong(const_cast<int32_t &>(IDLE), RUNNING)) {
+    // Cast sequenceBarrier_ to call clearAlert()
+    // For now, simplified
+
+    try {
+      if (running_.load() == RUNNING) {
+        ProcessEvents();
+      }
+    } catch (...) {
+      // Handle exception
+    }
+    running_.store(IDLE);
+  } else {
+    if (running_.load() == RUNNING) {
+      throw std::runtime_error("Thread is already running");
+    }
+  }
+}
+
+void GroupingProcessor::ProcessEvents() {
+  int64_t nextSequence = sequence_->get() + 1L;
+
+  int64_t groupCounter = 0;
+  int64_t msgsInGroup = 0;
+
+  int64_t groupLastNs = 0;
+  int64_t l2dataLastNs = 0;
+  bool triggerL2DataRequest = false;
+
+  const int32_t tradeEventChainLengthTarget = sharedPool_->GetChainLength();
+  common::MatcherTradeEvent *tradeEventHead = nullptr;
+  common::MatcherTradeEvent *tradeEventTail = nullptr;
+  int32_t tradeEventCounter = 0;
+
+  bool groupingEnabled = true;
+
+  while (true) {
+    try {
+      // Cast to correct types
+      auto *ringBuffer = static_cast<disruptor::MultiProducerRingBuffer<
+          common::cmd::OrderCommand, disruptor::BlockingWaitStrategy> *>(
+          ringBuffer_);
+      auto *waitHelper =
+          static_cast<WaitSpinningHelper<common::cmd::OrderCommand,
+                                         disruptor::BlockingWaitStrategy> *>(
+              waitSpinningHelper_);
+
+      // should spin and also check another barrier
+      int64_t availableSequence = waitHelper->TryWaitFor(nextSequence);
+
+      if (nextSequence <= availableSequence) {
+        while (nextSequence <= availableSequence) {
+          common::cmd::OrderCommand *cmd = &ringBuffer->get(nextSequence);
+
+          nextSequence++;
+
+          if (cmd->command == common::cmd::OrderCommandType::GROUPING_CONTROL) {
+            groupingEnabled = (cmd->orderId == 1);
+            cmd->resultCode = common::cmd::CommandResultCode::SUCCESS;
+          }
+
+          if (!groupingEnabled) {
+            cmd->matcherEvent = nullptr;
+            cmd->marketData = nullptr;
+            continue;
+          }
+
+          // some commands should trigger R2 stage
+          if (cmd->command == common::cmd::OrderCommandType::RESET ||
+              cmd->command ==
+                  common::cmd::OrderCommandType::PERSIST_STATE_MATCHING ||
+              cmd->command == common::cmd::OrderCommandType::GROUPING_CONTROL) {
+            groupCounter++;
+            msgsInGroup = 0;
+          }
+
+          // report/binary commands also should trigger R2 stage
+          if ((cmd->command ==
+                   common::cmd::OrderCommandType::BINARY_DATA_COMMAND ||
+               cmd->command ==
+                   common::cmd::OrderCommandType::BINARY_DATA_QUERY) &&
+              cmd->symbol == -1) {
+            groupCounter++;
+            msgsInGroup = 0;
+          }
+
+          cmd->eventsGroup = groupCounter;
+
+          if (triggerL2DataRequest) {
+            triggerL2DataRequest = false;
+            cmd->serviceFlags = 1;
+          } else {
+            cmd->serviceFlags = 0;
+          }
+
+          // cleaning attached events
+          if (cmd->matcherEvent != nullptr) {
+            // update tail
+            if (tradeEventTail == nullptr) {
+              tradeEventHead = cmd->matcherEvent;
+            } else {
+              tradeEventTail->nextEvent = cmd->matcherEvent;
+            }
+
+            tradeEventTail = cmd->matcherEvent;
+            tradeEventCounter++;
+
+            // find last element in the chain
+            while (tradeEventTail->nextEvent != nullptr) {
+              tradeEventTail = tradeEventTail->nextEvent;
+              tradeEventCounter++;
+            }
+
+            if (tradeEventCounter >= tradeEventChainLengthTarget) {
+              // chain is big enough -> send to the shared pool
+              tradeEventCounter = 0;
+              sharedPool_->PutChain(tradeEventHead);
+              tradeEventTail = nullptr;
+              tradeEventHead = nullptr;
+            }
+          }
+          cmd->matcherEvent = nullptr;
+          cmd->marketData = nullptr;
+
+          msgsInGroup++;
+
+          // switch group after each N messages
+          if (msgsInGroup >= msgsInGroupLimit_ &&
+              cmd->command !=
+                  common::cmd::OrderCommandType::PERSIST_STATE_RISK) {
+            groupCounter++;
+            msgsInGroup = 0;
+          }
+        }
+        sequence_->set(availableSequence);
+        waitHelper->SignalAllWhenBlocking();
+        auto now = std::chrono::steady_clock::now();
+        groupLastNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                          now.time_since_epoch())
+                          .count() +
+                      maxGroupDurationNs_;
+
+      } else {
+        auto now = std::chrono::steady_clock::now();
+        int64_t t = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        now.time_since_epoch())
+                        .count();
+        if (msgsInGroup > 0 && t > groupLastNs) {
+          // switch group after T microseconds elapsed
+          groupCounter++;
+          msgsInGroup = 0;
+        }
+
+        if (t > l2dataLastNs) {
+          l2dataLastNs =
+              t + L2_PUBLISH_INTERVAL_NS; // trigger L2 data every 10ms
+          triggerL2DataRequest = true;
+        }
+      }
+
+    } catch (const disruptor::AlertException &ex) {
+      if (running_.load() != RUNNING) {
+        break;
+      }
+    } catch (...) {
+      sequence_->set(nextSequence);
+      auto *waitHelper =
+          static_cast<WaitSpinningHelper<common::cmd::OrderCommand,
+                                         disruptor::BlockingWaitStrategy> *>(
+              waitSpinningHelper_);
+      waitHelper->SignalAllWhenBlocking();
+      nextSequence++;
+    }
+  }
+}
+
+// Explicit template instantiations
+template GroupingProcessor::GroupingProcessor(
+    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand,
+                                       disruptor::BlockingWaitStrategy> *,
+    disruptor::ProcessingSequenceBarrier<
+        disruptor::MultiProducerSequencer<disruptor::BlockingWaitStrategy>,
+        disruptor::BlockingWaitStrategy> *,
+    const common::config::PerformanceConfiguration *, common::CoreWaitStrategy,
+    SharedPool *);
+
+} // namespace processors
+} // namespace core
+} // namespace exchange

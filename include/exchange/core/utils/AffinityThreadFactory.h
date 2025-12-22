@@ -1,0 +1,68 @@
+/*
+ * Copyright 2019 Maksim Zheravin
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#pragma once
+
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <thread>
+
+namespace exchange {
+namespace core {
+namespace utils {
+
+/**
+ * ThreadAffinityMode - thread affinity configuration mode
+ */
+enum class ThreadAffinityMode {
+  THREAD_AFFINITY_DISABLE,
+  THREAD_AFFINITY_ENABLE_PER_PHYSICAL_CORE,
+  THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE
+};
+
+/**
+ * AffinityThreadFactory - factory for creating threads with CPU affinity
+ * Pins threads to specific CPU cores for better cache locality
+ */
+class AffinityThreadFactory {
+public:
+  explicit AffinityThreadFactory(ThreadAffinityMode threadAffinityMode);
+
+  /**
+   * Create a new thread with CPU affinity
+   */
+  std::unique_ptr<std::thread> NewThread(std::function<void()> runnable);
+
+  /**
+   * Check if task was already pinned
+   */
+  bool IsTaskPinned(void *task) const;
+
+private:
+  ThreadAffinityMode threadAffinityMode_;
+  mutable std::mutex mutex_;
+  std::set<void *> affinityReservations_;
+  static std::atomic<int32_t> threadsCounter_;
+
+  void ExecutePinned(std::function<void()> runnable);
+  void AcquireAffinityLock();
+};
+
+} // namespace utils
+} // namespace core
+} // namespace exchange

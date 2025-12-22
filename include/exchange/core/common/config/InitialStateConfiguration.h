@@ -1,0 +1,62 @@
+/*
+ * Copyright 2019 Maksim Zheravin
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#pragma once
+
+#include <cstdint>
+#include <string>
+
+namespace exchange {
+namespace core {
+namespace common {
+namespace config {
+
+/**
+ * InitialStateConfiguration - exchange initialization configuration
+ */
+class InitialStateConfiguration {
+public:
+  std::string exchangeId;
+  int64_t snapshotId;
+  int64_t snapshotBaseSeq;
+  int64_t journalTimestampNs;
+  bool throwIfSnapshotNotFound;
+
+  InitialStateConfiguration(std::string exchangeId, int64_t snapshotId,
+                            int64_t snapshotBaseSeq, int64_t journalTimestampNs,
+                            bool throwIfSnapshotNotFound)
+      : exchangeId(std::move(exchangeId)), snapshotId(snapshotId),
+        snapshotBaseSeq(snapshotBaseSeq),
+        journalTimestampNs(journalTimestampNs),
+        throwIfSnapshotNotFound(throwIfSnapshotNotFound) {}
+
+  bool FromSnapshot() const { return snapshotId != 0; }
+
+  static InitialStateConfiguration CleanStart(const std::string &exchangeId) {
+    return InitialStateConfiguration(exchangeId, 0, 0, 0, false);
+  }
+
+  static InitialStateConfiguration Default() {
+    return CleanStart("MY_EXCHANGE");
+  }
+
+  static InitialStateConfiguration CleanTest() { return CleanStart("EC0"); }
+};
+
+} // namespace config
+} // namespace common
+} // namespace core
+} // namespace exchange

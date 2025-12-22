@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(exchange-cpp VERSION 0.1.0 LANGUAGES CXX)
 
 # Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -23,32 +23,42 @@ endif()
 # Find dependencies
 find_package(Threads REQUIRED)
 
-# mimalloc (high-performance global allocator)
-find_package(mimalloc REQUIRED)
-
 # Build options
 option(BUILD_TESTING "Build tests" ON)
 option(BUILD_BENCHMARKS "Build benchmarks" ON)
 option(BUILD_EXAMPLES "Build examples" ON)
 
-# Enable testing
-if(BUILD_TESTING)
-    enable_testing()
-    find_package(GTest QUIET)
-    if(NOT GTest_FOUND)
-        message(STATUS "GTest not found, tests will be skipped")
-        set(BUILD_TESTING OFF)
-    endif()
-endif()
-
-# Include third-party dependencies
+# Include third-party dependencies (add disruptor-cpp first as it may provide googletest/benchmark)
 
 # disruptor-cpp: High-performance inter-thread communication
+# Note: disruptor-cpp may add googletest and benchmark as submodules if BUILD_BENCHMARKS is ON
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/disruptor-cpp/CMakeLists.txt)
     add_subdirectory(third_party/disruptor-cpp)
     message(STATUS "Using disruptor-cpp from submodule")
 else()
     message(FATAL_ERROR "disruptor-cpp submodule not found. Please run: git submodule update --init --recursive")
+endif()
+
+# Enable testing (check if GTest is already available from disruptor-cpp)
+if(BUILD_TESTING)
+    enable_testing()
+    # Check if GTest is already available (e.g., from disruptor-cpp)
+    if(TARGET gtest AND TARGET gtest_main)
+        set(GTest_FOUND TRUE)
+        message(STATUS "Using GoogleTest from disruptor-cpp")
+    elseif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/googletest/CMakeLists.txt)
+        add_subdirectory(third_party/googletest)
+        set(GTest_FOUND TRUE)
+        message(STATUS "Using GoogleTest from submodule")
+    else()
+        find_package(GTest QUIET)
+        if(NOT GTest_FOUND)
+            message(STATUS "GTest not found, tests will be skipped")
+            set(BUILD_TESTING OFF)
+        else()
+            message(STATUS "Using GTest from system")
+        endif()
+    endif()
 endif()
 
 # ankerl::unordered_dense: Fastest hash map (header-only)
@@ -58,20 +68,21 @@ else()
     message(WARNING "ankerl::unordered_dense not found. Please run: git submodule add https://github.com/martinus/unordered_dense.git third_party/unordered_dense")
 endif()
 
-# Include directories
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    # Simplified structure: exchange.core.* (removed core2 version suffix)
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/exchange/core
-    # Third-party header-only libraries
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/unordered_dense/include
-)
+# mimalloc: High-performance memory allocator
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mimalloc/CMakeLists.txt)
+    add_subdirectory(third_party/mimalloc)
+    message(STATUS "Using mimalloc from submodule")
+else()
+    message(WARNING "mimalloc submodule not found. Please run: git submodule add https://github.com/microsoft/mimalloc.git third_party/mimalloc")
+endif()
 
-# Source directories (will be populated as development progresses)
-set(EXCHANGE_SOURCES
-    # src/exchange/core/...
-    # src/exchange/risk/...
-    # src/exchange/api/...
+# Collect source files from subdirectories
+file(GLOB_RECURSE EXCHANGE_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/common/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/orderbook/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/processors/*.cpp"
+    # Add more patterns as development progresses:
+    # "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/utils/*.cpp"
 )
 
 # Create library (placeholder for now)
@@ -79,15 +90,30 @@ add_library(exchange-cpp STATIC
     ${EXCHANGE_SOURCES}
 )
 
+# Include directories - use target_include_directories for better IDE support
+target_include_directories(exchange-cpp
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        # Third-party header-only libraries
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/unordered_dense/include
+    PRIVATE
+        # Private includes if needed
+)
+
 target_link_libraries(exchange-cpp
     PUBLIC
         disruptor-cpp
         Threads::Threads
-        mimalloc             # High-performance global allocator
         # ART tree is custom implementation, no external dependency
 )
 
-target_compile_features(exchange-cpp PUBLIC cxx_std_17)
+# Link mimalloc if available as submodule
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mimalloc/CMakeLists.txt)
+    target_link_libraries(exchange-cpp PUBLIC mimalloc-static)
+    message(STATUS "Linking mimalloc-static for high-performance memory allocation")
+endif()
+
+target_compile_features(exchange-cpp PUBLIC cxx_std_20)
 
 # Suppress unused parameter warnings
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
@@ -113,11 +139,29 @@ endif()
 
 # Benchmarks
 if(BUILD_BENCHMARKS)
-    find_package(benchmark QUIET)
+    # Check if benchmark is already available (e.g., from disruptor-cpp)
+    if(TARGET benchmark AND TARGET benchmark_main)
+        set(benchmark_FOUND TRUE)
+        message(STATUS "Using Google Benchmark from disruptor-cpp")
+    elseif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/benchmark/CMakeLists.txt)
+        # Disable benchmark's own tests and examples
+        set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+        set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
+        set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+        add_subdirectory(third_party/benchmark)
+        set(benchmark_FOUND TRUE)
+        message(STATUS "Using Google Benchmark from submodule")
+    else()
+        find_package(benchmark QUIET)
+        if(benchmark_FOUND)
+            message(STATUS "Using Google Benchmark from system")
+        else()
+            message(STATUS "Google Benchmark not found, benchmarks will be skipped")
+        endif()
+    endif()
+    
     if(benchmark_FOUND)
         add_subdirectory(benchmarks)
-    else()
-        message(STATUS "Google Benchmark not found, benchmarks will be skipped")
     endif()
 endif()
 
