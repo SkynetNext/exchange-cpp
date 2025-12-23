@@ -225,6 +225,17 @@ public:
                          std::function<T *(common::BytesIn &)> creator) {
     return bytesIn.ReadBoolean() ? creator(bytesIn) : nullptr;
   }
+
+  /**
+   * Convert long array with LZ4 compressed data to bytes (decompress)
+   * Match Java: SerializationUtils.longsLz4ToWire()
+   *
+   * @param dataArray Long array containing compressed data
+   * @param longsTransferred Number of longs actually used
+   * @return Vector of decompressed bytes
+   */
+  static std::vector<uint8_t>
+  LongsLz4ToBytes(const std::vector<int64_t> &dataArray, int longsTransferred);
 };
 
 } // namespace utils

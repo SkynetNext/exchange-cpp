@@ -105,7 +105,7 @@ The directory structure is **1:1 mapped** to the Java `exchange-core` for easy r
 exchange-cpp/
 ├── CMakeLists.txt          # Main CMake configuration
 ├── README.md               # This file
-├── PLAN.md                 # Development plan
+├── PROJECT_STATUS.md      # Project status, plan, and progress
 ├── reference/              # Reference implementations
 │   └── exchange-core/      # Original Java implementation (git submodule)
 │       └── src/main/java/exchange/core2/core/
@@ -204,5 +204,5 @@ cd build
 
 ## Contributing
 
-Contributions are welcome! Please see [PLAN.md](PLAN.md) for development roadmap.
+Contributions are welcome! Please see [PROJECT_STATUS.md](PROJECT_STATUS.md) for development roadmap and current status.
 

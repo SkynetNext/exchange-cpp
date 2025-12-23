@@ -88,6 +88,22 @@ else()
     message(WARNING "mimalloc submodule not found. Please run: git submodule add https://github.com/microsoft/mimalloc.git third_party/mimalloc")
 endif()
 
+# lz4: Fast compression library (required dependency, 1:1 with Java version)
+# Java version uses lz4-java as required dependency, so C++ version should too
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lz4/lib/lz4.h)
+    add_subdirectory(third_party/lz4/build/cmake)
+    message(STATUS "Using lz4 from submodule")
+else()
+    find_package(lz4 REQUIRED)
+    if(lz4_FOUND)
+        message(STATUS "Using lz4 from system")
+    else()
+        message(FATAL_ERROR "lz4 not found. LZ4 is a required dependency (1:1 with Java version).")
+        message(FATAL_ERROR "Please run: git submodule add https://github.com/lz4/lz4.git third_party/lz4")
+        message(FATAL_ERROR "Or install: apt-get install liblz4-dev (Ubuntu) or brew install lz4 (macOS)")
+    endif()
+endif()
+
 # Collect source files from subdirectories
 file(GLOB_RECURSE EXCHANGE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/common/*.cpp"
@@ -124,6 +140,16 @@ target_link_libraries(exchange-cpp
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mimalloc/CMakeLists.txt)
     target_link_libraries(exchange-cpp PUBLIC mimalloc-static)
     message(STATUS "Linking mimalloc-static for high-performance memory allocation")
+endif()
+
+# Link lz4 if available
+if(TARGET lz4)
+    target_link_libraries(exchange-cpp PUBLIC lz4)
+    message(STATUS "Linking lz4 for compression support")
+elseif(lz4_FOUND)
+    target_link_libraries(exchange-cpp PUBLIC ${LZ4_LIBRARIES})
+    target_include_directories(exchange-cpp PRIVATE ${LZ4_INCLUDE_DIRS})
+    message(STATUS "Linking system lz4 for compression support")
 endif()
 
 target_compile_features(exchange-cpp PUBLIC cxx_std_20)

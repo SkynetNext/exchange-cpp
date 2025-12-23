@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+#include <cstring>
 #include <exchange/core/utils/SerializationUtils.h>
+#include <lz4.h>
+#include <stdexcept>
 
 namespace exchange {
 namespace core {
@@ -117,6 +120,40 @@ SerializationUtils::ReadIntLongHashMap(common::BytesIn &bytes) {
     hashMap[k] = v;
   }
   return hashMap;
+}
+
+std::vector<uint8_t>
+SerializationUtils::LongsLz4ToBytes(const std::vector<int64_t> &dataArray,
+                                    int longsTransferred) {
+  // Convert long array to byte array
+  // Each long is 8 bytes, so total bytes = longsTransferred * 8
+  const int compressedSizeBytes = longsTransferred * 8;
+  std::vector<uint8_t> compressedData(compressedSizeBytes);
+
+  // Copy long array to byte array (little-endian)
+  std::memcpy(compressedData.data(), dataArray.data(), compressedSizeBytes);
+
+  // Read original size from first 4 bytes (as int32_t)
+  int32_t originalSizeBytes = 0;
+  std::memcpy(&originalSizeBytes, compressedData.data(), sizeof(int32_t));
+
+  // Allocate buffer for decompressed data
+  std::vector<uint8_t> decompressedData(originalSizeBytes);
+
+  // Decompress using LZ4
+  // Skip first 4 bytes (original size) when decompressing
+  const int compressedDataSize = compressedSizeBytes - sizeof(int32_t);
+  const int decompressedSize = LZ4_decompress_safe(
+      reinterpret_cast<const char *>(compressedData.data() + sizeof(int32_t)),
+      reinterpret_cast<char *>(decompressedData.data()), compressedDataSize,
+      originalSizeBytes);
+
+  if (decompressedSize < 0 || decompressedSize != originalSizeBytes) {
+    throw std::runtime_error(
+        "LZ4 decompression failed: invalid compressed data or size mismatch");
+  }
+
+  return decompressedData;
 }
 
 } // namespace utils

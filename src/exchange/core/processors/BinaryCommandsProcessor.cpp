@@ -16,6 +16,7 @@
 
 #include <cstring>
 #include <exchange/core/common/BytesIn.h>
+#include <exchange/core/common/VectorBytesIn.h>
 #include <exchange/core/common/WriteBytesMarshallable.h>
 #include <exchange/core/common/cmd/CommandResultCode.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
@@ -150,31 +151,36 @@ BinaryCommandsProcessor::AcceptBinaryFrame(common::cmd::OrderCommand *cmd) {
     // All frames received - process complete message
     incomingData_.erase(transferId);
 
-    // TODO: Implement proper deserialization with LZ4 decompression
-    // For now, this is a placeholder that indicates the structure
-    // In full implementation:
-    // 1. Convert long array to bytes
-    // 2. Decompress with LZ4
-    // 3. Deserialize based on command type
+    // Decompress with LZ4 and create BytesIn
+    std::vector<uint8_t> decompressedBytes =
+        utils::SerializationUtils::LongsLz4ToBytes(record->dataArray,
+                                                   record->wordsTransferred);
+    common::VectorBytesIn bytesIn(decompressedBytes);
 
     if (cmd->command == common::cmd::OrderCommandType::BINARY_DATA_QUERY) {
       // Handle report query
-      // TODO: Deserialize query and process
-      // auto query = DeserializeQuery(bytes);
-      // if (query && reportQueriesHandler_) {
-      //   auto result = reportQueriesHandler_->HandleReport(query.get());
-      //   if (result) {
-      //     // Create binary events chain and append to cmd
-      //     auto binaryEventsChain = eventsHelper_->CreateBinaryEventsChain(
-      //         cmd->timestamp, section_, resultBytes);
-      //     // Append events to cmd->matcherEvent
+      // Read class code and deserialize query
+      int32_t classCode = bytesIn.ReadInt();
+      // TODO: Use queriesConfiguration to get constructor and deserialize
+      // For now, this is a placeholder
+      // if (reportQueriesHandler_) {
+      //   auto query = DeserializeQuery(bytesIn, classCode);
+      //   if (query) {
+      //     auto result = reportQueriesHandler_->HandleReport(query.get());
+      //     if (result) {
+      //       // Create binary events chain and append to cmd
+      //       // Implementation depends on OrderBookEventsHelper
+      //     }
       //   }
       // }
     } else if (cmd->command ==
                common::cmd::OrderCommandType::BINARY_DATA_COMMAND) {
       // Handle binary data command
-      // TODO: Deserialize binary command and call handler
-      // auto binaryCommand = DeserializeBinaryCommand(bytes);
+      // Read class code and deserialize command
+      int32_t classCode = bytesIn.ReadInt();
+      // TODO: Use queriesConfiguration to get constructor and deserialize
+      // For now, this is a placeholder
+      // auto binaryCommand = DeserializeBinaryCommand(bytesIn, classCode);
       // if (completeMessagesHandler_) {
       //   completeMessagesHandler_(binaryCommand.get());
       // }
