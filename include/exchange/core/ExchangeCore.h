@@ -34,6 +34,11 @@ namespace exchange {
 namespace core {
 // Forward declaration - full definition needed in .cpp
 namespace processors {
+class GroupingProcessor;
+template <typename WaitStrategyT> class TwoStepMasterProcessor;
+template <typename WaitStrategyT> class TwoStepSlaveProcessor;
+class EventProcessorAdapter;
+class SimpleEventHandler;
 namespace journaling {
 class ISerializationProcessor;
 }
@@ -77,6 +82,19 @@ private:
   std::unique_ptr<ExchangeApi<disruptor::BlockingWaitStrategy>> api_;
   processors::journaling::ISerializationProcessor *serializationProcessor_;
   const common::config::ExchangeConfiguration *exchangeConfiguration_;
+
+  // Store processors for lifecycle management
+  std::vector<std::unique_ptr<processors::GroupingProcessor>>
+      groupingProcessors_;
+  std::vector<std::unique_ptr<
+      processors::TwoStepMasterProcessor<disruptor::BlockingWaitStrategy>>>
+      r1Processors_;
+  std::vector<std::unique_ptr<
+      processors::TwoStepSlaveProcessor<disruptor::BlockingWaitStrategy>>>
+      r2Processors_;
+  std::vector<std::unique_ptr<processors::EventProcessorAdapter>>
+      processorAdapters_;
+  std::vector<std::unique_ptr<processors::SimpleEventHandler>> riskHandlers_;
 
   bool started_ = false;
   bool stopped_ = false;

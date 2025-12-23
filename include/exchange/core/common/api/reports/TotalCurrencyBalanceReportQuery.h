@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "../../BytesIn.h"
 #include "ReportQuery.h"
 #include "ReportType.h"
 #include "TotalCurrencyBalanceReportResult.h"
@@ -39,6 +40,9 @@ class TotalCurrencyBalanceReportQuery
     : public ReportQuery<TotalCurrencyBalanceReportResult> {
 public:
   TotalCurrencyBalanceReportQuery() {}
+  explicit TotalCurrencyBalanceReportQuery(BytesIn &bytesIn) {
+    // do nothing
+  }
 
   int32_t GetReportTypeCode() const override {
     return static_cast<int32_t>(ReportType::TOTAL_CURRENCY_BALANCE);

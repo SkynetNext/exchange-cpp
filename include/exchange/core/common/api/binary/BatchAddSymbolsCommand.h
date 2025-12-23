@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../../CoreSymbolSpecification.h"
+#include "../../BytesIn.h"
 #include "BinaryCommandType.h"
 #include "BinaryDataCommand.h"
 #include <ankerl/unordered_dense.h>
@@ -56,6 +57,8 @@ public:
       }
     }
   }
+
+  explicit BatchAddSymbolsCommand(BytesIn &bytes);
 
   int32_t GetBinaryCommandTypeCode() const override {
     return static_cast<int32_t>(BinaryCommandType::ADD_SYMBOLS);

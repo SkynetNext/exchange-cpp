@@ -18,6 +18,7 @@
 
 #include "BinaryCommandType.h"
 #include "BinaryDataCommand.h"
+#include "../../BytesIn.h"
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
 
@@ -42,6 +43,8 @@ public:
       const ankerl::unordered_dense::map<
           int64_t, ankerl::unordered_dense::map<int32_t, int64_t>> &users)
       : users(users) {}
+
+  explicit BatchAddAccountsCommand(BytesIn &bytes);
 
   int32_t GetBinaryCommandTypeCode() const override {
     return static_cast<int32_t>(BinaryCommandType::ADD_ACCOUNTS);

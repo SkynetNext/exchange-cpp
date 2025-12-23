@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "../../BytesIn.h"
 #include "ReportQuery.h"
 #include "ReportType.h"
 #include "StateHashReportResult.h"
@@ -38,6 +39,9 @@ namespace reports {
 class StateHashReportQuery : public ReportQuery<StateHashReportResult> {
 public:
   StateHashReportQuery() {}
+  explicit StateHashReportQuery(BytesIn &bytesIn) {
+    // do nothing
+  }
 
   int32_t GetReportTypeCode() const override {
     return static_cast<int32_t>(ReportType::STATE_HASH);

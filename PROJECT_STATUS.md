@@ -1,6 +1,6 @@
 # Exchange-CPP 项目状态报告
 
-## 📊 总体完成度：**约 92%**
+## 📊 总体完成度：**约 93%**
 
 ### 文件统计
 - **头文件 (.h)**: 92 个 ✅
@@ -37,6 +37,7 @@
 - ✅ **序列化/持久化**: WriteBytesMarshallable 接口，所有主要类序列化实现
 - ✅ **快照加载**: MatchingEngineRouter 和 RiskEngine 的快照加载逻辑
 - ✅ **LZ4 压缩**: SerializationUtils::LongsLz4ToBytes
+- ✅ **工厂模式反序列化**: BinaryDataCommandFactory 和 ReportQueryFactory（替代 Java 反射）
 
 ---
 
@@ -45,16 +46,21 @@
 ### 🔨 高优先级 (P0)
 
 #### 1. 完整 Disruptor 流水线配置
-- **状态**: ⏳ 部分完成
-- **待实现**:
+- **状态**: ⏳ 进行中
+- **已完成**:
+  - ✅ EventProcessorAdapter 适配器实现
+  - ✅ GroupingProcessorFactory 实现
+  - ✅ R1/R2 ProcessorFactory 框架
+- **待完成**:
+  - 修复 EventHandlerGroup::after() 的类型匹配问题
+  - 完成完整的处理器链配置（G -> R1 -> ME -> R2 -> E）
   - 动态 WaitStrategy 选择（当前硬编码为 BlockingWaitStrategy）
-  - 完整的 Disruptor DSL 处理器链配置
   - 处理器生命周期管理和清理逻辑
 
 #### 2. BinaryCommandsProcessor 反序列化
-- **状态**: ⏳ 待实现
-- **问题**: Java 使用反射获取构造函数，C++ 无反射
-- **方案**: 需要实现工厂模式或函数映射替代 Java 的反射机制
+- **状态**: ✅ 已完成
+- **实现**: 使用工厂模式（BinaryDataCommandFactory 和 ReportQueryFactory）替代 Java 反射
+- **注册机制**: 使用 REGISTER_BINARY_COMMAND_TYPE 和 REGISTER_REPORT_QUERY_TYPE 宏自动注册
 
 ### 🔧 中优先级 (P1)
 
@@ -110,7 +116,7 @@
 
 ### 立即完成 (1-2 周)
 1. 完成 Disruptor 流水线配置
-2. 实现 BinaryCommandsProcessor 反序列化（工厂模式）
+2. ~~实现 BinaryCommandsProcessor 反序列化（工厂模式）~~ ✅ 已完成
 3. 验证快照保存逻辑
 
 ### 短期目标 (2-4 周)

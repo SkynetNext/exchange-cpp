@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "../../BytesIn.h"
 #include "ReportQuery.h"
 #include "ReportType.h"
 #include "SingleUserReportResult.h"
@@ -42,6 +43,7 @@ public:
   int64_t uid;
 
   explicit SingleUserReportQuery(int64_t uid) : uid(uid) {}
+  explicit SingleUserReportQuery(BytesIn &bytesIn);
 
   int32_t GetReportTypeCode() const override {
     return static_cast<int32_t>(ReportType::SINGLE_USER_REPORT);

@@ -18,6 +18,16 @@
 #include <exchange/core/common/BytesIn.h>
 #include <exchange/core/common/VectorBytesIn.h>
 #include <exchange/core/common/WriteBytesMarshallable.h>
+#include <exchange/core/common/api/binary/BinaryCommandType.h>
+#include <exchange/core/common/api/binary/BinaryDataCommandFactory.h>
+#include <exchange/core/common/api/reports/ReportQueryFactory.h>
+#include <exchange/core/common/api/reports/ReportType.h>
+#include <exchange/core/common/api/reports/SingleUserReportQuery.h>
+#include <exchange/core/common/api/reports/SingleUserReportResult.h>
+#include <exchange/core/common/api/reports/StateHashReportQuery.h>
+#include <exchange/core/common/api/reports/StateHashReportResult.h>
+#include <exchange/core/common/api/reports/TotalCurrencyBalanceReportQuery.h>
+#include <exchange/core/common/api/reports/TotalCurrencyBalanceReportResult.h>
 #include <exchange/core/common/cmd/CommandResultCode.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/common/cmd/OrderCommandType.h>
@@ -161,29 +171,74 @@ BinaryCommandsProcessor::AcceptBinaryFrame(common::cmd::OrderCommand *cmd) {
       // Handle report query
       // Read class code and deserialize query
       int32_t classCode = bytesIn.ReadInt();
-      // TODO: Use queriesConfiguration to get constructor and deserialize
-      // For now, this is a placeholder
-      // if (reportQueriesHandler_) {
-      //   auto query = DeserializeQuery(bytesIn, classCode);
-      //   if (query) {
-      //     auto result = reportQueriesHandler_->HandleReport(query.get());
-      //     if (result) {
-      //       // Create binary events chain and append to cmd
-      //       // Implementation depends on OrderBookEventsHelper
-      //     }
-      //   }
-      // }
+      common::api::reports::ReportType reportType =
+          common::api::reports::ReportTypeFromCode(classCode);
+
+      if (reportQueriesHandler_) {
+        // Use factory to create report query and handle based on type
+        void *queryPtr =
+            common::api::reports::ReportQueryFactory::getInstance().createQuery(
+                reportType, bytesIn);
+        if (queryPtr != nullptr) {
+          std::optional<std::unique_ptr<common::api::reports::ReportResult>>
+              result;
+
+          // Cast to appropriate type and process
+          switch (reportType) {
+          case common::api::reports::ReportType::STATE_HASH: {
+            auto *query =
+                static_cast<common::api::reports::StateHashReportQuery *>(
+                    queryPtr);
+            result = reportQueriesHandler_->HandleReport(query);
+            delete query;
+            break;
+          }
+          case common::api::reports::ReportType::SINGLE_USER_REPORT: {
+            auto *query =
+                static_cast<common::api::reports::SingleUserReportQuery *>(
+                    queryPtr);
+            result = reportQueriesHandler_->HandleReport(query);
+            delete query;
+            break;
+          }
+          case common::api::reports::ReportType::TOTAL_CURRENCY_BALANCE: {
+            auto *query = static_cast<
+                common::api::reports::TotalCurrencyBalanceReportQuery *>(
+                queryPtr);
+            result = reportQueriesHandler_->HandleReport(query);
+            delete query;
+            break;
+          }
+          default:
+            delete static_cast<common::api::reports::ReportQuery<
+                common::api::reports::ReportResult> *>(queryPtr);
+            break;
+          }
+
+          // If result is available, create binary events chain
+          if (result.has_value() && eventsHelper_) {
+            // Serialize result to bytes
+            // TODO: Implement eventsHelper_->CreateBinaryEventsChain
+            // For now, we'll need to check OrderBookEventsHelper interface
+          }
+        }
+      }
     } else if (cmd->command ==
                common::cmd::OrderCommandType::BINARY_DATA_COMMAND) {
       // Handle binary data command
       // Read class code and deserialize command
       int32_t classCode = bytesIn.ReadInt();
-      // TODO: Use queriesConfiguration to get constructor and deserialize
-      // For now, this is a placeholder
-      // auto binaryCommand = DeserializeBinaryCommand(bytesIn, classCode);
-      // if (completeMessagesHandler_) {
-      //   completeMessagesHandler_(binaryCommand.get());
-      // }
+      common::api::binary::BinaryCommandType commandType =
+          common::api::binary::BinaryCommandTypeFromCode(classCode);
+
+      // Use factory to create binary command
+      auto binaryCommand =
+          common::api::binary::BinaryDataCommandFactory::getInstance()
+              .createCommand(commandType, bytesIn);
+
+      if (completeMessagesHandler_ && binaryCommand) {
+        completeMessagesHandler_(binaryCommand.get());
+      }
     } else {
       throw std::runtime_error("Invalid binary command type");
     }
