@@ -34,6 +34,33 @@ ObjectsPool *ObjectsPool::CreateDefaultTestPool() {
   return new ObjectsPool(config);
 }
 
+ObjectsPool *ObjectsPool::CreateProductionPool() {
+  std::unordered_map<int, int> config;
+  // Production configuration matching Java MatchingEngineRouter
+  // Optimized for order book operations with large capacity to minimize
+  // allocations
+  config[DIRECT_ORDER] = 1024 * 1024; // 1M orders
+  config[DIRECT_BUCKET] = 1024 * 64;  // 64K buckets
+  config[ART_NODE_4] = 1024 * 32;     // 32K nodes
+  config[ART_NODE_16] = 1024 * 16;    // 16K nodes
+  config[ART_NODE_48] = 1024 * 8;     // 8K nodes
+  config[ART_NODE_256] = 1024 * 4;    // 4K nodes
+  return new ObjectsPool(config);
+}
+
+ObjectsPool *ObjectsPool::CreateHighLoadPool() {
+  std::unordered_map<int, int> config;
+  // High-load configuration for maximum performance
+  // Extra large capacity for high-frequency trading scenarios
+  config[DIRECT_ORDER] = 1024 * 1024 * 2; // 2M orders
+  config[DIRECT_BUCKET] = 1024 * 128;     // 128K buckets
+  config[ART_NODE_4] = 1024 * 64;         // 64K nodes
+  config[ART_NODE_16] = 1024 * 32;        // 32K nodes
+  config[ART_NODE_48] = 1024 * 16;        // 16K nodes
+  config[ART_NODE_256] = 1024 * 8;        // 8K nodes
+  return new ObjectsPool(config);
+}
+
 ObjectsPool::ObjectsPool(const std::unordered_map<int, int> &sizesConfig)
     : pools_() {
   int maxStack = 0;

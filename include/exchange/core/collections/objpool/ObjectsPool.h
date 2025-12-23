@@ -42,8 +42,23 @@ public:
 
   /**
    * Create default test pool
+   * Small capacity for fast startup, suitable for unit tests and benchmarks
    */
   static ObjectsPool *CreateDefaultTestPool();
+
+  /**
+   * Create production pool
+   * Large capacity to minimize allocations, suitable for production
+   * environments Matches Java MatchingEngineRouter configuration
+   */
+  static ObjectsPool *CreateProductionPool();
+
+  /**
+   * Create high-load pool
+   * Extra large capacity for maximum performance, suitable for high-frequency
+   * trading
+   */
+  static ObjectsPool *CreateHighLoadPool();
 
   /**
    * Constructor with size configuration
