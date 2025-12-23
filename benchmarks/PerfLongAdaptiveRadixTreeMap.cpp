@@ -22,6 +22,7 @@
 #include <exchange/core/collections/art/LongObjConsumer.h>
 #include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <map>
+#include <mimalloc-new-delete.h>
 #include <random>
 #include <vector>
 

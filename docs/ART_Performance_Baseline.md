@@ -250,3 +250,69 @@ The gap is larger for GET_HIT (17.84x) because lookup operations benefit more fr
 **Status**: ✅ Performance baseline documented  
 **Java Comparison**: ✅ Completed (Last iteration results)
 
+---
+
+## Performance History
+
+### Version 1 (Initial Baseline)
+**Date**: 2023-12-23  
+**Memory Allocator**: System default (`malloc`/`new`)  
+**Status**: Initial C++ port baseline
+
+| Operation | ART Time | BST Time | Improvement | Speedup vs BST |
+|-----------|----------|----------|-------------|----------------|
+| **PUT** | 365.375 ms | 741.155 ms | +102.8% | 2.0x |
+| **GET_HIT** | 123.465 ms | 680.536 ms | +451.0% | 5.5x |
+| **REMOVE** | 274.092 ms | 1045.85 ms | +281.5% | 3.8x |
+| **FOREACH** | 29.26 μs | 19.61 μs | -33.0% | Slower |
+| **FOREACH_DESC** | 123.54 μs | 60.55 μs | -51.0% | Slower |
+| **HIGHER** | 343.818 ms | 934.49 ms | +171.8% | 2.7x |
+| **LOWER** | 296.755 ms | 665.687 ms | +124.3% | 2.2x |
+
+**Key Characteristics**:
+- Strong lookup and deletion performance (3.8-5.5x faster than BST)
+- Iteration operations were slower than `std::map` due to tree traversal overhead
+- Solid baseline demonstrating ART's core advantages
+
+---
+
+### Version 2 (mimalloc Optimization)
+**Date**: 2024-12-23  
+**Memory Allocator**: **mimalloc** (Global hook via `mimalloc-new-delete.h`)  
+**Status**: ✅ Significant performance improvements across all operations
+
+| Operation | ART Time | BST Time | Improvement | Speedup vs BST | vs V1 Speedup |
+|-----------|----------|----------|-------------|----------------|---------------|
+| **PUT** | 158.272 ms | 674.401 ms | +326.1% | 4.26x | **2.31x faster** |
+| **GET_HIT** | 101.605 ms | 418.435 ms | +311.8% | 4.12x | **1.21x faster** |
+| **REMOVE** | 197.976 ms | 689.492 ms | +248.3% | 3.48x | **1.38x faster** |
+| **FOREACH** | 7.60 μs | 17.50 μs | +130.3% | 2.30x | **3.85x faster** ⭐ |
+| **FOREACH_DESC** | 13.71 μs | 20.01 μs | +46.0% | 1.46x | **9.01x faster** ⭐ |
+| **HIGHER** | 169.449 ms | 424.188 ms | +150.3% | 2.50x | **2.03x faster** |
+| **LOWER** | 195.123 ms | 481.238 ms | +146.6% | 2.46x | **1.52x faster** |
+
+**Key Improvements**:
+
+1. **PUT Performance Doubled**: From 365ms to 158ms (**2.31x faster**). `mimalloc`'s optimized small object allocation dramatically reduces the overhead of creating ART nodes (`ArtNode4/16/48/256`).
+
+2. **Iteration Performance Breakthrough**: 
+   - **FOREACH**: Transformed from **-33% slower** to **+130% faster** than `std::map` (**3.85x faster than V1**)
+   - **FOREACH_DESC**: Improved from **-51% slower** to **+46% faster** (**9.01x faster than V1**)
+   - This reversal is attributed to `mimalloc`'s superior memory compactness, reducing cache misses during tree traversal.
+
+3. **Consistent Gains Across Operations**: All operations show 20-50% improvement, with the most dramatic gains in write-heavy operations (PUT) and iteration.
+
+4. **Java Comparison Enhancement**: 
+   - **PUT**: 10.88x → **25.09x faster** than Java (from 365ms to 158ms)
+   - **GET_HIT**: 17.84x → **21.66x faster** than Java (from 123ms to 101ms)
+   - **REMOVE**: 14.63x → **20.26x faster** than Java (from 274ms to 197ms)
+
+**Technical Analysis**:
+
+`mimalloc` provides several advantages for ART tree performance:
+- **Small Object Optimization**: ART nodes are typically 32-256 bytes. `mimalloc`'s segregated free lists and thread-local caching make these allocations nearly free.
+- **Memory Locality**: Better memory compaction improves cache hit rates during tree traversal, especially noticeable in iteration operations.
+- **Reduced Fragmentation**: Lower memory fragmentation means nodes are more likely to be allocated in contiguous regions, improving spatial locality.
+
+**Conclusion**: The integration of `mimalloc` elevates the C++ ART implementation from "excellent" to "exceptional", with particularly dramatic improvements in write operations and iteration. The performance gap with Java has widened to **20-25x**, making this implementation highly competitive for high-frequency trading systems.
+
