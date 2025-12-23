@@ -27,6 +27,7 @@
 #include <exchange/core/processors/BinaryCommandsProcessor.h>
 #include <exchange/core/processors/MatchingEngineRouter.h>
 #include <exchange/core/processors/SharedPool.h>
+#include <exchange/core/processors/journaling/DiskSerializationProcessorConfiguration.h>
 #include <exchange/core/utils/UnsafeUtils.h>
 #include <stdexcept>
 
@@ -72,8 +73,8 @@ MatchingEngineRouter::MatchingEngineRouter(
   if (exchangeCfg != nullptr) {
     const auto &initStateCfg = exchangeCfg->initStateCfg;
     exchangeId_ = initStateCfg.exchangeId;
-    // TODO: Use DiskSerializationProcessorConfiguration::DEFAULT_FOLDER
-    folder_ = std::filesystem::path("snapshots");
+    folder_ = std::filesystem::path(
+        journaling::DiskSerializationProcessorConfiguration::DEFAULT_FOLDER);
 
     const auto &ordersProcCfg = exchangeCfg->ordersProcessingCfg;
     cfgMarginTradingEnabled_ = (ordersProcCfg.marginTradingMode ==

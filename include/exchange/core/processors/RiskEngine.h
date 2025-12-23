@@ -199,6 +199,8 @@ private:
   std::unique_ptr<common::api::reports::ReportQueriesHandler>
       reportQueriesHandler_;
 
+  journaling::ISerializationProcessor *serializationProcessor_;
+
   // Object pool for risk engine operations
   // Created in constructor with configuration matching Java version
   std::unique_ptr<::exchange::core::collections::objpool::ObjectsPool>
@@ -298,6 +300,20 @@ private:
    * Get opposite action
    */
   static common::OrderAction OppositeAction(common::OrderAction action);
+
+  /**
+   * Check if margin order can be placed
+   */
+  bool CanPlaceMarginOrder(common::cmd::OrderCommand *cmd,
+                           common::UserProfile *userProfile,
+                           const common::CoreSymbolSpecification *spec,
+                           common::SymbolPositionRecord *position);
+
+  /**
+   * Remove position record
+   */
+  void RemovePositionRecord(common::SymbolPositionRecord *record,
+                            common::UserProfile *userProfile);
 };
 
 } // namespace processors

@@ -33,6 +33,7 @@
 #include <exchange/core/processors/RiskEngine.h>
 #include <exchange/core/processors/RiskEngineReportQueriesHandler.h>
 #include <exchange/core/processors/UserProfileService.h>
+#include <exchange/core/processors/journaling/DiskSerializationProcessorConfiguration.h>
 #include <exchange/core/processors/journaling/ISerializationProcessor.h>
 #include <exchange/core/utils/CoreArithmeticUtils.h>
 #include <exchange/core/utils/SerializationUtils.h>
@@ -49,7 +50,8 @@ RiskEngine::RiskEngine(
     journaling::ISerializationProcessor *serializationProcessor,
     SharedPool *sharedPool,
     const common::config::ExchangeConfiguration *exchangeConfiguration)
-    : shardId_(shardId), shardMask_(numShards - 1), exchangeId_(""),
+    : shardId_(shardId), shardMask_(numShards - 1),
+      serializationProcessor_(serializationProcessor), exchangeId_(""),
       folder_(""), cfgIgnoreRiskProcessing_(false),
       cfgMarginTradingEnabled_(false), logDebug_(false) {
   // Validate numShards is power of 2
@@ -65,8 +67,8 @@ RiskEngine::RiskEngine(
 
   // Initialize exchangeId and folder
   exchangeId_ = initStateCfg->exchangeId;
-  // TODO: Use DiskSerializationProcessorConfiguration::DEFAULT_FOLDER
-  folder_ = std::filesystem::path("snapshots");
+  folder_ = std::filesystem::path(
+      journaling::DiskSerializationProcessorConfiguration::DEFAULT_FOLDER);
 
   // Initialize configuration flags
   cfgIgnoreRiskProcessing_ = (ordersProcCfg->riskProcessingMode ==
@@ -240,8 +242,18 @@ bool RiskEngine::PreProcessCommand(int64_t seq,
                  // batch
 
   case common::cmd::OrderCommandType::PERSIST_STATE_RISK:
-    // TODO: Implement serialization
-    cmd->resultCode = common::cmd::CommandResultCode::SUCCESS;
+    if (serializationProcessor_ != nullptr) {
+      const bool isSuccess = serializationProcessor_->StoreData(
+          cmd->orderId, seq, cmd->timestamp,
+          journaling::ISerializationProcessor::SerializedModuleType::
+              RISK_ENGINE,
+          shardId_, this);
+      utils::UnsafeUtils::SetResultVolatile(
+          cmd, isSuccess, common::cmd::CommandResultCode::SUCCESS,
+          common::cmd::CommandResultCode::STATE_PERSIST_RISK_ENGINE_FAILED);
+    } else {
+      cmd->resultCode = common::cmd::CommandResultCode::SUCCESS;
+    }
     return false;
 
   default:
@@ -416,8 +428,37 @@ RiskEngine::PlaceOrder(common::cmd::OrderCommand *cmd,
     if (!cfgMarginTradingEnabled_) {
       return common::cmd::CommandResultCode::RISK_MARGIN_TRADING_DISABLED;
     }
-    // TODO: Implement margin order placement
-    return common::cmd::CommandResultCode::VALID_FOR_MATCHING_ENGINE;
+
+    // Get or create position record
+    common::SymbolPositionRecord *position = nullptr;
+    auto posIt = userProfile->positions.find(spec->symbolId);
+    if (posIt != userProfile->positions.end()) {
+      position = posIt->second;
+    } else {
+      // Create new position record
+      position = objectsPool_->Get<common::SymbolPositionRecord>(
+          ::exchange::core::collections::objpool::ObjectsPool::
+              SYMBOL_POSITION_RECORD,
+          [cmd, spec]() {
+            return new common::SymbolPositionRecord(cmd->uid, spec->symbolId,
+                                                    spec->quoteCurrency);
+          });
+      position->Initialize(cmd->uid, spec->symbolId, spec->quoteCurrency);
+      userProfile->positions[spec->symbolId] = position;
+    }
+
+    const bool canPlaceOrder =
+        CanPlaceMarginOrder(cmd, userProfile, spec, position);
+    if (canPlaceOrder) {
+      position->PendingHold(cmd->action, cmd->size);
+      return common::cmd::CommandResultCode::VALID_FOR_MATCHING_ENGINE;
+    } else {
+      // Try to cleanup position if refusing to place
+      if (position->IsEmpty()) {
+        RemovePositionRecord(position, userProfile);
+      }
+      return common::cmd::CommandResultCode::RISK_NSF;
+    }
   } else {
     return common::cmd::CommandResultCode::UNSUPPORTED_SYMBOL_TYPE;
   }
@@ -512,34 +553,106 @@ void RiskEngine::HandleMatcherRejectReduceEventExchange(
 void RiskEngine::HandleMatcherEventsExchangeSell(
     common::MatcherTradeEvent *ev, const common::CoreSymbolSpecification *spec,
     common::UserProfile *taker) {
-  // Simplified implementation - process trade events for sell orders
-  // TODO: Implement full logic with maker handling
+  int64_t takerSizeForThisHandler = 0;
+  int64_t makerSizeForThisHandler = 0;
+  int64_t takerSizePriceForThisHandler = 0;
+
+  const int32_t quoteCurrency = spec->quoteCurrency;
+
   while (ev != nullptr) {
-    if (ev->eventType == common::MatcherEventType::TRADE) {
-      // Update taker balance
-      if (taker != nullptr) {
-        int64_t quoteAmount = ev->size * ev->price * spec->quoteScaleK;
-        taker->accounts[spec->quoteCurrency] += quoteAmount;
-      }
+    // Aggregate transfers for selling taker
+    if (taker != nullptr) {
+      takerSizePriceForThisHandler += ev->size * ev->price;
+      takerSizeForThisHandler += ev->size;
     }
+
+    // Process transfers for buying maker
+    if (UidForThisHandler(ev->matchedOrderUid)) {
+      const int64_t size = ev->size;
+      auto *maker = userProfileService_->GetUserProfileOrAddSuspended(
+          ev->matchedOrderUid);
+
+      // Buying, use bidderHoldPrice to calculate released amount based on price
+      // difference
+      const int64_t priceDiff = ev->bidderHoldPrice - ev->price;
+      const int64_t amountDiffToReleaseInQuoteCurrency =
+          utils::CoreArithmeticUtils::CalculateAmountBidReleaseCorrMaker(
+              size, priceDiff, spec);
+      maker->accounts[quoteCurrency] += amountDiffToReleaseInQuoteCurrency;
+
+      const int64_t gainedAmountInBaseCurrency =
+          utils::CoreArithmeticUtils::CalculateAmountAsk(size, spec);
+      maker->accounts[spec->baseCurrency] += gainedAmountInBaseCurrency;
+
+      makerSizeForThisHandler += size;
+    }
+
     ev = ev->nextEvent;
+  }
+
+  if (taker != nullptr) {
+    taker->accounts[quoteCurrency] +=
+        takerSizePriceForThisHandler * spec->quoteScaleK -
+        spec->takerFee * takerSizeForThisHandler;
+  }
+
+  if (takerSizeForThisHandler != 0 || makerSizeForThisHandler != 0) {
+    fees_[quoteCurrency] += spec->takerFee * takerSizeForThisHandler +
+                            spec->makerFee * makerSizeForThisHandler;
   }
 }
 
 void RiskEngine::HandleMatcherEventsExchangeBuy(
     common::MatcherTradeEvent *ev, const common::CoreSymbolSpecification *spec,
     common::UserProfile *taker, common::cmd::OrderCommand *cmd) {
-  // Simplified implementation - process trade events for buy orders
-  // TODO: Implement full logic with maker handling
+  int64_t takerSizeForThisHandler = 0;
+  int64_t makerSizeForThisHandler = 0;
+  int64_t takerSizePriceSum = 0;
+  int64_t takerSizePriceHeldSum = 0;
+
+  const int32_t quoteCurrency = spec->quoteCurrency;
+
   while (ev != nullptr) {
-    if (ev->eventType == common::MatcherEventType::TRADE) {
-      // Update taker balance
-      if (taker != nullptr) {
-        int64_t baseAmount = ev->size * spec->baseScaleK;
-        taker->accounts[spec->baseCurrency] += baseAmount;
-      }
+    // Perform transfers for taker
+    if (taker != nullptr) {
+      takerSizePriceSum += ev->size * ev->price;
+      takerSizePriceHeldSum += ev->size * ev->bidderHoldPrice;
+      takerSizeForThisHandler += ev->size;
     }
+
+    // Process transfers for maker
+    if (UidForThisHandler(ev->matchedOrderUid)) {
+      const int64_t size = ev->size;
+      auto *maker = userProfileService_->GetUserProfileOrAddSuspended(
+          ev->matchedOrderUid);
+      const int64_t gainedAmountInQuoteCurrency =
+          utils::CoreArithmeticUtils::CalculateAmountBid(size, ev->price, spec);
+      maker->accounts[quoteCurrency] +=
+          gainedAmountInQuoteCurrency - spec->makerFee * size;
+      makerSizeForThisHandler += size;
+    }
+
     ev = ev->nextEvent;
+  }
+
+  if (taker != nullptr) {
+    if (cmd->command == common::cmd::OrderCommandType::PLACE_ORDER &&
+        cmd->orderType == common::OrderType::FOK_BUDGET) {
+      // For FOK budget held sum calculated differently
+      takerSizePriceHeldSum = cmd->price;
+    }
+    // TODO IOC_BUDGET - order can be partially rejected - need held taker fee
+    // correction
+
+    taker->accounts[quoteCurrency] +=
+        (takerSizePriceHeldSum - takerSizePriceSum) * spec->quoteScaleK;
+    taker->accounts[spec->baseCurrency] +=
+        takerSizeForThisHandler * spec->baseScaleK;
+  }
+
+  if (takerSizeForThisHandler != 0 || makerSizeForThisHandler != 0) {
+    fees_[quoteCurrency] += spec->takerFee * takerSizeForThisHandler +
+                            spec->makerFee * makerSizeForThisHandler;
   }
 }
 
@@ -586,6 +699,77 @@ void RiskEngine::HandleMatcherEventMargin(
 common::OrderAction RiskEngine::OppositeAction(common::OrderAction action) {
   return (action == common::OrderAction::BID) ? common::OrderAction::ASK
                                               : common::OrderAction::BID;
+}
+
+bool RiskEngine::CanPlaceMarginOrder(
+    common::cmd::OrderCommand *cmd, common::UserProfile *userProfile,
+    const common::CoreSymbolSpecification *spec,
+    common::SymbolPositionRecord *position) {
+  const int64_t newRequiredMarginForSymbol =
+      position->CalculateRequiredMarginForOrder(*spec, cmd->action, cmd->size);
+  if (newRequiredMarginForSymbol == -1) {
+    // Always allow placing a new order if it would not increase exposure
+    return true;
+  }
+
+  // Extra margin is required
+  const int32_t symbol = cmd->symbol;
+  // Calculate free margin for all positions same currency
+  int64_t freeMargin = 0;
+  for (const auto &posPair : userProfile->positions) {
+    const int32_t recSymbol = posPair.first;
+    if (recSymbol != symbol) {
+      if (posPair.second->currency == spec->quoteCurrency) {
+        const auto *spec2 =
+            symbolSpecificationProvider_->GetSymbolSpecification(recSymbol);
+        if (spec2 != nullptr) {
+          auto lastPriceIt = lastPriceCache_.find(recSymbol);
+          const LastPriceCacheRecord *lastPriceRecord =
+              (lastPriceIt != lastPriceCache_.end()) ? &lastPriceIt->second
+                                                     : nullptr;
+          // Add P&L subtract margin
+          // Convert LastPriceCacheRecord to
+          // common::processors::LastPriceCacheRecord
+          common::processors::LastPriceCacheRecord commonLastPrice;
+          if (lastPriceRecord != nullptr) {
+            commonLastPrice.askPrice = lastPriceRecord->askPrice;
+            commonLastPrice.bidPrice = lastPriceRecord->bidPrice;
+          }
+          freeMargin +=
+              posPair.second->EstimateProfit(*spec2, &commonLastPrice);
+          freeMargin -=
+              posPair.second->CalculateRequiredMarginForFutures(*spec2);
+        }
+      }
+    } else {
+      auto lastPriceIt = lastPriceCache_.find(spec->symbolId);
+      const LastPriceCacheRecord *lastPriceRecord =
+          (lastPriceIt != lastPriceCache_.end()) ? &lastPriceIt->second
+                                                 : nullptr;
+      // Convert RiskEngine::LastPriceCacheRecord to
+      // common::processors::LastPriceCacheRecord
+      common::processors::LastPriceCacheRecord commonLastPrice;
+      if (lastPriceRecord != nullptr) {
+        commonLastPrice.askPrice = lastPriceRecord->askPrice;
+        commonLastPrice.bidPrice = lastPriceRecord->bidPrice;
+      }
+      freeMargin = position->EstimateProfit(*spec, &commonLastPrice);
+    }
+  }
+
+  // Check if current balance and margin can cover new required margin for
+  // symbol position
+  return newRequiredMarginForSymbol <=
+         userProfile->accounts[position->currency] + freeMargin;
+}
+
+void RiskEngine::RemovePositionRecord(common::SymbolPositionRecord *record,
+                                      common::UserProfile *userProfile) {
+  userProfile->accounts[record->currency] += record->profit;
+  userProfile->positions.erase(record->symbol);
+  objectsPool_->Put(::exchange::core::collections::objpool::ObjectsPool::
+                        SYMBOL_POSITION_RECORD,
+                    record);
 }
 
 // Explicit template instantiation
