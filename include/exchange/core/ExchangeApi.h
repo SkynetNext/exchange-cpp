@@ -21,6 +21,7 @@
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <vector>
 
 // Include RingBuffer to use MultiProducerRingBuffer type alias
@@ -30,10 +31,40 @@ namespace exchange {
 namespace core {
 
 /**
+ * IExchangeApi - non-template interface for ExchangeApi
+ */
+class IExchangeApi {
+public:
+  virtual ~IExchangeApi() = default;
+
+  /**
+   * Submit command (fire and forget)
+   */
+  virtual void SubmitCommand(common::api::ApiCommand *cmd) = 0;
+
+  /**
+   * Submit command async (returns future)
+   */
+  virtual std::future<common::cmd::CommandResultCode>
+  SubmitCommandAsync(common::api::ApiCommand *cmd) = 0;
+
+  /**
+   * Submit commands synchronously
+   */
+  virtual void
+  SubmitCommandsSync(const std::vector<common::api::ApiCommand *> &cmds) = 0;
+
+  /**
+   * Process result from pipeline
+   */
+  virtual void ProcessResult(int64_t seq, common::cmd::OrderCommand *cmd) = 0;
+};
+
+/**
  * ExchangeApi - main API interface for submitting commands
  * Uses MultiProducerRingBuffer (most common case)
  */
-template <typename WaitStrategyT> class ExchangeApi {
+template <typename WaitStrategyT> class ExchangeApi : public IExchangeApi {
 public:
   using ResultsConsumer =
       std::function<void(common::cmd::OrderCommand *, int64_t)>;
@@ -44,29 +75,33 @@ public:
   /**
    * Process result from pipeline
    */
-  void ProcessResult(int64_t seq, common::cmd::OrderCommand *cmd);
+  void ProcessResult(int64_t seq, common::cmd::OrderCommand *cmd) override;
 
   /**
    * Submit command (fire and forget)
    */
-  void SubmitCommand(common::api::ApiCommand *cmd);
+  void SubmitCommand(common::api::ApiCommand *cmd) override;
 
   /**
    * Submit command async (returns future)
    */
-  // TODO: Implement async version with std::future
+  std::future<common::cmd::CommandResultCode>
+  SubmitCommandAsync(common::api::ApiCommand *cmd) override;
 
   /**
    * Submit commands synchronously
    */
-  void SubmitCommandsSync(const std::vector<common::api::ApiCommand *> &cmds);
+  void SubmitCommandsSync(
+      const std::vector<common::api::ApiCommand *> &cmds) override;
 
 private:
   disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>
       *ringBuffer_;
 
-  // promises cache (seq -> consumer)
-  ankerl::unordered_dense::map<int64_t, ResultsConsumer> promises_;
+  // promises cache (seq -> promise)
+  ankerl::unordered_dense::map<int64_t,
+                               std::promise<common::cmd::CommandResultCode>>
+      promises_;
 
   void PublishCommand(common::api::ApiCommand *cmd, int64_t seq);
 };

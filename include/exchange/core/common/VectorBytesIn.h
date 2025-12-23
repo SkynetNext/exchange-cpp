@@ -16,13 +16,17 @@
 
 #pragma once
 
-#include "BytesIn.h"
 #include <cstring>
+#include <stdexcept>
 #include <vector>
+
+#include "BytesIn.h"
 
 namespace exchange {
 namespace core {
 namespace common {
+
+using runtime_error = std::runtime_error;
 
 /**
  * VectorBytesIn - BytesIn implementation using std::vector<uint8_t>
@@ -39,14 +43,14 @@ public:
 
   int8_t ReadByte() override {
     if (position_ >= data_.size()) {
-      throw std::runtime_error("VectorBytesIn: Read beyond end of data");
+      throw runtime_error("VectorBytesIn: Read beyond end of data");
     }
     return static_cast<int8_t>(data_[position_++]);
   }
 
   int32_t ReadInt() override {
     if (position_ + sizeof(int32_t) > data_.size()) {
-      throw std::runtime_error("VectorBytesIn: Read beyond end of data");
+      throw runtime_error("VectorBytesIn: Read beyond end of data");
     }
     int32_t value = 0;
     std::memcpy(&value, data_.data() + position_, sizeof(int32_t));
@@ -56,7 +60,7 @@ public:
 
   int64_t ReadLong() override {
     if (position_ + sizeof(int64_t) > data_.size()) {
-      throw std::runtime_error("VectorBytesIn: Read beyond end of data");
+      throw runtime_error("VectorBytesIn: Read beyond end of data");
     }
     int64_t value = 0;
     std::memcpy(&value, data_.data() + position_, sizeof(int64_t));
@@ -66,7 +70,7 @@ public:
 
   bool ReadBoolean() override {
     if (position_ >= data_.size()) {
-      throw std::runtime_error("VectorBytesIn: Read beyond end of data");
+      throw runtime_error("VectorBytesIn: Read beyond end of data");
     }
     return data_[position_++] != 0;
   }
@@ -77,7 +81,7 @@ public:
 
   void Read(void *buffer, size_t length) override {
     if (position_ + length > data_.size()) {
-      throw std::runtime_error("VectorBytesIn: Read beyond end of data");
+      throw runtime_error("VectorBytesIn: Read beyond end of data");
     }
     std::memcpy(buffer, data_.data() + position_, length);
     position_ += length;
@@ -90,4 +94,3 @@ public:
 } // namespace common
 } // namespace core
 } // namespace exchange
-

@@ -24,21 +24,9 @@
 #include <memory>
 
 // Forward declarations
-// Note: Disruptor and RingBuffer are forward declared in other headers
-// with different template parameters, so we don't redeclare them here
-namespace disruptor::dsl {
-enum class ProducerType;
-}
-
 namespace exchange {
 namespace core {
-// Forward declaration - full definition needed in .cpp
 namespace processors {
-class GroupingProcessor;
-template <typename WaitStrategyT> class TwoStepMasterProcessor;
-template <typename WaitStrategyT> class TwoStepSlaveProcessor;
-class EventProcessorAdapter;
-class SimpleEventHandler;
 namespace journaling {
 class ISerializationProcessor;
 }
@@ -72,34 +60,16 @@ public:
   /**
    * Get ExchangeApi instance
    */
-  ExchangeApi<disruptor::BlockingWaitStrategy> *GetApi() { return api_.get(); }
+  IExchangeApi *GetApi();
+
+  // Internal implementation interface (must be public for template class access
+  // in .cpp)
+  struct IImpl;
 
 private:
-  // Type-erased Disruptor pointer (actual type depends on WaitStrategy)
-  // Using BlockingWaitStrategy as default
-  void *disruptor_;
-  void *ringBuffer_; // Type-erased RingBuffer pointer
-  std::unique_ptr<ExchangeApi<disruptor::BlockingWaitStrategy>> api_;
-  processors::journaling::ISerializationProcessor *serializationProcessor_;
+  std::unique_ptr<IImpl> impl_;
+
   const common::config::ExchangeConfiguration *exchangeConfiguration_;
-
-  // Store processors for lifecycle management
-  std::vector<std::unique_ptr<processors::GroupingProcessor>>
-      groupingProcessors_;
-  std::vector<std::unique_ptr<
-      processors::TwoStepMasterProcessor<disruptor::BlockingWaitStrategy>>>
-      r1Processors_;
-  std::vector<std::unique_ptr<
-      processors::TwoStepSlaveProcessor<disruptor::BlockingWaitStrategy>>>
-      r2Processors_;
-  std::vector<std::unique_ptr<processors::EventProcessorAdapter>>
-      processorAdapters_;
-  std::vector<std::unique_ptr<processors::SimpleEventHandler>> riskHandlers_;
-
-  bool started_ = false;
-  bool stopped_ = false;
-
-  static constexpr bool EVENTS_POOLING = false;
 };
 
 } // namespace core
