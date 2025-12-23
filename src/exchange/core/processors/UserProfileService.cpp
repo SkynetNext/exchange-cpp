@@ -165,7 +165,7 @@ int32_t UserProfileService::GetStateHash() const {
   return utils::HashingUtils::StateHash(userProfiles);
 }
 
-void UserProfileService::WriteMarshallable(common::BytesOut &bytes) {
+void UserProfileService::WriteMarshallable(common::BytesOut &bytes) const {
   // Write userProfiles (long -> UserProfile*)
   utils::SerializationUtils::MarshallLongHashMap(userProfiles, bytes);
 }

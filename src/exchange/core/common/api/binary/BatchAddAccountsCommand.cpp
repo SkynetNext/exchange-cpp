@@ -15,6 +15,7 @@
  */
 
 #include <exchange/core/common/BytesIn.h>
+#include <exchange/core/common/BytesOut.h>
 #include <exchange/core/common/api/binary/BatchAddAccountsCommand.h>
 #include <exchange/core/common/api/binary/BinaryDataCommandFactory.h>
 #include <exchange/core/utils/SerializationUtils.h>
@@ -50,6 +51,16 @@ BatchAddAccountsCommand::BatchAddAccountsCommand(BytesIn &bytes) {
       users[pair.first] = *pair.second;
       delete pair.second;
     }
+  }
+}
+
+void BatchAddAccountsCommand::WriteMarshallable(BytesOut &bytes) const {
+  // Match Java: SerializationUtils.marshallLongHashMap(users,
+  // SerializationUtils::marshallIntLongHashMap, bytes);
+  bytes.WriteInt(static_cast<int32_t>(users.size()));
+  for (const auto &pair : users) {
+    bytes.WriteLong(pair.first);
+    SerializationUtils::MarshallIntLongHashMap(pair.second, bytes);
   }
 }
 

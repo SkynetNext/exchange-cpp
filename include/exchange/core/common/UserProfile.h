@@ -60,7 +60,7 @@ public:
   int32_t GetStateHash() const override;
 
   // WriteBytesMarshallable interface
-  void WriteMarshallable(BytesOut &bytes) override;
+  void WriteMarshallable(BytesOut &bytes) const override;
 
   std::string ToString() const;
 };

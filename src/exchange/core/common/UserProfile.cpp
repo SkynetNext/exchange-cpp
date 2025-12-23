@@ -110,7 +110,7 @@ std::string UserProfile::ToString() const {
   return oss.str();
 }
 
-void UserProfile::WriteMarshallable(BytesOut &bytes) {
+void UserProfile::WriteMarshallable(BytesOut &bytes) const {
   bytes.WriteLong(uid);
 
   // positions (int -> SymbolPositionRecord*)

@@ -81,7 +81,7 @@ public:
   int32_t GetStateHash() const override;
 
   // WriteBytesMarshallable interface
-  void WriteMarshallable(BytesOut &bytes) override;
+  void WriteMarshallable(BytesOut &bytes) const override;
 
   // Comparison operators
   bool operator==(const Order &other) const;

@@ -250,6 +250,8 @@ public:
     auto afterGrouping = disruptor_->handleEventsWith(groupingFactory);
 
     // Stage 2: Journaling (Optional)
+    disruptor::EventHandler<common::cmd::OrderCommand> *journalingHandler =
+        nullptr;
     if (serializationCfg.enableJournaling) {
       class JournalingEventHandler
           : public disruptor::EventHandler<common::cmd::OrderCommand> {
@@ -266,10 +268,11 @@ public:
         processors::journaling::ISerializationProcessor *processor_;
       };
 
-      auto journalingHandler =
+      auto jh =
           std::make_unique<JournalingEventHandler>(serializationProcessor_);
-      afterGrouping.handleEventsWith(*journalingHandler);
-      eventHandlers_.push_back(std::move(journalingHandler));
+      journalingHandler = jh.get();
+      afterGrouping.handleEventsWith(*jh);
+      eventHandlers_.push_back(std::move(jh));
     }
 
     // Stage 3: Risk Pre-Process (R1)
@@ -298,11 +301,12 @@ public:
               processors::TwoStepMasterProcessor<WaitStrategyT>>>
               &r1ProcessorsOwned,
           std::vector<std::unique_ptr<processors::EventProcessorAdapter>>
-              &adapters)
+              &adapters,
+          std::vector<disruptor::EventProcessor *> &r1EventProcessors)
           : eventHandler_(eventHandler), exceptionHandler_(exceptionHandler),
             coreWaitStrategy_(coreWaitStrategy), name_(name),
             r1Processors_(r1Processors), r1ProcessorsOwned_(r1ProcessorsOwned),
-            adapters_(adapters) {}
+            adapters_(adapters), r1EventProcessors_(r1EventProcessors) {}
 
       disruptor::EventProcessor &
       createEventProcessor(RingBufferT &ringBuffer,
@@ -322,6 +326,7 @@ public:
         r1Processors_.push_back(processor.get());
         r1ProcessorsOwned_.push_back(std::move(processor));
         adapters_.push_back(std::move(adapter));
+        r1EventProcessors_.push_back(adapters_.back().get());
         return *adapters_.back();
       }
 
@@ -337,6 +342,7 @@ public:
           &r1ProcessorsOwned_;
       std::vector<std::unique_ptr<processors::EventProcessorAdapter>>
           &adapters_;
+      std::vector<disruptor::EventProcessor *> &r1EventProcessors_;
     };
 
     for (size_t i = 0; i < riskEngines_.size(); i++) {
@@ -345,12 +351,12 @@ public:
       auto r1Factory = R1ProcessorFactory(
           handler.get(), exceptionHandler_.get(), perfCfg.waitStrategy,
           "R1_" + std::to_string(i), r1Processors_, r1ProcessorsOwned_,
-          processorAdapters_);
+          processorAdapters_, r1EventProcessors_);
       afterGrouping.handleEventsWith(r1Factory);
       riskHandlers_.push_back(std::move(handler));
     }
 
-    // Stage 4: Matching Engines
+    // Stage 4: Matching Engines (after R1)
     class MatchingEngineEventHandler
         : public disruptor::EventHandler<common::cmd::OrderCommand> {
     public:
@@ -367,9 +373,16 @@ public:
       processors::MatchingEngineRouter *matchingEngine_;
     };
 
+    // Create afterR1 group (wait for all R1 processors to complete)
+    // Java: disruptor.after(procR1.toArray(new TwoStepMasterProcessor[0]))
+    auto afterR1 =
+        disruptor_->after(const_cast<disruptor::EventProcessor *const *>(
+                              r1EventProcessors_.data()),
+                          static_cast<int>(r1EventProcessors_.size()));
+
     for (auto &me : matchingEngines_) {
       auto handler = std::make_unique<MatchingEngineEventHandler>(me.get());
-      afterGrouping.handleEventsWith(*handler);
+      afterR1.handleEventsWith(*handler);
       matchingEngineHandlers_.push_back(std::move(handler));
     }
 
@@ -454,6 +467,9 @@ public:
     }
 
     // Stage 6: Results Handler
+    // Java: mainHandlerGroup = enableJournaling
+    //   ? disruptor.after(arraysAddHandler(matchingEngineHandlers, jh))
+    //   : afterMatchingEngine;
     resultsHandler_ =
         std::make_unique<processors::ResultsHandler>(resultsConsumer);
     class ResultsEventHandler
@@ -473,9 +489,21 @@ public:
       ExchangeApi<WaitStrategyT> *api_;
     };
 
+    // Create mainHandlerGroup: wait for ME + J (if journaling enabled)
+    auto mainHandlerGroup = afterME;
+    if (serializationCfg.enableJournaling && journalingHandler) {
+      // Wait for both ME and J
+      std::vector<disruptor::EventHandlerIdentity *> meAndJIdentities;
+      for (auto &h : matchingEngineHandlers_)
+        meAndJIdentities.push_back(h.get());
+      meAndJIdentities.push_back(journalingHandler);
+      mainHandlerGroup =
+          disruptor_->after(meAndJIdentities.data(), meAndJIdentities.size());
+    }
+
     auto resHandler = std::make_unique<ResultsEventHandler>(
         resultsHandler_.get(), api_.get());
-    afterME.handleEventsWith(*resHandler);
+    mainHandlerGroup.handleEventsWith(*resHandler);
     eventHandlers_.push_back(std::move(resHandler));
 
     // Final Stage: Link R1 and R2
@@ -531,6 +559,7 @@ private:
       r2ProcessorsOwned_;
   std::vector<std::unique_ptr<processors::EventProcessorAdapter>>
       processorAdapters_;
+  std::vector<disruptor::EventProcessor *> r1EventProcessors_;
   std::vector<std::unique_ptr<processors::SimpleEventHandler>> riskHandlers_;
   std::vector<
       std::unique_ptr<disruptor::EventHandler<common::cmd::OrderCommand>>>

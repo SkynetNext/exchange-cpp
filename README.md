@@ -38,37 +38,43 @@ graph TD
         GW[Gateways: Aeron/TCP/WS]
     end
 
-    GW -- "Multi-Producer Write" --> RB((Ring Buffer))
+    GW -- "MP-Batch Write" --> RB((Ring Buffer))
 
-    %% Pipeline Stage 1
+    %% Pipeline Stage 1 - Centered
     subgraph Stage1 [Stage 1: Pre-process]
         G[G: Grouping - 1 Thread]
     end
 
-    %% Pipeline Stage 2 & 3 (Parallel Paths)
+    %% Pipeline Stage 2 & 3 - Centered
     subgraph Stage2_3 [Stage 2 & 3: Execution & Persistence]
-        subgraph TradingChain [Trading Chain: Serial]
+        subgraph TradingChain [Trading Chain]
             R1[R1: Risk Pre-hold - N Threads]
             --> ME[ME: Matching Engine - M Threads]
-            --> R2[R2: Risk Release - N Threads]
         end
         
-        subgraph JournalPath [Journal Path: Parallel]
+        subgraph JournalPath [Journal Path]
             J[J: Journaling - 1 Thread]
         end
     end
 
-    %% Egress
-    subgraph Egress [Egress: 1 Thread]
+    %% Egress & Cleanup - Centered
+    subgraph Egress [Stage 4: Egress & Cleanup]
+        R2[R2: Risk Release - N Threads]
         E[E: Results Handler]
     end
 
+    %% Output - Centered
+    Out[Market Data / Execution Reports]
+
+    %% Connections
     RB --> G
     G --> R1
     G --> J
-    R2 --> E
+    R1 --> ME
+    ME --> R2
+    ME --> E
     J --> E
-    E --> Out[Market Data / Execution Reports]
+    E --> Out
 
     %% Styling
     style RB fill:#f96,stroke:#333,stroke-width:2px
@@ -80,13 +86,13 @@ graph TD
 
 | Role | Threads | Sharding | Responsibility |
 | :--- | :--- | :--- | :--- |
-| **Gateway** | **K** | `ConnID` | Protocol parsing, authentication, and publishing into Ring Buffer. |
-| **Grouping (G)** | **1** | N/A | Batching small orders and identifying cancel-replace patterns. |
-| **Journaling (J)** | **1** | N/A | **Parallel Path**: Binary persistence for state recovery (mmap). |
-| **Risk (R1)** | **N** | `UID` | **Serial Path**: Pre-match balance checks and speculative freezing. |
-| **Matching (ME)** | **M** | `SymbolID` | **Serial Path**: OrderBook matching (Price-Time Priority). |
-| **Risk (R2)** | **N** | `UID` | **Serial Path**: Final settlement, fee deduction, and profit/loss release. |
-| **Results (E)** | **1** | N/A | Merging parallel events into a single output stream. |
+| **Gateway** | **K** | `ConnID` | **Producer (MP-Batch)**: Protocol parsing, authentication, and batch publishing into Ring Buffer. |
+| **Grouping (G)** | **1** | N/A | **Consumer**: Batching small orders and identifying cancel-replace patterns. |
+| **Journaling (J)** | **1** | N/A | **Consumer (Parallel Path)**: Binary persistence for state recovery (mmap). |
+| **Risk (R1)** | **N** | `UID` | **Consumer (Serial Path)**: Pre-match balance checks and speculative freezing. |
+| **Matching (ME)** | **M** | `SymbolID` | **Consumer (Serial Path)**: OrderBook matching (Price-Time Priority). |
+| **Risk (R2)** | **N** | `UID` | **Consumer (Parallel Cleanup)**: Final settlement, fee deduction, and profit/loss release. |
+| **Results (E)** | **1** | N/A | **Consumer (Parallel Egress)**: Merging ME and J results into output stream (waits for ME + J). |
 
 ### Architectural Pillars
 1.  **Lock-Free Pipeline**: Using `disruptor-cpp` to manage dependencies between stages without mutexes.

@@ -71,7 +71,7 @@ public:
   int32_t GetStateHash() const override;
 
   // WriteBytesMarshallable interface
-  void WriteMarshallable(common::BytesOut &bytes) override;
+  void WriteMarshallable(common::BytesOut &bytes) const override;
 
 private:
   // symbol ID -> CoreSymbolSpecification

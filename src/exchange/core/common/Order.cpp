@@ -67,7 +67,7 @@ std::string Order::ToString() const {
   return oss.str();
 }
 
-void Order::WriteMarshallable(BytesOut &bytes) {
+void Order::WriteMarshallable(BytesOut &bytes) const {
   bytes.WriteLong(orderId);
   bytes.WriteLong(price);
   bytes.WriteLong(size);

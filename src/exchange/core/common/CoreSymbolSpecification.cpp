@@ -70,7 +70,7 @@ std::string CoreSymbolSpecification::ToString() const {
   return oss.str();
 }
 
-void CoreSymbolSpecification::WriteMarshallable(BytesOut &bytes) {
+void CoreSymbolSpecification::WriteMarshallable(BytesOut &bytes) const {
   bytes.WriteInt(symbolId);
   bytes.WriteByte(static_cast<int8_t>(type));
   bytes.WriteInt(baseCurrency);

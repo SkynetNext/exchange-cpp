@@ -30,6 +30,14 @@
 namespace exchange {
 namespace core {
 
+// Forward declarations
+namespace common {
+namespace api {
+class ApiBinaryDataCommand;
+class ApiPersistState;
+} // namespace api
+} // namespace common
+
 /**
  * IExchangeApi - non-template interface for ExchangeApi
  */
@@ -104,6 +112,14 @@ private:
       promises_;
 
   void PublishCommand(common::api::ApiCommand *cmd, int64_t seq);
+
+  // Batch publishing methods (using next(n) + publish(lo, hi))
+  void PublishBinaryData(common::api::ApiBinaryDataCommand *apiCmd,
+                         std::function<void(int64_t)> endSeqConsumer);
+  void PublishPersistCmd(common::api::ApiPersistState *api,
+                         std::function<void(int64_t, int64_t)> seqConsumer);
+
+  static constexpr int LONGS_PER_MESSAGE = 5;
 };
 
 } // namespace core

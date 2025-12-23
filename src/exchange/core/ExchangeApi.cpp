@@ -18,7 +18,9 @@
 #include <disruptor/RingBuffer.h>
 #include <exchange/core/ExchangeApi.h>
 #include <exchange/core/common/BalanceAdjustmentType.h>
+#include <exchange/core/common/BytesOut.h>
 #include <exchange/core/common/OrderType.h>
+#include <exchange/core/common/VectorBytesOut.h>
 #include <exchange/core/common/api/ApiAddUser.h>
 #include <exchange/core/common/api/ApiAdjustUserBalance.h>
 #include <exchange/core/common/api/ApiBinaryDataCommand.h>
@@ -37,7 +39,11 @@
 #include <exchange/core/common/cmd/CommandResultCode.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/common/cmd/OrderCommandType.h>
+#include <exchange/core/processors/BinaryCommandsProcessor.h>
+#include <exchange/core/utils/SerializationUtils.h>
+#include <functional>
 #include <stdexcept>
+#include <vector>
 
 namespace exchange {
 namespace core {
@@ -278,6 +284,12 @@ void ExchangeApi<WaitStrategyT>::SubmitCommand(common::api::ApiCommand *cmd) {
     ringBuffer_->publishEvent(RESET_TRANSLATOR, *reset);
   } else if (auto *nop = dynamic_cast<common::api::ApiNop *>(cmd)) {
     ringBuffer_->publishEvent(NOP_TRANSLATOR, *nop);
+  } else if (auto *binaryData =
+                 dynamic_cast<common::api::ApiBinaryDataCommand *>(cmd)) {
+    PublishBinaryData(binaryData, [](int64_t) {});
+  } else if (auto *persistState =
+                 dynamic_cast<common::api::ApiPersistState *>(cmd)) {
+    PublishPersistCmd(persistState, [](int64_t, int64_t) {});
   } else {
     throw std::invalid_argument("Unsupported command type");
   }
@@ -360,6 +372,126 @@ template <typename WaitStrategyT>
 void ExchangeApi<WaitStrategyT>::PublishCommand(common::api::ApiCommand *cmd,
                                                 int64_t seq) {
   SubmitCommand(cmd);
+}
+
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::PublishBinaryData(
+    common::api::ApiBinaryDataCommand *apiCmd,
+    std::function<void(int64_t)> endSeqConsumer) {
+  if (!apiCmd || !apiCmd->data) {
+    throw std::invalid_argument("Invalid ApiBinaryDataCommand");
+  }
+
+  // Serialize object to bytes
+  std::vector<uint8_t> serializedBytes;
+  serializedBytes.reserve(128);
+  common::VectorBytesOut bytesOut(serializedBytes);
+  bytesOut.WriteInt(apiCmd->data->GetBinaryCommandTypeCode());
+  apiCmd->data->WriteMarshallable(bytesOut);
+
+  // Compress and convert to long array
+  const std::vector<int64_t> longsArrayData =
+      utils::SerializationUtils::BytesToLongArrayLz4(serializedBytes,
+                                                     LONGS_PER_MESSAGE);
+
+  const int totalNumMessagesToClaim =
+      static_cast<int>(longsArrayData.size()) / LONGS_PER_MESSAGE;
+
+  // Max fragment size is quarter of ring buffer
+  const int batchSize = ringBuffer_->getBufferSize() / 4;
+
+  int offset = 0;
+  bool isLastFragment = false;
+  int fragmentSize = batchSize;
+
+  do {
+    if (offset + batchSize >= totalNumMessagesToClaim) {
+      fragmentSize = totalNumMessagesToClaim - offset;
+      isLastFragment = true;
+    }
+
+    // Batch publish: next(n) + publish(lo, hi)
+    const int64_t highSeq = ringBuffer_->next(fragmentSize);
+    const int64_t lowSeq = highSeq - fragmentSize + 1;
+
+    try {
+      int ptr = offset * LONGS_PER_MESSAGE;
+      for (int64_t seq = lowSeq; seq <= highSeq; seq++) {
+        auto &cmd = ringBuffer_->get(seq);
+        cmd.command = common::cmd::OrderCommandType::BINARY_DATA_COMMAND;
+        cmd.userCookie = apiCmd->transferId;
+        cmd.symbol = (isLastFragment && seq == highSeq) ? -1 : 0;
+
+        cmd.orderId = longsArrayData[ptr];
+        cmd.price = longsArrayData[ptr + 1];
+        cmd.reserveBidPrice = longsArrayData[ptr + 2];
+        cmd.size = longsArrayData[ptr + 3];
+        cmd.uid = longsArrayData[ptr + 4];
+
+        cmd.timestamp = apiCmd->timestamp;
+        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+
+        ptr += LONGS_PER_MESSAGE;
+      }
+    } catch (const std::exception &ex) {
+      // Publish even on error to maintain sequence consistency
+      ringBuffer_->publish(lowSeq, highSeq);
+      throw;
+    }
+
+    if (isLastFragment) {
+      // Report last sequence before actually publishing data
+      endSeqConsumer(highSeq);
+    }
+
+    // Batch publish: publish(lo, hi)
+    ringBuffer_->publish(lowSeq, highSeq);
+
+    offset += batchSize;
+  } while (!isLastFragment);
+}
+
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::PublishPersistCmd(
+    common::api::ApiPersistState *api,
+    std::function<void(int64_t, int64_t)> seqConsumer) {
+  if (!api) {
+    throw std::invalid_argument("Invalid ApiPersistState");
+  }
+
+  // Batch publish: next(2) + publish(lo, hi)
+  const int64_t secondSeq = ringBuffer_->next(2);
+  const int64_t firstSeq = secondSeq - 1;
+
+  try {
+    // Will be ignored by risk handlers, but processed by matching engine
+    auto &cmdMatching = ringBuffer_->get(firstSeq);
+    cmdMatching.command = common::cmd::OrderCommandType::PERSIST_STATE_MATCHING;
+    cmdMatching.orderId = api->dumpId;
+    cmdMatching.symbol = -1;
+    cmdMatching.uid = 0;
+    cmdMatching.price = 0;
+    cmdMatching.timestamp = api->timestamp;
+    cmdMatching.resultCode = common::cmd::CommandResultCode::NEW;
+
+    // Sequential command will make risk handler to create snapshot
+    auto &cmdRisk = ringBuffer_->get(secondSeq);
+    cmdRisk.command = common::cmd::OrderCommandType::PERSIST_STATE_RISK;
+    cmdRisk.orderId = api->dumpId;
+    cmdRisk.symbol = -1;
+    cmdRisk.uid = 0;
+    cmdRisk.price = 0;
+    cmdRisk.timestamp = api->timestamp;
+    cmdRisk.resultCode = common::cmd::CommandResultCode::NEW;
+  } catch (const std::exception &ex) {
+    // Publish even on error to maintain sequence consistency
+    ringBuffer_->publish(firstSeq, secondSeq);
+    throw;
+  }
+
+  seqConsumer(firstSeq, secondSeq);
+  // Batch publish: publish(lo, hi)
+  ringBuffer_->publish(firstSeq, secondSeq);
 }
 
 } // namespace core

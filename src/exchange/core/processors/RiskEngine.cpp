@@ -815,7 +815,7 @@ int32_t RiskEngine::GetStateHash() const {
   return static_cast<int32_t>(hash);
 }
 
-void RiskEngine::WriteMarshallable(common::BytesOut &bytes) {
+void RiskEngine::WriteMarshallable(common::BytesOut &bytes) const {
   // Write shardId and shardMask
   bytes.WriteInt(shardId_).WriteLong(shardMask_);
 

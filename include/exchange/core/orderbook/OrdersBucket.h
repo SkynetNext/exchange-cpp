@@ -109,7 +109,7 @@ public:
   /**
    * WriteMarshallable interface
    */
-  void WriteMarshallable(common::BytesOut &bytes) override;
+  void WriteMarshallable(common::BytesOut &bytes) const override;
 
 private:
   int64_t price_;

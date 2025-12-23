@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "../../WriteBytesMarshallable.h"
 #include <cstdint>
 
 namespace exchange {
@@ -26,8 +27,9 @@ namespace binary {
 
 /**
  * BinaryDataCommand - interface for binary data commands
+ * Matches Java: BinaryDataCommand extends WriteBytesMarshallable
  */
-class BinaryDataCommand {
+class BinaryDataCommand : public WriteBytesMarshallable {
 public:
   virtual ~BinaryDataCommand() = default;
 

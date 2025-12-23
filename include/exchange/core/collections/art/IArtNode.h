@@ -83,19 +83,21 @@ public:
 
   /**
    * For each element in ascending order
+   * Const method - only reads tree structure, does not modify it
    * @param consumer Consumer function (key, value)
    * @param limit Maximum number of elements to process
    * @return Number of elements processed
    */
-  virtual int ForEach(LongObjConsumer<V> *consumer, int limit) = 0;
+  virtual int ForEach(LongObjConsumer<V> *consumer, int limit) const = 0;
 
   /**
    * For each element in descending order
+   * Const method - only reads tree structure, does not modify it
    * @param consumer Consumer function (key, value)
    * @param limit Maximum number of elements to process
    * @return Number of elements processed
    */
-  virtual int ForEachDesc(LongObjConsumer<V> *consumer, int limit) = 0;
+  virtual int ForEachDesc(LongObjConsumer<V> *consumer, int limit) const = 0;
 
   /**
    * Get number of elements

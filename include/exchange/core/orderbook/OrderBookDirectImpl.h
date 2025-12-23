@@ -83,7 +83,7 @@ public:
     int32_t GetStateHash() const override;
 
     // WriteBytesMarshallable interface
-    void WriteMarshallable(common::BytesOut &bytes) override;
+    void WriteMarshallable(common::BytesOut &bytes) const override;
   };
 
   OrderBookDirectImpl(
@@ -128,7 +128,7 @@ public:
   int32_t GetStateHash() const override;
 
   // WriteBytesMarshallable interface
-  void WriteMarshallable(common::BytesOut &bytes) override;
+  void WriteMarshallable(common::BytesOut &bytes) const override;
 
 private:
   // Price buckets using ART tree

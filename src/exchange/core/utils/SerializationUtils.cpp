@@ -156,6 +156,44 @@ SerializationUtils::LongsLz4ToBytes(const std::vector<int64_t> &dataArray,
   return decompressedData;
 }
 
+std::vector<int64_t>
+SerializationUtils::BytesToLongArrayLz4(const std::vector<uint8_t> &bytes,
+                                        int padding) {
+  const int originalSize = static_cast<int>(bytes.size());
+
+  // Allocate buffer for compressed data: 4 bytes (original size) + compressed
+  // data
+  const int maxCompressedSize = LZ4_compressBound(originalSize);
+  std::vector<uint8_t> compressedBuffer(4 + maxCompressedSize);
+
+  // Write original size in first 4 bytes
+  std::memcpy(compressedBuffer.data(), &originalSize, sizeof(int32_t));
+
+  // Compress using LZ4
+  const int compressedSize = LZ4_compress_default(
+      reinterpret_cast<const char *>(bytes.data()),
+      reinterpret_cast<char *>(compressedBuffer.data() + 4), originalSize,
+      maxCompressedSize);
+
+  if (compressedSize <= 0) {
+    throw std::runtime_error("LZ4 compression failed");
+  }
+
+  // Resize buffer to actual compressed size (including 4-byte header)
+  compressedBuffer.resize(4 + compressedSize);
+
+  // Calculate required long array size with padding
+  const int longArraySize =
+      RequiredLongArraySize(static_cast<int>(compressedBuffer.size()), padding);
+
+  // Convert compressed bytes to long array
+  std::vector<int64_t> longArray(longArraySize, 0);
+  std::memcpy(longArray.data(), compressedBuffer.data(),
+              compressedBuffer.size());
+
+  return longArray;
+}
+
 } // namespace utils
 } // namespace core
 } // namespace exchange

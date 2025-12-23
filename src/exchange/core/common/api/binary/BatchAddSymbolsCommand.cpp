@@ -15,6 +15,7 @@
  */
 
 #include <exchange/core/common/BytesIn.h>
+#include <exchange/core/common/BytesOut.h>
 #include <exchange/core/common/CoreSymbolSpecification.h>
 #include <exchange/core/common/api/binary/BatchAddSymbolsCommand.h>
 #include <exchange/core/common/api/binary/BinaryDataCommandFactory.h>
@@ -47,6 +48,19 @@ BatchAddSymbolsCommand::BatchAddSymbolsCommand(BytesIn &bytes) {
       symbols[pair.first] = pair.second;
     }
   }
+}
+
+void BatchAddSymbolsCommand::WriteMarshallable(BytesOut &bytes) const {
+  // Match Java: SerializationUtils.marshallIntHashMap(symbols, bytes);
+  // Convert from map<int32_t, const CoreSymbolSpecification*> to
+  // map<int32_t, CoreSymbolSpecification*> for template
+  ankerl::unordered_dense::map<int32_t, CoreSymbolSpecification *> tempMap;
+  for (const auto &pair : symbols) {
+    if (pair.second != nullptr) {
+      tempMap[pair.first] = const_cast<CoreSymbolSpecification *>(pair.second);
+    }
+  }
+  SerializationUtils::MarshallIntHashMap(tempMap, bytes);
 }
 
 } // namespace binary

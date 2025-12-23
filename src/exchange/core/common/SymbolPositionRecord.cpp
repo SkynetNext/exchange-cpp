@@ -259,7 +259,7 @@ std::string SymbolPositionRecord::ToString() const {
   return oss.str();
 }
 
-void SymbolPositionRecord::WriteMarshallable(BytesOut &bytes) {
+void SymbolPositionRecord::WriteMarshallable(BytesOut &bytes) const {
   bytes.WriteInt(symbol);
   bytes.WriteInt(currency);
   bytes.WriteByte(static_cast<int8_t>(GetMultiplier(direction)));

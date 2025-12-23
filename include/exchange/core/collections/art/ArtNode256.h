@@ -70,8 +70,8 @@ public:
   IArtNode<V> *Remove(int64_t key, int level) override;
   V *GetCeilingValue(int64_t key, int level) override;
   V *GetFloorValue(int64_t key, int level) override;
-  int ForEach(LongObjConsumer<V> *consumer, int limit) override;
-  int ForEachDesc(LongObjConsumer<V> *consumer, int limit) override;
+  int ForEach(LongObjConsumer<V> *consumer, int limit) const override;
+  int ForEachDesc(LongObjConsumer<V> *consumer, int limit) const override;
   int Size(int limit) override;
   void ValidateInternalState(int level) override;
   std::string PrintDiagram(const std::string &prefix, int level) override;
@@ -228,7 +228,7 @@ template <typename V> V *ArtNode256<V>::GetFloorValue(int64_t key, int level) {
 }
 
 template <typename V>
-int ArtNode256<V>::ForEach(LongObjConsumer<V> *consumer, int limit) {
+int ArtNode256<V>::ForEach(LongObjConsumer<V> *consumer, int limit) const {
   int numLeft = limit;
   for (int i = 0; i < 256 && numLeft > 0; i++) {
     if (nodes_[i]) {
@@ -245,7 +245,7 @@ int ArtNode256<V>::ForEach(LongObjConsumer<V> *consumer, int limit) {
 }
 
 template <typename V>
-int ArtNode256<V>::ForEachDesc(LongObjConsumer<V> *consumer, int limit) {
+int ArtNode256<V>::ForEachDesc(LongObjConsumer<V> *consumer, int limit) const {
   int numLeft = limit;
   for (int i = 255; i >= 0 && numLeft > 0; i--) {
     if (nodes_[i]) {

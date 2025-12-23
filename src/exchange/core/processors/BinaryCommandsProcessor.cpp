@@ -66,7 +66,7 @@ public:
     dataArray[wordsTransferred++] = word;
   }
 
-  void WriteMarshallable(common::BytesOut &bytes) override {
+  void WriteMarshallable(common::BytesOut &bytes) const override {
     bytes.WriteInt(wordsTransferred);
     utils::SerializationUtils::MarshallLongArray(dataArray, bytes);
   }
@@ -269,7 +269,7 @@ int32_t BinaryCommandsProcessor::GetStateHash() const {
   return static_cast<int32_t>(hash);
 }
 
-void BinaryCommandsProcessor::WriteMarshallable(common::BytesOut &bytes) {
+void BinaryCommandsProcessor::WriteMarshallable(common::BytesOut &bytes) const {
   // Write incomingData (transactionId -> TransferRecord)
   bytes.WriteInt(static_cast<int32_t>(incomingData_.size()));
   for (const auto &pair : incomingData_) {

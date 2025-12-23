@@ -81,7 +81,7 @@ int32_t SymbolSpecificationProvider::GetStateHash() const {
   return utils::HashingUtils::StateHash(nonConstMap);
 }
 
-void SymbolSpecificationProvider::WriteMarshallable(common::BytesOut &bytes) {
+void SymbolSpecificationProvider::WriteMarshallable(common::BytesOut &bytes) const {
   // Write symbolSpecs (int -> CoreSymbolSpecification*)
   // Convert const map to non-const for serialization (safe cast)
   ankerl::unordered_dense::map<int32_t, common::CoreSymbolSpecification *>

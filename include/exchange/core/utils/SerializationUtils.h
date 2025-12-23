@@ -236,6 +236,17 @@ public:
    */
   static std::vector<uint8_t>
   LongsLz4ToBytes(const std::vector<int64_t> &dataArray, int longsTransferred);
+
+  /**
+   * Convert bytes to long array with LZ4 compression
+   * Match Java: SerializationUtils.bytesToLongArrayLz4()
+   *
+   * @param bytes Bytes to compress
+   * @param padding Padding for long array size (LONGS_PER_MESSAGE)
+   * @return Vector of int64_t containing compressed data
+   */
+  static std::vector<int64_t>
+  BytesToLongArrayLz4(const std::vector<uint8_t> &bytes, int padding);
 };
 
 } // namespace utils

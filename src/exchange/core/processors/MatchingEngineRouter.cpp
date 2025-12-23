@@ -333,7 +333,7 @@ void MatchingEngineRouter::ProcessMatchingCommand(
   }
 }
 
-void MatchingEngineRouter::WriteMarshallable(common::BytesOut &bytes) {
+void MatchingEngineRouter::WriteMarshallable(common::BytesOut &bytes) const {
   // Write shardId and shardMask
   bytes.WriteInt(shardId_).WriteLong(shardMask_);
 

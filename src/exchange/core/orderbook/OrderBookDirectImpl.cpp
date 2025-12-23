@@ -517,7 +517,7 @@ CollectOrders(OrderBookDirectImpl::DirectOrder *startOrder,
   }
 }
 
-void OrderBookDirectImpl::WriteMarshallable(common::BytesOut &bytes) {
+void OrderBookDirectImpl::WriteMarshallable(common::BytesOut &bytes) const {
   // Write implementation type
   bytes.WriteByte(static_cast<int8_t>(GetImplementationType()));
 
@@ -573,7 +573,7 @@ OrderBookDirectImpl::DirectOrder::DirectOrder(common::BytesIn &bytes) {
 }
 
 void OrderBookDirectImpl::DirectOrder::WriteMarshallable(
-    common::BytesOut &bytes) {
+    common::BytesOut &bytes) const {
   bytes.WriteLong(orderId);
   bytes.WriteLong(price);
   bytes.WriteLong(size);

@@ -16,9 +16,9 @@
 
 #pragma once
 
+#include "../../BytesIn.h"
 #include "BinaryCommandType.h"
 #include "BinaryDataCommand.h"
-#include "../../BytesIn.h"
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
 
@@ -49,6 +49,8 @@ public:
   int32_t GetBinaryCommandTypeCode() const override {
     return static_cast<int32_t>(BinaryCommandType::ADD_ACCOUNTS);
   }
+
+  void WriteMarshallable(BytesOut &bytes) const override;
 };
 
 } // namespace binary

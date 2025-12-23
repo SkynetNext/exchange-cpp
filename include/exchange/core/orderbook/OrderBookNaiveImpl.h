@@ -73,7 +73,7 @@ public:
   /**
    * WriteMarshallable interface
    */
-  void WriteMarshallable(common::BytesOut &bytes) override;
+  void WriteMarshallable(common::BytesOut &bytes) const override;
 
   std::unique_ptr<common::L2MarketData>
   GetL2MarketDataSnapshot(int32_t size) override;

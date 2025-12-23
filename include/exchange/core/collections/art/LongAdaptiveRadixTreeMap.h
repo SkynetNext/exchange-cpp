@@ -87,19 +87,20 @@ public:
   V *GetHigherValue(int64_t key) const;
   V *GetLowerValue(int64_t key) const;
 
-  int ForEach(LongObjConsumer<V> *consumer, int limit);
-  int ForEachDesc(LongObjConsumer<V> *consumer, int limit);
+  // Const methods - only read tree structure, do not modify it
+  int ForEach(LongObjConsumer<V> *consumer, int limit) const;
+  int ForEachDesc(LongObjConsumer<V> *consumer, int limit) const;
 
   template <typename F>
     requires(!std::is_convertible_v<F, LongObjConsumer<V> *>)
-  int ForEach(F f, int limit) {
+  int ForEach(F f, int limit) const {
     LambdaConsumer<V, F> consumer(f);
     return ForEach(static_cast<LongObjConsumer<V> *>(&consumer), limit);
   }
 
   template <typename F>
     requires(!std::is_convertible_v<F, LongObjConsumer<V> *>)
-  int ForEachDesc(F f, int limit) {
+  int ForEachDesc(F f, int limit) const {
     LambdaConsumer<V, F> consumer(f);
     return ForEachDesc(static_cast<LongObjConsumer<V> *>(&consumer), limit);
   }
@@ -286,13 +287,13 @@ V *LongAdaptiveRadixTreeMap<V>::GetLowerValue(int64_t key) const {
 
 template <typename V>
 int LongAdaptiveRadixTreeMap<V>::ForEach(LongObjConsumer<V> *consumer,
-                                         int limit) {
+                                         int limit) const {
   return root_ ? root_->ForEach(consumer, limit) : 0;
 }
 
 template <typename V>
 int LongAdaptiveRadixTreeMap<V>::ForEachDesc(LongObjConsumer<V> *consumer,
-                                             int limit) {
+                                             int limit) const {
   return root_ ? root_->ForEachDesc(consumer, limit) : 0;
 }
 

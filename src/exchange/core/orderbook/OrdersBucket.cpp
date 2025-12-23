@@ -36,7 +36,7 @@ OrdersBucket::OrdersBucket(common::BytesIn *bytes) {
     throw std::invalid_argument("BytesIn cannot be nullptr");
   }
   price_ = bytes->ReadLong();
-  
+
   // Read orders map (long -> Order*)
   int length = bytes->ReadInt();
   for (int i = 0; i < length; i++) {
@@ -44,7 +44,7 @@ OrdersBucket::OrdersBucket(common::BytesIn *bytes) {
     common::Order *order = new common::Order(*bytes);
     Put(order);
   }
-  
+
   totalVolume_ = bytes->ReadLong();
 }
 
@@ -178,10 +178,10 @@ void OrdersBucket::Validate() const {
   }
 }
 
-void OrdersBucket::WriteMarshallable(common::BytesOut &bytes) {
+void OrdersBucket::WriteMarshallable(common::BytesOut &bytes) const {
   // Write price
   bytes.WriteLong(price_);
-  
+
   // Convert orderList_ to map for serialization (orderId -> Order*)
   ankerl::unordered_dense::map<int64_t, common::Order *> orderMap;
   for (common::Order *order : orderList_) {
@@ -189,10 +189,10 @@ void OrdersBucket::WriteMarshallable(common::BytesOut &bytes) {
       orderMap[order->orderId] = order;
     }
   }
-  
+
   // Write orders map
   utils::SerializationUtils::MarshallLongHashMap(orderMap, bytes);
-  
+
   // Write totalVolume
   bytes.WriteLong(totalVolume_);
 }
