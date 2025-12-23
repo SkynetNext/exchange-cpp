@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+#include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
+
 
 namespace exchange {
 namespace core {
@@ -33,9 +35,12 @@ PerformanceConfiguration PerformanceConfiguration::Default() {
       8,         // l2RefreshDepth
       CoreWaitStrategy::BLOCKING,
       [](const CoreSymbolSpecification *spec,
+         ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
          orderbook::OrderBookEventsHelper *eventsHelper) {
-        return std::make_unique<orderbook::OrderBookNaiveImpl>(spec,
-                                                               eventsHelper);
+        // OrderBookNaiveImpl doesn't use ObjectsPool, but accepts it for
+        // interface consistency
+        return std::make_unique<orderbook::OrderBookNaiveImpl>(
+            spec, objectsPool, eventsHelper);
       });
 }
 

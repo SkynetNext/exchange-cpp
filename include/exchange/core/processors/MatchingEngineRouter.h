@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "../collections/objpool/ObjectsPool.h"
 #include "../common/cmd/OrderCommand.h"
 #include "../orderbook/IOrderBook.h"
 #include "../orderbook/OrderBookEventsHelper.h"
@@ -44,8 +45,10 @@ class SharedPool;
 class MatchingEngineRouter {
 public:
   // OrderBook factory function type
+  // Matches Java IOrderBook.OrderBookFactory signature
   using OrderBookFactory = std::function<std::unique_ptr<orderbook::IOrderBook>(
       const common::CoreSymbolSpecification *spec,
+      ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
       orderbook::OrderBookEventsHelper *eventsHelper)>;
 
   MatchingEngineRouter(int32_t shardId, int64_t numShards,
@@ -90,6 +93,11 @@ private:
 
   SymbolSpecificationProvider *symbolSpecProvider_;
   OrderBookFactory orderBookFactory_;
+
+  // Object pool for order book operations
+  // Created in constructor with production configuration
+  std::unique_ptr<::exchange::core::collections::objpool::ObjectsPool>
+      objectsPool_;
 
   // symbol ID -> OrderBook
   // Using ankerl::unordered_dense for better performance

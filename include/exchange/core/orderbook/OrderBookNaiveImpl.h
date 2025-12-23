@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "../collections/objpool/ObjectsPool.h"
 #include "../common/CoreSymbolSpecification.h"
 #include "../common/Order.h"
 #include "IOrderBook.h"
@@ -37,6 +38,8 @@ namespace orderbook {
 class OrderBookNaiveImpl : public IOrderBook {
 public:
   OrderBookNaiveImpl(const common::CoreSymbolSpecification *symbolSpec,
+                     ::exchange::core::collections::objpool::ObjectsPool
+                         *objectsPool = nullptr,
                      OrderBookEventsHelper *eventsHelper = nullptr);
 
   // IOrderBook interface

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/common/cmd/OrderCommandType.h>
 #include <exchange/core/orderbook/IOrderBook.h>
@@ -48,6 +49,14 @@ MatchingEngineRouter::MatchingEngineRouter(
   } else {
     eventsHelper_ = std::make_unique<orderbook::OrderBookEventsHelper>();
   }
+
+  // Initialize object pools
+  // Matches Java MatchingEngineRouter configuration (production pool)
+  // TODO: Move to performance configuration
+  objectsPool_ =
+      std::unique_ptr<::exchange::core::collections::objpool::ObjectsPool>(
+          ::exchange::core::collections::objpool::ObjectsPool::
+              CreateProductionPool());
 }
 
 void MatchingEngineRouter::ProcessOrder(int64_t seq,
@@ -93,12 +102,13 @@ void MatchingEngineRouter::AddSymbol(
 
   // Create new order book using factory
   if (orderBookFactory_) {
-    auto orderBook = orderBookFactory_(spec, eventsHelper_.get());
+    auto orderBook =
+        orderBookFactory_(spec, objectsPool_.get(), eventsHelper_.get());
     orderBooks_[spec->symbolId] = std::move(orderBook);
   } else {
     // Fallback to naive implementation
     auto orderBook = std::make_unique<orderbook::OrderBookNaiveImpl>(
-        spec, eventsHelper_.get());
+        spec, objectsPool_.get(), eventsHelper_.get());
     orderBooks_[spec->symbolId] = std::move(orderBook);
   }
 

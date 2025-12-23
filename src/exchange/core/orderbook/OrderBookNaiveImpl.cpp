@@ -15,6 +15,7 @@
  */
 
 #include <algorithm>
+#include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <exchange/core/common/MatcherTradeEvent.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
 #include <stdexcept>
@@ -25,11 +26,17 @@ namespace orderbook {
 
 OrderBookNaiveImpl::OrderBookNaiveImpl(
     const common::CoreSymbolSpecification *symbolSpec,
+    ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
     OrderBookEventsHelper *eventsHelper)
     : symbolSpec_(symbolSpec),
       eventsHelper_(eventsHelper != nullptr
                         ? eventsHelper
-                        : OrderBookEventsHelper::NonPooledEventsHelper()) {}
+                        : OrderBookEventsHelper::NonPooledEventsHelper()) {
+  // Note: OrderBookNaiveImpl doesn't use ObjectsPool (uses std::map instead
+  // of ART tree), but accepts it for interface consistency with
+  // OrderBookDirectImpl
+  (void)objectsPool; // Suppress unused parameter warning
+}
 
 void OrderBookNaiveImpl::NewOrder(common::cmd::OrderCommand *cmd) {
   switch (cmd->orderType) {

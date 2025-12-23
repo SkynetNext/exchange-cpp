@@ -26,6 +26,11 @@ namespace exchange {
 namespace core {
 // Forward declarations
 class CoreSymbolSpecification;
+namespace collections {
+namespace objpool {
+class ObjectsPool;
+}
+} // namespace collections
 namespace orderbook {
 class OrderBookEventsHelper;
 }
@@ -61,9 +66,10 @@ public:
   // Wait strategy
   CoreWaitStrategy waitStrategy;
 
-  // OrderBook factory (simplified - using function pointer)
+  // OrderBook factory (matches Java IOrderBook.OrderBookFactory signature)
   using OrderBookFactory = std::function<std::unique_ptr<orderbook::IOrderBook>(
       const CoreSymbolSpecification *spec,
+      ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
       orderbook::OrderBookEventsHelper *eventsHelper)>;
   OrderBookFactory orderBookFactory;
 
