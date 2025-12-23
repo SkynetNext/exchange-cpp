@@ -15,10 +15,11 @@
  */
 
 #include <algorithm>
+#include <exchange/core/common/BytesIn.h>
+#include <exchange/core/common/BytesOut.h>
 #include <exchange/core/common/CoreSymbolSpecification.h>
 #include <exchange/core/common/PositionDirection.h>
 #include <exchange/core/common/SymbolPositionRecord.h>
-#include <functional>
 #include <sstream>
 #include <stdexcept>
 
@@ -31,6 +32,18 @@ SymbolPositionRecord::SymbolPositionRecord(int64_t uid, int32_t symbol,
     : uid(uid), symbol(symbol), currency(currency),
       direction(PositionDirection::EMPTY), openVolume(0), openPriceSum(0),
       profit(0), pendingSellSize(0), pendingBuySize(0) {}
+
+SymbolPositionRecord::SymbolPositionRecord(int64_t uid, BytesIn &bytes)
+    : uid(uid) {
+  symbol = bytes.ReadInt();
+  currency = bytes.ReadInt();
+  direction = PositionDirectionFromCode(bytes.ReadByte());
+  openVolume = bytes.ReadLong();
+  openPriceSum = bytes.ReadLong();
+  profit = bytes.ReadLong();
+  pendingSellSize = bytes.ReadLong();
+  pendingBuySize = bytes.ReadLong();
+}
 
 void SymbolPositionRecord::Initialize(int64_t uid, int32_t symbol,
                                       int32_t currency) {
@@ -217,17 +230,23 @@ void SymbolPositionRecord::ValidateInternalState() const {
 }
 
 int32_t SymbolPositionRecord::GetStateHash() const {
-  std::size_t h1 = std::hash<int32_t>{}(symbol);
-  std::size_t h2 = std::hash<int32_t>{}(currency);
-  std::size_t h3 = std::hash<int8_t>{}(GetMultiplier(direction));
-  std::size_t h4 = std::hash<int64_t>{}(openVolume);
-  std::size_t h5 = std::hash<int64_t>{}(openPriceSum);
-  std::size_t h6 = std::hash<int64_t>{}(profit);
-  std::size_t h7 = std::hash<int64_t>{}(pendingSellSize);
-  std::size_t h8 = std::hash<int64_t>{}(pendingBuySize);
-
-  return static_cast<int32_t>(h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^
-                              (h5 << 4) ^ (h6 << 5) ^ (h7 << 6) ^ (h8 << 7));
+  // Match Java Objects.hash(symbol, currency, direction.getMultiplier(),
+  // openVolume, openPriceSum, profit, pendingSellSize, pendingBuySize)
+  // Objects.hash uses: result = 31 * result + (element == null ? 0 :
+  // element.hashCode())
+  int32_t result = 1;
+  result = 31 * result + symbol;
+  result = 31 * result + currency;
+  result = 31 * result + static_cast<int32_t>(GetMultiplier(direction));
+  result = 31 * result + static_cast<int32_t>(openVolume ^ (openVolume >> 32));
+  result =
+      31 * result + static_cast<int32_t>(openPriceSum ^ (openPriceSum >> 32));
+  result = 31 * result + static_cast<int32_t>(profit ^ (profit >> 32));
+  result = 31 * result +
+           static_cast<int32_t>(pendingSellSize ^ (pendingSellSize >> 32));
+  result = 31 * result +
+           static_cast<int32_t>(pendingBuySize ^ (pendingBuySize >> 32));
+  return result;
 }
 
 std::string SymbolPositionRecord::ToString() const {
@@ -238,6 +257,17 @@ std::string SymbolPositionRecord::ToString() const {
       << " pendingS=" << pendingSellSize << " pendingB=" << pendingBuySize
       << "}";
   return oss.str();
+}
+
+void SymbolPositionRecord::WriteMarshallable(BytesOut &bytes) {
+  bytes.WriteInt(symbol);
+  bytes.WriteInt(currency);
+  bytes.WriteByte(static_cast<int8_t>(GetMultiplier(direction)));
+  bytes.WriteLong(openVolume);
+  bytes.WriteLong(openPriceSum);
+  bytes.WriteLong(profit);
+  bytes.WriteLong(pendingSellSize);
+  bytes.WriteLong(pendingBuySize);
 }
 
 } // namespace common

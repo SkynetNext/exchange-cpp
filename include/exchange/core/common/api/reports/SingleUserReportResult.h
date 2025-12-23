@@ -28,6 +28,15 @@
 namespace exchange {
 namespace core {
 namespace common {
+class BytesIn;
+class BytesOut;
+} // namespace common
+} // namespace core
+} // namespace exchange
+
+namespace exchange {
+namespace core {
+namespace common {
 namespace api {
 namespace reports {
 
@@ -53,6 +62,14 @@ public:
         : quoteCurrency(quoteCurrency), direction(direction),
           openVolume(openVolume), openPriceSum(openPriceSum), profit(profit),
           pendingSellSize(pendingSellSize), pendingBuySize(pendingBuySize) {}
+
+    /**
+     * Constructor from BytesIn (deserialization)
+     */
+    Position(BytesIn &bytes);
+
+    // Serialization method (not inheriting WriteBytesMarshallable)
+    void WriteMarshallable(BytesOut &bytes) const;
   };
 
   int64_t uid;

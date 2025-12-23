@@ -18,6 +18,7 @@
 
 #include "../common/CoreSymbolSpecification.h"
 #include "../common/StateHash.h"
+#include "../common/WriteBytesMarshallable.h"
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
 
@@ -29,9 +30,15 @@ namespace processors {
  * SymbolSpecificationProvider - manages symbol specifications
  * Maps symbol ID to CoreSymbolSpecification
  */
-class SymbolSpecificationProvider : public common::StateHash {
+class SymbolSpecificationProvider : public common::StateHash,
+                                    public common::WriteBytesMarshallable {
 public:
   SymbolSpecificationProvider();
+
+  /**
+   * Constructor from BytesIn (deserialization)
+   */
+  SymbolSpecificationProvider(common::BytesIn *bytes);
 
   /**
    * Add a new symbol specification
@@ -62,6 +69,9 @@ public:
 
   // StateHash interface
   int32_t GetStateHash() const override;
+
+  // WriteBytesMarshallable interface
+  void WriteMarshallable(common::BytesOut &bytes) override;
 
 private:
   // symbol ID -> CoreSymbolSpecification

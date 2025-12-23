@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../common/StateHash.h"
+#include "../common/WriteBytesMarshallable.h"
 #include "../common/api/binary/BinaryDataCommand.h"
 #include "../common/api/reports/ReportQueriesHandler.h"
 #include "../common/config/ReportsQueriesConfiguration.h"
@@ -30,6 +31,7 @@
 namespace exchange {
 namespace core {
 namespace common {
+class BytesIn;
 namespace cmd {
 class OrderCommand;
 }
@@ -40,7 +42,8 @@ namespace processors {
  * BinaryCommandsProcessor - stateful binary commands processor
  * Handles binary data commands and report queries
  */
-class BinaryCommandsProcessor : public common::StateHash {
+class BinaryCommandsProcessor : public common::StateHash,
+                                public common::WriteBytesMarshallable {
 public:
   using CompleteMessagesHandler =
       std::function<void(common::api::binary::BinaryDataCommand *)>;
@@ -51,6 +54,16 @@ public:
       SharedPool *sharedPool,
       const common::config::ReportsQueriesConfiguration *queriesConfiguration,
       int32_t section);
+
+  /**
+   * Constructor from BytesIn (deserialization)
+   */
+  BinaryCommandsProcessor(
+      CompleteMessagesHandler completeMessagesHandler,
+      common::api::reports::ReportQueriesHandler *reportQueriesHandler,
+      SharedPool *sharedPool,
+      const common::config::ReportsQueriesConfiguration *queriesConfiguration,
+      common::BytesIn *bytesIn, int32_t section);
 
   /**
    * Accept binary frame from OrderCommand
@@ -65,6 +78,9 @@ public:
 
   // StateHash interface
   int32_t GetStateHash() const override;
+
+  // WriteBytesMarshallable interface
+  void WriteMarshallable(common::BytesOut &bytes) override;
 
 private:
   // transactionId -> TransferRecord (simplified for now)

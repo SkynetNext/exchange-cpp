@@ -64,6 +64,61 @@ ankerl::unordered_dense::map<int32_t, int64_t> SerializationUtils::MergeSum(
   return result;
 }
 
+int SerializationUtils::RequiredLongArraySize(int bytesLength) {
+  return ((bytesLength - 1) >> 3) + 1;
+}
+
+int SerializationUtils::RequiredLongArraySize(int bytesLength, int padding) {
+  int len = RequiredLongArraySize(bytesLength);
+  if (padding == 1) {
+    return len;
+  } else {
+    int rem = len % padding;
+    return rem == 0 ? len : (len + padding - rem);
+  }
+}
+
+void SerializationUtils::MarshallLongArray(const std::vector<int64_t> &longs,
+                                           common::BytesOut &bytes) {
+  bytes.WriteInt(static_cast<int32_t>(longs.size()));
+  for (int64_t word : longs) {
+    bytes.WriteLong(word);
+  }
+}
+
+std::vector<int64_t> SerializationUtils::ReadLongArray(common::BytesIn &bytes) {
+  const int length = bytes.ReadInt();
+  std::vector<int64_t> array;
+  array.reserve(length);
+  for (int i = 0; i < length; i++) {
+    array.push_back(bytes.ReadLong());
+  }
+  return array;
+}
+
+void SerializationUtils::MarshallIntLongHashMap(
+    const ankerl::unordered_dense::map<int32_t, int64_t> &hashMap,
+    common::BytesOut &bytes) {
+  bytes.WriteInt(static_cast<int32_t>(hashMap.size()));
+  for (const auto &pair : hashMap) {
+    bytes.WriteInt(pair.first);
+    bytes.WriteLong(pair.second);
+  }
+}
+
+ankerl::unordered_dense::map<int32_t, int64_t>
+SerializationUtils::ReadIntLongHashMap(common::BytesIn &bytes) {
+  int length = bytes.ReadInt();
+  ankerl::unordered_dense::map<int32_t, int64_t> hashMap;
+  hashMap.reserve(length);
+  for (int i = 0; i < length; i++) {
+    int32_t k = bytes.ReadInt();
+    int64_t v = bytes.ReadLong();
+    hashMap[k] = v;
+  }
+  return hashMap;
+}
+
 } // namespace utils
 } // namespace core
 } // namespace exchange

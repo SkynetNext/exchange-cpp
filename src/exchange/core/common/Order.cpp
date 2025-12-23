@@ -14,25 +14,38 @@
  * limitations under the License.
  */
 
+#include <exchange/core/common/BytesIn.h>
+#include <exchange/core/common/BytesOut.h>
 #include <exchange/core/common/Order.h>
-#include <functional>
+#include <exchange/core/common/OrderAction.h>
+#include <sstream>
 
 namespace exchange {
 namespace core {
 namespace common {
 
+Order::Order(BytesIn &bytes)
+    : orderId(bytes.ReadLong()), price(bytes.ReadLong()),
+      size(bytes.ReadLong()), filled(bytes.ReadLong()),
+      reserveBidPrice(bytes.ReadLong()),
+      action(OrderActionFromCode(bytes.ReadByte())), uid(bytes.ReadLong()),
+      timestamp(bytes.ReadLong()) {}
+
 int32_t Order::GetStateHash() const {
   // timestamp is not included in hashCode for repeatable results
-  std::size_t h1 = std::hash<int64_t>{}(orderId);
-  std::size_t h2 = std::hash<int64_t>{}(price);
-  std::size_t h3 = std::hash<int64_t>{}(size);
-  std::size_t h4 = std::hash<int64_t>{}(reserveBidPrice);
-  std::size_t h5 = std::hash<int64_t>{}(filled);
-  std::size_t h6 = std::hash<OrderAction>{}(action);
-  std::size_t h7 = std::hash<int64_t>{}(uid);
-
-  return static_cast<int32_t>(h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^
-                              (h5 << 4) ^ (h6 << 5) ^ (h7 << 6));
+  // Match Java Objects.hash(orderId, action, price, size, reserveBidPrice,
+  // filled, uid) Objects.hash uses: result = 31 * result + (element == null ? 0
+  // : element.hashCode())
+  int32_t result = 1;
+  result = 31 * result + static_cast<int32_t>(orderId ^ (orderId >> 32));
+  result = 31 * result + static_cast<int32_t>(static_cast<int8_t>(action));
+  result = 31 * result + static_cast<int32_t>(price ^ (price >> 32));
+  result = 31 * result + static_cast<int32_t>(size ^ (size >> 32));
+  result = 31 * result +
+           static_cast<int32_t>(reserveBidPrice ^ (reserveBidPrice >> 32));
+  result = 31 * result + static_cast<int32_t>(filled ^ (filled >> 32));
+  result = 31 * result + static_cast<int32_t>(uid ^ (uid >> 32));
+  return result;
 }
 
 bool Order::operator==(const Order &other) const {
@@ -54,7 +67,17 @@ std::string Order::ToString() const {
   return oss.str();
 }
 
+void Order::WriteMarshallable(BytesOut &bytes) {
+  bytes.WriteLong(orderId);
+  bytes.WriteLong(price);
+  bytes.WriteLong(size);
+  bytes.WriteLong(filled);
+  bytes.WriteLong(reserveBidPrice);
+  bytes.WriteByte(static_cast<int8_t>(action));
+  bytes.WriteLong(uid);
+  bytes.WriteLong(timestamp);
+}
+
 } // namespace common
 } // namespace core
 } // namespace exchange
-

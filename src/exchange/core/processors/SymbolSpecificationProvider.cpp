@@ -14,14 +14,32 @@
  * limitations under the License.
  */
 
+#include <exchange/core/common/BytesIn.h>
+#include <exchange/core/common/BytesOut.h>
 #include <exchange/core/processors/SymbolSpecificationProvider.h>
-#include <functional>
+#include <exchange/core/utils/HashingUtils.h>
+#include <exchange/core/utils/SerializationUtils.h>
 
 namespace exchange {
 namespace core {
 namespace processors {
 
 SymbolSpecificationProvider::SymbolSpecificationProvider() {}
+
+SymbolSpecificationProvider::SymbolSpecificationProvider(
+    common::BytesIn *bytes) {
+  if (bytes == nullptr) {
+    throw std::invalid_argument("BytesIn cannot be nullptr");
+  }
+  // Read symbolSpecs (int -> CoreSymbolSpecification*)
+  int length = bytes->ReadInt();
+  for (int i = 0; i < length; i++) {
+    int32_t symbolId = bytes->ReadInt();
+    common::CoreSymbolSpecification *spec =
+        new common::CoreSymbolSpecification(*bytes);
+    symbolSpecs_[symbolId] = spec;
+  }
+}
 
 bool SymbolSpecificationProvider::AddSymbol(
     const common::CoreSymbolSpecification *symbolSpec) {
@@ -52,18 +70,27 @@ void SymbolSpecificationProvider::RegisterSymbol(
 void SymbolSpecificationProvider::Reset() { symbolSpecs_.clear(); }
 
 int32_t SymbolSpecificationProvider::GetStateHash() const {
-  // Hash all symbol specifications
-  std::size_t hash = 0;
+  // Use HashingUtils::StateHash to match Java implementation
+  // Convert const map to non-const for HashingUtils (safe cast)
+  ankerl::unordered_dense::map<int32_t, common::CoreSymbolSpecification *>
+      nonConstMap;
   for (const auto &pair : symbolSpecs_) {
-    std::size_t h1 = std::hash<int32_t>{}(pair.first);
-    std::size_t h2 =
-        std::hash<const common::CoreSymbolSpecification *>{}(pair.second);
-    if (pair.second != nullptr) {
-      h2 ^= static_cast<std::size_t>(pair.second->GetStateHash());
-    }
-    hash ^= (h1 << 1) ^ (h2 << 2);
+    nonConstMap[pair.first] =
+        const_cast<common::CoreSymbolSpecification *>(pair.second);
   }
-  return static_cast<int32_t>(hash);
+  return utils::HashingUtils::StateHash(nonConstMap);
+}
+
+void SymbolSpecificationProvider::WriteMarshallable(common::BytesOut &bytes) {
+  // Write symbolSpecs (int -> CoreSymbolSpecification*)
+  // Convert const map to non-const for serialization (safe cast)
+  ankerl::unordered_dense::map<int32_t, common::CoreSymbolSpecification *>
+      nonConstMap;
+  for (const auto &pair : symbolSpecs_) {
+    nonConstMap[pair.first] =
+        const_cast<common::CoreSymbolSpecification *>(pair.second);
+  }
+  utils::SerializationUtils::MarshallIntHashMap(nonConstMap, bytes);
 }
 
 } // namespace processors

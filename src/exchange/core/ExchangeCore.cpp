@@ -189,7 +189,7 @@ ExchangeCore::ExchangeCore(
   for (int32_t shardId = 0; shardId < matchingEnginesNum; shardId++) {
     auto matchingEngine = std::make_unique<processors::MatchingEngineRouter>(
         shardId, matchingEnginesNum, perfCfg.orderBookFactory, sharedPool.get(),
-        nullptr);
+        exchangeConfiguration, serializationProcessor_, nullptr);
     matchingEngines.push_back(std::move(matchingEngine));
   }
 

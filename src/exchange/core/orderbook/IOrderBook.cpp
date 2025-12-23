@@ -15,7 +15,14 @@
  */
 
 #include <climits>
+#include <exchange/core/collections/objpool/ObjectsPool.h>
+#include <exchange/core/common/BytesIn.h>
+#include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/orderbook/IOrderBook.h>
+#include <exchange/core/orderbook/OrderBookDirectImpl.h>
+#include <exchange/core/orderbook/OrderBookEventsHelper.h>
+#include <exchange/core/orderbook/OrderBookNaiveImpl.h>
+#include <stdexcept>
 
 namespace exchange {
 namespace core {
@@ -47,6 +54,31 @@ IOrderBook::ProcessCommand(IOrderBook *orderBook,
     return common::cmd::CommandResultCode::SUCCESS;
   } else {
     return common::cmd::CommandResultCode::MATCHING_UNSUPPORTED_COMMAND;
+  }
+}
+
+std::unique_ptr<IOrderBook> IOrderBook::Create(
+    common::BytesIn *bytes,
+    ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
+    OrderBookEventsHelper *eventsHelper,
+    const common::config::LoggingConfiguration *loggingCfg) {
+  if (bytes == nullptr) {
+    throw std::invalid_argument("BytesIn cannot be nullptr");
+  }
+
+  // Read implementation type
+  int8_t implTypeCode = bytes->ReadByte();
+  OrderBookImplType implType = static_cast<OrderBookImplType>(implTypeCode);
+
+  switch (implType) {
+  case OrderBookImplType::NAIVE:
+    return std::make_unique<OrderBookNaiveImpl>(bytes, loggingCfg);
+  case OrderBookImplType::DIRECT:
+    return std::make_unique<OrderBookDirectImpl>(bytes, objectsPool,
+                                                 eventsHelper, loggingCfg);
+  default:
+    throw std::invalid_argument("Unknown OrderBook implementation type: " +
+                                std::to_string(implTypeCode));
   }
 }
 

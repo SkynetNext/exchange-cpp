@@ -23,6 +23,8 @@
 namespace exchange {
 namespace core {
 namespace common {
+class BytesIn;
+class BytesOut;
 namespace api {
 namespace reports {
 
@@ -54,6 +56,11 @@ public:
     SubmoduleKey(int32_t moduleId, SubmoduleType submodule)
         : moduleId(moduleId), submodule(submodule) {}
 
+    /**
+     * Constructor from BytesIn (deserialization)
+     */
+    SubmoduleKey(BytesIn &bytes);
+
     bool operator<(const SubmoduleKey &other) const {
       if (submodule != other.submodule) {
         return static_cast<int32_t>(submodule) <
@@ -65,6 +72,9 @@ public:
     bool operator==(const SubmoduleKey &other) const {
       return moduleId == other.moduleId && submodule == other.submodule;
     }
+
+    // Serialization method (not inheriting WriteBytesMarshallable)
+    void WriteMarshallable(BytesOut &bytes) const;
   };
 
   static SubmoduleKey CreateKey(int32_t moduleId, SubmoduleType submoduleType) {

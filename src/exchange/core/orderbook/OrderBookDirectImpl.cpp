@@ -44,6 +44,47 @@ OrderBookDirectImpl::OrderBookDirectImpl(
                                           LoggingLevel::LOGGING_MATCHING_DEBUG);
 }
 
+OrderBookDirectImpl::OrderBookDirectImpl(
+    common::BytesIn *bytes,
+    ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
+    OrderBookEventsHelper *eventsHelper,
+    const common::config::LoggingConfiguration *loggingCfg)
+    : askPriceBuckets_(objectsPool), bidPriceBuckets_(objectsPool),
+      objectsPool_(objectsPool), orderIdIndex_(objectsPool),
+      bestAskOrder_(nullptr), bestBidOrder_(nullptr),
+      eventsHelper_(eventsHelper) {
+  if (bytes == nullptr) {
+    throw std::invalid_argument("BytesIn cannot be nullptr");
+  }
+  if (objectsPool == nullptr) {
+    throw std::invalid_argument("ObjectsPool cannot be nullptr");
+  }
+  if (loggingCfg == nullptr) {
+    throw std::invalid_argument("LoggingConfiguration cannot be nullptr");
+  }
+
+  // Read symbolSpec (implementation type was already read by
+  // IOrderBook::Create)
+  symbolSpec_ = new common::CoreSymbolSpecification(*bytes);
+
+  logDebug_ =
+      loggingCfg->loggingLevels.count(common::config::LoggingConfiguration::
+                                          LoggingLevel::LOGGING_MATCHING_DEBUG);
+
+  // Read number of orders
+  int32_t size = bytes->ReadInt();
+
+  // Read and insert all orders
+  for (int32_t i = 0; i < size; i++) {
+    // Create DirectOrder from bytes (deserialization)
+    DirectOrder *order = new DirectOrder(*bytes);
+
+    // Insert order into the order book structure
+    insertOrder(order, nullptr);
+    orderIdIndex_.Put(order->orderId, order);
+  }
+}
+
 const common::CoreSymbolSpecification *
 OrderBookDirectImpl::GetSymbolSpec() const {
   return symbolSpec_;
@@ -463,6 +504,144 @@ void OrderBookDirectImpl::ValidateInternalState() {
 
 OrderBookImplType OrderBookDirectImpl::GetImplementationType() const {
   return OrderBookImplType::DIRECT;
+}
+
+// Helper function to collect orders from a linked list
+static void
+CollectOrders(OrderBookDirectImpl::DirectOrder *startOrder,
+              std::vector<OrderBookDirectImpl::DirectOrder *> &orders) {
+  OrderBookDirectImpl::DirectOrder *current = startOrder;
+  while (current != nullptr) {
+    orders.push_back(current);
+    current = current->next;
+  }
+}
+
+void OrderBookDirectImpl::WriteMarshallable(common::BytesOut &bytes) {
+  // Write implementation type
+  bytes.WriteByte(static_cast<int8_t>(GetImplementationType()));
+
+  // Write symbolSpec
+  if (symbolSpec_ != nullptr) {
+    // Create a non-const reference for WriteMarshallable call
+    // Since WriteMarshallable is not const in the interface, we need to call it
+    // on non-const
+    const_cast<common::CoreSymbolSpecification *>(symbolSpec_)
+        ->WriteMarshallable(bytes);
+  }
+
+  // Collect all orders from orderIdIndex
+  std::vector<DirectOrder *> allOrders;
+  orderIdIndex_.ForEach(
+      [&allOrders](int64_t, DirectOrder *order) {
+        if (order != nullptr) {
+          allOrders.push_back(order);
+        }
+      },
+      INT32_MAX);
+
+  // Write total number of orders
+  bytes.WriteInt(static_cast<int32_t>(allOrders.size()));
+
+  // Write ask orders (sorted by price ascending)
+  std::vector<DirectOrder *> askOrders;
+  CollectOrders(bestAskOrder_, askOrders);
+  for (DirectOrder *order : askOrders) {
+    order->WriteMarshallable(bytes);
+  }
+
+  // Write bid orders (sorted by price descending)
+  std::vector<DirectOrder *> bidOrders;
+  CollectOrders(bestBidOrder_, bidOrders);
+  for (DirectOrder *order : bidOrders) {
+    order->WriteMarshallable(bytes);
+  }
+}
+
+OrderBookDirectImpl::DirectOrder::DirectOrder(common::BytesIn &bytes) {
+  orderId = bytes.ReadLong();
+  price = bytes.ReadLong();
+  size = bytes.ReadLong();
+  filled = bytes.ReadLong();
+  reserveBidPrice = bytes.ReadLong();
+  action = common::OrderActionFromCode(bytes.ReadByte());
+  uid = bytes.ReadLong();
+  timestamp = bytes.ReadLong();
+  next = nullptr;
+  prev = nullptr;
+  bucket = nullptr;
+}
+
+void OrderBookDirectImpl::DirectOrder::WriteMarshallable(
+    common::BytesOut &bytes) {
+  bytes.WriteLong(orderId);
+  bytes.WriteLong(price);
+  bytes.WriteLong(size);
+  bytes.WriteLong(filled);
+  bytes.WriteLong(reserveBidPrice);
+  bytes.WriteByte(common::OrderActionToCode(action));
+  bytes.WriteLong(uid);
+  bytes.WriteLong(timestamp);
+}
+
+int32_t OrderBookDirectImpl::DirectOrder::GetStateHash() const {
+  // Match Java DirectOrder.stateHash() implementation:
+  // Objects.hash(orderId, action, price, size, reserveBidPrice, filled, uid)
+  int32_t result = 1;
+  result = result * 31 + static_cast<int32_t>(orderId ^ (orderId >> 32));
+  result =
+      result * 31 + static_cast<int32_t>(common::OrderActionToCode(action));
+  result = result * 31 + static_cast<int32_t>(price ^ (price >> 32));
+  result = result * 31 + static_cast<int32_t>(size ^ (size >> 32));
+  result = result * 31 +
+           static_cast<int32_t>(reserveBidPrice ^ (reserveBidPrice >> 32));
+  result = result * 31 + static_cast<int32_t>(filled ^ (filled >> 32));
+  result = result * 31 + static_cast<int32_t>(uid ^ (uid >> 32));
+  return result;
+}
+
+int32_t OrderBookDirectImpl::GetStateHash() const {
+  // Match Java IOrderBook.default stateHash() implementation:
+  // Objects.hash(
+  //     HashingUtils.stateHashStream(askOrdersStream(true)),
+  //     HashingUtils.stateHashStream(bidOrdersStream(true)),
+  //     getSymbolSpec().stateHash());
+
+  // Collect ask orders (sorted by price ascending)
+  std::vector<DirectOrder *> askOrders;
+  CollectOrders(bestAskOrder_, askOrders);
+
+  // Collect bid orders (sorted by price descending)
+  std::vector<DirectOrder *> bidOrders;
+  CollectOrders(bestBidOrder_, bidOrders);
+
+  // Calculate hash for ask orders stream
+  int32_t askHash = 0;
+  for (const DirectOrder *order : askOrders) {
+    if (order != nullptr) {
+      askHash = askHash * 31 + order->GetStateHash();
+    }
+  }
+
+  // Calculate hash for bid orders stream
+  int32_t bidHash = 0;
+  for (const DirectOrder *order : bidOrders) {
+    if (order != nullptr) {
+      bidHash = bidHash * 31 + order->GetStateHash();
+    }
+  }
+
+  // Combine using Objects.hash algorithm (31x multiplier)
+  int32_t result = 1;
+  result = result * 31 + askHash;
+  result = result * 31 + bidHash;
+  if (symbolSpec_ != nullptr) {
+    result = result * 31 + symbolSpec_->GetStateHash();
+  } else {
+    result = result * 31 + 0;
+  }
+
+  return result;
 }
 
 } // namespace orderbook

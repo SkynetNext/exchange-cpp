@@ -42,6 +42,12 @@ public:
                          *objectsPool = nullptr,
                      OrderBookEventsHelper *eventsHelper = nullptr);
 
+  /**
+   * Constructor from BytesIn (deserialization)
+   */
+  OrderBookNaiveImpl(common::BytesIn *bytes,
+                     const common::config::LoggingConfiguration *loggingCfg);
+
   // IOrderBook interface
   void NewOrder(common::cmd::OrderCommand *cmd) override;
   common::cmd::CommandResultCode
@@ -64,6 +70,11 @@ public:
     return symbolSpec_;
   }
 
+  /**
+   * WriteMarshallable interface
+   */
+  void WriteMarshallable(common::BytesOut &bytes) override;
+
   std::unique_ptr<common::L2MarketData>
   GetL2MarketDataSnapshot(int32_t size) override;
   void FillAsks(int32_t size, common::L2MarketData *data) override;
@@ -77,6 +88,7 @@ public:
 private:
   const common::CoreSymbolSpecification *symbolSpec_;
   OrderBookEventsHelper *eventsHelper_;
+  bool logDebug_ = false;
 
   // Price-indexed buckets (ask: ascending, bid: descending)
   std::map<int64_t, std::unique_ptr<OrdersBucket>> askBuckets_;

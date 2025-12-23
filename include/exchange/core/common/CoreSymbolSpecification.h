@@ -16,8 +16,10 @@
 
 #pragma once
 
+#include "BytesIn.h"
 #include "StateHash.h"
 #include "SymbolType.h"
+#include "WriteBytesMarshallable.h"
 #include <cstdint>
 #include <string>
 
@@ -25,7 +27,8 @@ namespace exchange {
 namespace core {
 namespace common {
 
-class CoreSymbolSpecification : public StateHash {
+class CoreSymbolSpecification : public StateHash,
+                                public WriteBytesMarshallable {
 public:
   int32_t symbolId = 0;
   SymbolType type = SymbolType::CURRENCY_EXCHANGE_PAIR;
@@ -56,8 +59,16 @@ public:
                           int64_t takerFee, int64_t makerFee, int64_t marginBuy,
                           int64_t marginSell);
 
+  /**
+   * Constructor from BytesIn (deserialization)
+   */
+  CoreSymbolSpecification(BytesIn &bytes);
+
   // StateHash interface implementation
   int32_t GetStateHash() const override;
+
+  // WriteBytesMarshallable interface
+  void WriteMarshallable(BytesOut &bytes) override;
 
   std::string ToString() const;
 };

@@ -16,8 +16,12 @@
 
 #pragma once
 
+#include "../common/BytesIn.h"
+#include "../common/BytesOut.h"
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
+#include <functional>
+#include <vector>
 
 namespace exchange {
 namespace core {
@@ -25,7 +29,7 @@ namespace utils {
 
 /**
  * SerializationUtils - serialization utility functions
- * Simplified version for now
+ * 1:1 translation from Java version
  */
 class SerializationUtils {
 public:
@@ -77,6 +81,149 @@ public:
       }
     }
     return result;
+  }
+
+  // Serialization methods - 1:1 translation from Java
+
+  /**
+   * Calculate required long array size for bytes
+   */
+  static int RequiredLongArraySize(int bytesLength);
+
+  /**
+   * Calculate required long array size with padding
+   */
+  static int RequiredLongArraySize(int bytesLength, int padding);
+
+  /**
+   * Marshall long array
+   */
+  static void MarshallLongArray(const std::vector<int64_t> &longs,
+                                common::BytesOut &bytes);
+
+  /**
+   * Read long array
+   */
+  static std::vector<int64_t> ReadLongArray(common::BytesIn &bytes);
+
+  /**
+   * Marshall int->long hash map
+   */
+  static void MarshallIntLongHashMap(
+      const ankerl::unordered_dense::map<int32_t, int64_t> &hashMap,
+      common::BytesOut &bytes);
+
+  /**
+   * Read int->long hash map
+   */
+  static ankerl::unordered_dense::map<int32_t, int64_t>
+  ReadIntLongHashMap(common::BytesIn &bytes);
+
+  /**
+   * Marshall int->Object hash map (with WriteBytesMarshallable values)
+   */
+  template <typename T>
+  static void
+  MarshallIntHashMap(const ankerl::unordered_dense::map<int32_t, T *> &hashMap,
+                     common::BytesOut &bytes) {
+    bytes.WriteInt(static_cast<int32_t>(hashMap.size()));
+    for (const auto &pair : hashMap) {
+      bytes.WriteInt(pair.first);
+      if (pair.second != nullptr) {
+        pair.second->WriteMarshallable(bytes);
+      }
+    }
+  }
+
+  /**
+   * Marshall int->Object hash map (with custom marshaller)
+   */
+  template <typename T>
+  static void MarshallIntHashMap(
+      const ankerl::unordered_dense::map<int32_t, T *> &hashMap,
+      common::BytesOut &bytes,
+      std::function<void(T *, common::BytesOut &)> elementMarshaller) {
+    bytes.WriteInt(static_cast<int32_t>(hashMap.size()));
+    for (const auto &pair : hashMap) {
+      bytes.WriteInt(pair.first);
+      if (pair.second != nullptr) {
+        elementMarshaller(pair.second, bytes);
+      }
+    }
+  }
+
+  /**
+   * Read int->Object hash map
+   */
+  template <typename T>
+  static ankerl::unordered_dense::map<int32_t, T *>
+  ReadIntHashMap(common::BytesIn &bytes,
+                 std::function<T *(common::BytesIn &)> creator) {
+    int length = bytes.ReadInt();
+    ankerl::unordered_dense::map<int32_t, T *> hashMap;
+    hashMap.reserve(length);
+    for (int i = 0; i < length; i++) {
+      int32_t key = bytes.ReadInt();
+      T *value = creator(bytes);
+      hashMap[key] = value;
+    }
+    return hashMap;
+  }
+
+  /**
+   * Marshall long->Object hash map (with WriteBytesMarshallable values)
+   */
+  template <typename T>
+  static void
+  MarshallLongHashMap(const ankerl::unordered_dense::map<int64_t, T *> &hashMap,
+                      common::BytesOut &bytes) {
+    bytes.WriteInt(static_cast<int32_t>(hashMap.size()));
+    for (const auto &pair : hashMap) {
+      bytes.WriteLong(pair.first);
+      if (pair.second != nullptr) {
+        pair.second->WriteMarshallable(bytes);
+      }
+    }
+  }
+
+  /**
+   * Read long->Object hash map
+   */
+  template <typename T>
+  static ankerl::unordered_dense::map<int64_t, T *>
+  ReadLongHashMap(common::BytesIn &bytes,
+                  std::function<T *(common::BytesIn &)> creator) {
+    int length = bytes.ReadInt();
+    ankerl::unordered_dense::map<int64_t, T *> hashMap;
+    hashMap.reserve(length);
+    for (int i = 0; i < length; i++) {
+      int64_t key = bytes.ReadLong();
+      T *value = creator(bytes);
+      hashMap[key] = value;
+    }
+    return hashMap;
+  }
+
+  /**
+   * Marshall nullable object
+   */
+  template <typename T>
+  static void
+  MarshallNullable(T *object, common::BytesOut &bytes,
+                   std::function<void(T *, common::BytesOut &)> marshaller) {
+    bytes.WriteBoolean(object != nullptr);
+    if (object != nullptr) {
+      marshaller(object, bytes);
+    }
+  }
+
+  /**
+   * Read nullable object
+   */
+  template <typename T>
+  static T *ReadNullable(common::BytesIn &bytesIn,
+                         std::function<T *(common::BytesIn &)> creator) {
+    return bytesIn.ReadBoolean() ? creator(bytesIn) : nullptr;
   }
 };
 

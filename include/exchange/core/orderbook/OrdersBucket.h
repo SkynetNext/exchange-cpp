@@ -19,6 +19,7 @@
 #include "../common/IOrder.h"
 #include "../common/MatcherTradeEvent.h"
 #include "../common/Order.h"
+#include "../common/WriteBytesMarshallable.h"
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
 #include <functional>
@@ -35,9 +36,14 @@ class OrderBookEventsHelper;
  * OrdersBucket - manages orders at the same price level
  * Maintains FIFO order (time priority) using insertion order
  */
-class OrdersBucket {
+class OrdersBucket : public common::WriteBytesMarshallable {
 public:
   explicit OrdersBucket(int64_t price);
+
+  /**
+   * Constructor from BytesIn (deserialization)
+   */
+  OrdersBucket(common::BytesIn *bytes);
 
   int64_t GetPrice() const { return price_; }
   int64_t GetTotalVolume() const { return totalVolume_; }
@@ -99,6 +105,11 @@ public:
    * Validate internal state
    */
   void Validate() const;
+
+  /**
+   * WriteMarshallable interface
+   */
+  void WriteMarshallable(common::BytesOut &bytes) override;
 
 private:
   int64_t price_;

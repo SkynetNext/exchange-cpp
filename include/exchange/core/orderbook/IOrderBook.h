@@ -20,6 +20,7 @@
 #include "../common/L2MarketData.h"
 #include "../common/OrderAction.h"
 #include "../common/StateHash.h"
+#include "../common/WriteBytesMarshallable.h"
 #include "../common/cmd/CommandResultCode.h"
 #include "../common/cmd/OrderCommand.h"
 #include <cstdint>
@@ -29,16 +30,28 @@ namespace exchange {
 namespace core {
 namespace common {
 class CoreSymbolSpecification;
+class BytesIn;
+namespace config {
+class LoggingConfiguration;
 }
+} // namespace common
+namespace collections {
+namespace objpool {
+class ObjectsPool;
+}
+} // namespace collections
 
 namespace orderbook {
+
+class OrderBookEventsHelper;
 
 enum class OrderBookImplType : uint8_t { NAIVE = 0, DIRECT = 2 };
 
 /**
  * OrderBook interface - manages buy and sell orders for a symbol
  */
-class IOrderBook : public common::StateHash {
+class IOrderBook : public common::StateHash,
+                   public common::WriteBytesMarshallable {
 public:
   virtual ~IOrderBook() = default;
 
@@ -136,6 +149,15 @@ public:
    */
   static common::cmd::CommandResultCode
   ProcessCommand(IOrderBook *orderBook, common::cmd::OrderCommand *cmd);
+
+  /**
+   * Create OrderBook from BytesIn (deserialization)
+   */
+  static std::unique_ptr<IOrderBook>
+  Create(common::BytesIn *bytes,
+         ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
+         OrderBookEventsHelper *eventsHelper,
+         const common::config::LoggingConfiguration *loggingCfg);
 };
 
 } // namespace orderbook

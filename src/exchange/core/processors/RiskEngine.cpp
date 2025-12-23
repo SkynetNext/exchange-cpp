@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+#include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <exchange/core/common/BalanceAdjustmentType.h>
+#include <exchange/core/common/BytesIn.h>
 #include <exchange/core/common/MatcherEventType.h>
 #include <exchange/core/common/OrderAction.h>
 #include <exchange/core/common/OrderType.h>
@@ -31,9 +33,12 @@
 #include <exchange/core/processors/RiskEngine.h>
 #include <exchange/core/processors/RiskEngineReportQueriesHandler.h>
 #include <exchange/core/processors/UserProfileService.h>
+#include <exchange/core/processors/journaling/ISerializationProcessor.h>
 #include <exchange/core/utils/CoreArithmeticUtils.h>
+#include <exchange/core/utils/SerializationUtils.h>
 #include <exchange/core/utils/UnsafeUtils.h>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace exchange {
 namespace core {
@@ -44,8 +49,9 @@ RiskEngine::RiskEngine(
     journaling::ISerializationProcessor *serializationProcessor,
     SharedPool *sharedPool,
     const common::config::ExchangeConfiguration *exchangeConfiguration)
-    : shardId_(shardId), shardMask_(numShards - 1),
-      cfgIgnoreRiskProcessing_(false), cfgMarginTradingEnabled_(false) {
+    : shardId_(shardId), shardMask_(numShards - 1), exchangeId_(""),
+      folder_(""), cfgIgnoreRiskProcessing_(false),
+      cfgMarginTradingEnabled_(false), logDebug_(false) {
   // Validate numShards is power of 2
   if ((numShards & (numShards - 1)) != 0) {
     throw std::invalid_argument("Invalid number of shards " +
@@ -57,6 +63,11 @@ RiskEngine::RiskEngine(
   const auto *ordersProcCfg = &exchangeConfiguration->ordersProcessingCfg;
   const auto *reportsQueriesCfg = &exchangeConfiguration->reportsQueriesCfg;
 
+  // Initialize exchangeId and folder
+  exchangeId_ = initStateCfg->exchangeId;
+  // TODO: Use DiskSerializationProcessorConfiguration::DEFAULT_FOLDER
+  folder_ = std::filesystem::path("snapshots");
+
   // Initialize configuration flags
   cfgIgnoreRiskProcessing_ = (ordersProcCfg->riskProcessingMode ==
                               common::config::OrdersProcessingConfiguration::
@@ -65,21 +76,101 @@ RiskEngine::RiskEngine(
                               common::config::OrdersProcessingConfiguration::
                                   MarginTradingMode::MARGIN_TRADING_ENABLED);
 
-  // Initialize services
-  // TODO: Load from snapshot if available
-  symbolSpecificationProvider_ =
-      std::make_unique<SymbolSpecificationProvider>();
-  userProfileService_ = std::make_unique<UserProfileService>();
+  // Initialize logging configuration
+  const auto *loggingCfg = &exchangeConfiguration->loggingCfg;
+  logDebug_ = loggingCfg->Contains(
+      common::config::LoggingConfiguration::LoggingLevel::LOGGING_RISK_DEBUG);
 
-  // Create ReportQueriesHandler adapter to forward queries to RiskEngine
-  reportQueriesHandler_ =
-      std::make_unique<RiskEngineReportQueriesHandler>(this);
+  // Initialize object pools
+  // Matches Java RiskEngine configuration (SYMBOL_POSITION_RECORD = 1024 * 256)
+  // TODO: Move to performance configuration
+  std::unordered_map<int, int> objectsPoolConfig;
+  objectsPoolConfig[::exchange::core::collections::objpool::ObjectsPool::
+                        SYMBOL_POSITION_RECORD] = 1024 * 256;
+  objectsPool_ =
+      std::unique_ptr<::exchange::core::collections::objpool::ObjectsPool>(
+          new ::exchange::core::collections::objpool::ObjectsPool(
+              objectsPoolConfig));
 
-  binaryCommandsProcessor_ = std::make_unique<BinaryCommandsProcessor>(
-      [this](common::api::binary::BinaryDataCommand *msg) {
-        HandleBinaryMessage(msg);
-      },
-      reportQueriesHandler_.get(), sharedPool, reportsQueriesCfg, shardId_);
+  // Try to load from snapshot
+  if (journaling::ISerializationProcessor::CanLoadFromSnapshot(
+          serializationProcessor, initStateCfg, shardId_,
+          journaling::ISerializationProcessor::SerializedModuleType::
+              RISK_ENGINE)) {
+    // Load from snapshot
+    auto state = serializationProcessor->LoadData<void *>(
+        initStateCfg->snapshotId,
+        journaling::ISerializationProcessor::SerializedModuleType::RISK_ENGINE,
+        shardId_,
+        [this, sharedPool,
+         reportsQueriesCfg](common::BytesIn *bytesIn) -> void * {
+          if (bytesIn == nullptr) {
+            throw std::invalid_argument("BytesIn cannot be nullptr");
+          }
+          // Verify shardId and shardMask
+          if (shardId_ != bytesIn->ReadInt()) {
+            throw std::runtime_error("wrong shardId");
+          }
+          if (shardMask_ != bytesIn->ReadLong()) {
+            throw std::runtime_error("wrong shardMask");
+          }
+
+          // Deserialize SymbolSpecificationProvider
+          symbolSpecificationProvider_ =
+              std::make_unique<SymbolSpecificationProvider>(bytesIn);
+
+          // Deserialize UserProfileService
+          userProfileService_ = std::make_unique<UserProfileService>(bytesIn);
+
+          // Create ReportQueriesHandler adapter to forward queries to
+          // RiskEngine
+          reportQueriesHandler_ =
+              std::make_unique<RiskEngineReportQueriesHandler>(this);
+
+          // Deserialize BinaryCommandsProcessor
+          binaryCommandsProcessor_ = std::make_unique<BinaryCommandsProcessor>(
+              [this](common::api::binary::BinaryDataCommand *msg) {
+                HandleBinaryMessage(msg);
+              },
+              reportQueriesHandler_.get(), sharedPool, reportsQueriesCfg,
+              bytesIn, shardId_);
+
+          // Deserialize lastPriceCache (int -> LastPriceCacheRecord)
+          int lastPriceCacheLength = bytesIn->ReadInt();
+          for (int i = 0; i < lastPriceCacheLength; i++) {
+            int32_t symbolId = bytesIn->ReadInt();
+            LastPriceCacheRecord record(*bytesIn);
+            lastPriceCache_[symbolId] = record;
+          }
+
+          // Deserialize fees (int -> long)
+          fees_ = utils::SerializationUtils::ReadIntLongHashMap(*bytesIn);
+
+          // Deserialize adjustments (int -> long)
+          adjustments_ =
+              utils::SerializationUtils::ReadIntLongHashMap(*bytesIn);
+
+          // Deserialize suspends (int -> long)
+          suspends_ = utils::SerializationUtils::ReadIntLongHashMap(*bytesIn);
+
+          return nullptr; // Not used
+        });
+  } else {
+    // Initialize services normally
+    symbolSpecificationProvider_ =
+        std::make_unique<SymbolSpecificationProvider>();
+    userProfileService_ = std::make_unique<UserProfileService>();
+
+    // Create ReportQueriesHandler adapter to forward queries to RiskEngine
+    reportQueriesHandler_ =
+        std::make_unique<RiskEngineReportQueriesHandler>(this);
+
+    binaryCommandsProcessor_ = std::make_unique<BinaryCommandsProcessor>(
+        [this](common::api::binary::BinaryDataCommand *msg) {
+          HandleBinaryMessage(msg);
+        },
+        reportQueriesHandler_.get(), sharedPool, reportsQueriesCfg, shardId_);
+  }
 }
 
 bool RiskEngine::PreProcessCommand(int64_t seq,
@@ -501,6 +592,80 @@ common::OrderAction RiskEngine::OppositeAction(common::OrderAction action) {
 template std::optional<std::unique_ptr<common::api::reports::ReportResult>>
 RiskEngine::HandleReportQuery<common::api::reports::ReportResult>(
     common::api::reports::ReportQuery<common::api::reports::ReportResult> *);
+
+int32_t RiskEngine::GetStateHash() const {
+  // Calculate state hash based on all stateful components
+  // Note: Java version doesn't have explicit stateHash for RiskEngine,
+  // but we implement it for consistency
+  std::size_t hash = 0;
+  if (symbolSpecificationProvider_ != nullptr) {
+    hash ^=
+        static_cast<std::size_t>(symbolSpecificationProvider_->GetStateHash())
+        << 1;
+  }
+  if (userProfileService_ != nullptr) {
+    hash ^= static_cast<std::size_t>(userProfileService_->GetStateHash()) << 2;
+  }
+  if (binaryCommandsProcessor_ != nullptr) {
+    hash ^= static_cast<std::size_t>(binaryCommandsProcessor_->GetStateHash())
+            << 3;
+  }
+  // Hash lastPriceCache, fees, adjustments, suspends
+  for (const auto &pair : lastPriceCache_) {
+    hash ^= (std::hash<int32_t>{}(pair.first) << 4) ^
+            (std::hash<int64_t>{}(pair.second.askPrice) << 5) ^
+            (std::hash<int64_t>{}(pair.second.bidPrice) << 6);
+  }
+  for (const auto &pair : fees_) {
+    hash ^= (std::hash<int32_t>{}(pair.first) << 7) ^
+            (std::hash<int64_t>{}(pair.second) << 8);
+  }
+  for (const auto &pair : adjustments_) {
+    hash ^= (std::hash<int32_t>{}(pair.first) << 9) ^
+            (std::hash<int64_t>{}(pair.second) << 10);
+  }
+  for (const auto &pair : suspends_) {
+    hash ^= (std::hash<int32_t>{}(pair.first) << 11) ^
+            (std::hash<int64_t>{}(pair.second) << 12);
+  }
+  return static_cast<int32_t>(hash);
+}
+
+void RiskEngine::WriteMarshallable(common::BytesOut &bytes) {
+  // Write shardId and shardMask
+  bytes.WriteInt(shardId_).WriteLong(shardMask_);
+
+  // Write symbolSpecificationProvider
+  if (symbolSpecificationProvider_ != nullptr) {
+    symbolSpecificationProvider_->WriteMarshallable(bytes);
+  }
+
+  // Write userProfileService
+  if (userProfileService_ != nullptr) {
+    userProfileService_->WriteMarshallable(bytes);
+  }
+
+  // Write binaryCommandsProcessor
+  if (binaryCommandsProcessor_ != nullptr) {
+    binaryCommandsProcessor_->WriteMarshallable(bytes);
+  }
+
+  // Write lastPriceCache (int -> LastPriceCacheRecord)
+  bytes.WriteInt(static_cast<int32_t>(lastPriceCache_.size()));
+  for (const auto &pair : lastPriceCache_) {
+    bytes.WriteInt(pair.first);
+    pair.second.WriteMarshallable(bytes);
+  }
+
+  // Write fees (int -> long)
+  utils::SerializationUtils::MarshallIntLongHashMap(fees_, bytes);
+
+  // Write adjustments (int -> long)
+  utils::SerializationUtils::MarshallIntLongHashMap(adjustments_, bytes);
+
+  // Write suspends (int -> long)
+  utils::SerializationUtils::MarshallIntLongHashMap(suspends_, bytes);
+}
 
 } // namespace processors
 } // namespace core

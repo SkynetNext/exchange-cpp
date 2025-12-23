@@ -16,7 +16,9 @@
 
 #pragma once
 
+#include "../collections/objpool/ObjectsPool.h"
 #include "../common/BalanceAdjustmentType.h"
+#include "../common/WriteBytesMarshallable.h"
 #include "../common/api/binary/BinaryDataCommand.h"
 #include "../common/api/reports/ReportQuery.h"
 #include "../common/cmd/OrderCommand.h"
@@ -26,8 +28,10 @@
 #include "UserProfileService.h"
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
+#include <string>
 
 namespace exchange {
 namespace core {
@@ -54,6 +58,14 @@ struct LastPriceCacheRecord {
   LastPriceCacheRecord(int64_t askPrice, int64_t bidPrice)
       : askPrice(askPrice), bidPrice(bidPrice) {}
 
+  /**
+   * Constructor from BytesIn (deserialization)
+   */
+  LastPriceCacheRecord(common::BytesIn &bytes) {
+    askPrice = bytes.ReadLong();
+    bidPrice = bytes.ReadLong();
+  }
+
   LastPriceCacheRecord AveragingRecord() const {
     LastPriceCacheRecord average;
     average.askPrice = (askPrice + bidPrice) >> 1;
@@ -62,13 +74,20 @@ struct LastPriceCacheRecord {
   }
 
   static LastPriceCacheRecord Dummy() { return LastPriceCacheRecord(42, 42); }
+
+  // Helper method for serialization
+  void WriteMarshallable(common::BytesOut &bytes) const {
+    bytes.WriteLong(askPrice);
+    bytes.WriteLong(bidPrice);
+  }
 };
 
 /**
  * RiskEngine - stateful risk engine
  * Handles risk management (R1 - Pre-hold, R2 - Release)
  */
-class RiskEngine {
+class RiskEngine : public common::StateHash,
+                   public common::WriteBytesMarshallable {
 public:
   RiskEngine(
       int32_t shardId, int64_t numShards,
@@ -161,15 +180,29 @@ public:
    */
   void Reset();
 
+  // StateHash interface
+  int32_t GetStateHash() const override;
+
+  // WriteBytesMarshallable interface
+  void WriteMarshallable(common::BytesOut &bytes) override;
+
 private:
   int32_t shardId_;
   int64_t shardMask_; // numShards - 1 (must be power of 2)
+
+  std::string exchangeId_; // TODO validate
+  std::filesystem::path folder_;
 
   std::unique_ptr<SymbolSpecificationProvider> symbolSpecificationProvider_;
   std::unique_ptr<UserProfileService> userProfileService_;
   std::unique_ptr<BinaryCommandsProcessor> binaryCommandsProcessor_;
   std::unique_ptr<common::api::reports::ReportQueriesHandler>
       reportQueriesHandler_;
+
+  // Object pool for risk engine operations
+  // Created in constructor with configuration matching Java version
+  std::unique_ptr<::exchange::core::collections::objpool::ObjectsPool>
+      objectsPool_;
 
   // symbol -> LastPriceCacheRecord
   ankerl::unordered_dense::map<int32_t, LastPriceCacheRecord> lastPriceCache_;
@@ -181,6 +214,7 @@ private:
 
   bool cfgIgnoreRiskProcessing_;
   bool cfgMarginTradingEnabled_;
+  bool logDebug_;
 
   /**
    * Place order risk check

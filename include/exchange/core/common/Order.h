@@ -16,11 +16,12 @@
 
 #pragma once
 
+#include "BytesIn.h"
 #include "IOrder.h"
 #include "OrderAction.h"
 #include "StateHash.h"
+#include "WriteBytesMarshallable.h"
 #include <cstdint>
-#include <sstream>
 #include <string>
 
 namespace exchange {
@@ -35,7 +36,7 @@ namespace common {
  * No external references allowed to such object - order objects only live
  * inside OrderBook.
  */
-class Order : public IOrder, public StateHash {
+class Order : public IOrder, public StateHash, public WriteBytesMarshallable {
 public:
   int64_t orderId = 0;
   int64_t price = 0;
@@ -61,6 +62,11 @@ public:
         reserveBidPrice(reserveBidPrice), action(action), uid(uid),
         timestamp(timestamp) {}
 
+  /**
+   * Constructor from BytesIn (deserialization)
+   */
+  Order(BytesIn &bytes);
+
   // IOrder interface implementation
   int64_t GetPrice() const override { return price; }
   int64_t GetSize() const override { return size; }
@@ -73,6 +79,9 @@ public:
 
   // StateHash interface implementation
   int32_t GetStateHash() const override;
+
+  // WriteBytesMarshallable interface
+  void WriteMarshallable(BytesOut &bytes) override;
 
   // Comparison operators
   bool operator==(const Order &other) const;

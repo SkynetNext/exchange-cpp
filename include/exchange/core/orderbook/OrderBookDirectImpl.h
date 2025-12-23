@@ -46,11 +46,14 @@ public:
     int32_t numOrders;
   };
 
-  struct DirectOrder : public common::IOrder {
+  struct DirectOrder : public common::IOrder,
+                       public common::WriteBytesMarshallable,
+                       public common::StateHash {
     int64_t orderId;
     int64_t price;
     int64_t size;
     int64_t filled;
+    int64_t reserveBidPrice; // Reserved price for fast moves
     int64_t uid;
     common::OrderAction action;
     int64_t timestamp;
@@ -59,19 +62,41 @@ public:
     DirectOrder *prev;
     Bucket *bucket;
 
+    DirectOrder() = default;
+
+    /**
+     * Constructor from BytesIn (deserialization)
+     */
+    DirectOrder(common::BytesIn &bytes);
+
     // IOrder interface
     int64_t GetOrderId() const override { return orderId; }
     int64_t GetPrice() const override { return price; }
     int64_t GetSize() const override { return size; }
     int64_t GetFilled() const override { return filled; }
-    int64_t GetReserveBidPrice() const override { return 0; }
+    int64_t GetReserveBidPrice() const override { return reserveBidPrice; }
     common::OrderAction GetAction() const override { return action; }
     int64_t GetUid() const override { return uid; }
     int64_t GetTimestamp() const override { return timestamp; }
+
+    // StateHash interface
+    int32_t GetStateHash() const override;
+
+    // WriteBytesMarshallable interface
+    void WriteMarshallable(common::BytesOut &bytes) override;
   };
 
   OrderBookDirectImpl(
       const common::CoreSymbolSpecification *symbolSpec,
+      ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
+      OrderBookEventsHelper *eventsHelper,
+      const common::config::LoggingConfiguration *loggingCfg);
+
+  /**
+   * Constructor from BytesIn (deserialization)
+   */
+  OrderBookDirectImpl(
+      common::BytesIn *bytes,
       ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
       OrderBookEventsHelper *eventsHelper,
       const common::config::LoggingConfiguration *loggingCfg);
@@ -98,6 +123,12 @@ public:
   int32_t GetTotalBidBuckets(int32_t limit) override;
   std::vector<common::Order *> FindUserOrders(int64_t uid);
   void Reset();
+
+  // StateHash interface
+  int32_t GetStateHash() const override;
+
+  // WriteBytesMarshallable interface
+  void WriteMarshallable(common::BytesOut &bytes) override;
 
 private:
   // Price buckets using ART tree

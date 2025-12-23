@@ -19,7 +19,16 @@
 #include "OrderAction.h"
 #include "PositionDirection.h"
 #include "StateHash.h"
+#include "WriteBytesMarshallable.h"
 #include <cstdint>
+
+namespace exchange {
+namespace core {
+namespace common {
+class BytesIn;
+} // namespace common
+} // namespace core
+} // namespace exchange
 #include <string>
 
 namespace exchange {
@@ -36,7 +45,7 @@ struct LastPriceCacheRecord {
 };
 } // namespace processors
 
-class SymbolPositionRecord : public StateHash {
+class SymbolPositionRecord : public StateHash, public WriteBytesMarshallable {
 public:
   int64_t uid = 0;
   int32_t symbol = 0;
@@ -57,6 +66,11 @@ public:
   SymbolPositionRecord() = default;
 
   SymbolPositionRecord(int64_t uid, int32_t symbol, int32_t currency);
+
+  /**
+   * Constructor from BytesIn (deserialization)
+   */
+  SymbolPositionRecord(int64_t uid, common::BytesIn &bytes);
 
   void Initialize(int64_t uid, int32_t symbol, int32_t currency);
 
@@ -105,6 +119,9 @@ public:
 
   // StateHash interface implementation
   int32_t GetStateHash() const override;
+
+  // WriteBytesMarshallable interface
+  void WriteMarshallable(BytesOut &bytes) override;
 
   std::string ToString() const;
 

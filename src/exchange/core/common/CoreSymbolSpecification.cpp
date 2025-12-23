@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <exchange/core/common/BytesIn.h>
+#include <exchange/core/common/BytesOut.h>
 #include <exchange/core/common/CoreSymbolSpecification.h>
 #include <exchange/core/common/SymbolType.h>
 #include <functional>
@@ -22,6 +24,13 @@
 namespace exchange {
 namespace core {
 namespace common {
+
+CoreSymbolSpecification::CoreSymbolSpecification(BytesIn &bytes)
+    : symbolId(bytes.ReadInt()), type(SymbolTypeFromCode(bytes.ReadByte())),
+      baseCurrency(bytes.ReadInt()), quoteCurrency(bytes.ReadInt()),
+      baseScaleK(bytes.ReadLong()), quoteScaleK(bytes.ReadLong()),
+      takerFee(bytes.ReadLong()), makerFee(bytes.ReadLong()),
+      marginBuy(bytes.ReadLong()), marginSell(bytes.ReadLong()) {}
 
 CoreSymbolSpecification::CoreSymbolSpecification(
     int32_t symbolId, SymbolType type, int32_t baseCurrency,
@@ -59,6 +68,19 @@ std::string CoreSymbolSpecification::ToString() const {
       << ", makerFee=" << makerFee << ", marginBuy=" << marginBuy
       << ", marginSell=" << marginSell << "}";
   return oss.str();
+}
+
+void CoreSymbolSpecification::WriteMarshallable(BytesOut &bytes) {
+  bytes.WriteInt(symbolId);
+  bytes.WriteByte(static_cast<int8_t>(type));
+  bytes.WriteInt(baseCurrency);
+  bytes.WriteInt(quoteCurrency);
+  bytes.WriteLong(baseScaleK);
+  bytes.WriteLong(quoteScaleK);
+  bytes.WriteLong(takerFee);
+  bytes.WriteLong(makerFee);
+  bytes.WriteLong(marginBuy);
+  bytes.WriteLong(marginSell);
 }
 
 } // namespace common

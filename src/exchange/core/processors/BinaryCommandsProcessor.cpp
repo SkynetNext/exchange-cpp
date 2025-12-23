@@ -15,11 +15,14 @@
  */
 
 #include <cstring>
+#include <exchange/core/common/BytesIn.h>
+#include <exchange/core/common/WriteBytesMarshallable.h>
 #include <exchange/core/common/cmd/CommandResultCode.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/common/cmd/OrderCommandType.h>
 #include <exchange/core/processors/BinaryCommandsProcessor.h>
 #include <exchange/core/utils/HashingUtils.h>
+#include <exchange/core/utils/SerializationUtils.h>
 #include <stdexcept>
 #include <vector>
 
@@ -28,7 +31,7 @@ namespace core {
 namespace processors {
 
 // TransferRecord - internal class for storing binary frame data
-class TransferRecord {
+class TransferRecord : public common::WriteBytesMarshallable {
 public:
   std::vector<int64_t> dataArray;
   int wordsTransferred;
@@ -36,12 +39,25 @@ public:
   TransferRecord(int expectedLength)
       : wordsTransferred(0), dataArray(expectedLength, 0) {}
 
+  /**
+   * Constructor from BytesIn (deserialization)
+   */
+  TransferRecord(common::BytesIn &bytes) {
+    wordsTransferred = bytes.ReadInt();
+    dataArray = utils::SerializationUtils::ReadLongArray(bytes);
+  }
+
   void AddWord(int64_t word) {
     if (wordsTransferred >= static_cast<int>(dataArray.size())) {
       // Resize if needed
       dataArray.resize(dataArray.size() * 2);
     }
     dataArray[wordsTransferred++] = word;
+  }
+
+  void WriteMarshallable(common::BytesOut &bytes) override {
+    bytes.WriteInt(wordsTransferred);
+    utils::SerializationUtils::MarshallLongArray(dataArray, bytes);
   }
 };
 
@@ -64,6 +80,35 @@ BinaryCommandsProcessor::BinaryCommandsProcessor(
     : completeMessagesHandler_(std::move(completeMessagesHandler)),
       reportQueriesHandler_(reportQueriesHandler),
       queriesConfiguration_(queriesConfiguration), section_(section) {
+  if (sharedPool != nullptr) {
+    eventsHelper_ = std::make_unique<orderbook::OrderBookEventsHelper>(
+        [sharedPool]() { return sharedPool->GetChain(); });
+  } else {
+    eventsHelper_ = std::make_unique<orderbook::OrderBookEventsHelper>();
+  }
+}
+
+BinaryCommandsProcessor::BinaryCommandsProcessor(
+    CompleteMessagesHandler completeMessagesHandler,
+    common::api::reports::ReportQueriesHandler *reportQueriesHandler,
+    SharedPool *sharedPool,
+    const common::config::ReportsQueriesConfiguration *queriesConfiguration,
+    common::BytesIn *bytesIn, int32_t section)
+    : completeMessagesHandler_(std::move(completeMessagesHandler)),
+      reportQueriesHandler_(reportQueriesHandler),
+      queriesConfiguration_(queriesConfiguration), section_(section) {
+  if (bytesIn == nullptr) {
+    throw std::invalid_argument("BytesIn cannot be nullptr");
+  }
+
+  // Read incomingData (long -> TransferRecord*)
+  int length = bytesIn->ReadInt();
+  for (int i = 0; i < length; i++) {
+    int64_t transactionId = bytesIn->ReadLong();
+    TransferRecord *record = new TransferRecord(*bytesIn);
+    incomingData_[transactionId] = record;
+  }
+
   if (sharedPool != nullptr) {
     eventsHelper_ = std::make_unique<orderbook::OrderBookEventsHelper>(
         [sharedPool]() { return sharedPool->GetChain(); });
@@ -161,6 +206,18 @@ int32_t BinaryCommandsProcessor::GetStateHash() const {
     hash ^= std::hash<int64_t>{}(pair.first) << 1;
   }
   return static_cast<int32_t>(hash);
+}
+
+void BinaryCommandsProcessor::WriteMarshallable(common::BytesOut &bytes) {
+  // Write incomingData (transactionId -> TransferRecord)
+  bytes.WriteInt(static_cast<int32_t>(incomingData_.size()));
+  for (const auto &pair : incomingData_) {
+    bytes.WriteLong(pair.first);
+    TransferRecord *record = static_cast<TransferRecord *>(pair.second);
+    if (record != nullptr) {
+      record->WriteMarshallable(bytes);
+    }
+  }
 }
 
 } // namespace processors

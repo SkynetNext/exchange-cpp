@@ -15,9 +15,13 @@
  */
 
 #include <algorithm>
+#include <exchange/core/common/BytesIn.h>
+#include <exchange/core/common/BytesOut.h>
 #include <exchange/core/common/MatcherTradeEvent.h>
+#include <exchange/core/common/Order.h>
 #include <exchange/core/orderbook/OrderBookEventsHelper.h>
 #include <exchange/core/orderbook/OrdersBucket.h>
+#include <exchange/core/utils/SerializationUtils.h>
 #include <stdexcept>
 #include <vector>
 
@@ -26,6 +30,23 @@ namespace core {
 namespace orderbook {
 
 OrdersBucket::OrdersBucket(int64_t price) : price_(price), totalVolume_(0) {}
+
+OrdersBucket::OrdersBucket(common::BytesIn *bytes) {
+  if (bytes == nullptr) {
+    throw std::invalid_argument("BytesIn cannot be nullptr");
+  }
+  price_ = bytes->ReadLong();
+  
+  // Read orders map (long -> Order*)
+  int length = bytes->ReadInt();
+  for (int i = 0; i < length; i++) {
+    int64_t orderId = bytes->ReadLong();
+    common::Order *order = new common::Order(*bytes);
+    Put(order);
+  }
+  
+  totalVolume_ = bytes->ReadLong();
+}
 
 void OrdersBucket::Put(::exchange::core::common::Order *order) {
   if (order == nullptr) {
@@ -155,6 +176,25 @@ void OrdersBucket::Validate() const {
                              std::to_string(totalVolume_) +
                              " calculated=" + std::to_string(calculatedVolume));
   }
+}
+
+void OrdersBucket::WriteMarshallable(common::BytesOut &bytes) {
+  // Write price
+  bytes.WriteLong(price_);
+  
+  // Convert orderList_ to map for serialization (orderId -> Order*)
+  ankerl::unordered_dense::map<int64_t, common::Order *> orderMap;
+  for (common::Order *order : orderList_) {
+    if (order != nullptr) {
+      orderMap[order->orderId] = order;
+    }
+  }
+  
+  // Write orders map
+  utils::SerializationUtils::MarshallLongHashMap(orderMap, bytes);
+  
+  // Write totalVolume
+  bytes.WriteLong(totalVolume_);
 }
 
 } // namespace orderbook

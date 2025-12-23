@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "../../common/BytesIn.h"
 #include "../../common/cmd/OrderCommand.h"
 #include "../../common/config/InitialStateConfiguration.h"
 #include <cstdint>
@@ -52,8 +53,10 @@ public:
    */
   template <typename T>
   T LoadData(int64_t snapshotId, SerializedModuleType type, int32_t instanceId,
-             std::function<T(void *)> initFunc) {
-    return initFunc(nullptr); // Simplified for now
+             std::function<T(common::BytesIn *)> initFunc) {
+    // This is a placeholder - actual implementation should be provided by
+    // concrete classes
+    return initFunc(nullptr);
   }
 
   /**

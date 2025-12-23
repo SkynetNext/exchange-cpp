@@ -16,8 +16,12 @@
 
 #include <algorithm>
 #include <exchange/core/collections/objpool/ObjectsPool.h>
+#include <exchange/core/common/BytesIn.h>
 #include <exchange/core/common/MatcherTradeEvent.h>
+#include <exchange/core/common/config/LoggingConfiguration.h>
+#include <exchange/core/orderbook/OrderBookEventsHelper.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
+#include <exchange/core/utils/SerializationUtils.h>
 #include <stdexcept>
 
 namespace exchange {
@@ -496,6 +500,56 @@ OrderBookNaiveImpl::SubtreeForMatching(common::OrderAction action,
     // askBuckets_ is in ascending order, so we need to iterate from beginning
     return &askBuckets_;
   }
+}
+
+OrderBookNaiveImpl::OrderBookNaiveImpl(
+    common::BytesIn *bytes,
+    const common::config::LoggingConfiguration *loggingCfg) {
+  if (bytes == nullptr) {
+    throw std::invalid_argument("BytesIn cannot be nullptr");
+  }
+  if (loggingCfg == nullptr) {
+    throw std::invalid_argument("LoggingConfiguration cannot be nullptr");
+  }
+
+  // Read symbolSpec
+  symbolSpec_ = new common::CoreSymbolSpecification(*bytes);
+
+  // Read askBuckets (long -> OrdersBucket*)
+  int askLength = bytes->ReadInt();
+  for (int i = 0; i < askLength; i++) {
+    int64_t price = bytes->ReadLong();
+    OrdersBucket *bucket = new OrdersBucket(bytes);
+    askBuckets_[price] = std::unique_ptr<OrdersBucket>(bucket);
+  }
+
+  // Read bidBuckets (long -> OrdersBucket*)
+  int bidLength = bytes->ReadInt();
+  for (int i = 0; i < bidLength; i++) {
+    int64_t price = bytes->ReadLong();
+    OrdersBucket *bucket = new OrdersBucket(bytes);
+    bidBuckets_[price] = std::unique_ptr<OrdersBucket>(bucket);
+  }
+
+  // Reconstruct orderId -> Order cache
+  for (const auto &pair : askBuckets_) {
+    pair.second->ForEachOrder([this](common::Order *order) {
+      if (order != nullptr) {
+        idMap_[order->orderId] = order;
+      }
+    });
+  }
+  for (const auto &pair : bidBuckets_) {
+    pair.second->ForEachOrder([this](common::Order *order) {
+      if (order != nullptr) {
+        idMap_[order->orderId] = order;
+      }
+    });
+  }
+
+  eventsHelper_ = OrderBookEventsHelper::NonPooledEventsHelper();
+  logDebug_ = loggingCfg->Contains(common::config::LoggingConfiguration::
+                                       LoggingLevel::LOGGING_MATCHING_DEBUG);
 }
 
 } // namespace orderbook

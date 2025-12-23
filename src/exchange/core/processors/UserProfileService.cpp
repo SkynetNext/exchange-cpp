@@ -14,15 +14,32 @@
  * limitations under the License.
  */
 
+#include <exchange/core/common/BytesIn.h>
+#include <exchange/core/common/BytesOut.h>
 #include <exchange/core/common/UserProfile.h>
 #include <exchange/core/common/UserStatus.h>
 #include <exchange/core/processors/UserProfileService.h>
+#include <exchange/core/utils/HashingUtils.h>
+#include <exchange/core/utils/SerializationUtils.h>
 
 namespace exchange {
 namespace core {
 namespace processors {
 
 UserProfileService::UserProfileService() {}
+
+UserProfileService::UserProfileService(common::BytesIn *bytes) {
+  if (bytes == nullptr) {
+    throw std::invalid_argument("BytesIn cannot be nullptr");
+  }
+  // Read userProfiles (long -> UserProfile*)
+  int length = bytes->ReadInt();
+  for (int i = 0; i < length; i++) {
+    int64_t uid = bytes->ReadLong();
+    common::UserProfile *profile = new common::UserProfile(bytes);
+    userProfiles[uid] = profile;
+  }
+}
 
 common::UserProfile *UserProfileService::GetUserProfile(int64_t uid) {
   auto it = userProfiles.find(uid);
@@ -135,18 +152,22 @@ std::vector<common::UserProfile *> UserProfileService::GetUserProfiles() const {
   return result;
 }
 
-void UserProfileService::Reset() { userProfiles.clear(); }
+void UserProfileService::Reset() {
+  // Delete all user profiles before clearing
+  for (auto &pair : userProfiles) {
+    delete pair.second;
+  }
+  userProfiles.clear();
+}
 
 int32_t UserProfileService::GetStateHash() const {
-  std::size_t hash = 0;
-  for (const auto &pair : userProfiles) {
-    std::size_t h1 = std::hash<int64_t>{}(pair.first);
-    if (pair.second != nullptr) {
-      h1 ^= static_cast<std::size_t>(pair.second->GetStateHash());
-    }
-    hash ^= (h1 << 1);
-  }
-  return static_cast<int32_t>(hash);
+  // Use HashingUtils::StateHash to match Java implementation
+  return utils::HashingUtils::StateHash(userProfiles);
+}
+
+void UserProfileService::WriteMarshallable(common::BytesOut &bytes) {
+  // Write userProfiles (long -> UserProfile*)
+  utils::SerializationUtils::MarshallLongHashMap(userProfiles, bytes);
 }
 
 } // namespace processors

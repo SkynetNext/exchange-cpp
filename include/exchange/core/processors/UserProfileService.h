@@ -18,6 +18,7 @@
 
 #include "../common/StateHash.h"
 #include "../common/UserProfile.h"
+#include "../common/WriteBytesMarshallable.h"
 #include "../common/cmd/CommandResultCode.h"
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
@@ -25,18 +26,27 @@
 
 namespace exchange {
 namespace core {
+namespace common {
+class BytesIn;
+} // namespace common
 namespace processors {
 
 /**
  * UserProfileService - stateful user profile service
  * Manages user profiles (uid -> UserProfile)
  */
-class UserProfileService : public common::StateHash {
+class UserProfileService : public common::StateHash,
+                           public common::WriteBytesMarshallable {
 public:
   // uid -> UserProfile
   ankerl::unordered_dense::map<int64_t, common::UserProfile *> userProfiles;
 
   UserProfileService();
+
+  /**
+   * Constructor from BytesIn (deserialization)
+   */
+  UserProfileService(common::BytesIn *bytes);
 
   /**
    * Find user profile
@@ -84,6 +94,9 @@ public:
 
   // StateHash interface
   int32_t GetStateHash() const override;
+
+  // WriteBytesMarshallable interface
+  void WriteMarshallable(common::BytesOut &bytes) override;
 };
 
 } // namespace processors

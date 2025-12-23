@@ -17,8 +17,9 @@
 #pragma once
 
 #include "StateHash.h"
-#include "UserStatus.h"
 #include "SymbolPositionRecord.h"
+#include "UserStatus.h"
+#include "WriteBytesMarshallable.h"
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
 #include <string>
@@ -27,7 +28,7 @@ namespace exchange {
 namespace core {
 namespace common {
 
-class UserProfile : public StateHash {
+class UserProfile : public StateHash, public WriteBytesMarshallable {
 public:
   int64_t uid = 0;
 
@@ -48,10 +49,18 @@ public:
 
   UserProfile(int64_t uid, UserStatus userStatus);
 
+  /**
+   * Constructor from BytesIn (deserialization)
+   */
+  UserProfile(BytesIn *bytes);
+
   SymbolPositionRecord *GetPositionRecordOrThrowEx(int32_t symbol);
 
   // StateHash interface implementation
   int32_t GetStateHash() const override;
+
+  // WriteBytesMarshallable interface
+  void WriteMarshallable(BytesOut &bytes) override;
 
   std::string ToString() const;
 };
@@ -59,4 +68,3 @@ public:
 } // namespace common
 } // namespace core
 } // namespace exchange
-
