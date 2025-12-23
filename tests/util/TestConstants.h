@@ -19,6 +19,8 @@
 #include <cstdint>
 #include <exchange/core/common/CoreSymbolSpecification.h>
 #include <exchange/core/common/SymbolType.h>
+#include <set>
+#include <string>
 
 namespace exchange {
 namespace core2 {
@@ -81,6 +83,11 @@ struct TestConstants {
   static constexpr int32_t CURRENCY_ETC = 4149;
   static constexpr int32_t CURRENCY_ZEC = 4150;
 
+  // Currency sets (for integration and performance tests)
+  static const std::set<int32_t> &GetCurrenciesFutures();
+  static const std::set<int32_t> &GetCurrenciesExchange();
+  static const std::set<int32_t> &GetAllCurrencies();
+
   // Create SYMBOLSPEC_EUR_USD
   static exchange::core::common::CoreSymbolSpecification
   CreateSymbolSpecEurUsd();
@@ -98,6 +105,34 @@ struct TestConstants {
   CreateSymbolSpecFeeXbtLtc();
 
   static int32_t GetCurrency(const std::string &currency);
+
+  // Static symbol specifications (for convenience, matching Java version)
+  static const exchange::core::common::CoreSymbolSpecification &
+  GetSymbolSpecEurUsd();
+  static const exchange::core::common::CoreSymbolSpecification &
+  GetSymbolSpecEthXbt();
+  static const exchange::core::common::CoreSymbolSpecification &
+  GetSymbolSpecFeeUsdJpy();
+  static const exchange::core::common::CoreSymbolSpecification &
+  GetSymbolSpecFeeXbtLtc();
+
+  // Aliases matching Java naming
+  static const exchange::core::common::CoreSymbolSpecification &
+  SYMBOLSPEC_EUR_USD() {
+    return GetSymbolSpecEurUsd();
+  }
+  static const exchange::core::common::CoreSymbolSpecification &
+  SYMBOLSPEC_ETH_XBT() {
+    return GetSymbolSpecEthXbt();
+  }
+  static const exchange::core::common::CoreSymbolSpecification &
+  SYMBOLSPECFEE_USD_JPY() {
+    return GetSymbolSpecFeeUsdJpy();
+  }
+  static const exchange::core::common::CoreSymbolSpecification &
+  SYMBOLSPECFEE_XBT_LTC() {
+    return GetSymbolSpecFeeXbtLtc();
+  }
 };
 
 } // namespace util

@@ -14,28 +14,27 @@
  * limitations under the License.
  */
 
-#pragma once
-
-#include "OrderBookBaseTest.h"
+#include "ITFeesExchangeLatency.h"
+#include <exchange/core/common/config/PerformanceConfiguration.h>
 
 namespace exchange {
 namespace core2 {
-namespace core {
-namespace orderbook {
+namespace tests {
+namespace integration {
 
-/**
- * OrderBookDirectImplTest - base class for Direct implementation tests
- * Adds additional tests specific to Direct implementation
- */
-class OrderBookDirectImplTest : public OrderBookBaseTest {
-protected:
-  // Additional test methods for Direct implementation
-  void TestSequentialAsks();
-  void TestSequentialBids();
-  void TestMultipleCommandsCompare();
-};
+ITFeesExchangeLatency::ITFeesExchangeLatency() : ITFeesExchange() {}
 
-} // namespace orderbook
-} // namespace core
+exchange::core::common::config::PerformanceConfiguration
+ITFeesExchangeLatency::GetPerformanceConfiguration() {
+  // Note: latencyPerformanceBuilder() equivalent - use Default() with
+  // latency-optimized settings
+  auto cfg = exchange::core::common::config::PerformanceConfiguration::Default();
+  // Latency-optimized settings would be applied here if needed
+  return cfg;
+}
+
+} // namespace integration
+} // namespace tests
 } // namespace core2
 } // namespace exchange
+

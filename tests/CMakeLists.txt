@@ -4,6 +4,36 @@ if(BUILD_TESTING AND GTest_FOUND)
     # List of all test executables (will be collected for all_tests target)
     set(ALL_TEST_TARGETS "")
 
+    # ============================================================================
+    # Test utility library - shared utilities for tests
+    # ============================================================================
+    add_library(test_utils STATIC
+        util/ExecutionTime.cpp
+        util/LatencyTools.cpp
+        util/L2MarketDataHelper.cpp
+        util/TestConstants.cpp
+        util/TestDataParameters.cpp
+        util/TestOrdersGenerator.cpp
+        util/TestOrdersGeneratorConfig.cpp
+        util/ThroughputTestsModule.cpp
+        util/UserCurrencyAccountsGenerator.cpp
+    )
+    
+    target_link_libraries(test_utils
+        PRIVATE
+            exchange-cpp
+            GTest::gtest
+    )
+    
+    target_include_directories(test_utils
+        PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
+    # ============================================================================
+    # Unit Tests
+    # ============================================================================
+
     # ART Tree tests
     add_executable(test_long_adaptive_radix_tree_map
         collections/art/LongAdaptiveRadixTreeMapTest.cpp
@@ -41,13 +71,12 @@ if(BUILD_TESTING AND GTest_FOUND)
     add_executable(test_orderbook_naive_impl_exchange
         orderbook/OrderBookBaseTest.cpp
         orderbook/OrderBookNaiveImplExchangeTest.cpp
-        util/L2MarketDataHelper.cpp
-        util/TestConstants.cpp
     )
     
     target_link_libraries(test_orderbook_naive_impl_exchange
         PRIVATE
             exchange-cpp
+            test_utils
             GTest::gtest
             GTest::gtest_main
     )
@@ -58,13 +87,12 @@ if(BUILD_TESTING AND GTest_FOUND)
     add_executable(test_orderbook_naive_impl_margin
         orderbook/OrderBookBaseTest.cpp
         orderbook/OrderBookNaiveImplMarginTest.cpp
-        util/L2MarketDataHelper.cpp
-        util/TestConstants.cpp
     )
     
     target_link_libraries(test_orderbook_naive_impl_margin
         PRIVATE
             exchange-cpp
+            test_utils
             GTest::gtest
             GTest::gtest_main
     )
@@ -77,13 +105,12 @@ if(BUILD_TESTING AND GTest_FOUND)
         orderbook/OrderBookBaseTest.cpp
         orderbook/OrderBookDirectImplTest.cpp
         orderbook/OrderBookDirectImplExchangeTest.cpp
-        util/L2MarketDataHelper.cpp
-        util/TestConstants.cpp
     )
     
     target_link_libraries(test_orderbook_direct_impl_exchange
         PRIVATE
             exchange-cpp
+            test_utils
             GTest::gtest
             GTest::gtest_main
     )
@@ -95,13 +122,12 @@ if(BUILD_TESTING AND GTest_FOUND)
         orderbook/OrderBookBaseTest.cpp
         orderbook/OrderBookDirectImplTest.cpp
         orderbook/OrderBookDirectImplMarginTest.cpp
-        util/L2MarketDataHelper.cpp
-        util/TestConstants.cpp
     )
     
     target_link_libraries(test_orderbook_direct_impl_margin
         PRIVATE
             exchange-cpp
+            test_utils
             GTest::gtest
             GTest::gtest_main
     )
@@ -109,7 +135,110 @@ if(BUILD_TESTING AND GTest_FOUND)
     add_test(NAME OrderBookDirectImplMarginTest COMMAND test_orderbook_direct_impl_margin)
     list(APPEND ALL_TEST_TARGETS test_orderbook_direct_impl_margin)
 
-    # Create a custom target that builds all tests
+    # OrdersBucket tests
+    add_executable(test_orders_bucket
+        orderbook/OrdersBucketTest.cpp
+    )
+    
+    target_link_libraries(test_orders_bucket
+        PRIVATE
+            exchange-cpp
+            GTest::gtest
+            GTest::gtest_main
+    )
+    
+    add_test(NAME OrdersBucketTest COMMAND test_orders_bucket)
+    list(APPEND ALL_TEST_TARGETS test_orders_bucket)
+
+    # ============================================================================
+    # Integration Tests
+    # ============================================================================
+    
+    # Note: Integration tests require ExchangeTestContainer implementation
+    # These are currently framework-only and will be enabled when ExchangeTestContainer.cpp is implemented
+    
+    # ITExchangeCoreIntegrationBasic
+    # add_executable(test_integration_basic
+    #     integration/ITExchangeCoreIntegrationBasic.cpp
+    # )
+    # target_link_libraries(test_integration_basic
+    #     PRIVATE
+    #         exchange-cpp
+    #         test_utils
+    #         GTest::gtest
+    #         GTest::gtest_main
+    # )
+    # add_test(NAME ITExchangeCoreIntegrationBasic COMMAND test_integration_basic)
+    # list(APPEND ALL_TEST_TARGETS test_integration_basic)
+    
+    # ITMultiOperation
+    # add_executable(test_integration_multi_operation
+    #     integration/ITMultiOperation.cpp
+    # )
+    # target_link_libraries(test_integration_multi_operation
+    #     PRIVATE
+    #         exchange-cpp
+    #         test_utils
+    #         GTest::gtest
+    #         GTest::gtest_main
+    # )
+    # add_test(NAME ITMultiOperation COMMAND test_integration_multi_operation)
+    # list(APPEND ALL_TEST_TARGETS test_integration_multi_operation)
+
+    # ============================================================================
+    # Performance Tests
+    # ============================================================================
+    
+    # Note: Performance tests require LatencyTestsModule, JournalingTestsModule, 
+    # PersistenceTestsModule implementations
+    
+    # PerfThroughput
+    # add_executable(test_perf_throughput
+    #     perf/PerfThroughput.cpp
+    # )
+    # target_link_libraries(test_perf_throughput
+    #     PRIVATE
+    #         exchange-cpp
+    #         test_utils
+    #         GTest::gtest
+    #         GTest::gtest_main
+    # )
+    # add_test(NAME PerfThroughput COMMAND test_perf_throughput)
+    # list(APPEND ALL_TEST_TARGETS test_perf_throughput)
+    
+    # PerfLatency
+    # add_executable(test_perf_latency
+    #     perf/PerfLatency.cpp
+    # )
+    # target_link_libraries(test_perf_latency
+    #     PRIVATE
+    #         exchange-cpp
+    #         test_utils
+    #         GTest::gtest
+    #         GTest::gtest_main
+    # )
+    # add_test(NAME PerfLatency COMMAND test_perf_latency)
+    # list(APPEND ALL_TEST_TARGETS test_perf_latency)
+
+    # ============================================================================
+    # Example Tests
+    # ============================================================================
+    
+    add_executable(test_examples_core
+        examples/ITCoreExample.cpp
+    )
+    
+    target_link_libraries(test_examples_core
+        PRIVATE
+            exchange-cpp
+            GTest::gtest
+            GTest::gtest_main
+    )
+    
+    add_test(NAME ITCoreExample COMMAND test_examples_core)
+    list(APPEND ALL_TEST_TARGETS test_examples_core)
+
+        # Create a custom target that builds all tests
     # This allows CMake Tools to build all tests at once
     add_custom_target(all_tests
         DEPENDS ${ALL_TEST_TARGETS}

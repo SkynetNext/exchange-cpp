@@ -15,6 +15,7 @@
  */
 
 #include "OrderBookBaseTest.h"
+#include "../util/TestOrdersGenerator.h"
 #include <numeric>
 
 using namespace exchange::core::common;
@@ -772,6 +773,26 @@ void OrderBookBaseTest::TestShouldMoveOrderMatchesAllLiquidity() {
   CheckEventTrade(events[3], 10L, 200954, 10L);
   CheckEventTrade(events[4], 8L, 201000, 28L);
   CheckEventTrade(events[5], 9L, 201000, 32L);
+}
+
+void OrderBookBaseTest::TestMultipleCommandsKeepInternalState() {
+  const int tranNum = 25000;
+
+  auto localOrderBook = CreateNewOrderBook();
+  localOrderBook->ValidateInternalState();
+
+  auto genResult = TestOrdersGenerator::GenerateCommands(
+      tranNum, 200, 6, TestOrdersGenerator::UID_PLAIN_MAPPER, 0, false, false,
+      TestOrdersGenerator::CreateAsyncProgressLogger(tranNum), 348290254);
+
+  auto &allCommands = genResult.GetCommands();
+  for (auto &cmd : allCommands) {
+    cmd.orderId += 100; // TODO set start id
+    CommandResultCode commandResultCode =
+        IOrderBook::ProcessCommand(localOrderBook.get(), &cmd);
+    ASSERT_EQ(commandResultCode, CommandResultCode::SUCCESS);
+    localOrderBook->ValidateInternalState();
+  }
 }
 
 } // namespace orderbook

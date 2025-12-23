@@ -16,26 +16,5 @@
 
 #pragma once
 
-#include "OrderBookBaseTest.h"
-
-namespace exchange {
-namespace core2 {
-namespace core {
-namespace orderbook {
-
-/**
- * OrderBookDirectImplTest - base class for Direct implementation tests
- * Adds additional tests specific to Direct implementation
- */
-class OrderBookDirectImplTest : public OrderBookBaseTest {
-protected:
-  // Additional test methods for Direct implementation
-  void TestSequentialAsks();
-  void TestSequentialBids();
-  void TestMultipleCommandsCompare();
-};
-
-} // namespace orderbook
-} // namespace core
-} // namespace core2
-} // namespace exchange
+// This header is included for test declarations
+// Actual tests are in ITMultiOperation.cpp

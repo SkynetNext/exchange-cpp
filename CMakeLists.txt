@@ -115,8 +115,15 @@ file(GLOB_RECURSE EXCHANGE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/common/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/orderbook/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/processors/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/processors/journaling/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/collections/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/utils/*.cpp"
+)
+
+# Explicitly ensure new files are included (in case GLOB_RECURSE cache is stale)
+list(APPEND EXCHANGE_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/processors/journaling/DummySerializationProcessor.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/utils/AffinityThreadFactory.cpp"
 )
 
 # Create library (placeholder for now)

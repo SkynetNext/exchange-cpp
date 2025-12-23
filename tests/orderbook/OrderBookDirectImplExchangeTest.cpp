@@ -209,6 +209,10 @@ TEST_F(OrderBookDirectImplExchangeTest, SequentialBidsTest) {
   TestSequentialBids();
 }
 
+TEST_F(OrderBookDirectImplExchangeTest, MultipleCommandsCompareTest) {
+  TestMultipleCommandsCompare();
+}
+
 } // namespace orderbook
 } // namespace core
 } // namespace core2

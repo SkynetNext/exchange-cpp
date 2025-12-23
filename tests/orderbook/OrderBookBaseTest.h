@@ -119,6 +119,7 @@ protected:
   void TestShouldMoveOrderFullyMatchAsMarketable();
   void TestShouldMoveOrderFullyMatchAsMarketable2Prices();
   void TestShouldMoveOrderMatchesAllLiquidity();
+  void TestMultipleCommandsKeepInternalState();
 };
 
 } // namespace orderbook

@@ -16,26 +16,26 @@
 
 #pragma once
 
-#include "OrderBookBaseTest.h"
+#include "ITFeesMargin.h"
 
 namespace exchange {
 namespace core2 {
-namespace core {
-namespace orderbook {
+namespace tests {
+namespace integration {
 
 /**
- * OrderBookDirectImplTest - base class for Direct implementation tests
- * Adds additional tests specific to Direct implementation
+ * ITFeesMarginBasic - margin fees tests with basic performance configuration
  */
-class OrderBookDirectImplTest : public OrderBookBaseTest {
-protected:
-  // Additional test methods for Direct implementation
-  void TestSequentialAsks();
-  void TestSequentialBids();
-  void TestMultipleCommandsCompare();
+class ITFeesMarginBasic : public ITFeesMargin {
+public:
+  ITFeesMarginBasic();
+
+  exchange::core::common::config::PerformanceConfiguration
+  GetPerformanceConfiguration() override;
 };
 
-} // namespace orderbook
-} // namespace core
+} // namespace integration
+} // namespace tests
 } // namespace core2
 } // namespace exchange
+

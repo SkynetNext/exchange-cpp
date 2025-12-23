@@ -16,26 +16,27 @@
 
 #pragma once
 
-#include "OrderBookBaseTest.h"
+#include "ITExchangeCoreIntegrationStress.h"
 
 namespace exchange {
 namespace core2 {
-namespace core {
-namespace orderbook {
+namespace tests {
+namespace integration {
 
 /**
- * OrderBookDirectImplTest - base class for Direct implementation tests
- * Adds additional tests specific to Direct implementation
+ * ITExchangeCoreIntegrationStressBasic - stress tests with basic performance
+ * configuration
  */
-class OrderBookDirectImplTest : public OrderBookBaseTest {
-protected:
-  // Additional test methods for Direct implementation
-  void TestSequentialAsks();
-  void TestSequentialBids();
-  void TestMultipleCommandsCompare();
+class ITExchangeCoreIntegrationStressBasic
+    : public ITExchangeCoreIntegrationStress {
+public:
+  ITExchangeCoreIntegrationStressBasic();
+
+  exchange::core::common::config::PerformanceConfiguration
+  GetPerformanceConfiguration() override;
 };
 
-} // namespace orderbook
-} // namespace core
+} // namespace integration
+} // namespace tests
 } // namespace core2
 } // namespace exchange

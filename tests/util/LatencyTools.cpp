@@ -14,28 +14,42 @@
  * limitations under the License.
  */
 
-#pragma once
-
-#include "OrderBookBaseTest.h"
+#include "LatencyTools.h"
+#include <cmath>
+#include <sstream>
 
 namespace exchange {
 namespace core2 {
-namespace core {
-namespace orderbook {
+namespace tests {
+namespace util {
 
-/**
- * OrderBookDirectImplTest - base class for Direct implementation tests
- * Adds additional tests specific to Direct implementation
- */
-class OrderBookDirectImplTest : public OrderBookBaseTest {
-protected:
-  // Additional test methods for Direct implementation
-  void TestSequentialAsks();
-  void TestSequentialBids();
-  void TestMultipleCommandsCompare();
-};
+std::string LatencyTools::FormatNanos(int64_t ns) {
+  float value = ns / 1000.0f;
+  std::string timeUnit = "µs";
 
-} // namespace orderbook
-} // namespace core
+  if (value > 1000) {
+    value /= 1000;
+    timeUnit = "ms";
+  }
+
+  if (value > 1000) {
+    value /= 1000;
+    timeUnit = "s";
+  }
+
+  std::ostringstream oss;
+  if (value < 3) {
+    oss << std::round(value * 100) / 100.0f << timeUnit;
+  } else if (value < 30) {
+    oss << std::round(value * 10) / 10.0f << timeUnit;
+  } else {
+    oss << std::round(value) << timeUnit;
+  }
+
+  return oss.str();
+}
+
+} // namespace util
+} // namespace tests
 } // namespace core2
 } // namespace exchange

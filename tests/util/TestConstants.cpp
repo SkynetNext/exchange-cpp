@@ -15,6 +15,7 @@
  */
 
 #include "TestConstants.h"
+#include <set>
 #include <stdexcept>
 
 namespace exchange {
@@ -91,6 +92,105 @@ int32_t TestConstants::GetCurrency(const std::string &currency) {
     return CURRENCY_ETH;
   }
   throw std::runtime_error("Unknown currency [" + currency + "]");
+}
+
+// Currency sets
+static const std::set<int32_t> &GetCurrenciesFuturesImpl() {
+  static const std::set<int32_t> currencies = {TestConstants::CURRENCY_USD,
+                                               TestConstants::CURRENCY_EUR};
+  return currencies;
+}
+
+static const std::set<int32_t> &GetCurrenciesExchangeImpl() {
+  static const std::set<int32_t> currencies = {TestConstants::CURRENCY_ETH,
+                                               TestConstants::CURRENCY_XBT};
+  return currencies;
+}
+
+static const std::set<int32_t> &GetAllCurrenciesImpl() {
+  static const std::set<int32_t> currencies = {
+      TestConstants::CURRENCY_AUD, TestConstants::CURRENCY_BRL,
+      TestConstants::CURRENCY_CAD, TestConstants::CURRENCY_CHF,
+      TestConstants::CURRENCY_CNY, TestConstants::CURRENCY_CZK,
+      TestConstants::CURRENCY_DKK, TestConstants::CURRENCY_EUR,
+      TestConstants::CURRENCY_GBP, TestConstants::CURRENCY_HKD,
+      TestConstants::CURRENCY_JPY, TestConstants::CURRENCY_KRW,
+      TestConstants::CURRENCY_MXN, TestConstants::CURRENCY_MYR,
+      TestConstants::CURRENCY_NOK, TestConstants::CURRENCY_NZD,
+      TestConstants::CURRENCY_PLN, TestConstants::CURRENCY_RUB,
+      TestConstants::CURRENCY_SEK, TestConstants::CURRENCY_SGD,
+      TestConstants::CURRENCY_THB, TestConstants::CURRENCY_TRY,
+      TestConstants::CURRENCY_UAH, TestConstants::CURRENCY_USD,
+      TestConstants::CURRENCY_VND, TestConstants::CURRENCY_XAG,
+      TestConstants::CURRENCY_XAU, TestConstants::CURRENCY_ZAR,
+      TestConstants::CURRENCY_XBT, TestConstants::CURRENCY_ETH,
+      TestConstants::CURRENCY_LTC, TestConstants::CURRENCY_XDG,
+      TestConstants::CURRENCY_GRC, TestConstants::CURRENCY_XPM,
+      TestConstants::CURRENCY_XRP, TestConstants::CURRENCY_DASH,
+      TestConstants::CURRENCY_XMR, TestConstants::CURRENCY_XLM,
+      TestConstants::CURRENCY_ETC, TestConstants::CURRENCY_ZEC};
+  return currencies;
+}
+
+const std::set<int32_t> &TestConstants::GetCurrenciesFutures() {
+  return GetCurrenciesFuturesImpl();
+}
+
+const std::set<int32_t> &TestConstants::GetCurrenciesExchange() {
+  return GetCurrenciesExchangeImpl();
+}
+
+const std::set<int32_t> &TestConstants::GetAllCurrencies() {
+  return GetAllCurrenciesImpl();
+}
+
+// Static symbol specifications
+static const exchange::core::common::CoreSymbolSpecification &
+GetSymbolSpecEurUsdImpl() {
+  static const exchange::core::common::CoreSymbolSpecification spec =
+      TestConstants::CreateSymbolSpecEurUsd();
+  return spec;
+}
+
+static const exchange::core::common::CoreSymbolSpecification &
+GetSymbolSpecEthXbtImpl() {
+  static const exchange::core::common::CoreSymbolSpecification spec =
+      TestConstants::CreateSymbolSpecEthXbt();
+  return spec;
+}
+
+static const exchange::core::common::CoreSymbolSpecification &
+GetSymbolSpecFeeUsdJpyImpl() {
+  static const exchange::core::common::CoreSymbolSpecification spec =
+      TestConstants::CreateSymbolSpecFeeUsdJpy();
+  return spec;
+}
+
+static const exchange::core::common::CoreSymbolSpecification &
+GetSymbolSpecFeeXbtLtcImpl() {
+  static const exchange::core::common::CoreSymbolSpecification spec =
+      TestConstants::CreateSymbolSpecFeeXbtLtc();
+  return spec;
+}
+
+const exchange::core::common::CoreSymbolSpecification &
+TestConstants::GetSymbolSpecEurUsd() {
+  return GetSymbolSpecEurUsdImpl();
+}
+
+const exchange::core::common::CoreSymbolSpecification &
+TestConstants::GetSymbolSpecEthXbt() {
+  return GetSymbolSpecEthXbtImpl();
+}
+
+const exchange::core::common::CoreSymbolSpecification &
+TestConstants::GetSymbolSpecFeeUsdJpy() {
+  return GetSymbolSpecFeeUsdJpyImpl();
+}
+
+const exchange::core::common::CoreSymbolSpecification &
+TestConstants::GetSymbolSpecFeeXbtLtc() {
+  return GetSymbolSpecFeeXbtLtcImpl();
 }
 
 } // namespace util

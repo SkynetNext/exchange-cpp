@@ -87,6 +87,8 @@ public:
         orderBookFactory(std::move(orderBookFactory)) {}
 
   static PerformanceConfiguration Default();
+  static PerformanceConfiguration LatencyPerformanceBuilder();
+  static PerformanceConfiguration ThroughputPerformanceBuilder();
 };
 
 } // namespace config

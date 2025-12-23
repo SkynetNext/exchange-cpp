@@ -14,28 +14,23 @@
  * limitations under the License.
  */
 
-#pragma once
-
-#include "OrderBookBaseTest.h"
+#include "ITFeesMarginBasic.h"
+#include <exchange/core/common/config/PerformanceConfiguration.h>
 
 namespace exchange {
 namespace core2 {
-namespace core {
-namespace orderbook {
+namespace tests {
+namespace integration {
 
-/**
- * OrderBookDirectImplTest - base class for Direct implementation tests
- * Adds additional tests specific to Direct implementation
- */
-class OrderBookDirectImplTest : public OrderBookBaseTest {
-protected:
-  // Additional test methods for Direct implementation
-  void TestSequentialAsks();
-  void TestSequentialBids();
-  void TestMultipleCommandsCompare();
-};
+ITFeesMarginBasic::ITFeesMarginBasic() : ITFeesMargin() {}
 
-} // namespace orderbook
-} // namespace core
+exchange::core::common::config::PerformanceConfiguration
+ITFeesMarginBasic::GetPerformanceConfiguration() {
+  return exchange::core::common::config::PerformanceConfiguration::Default();
+}
+
+} // namespace integration
+} // namespace tests
 } // namespace core2
 } // namespace exchange
+

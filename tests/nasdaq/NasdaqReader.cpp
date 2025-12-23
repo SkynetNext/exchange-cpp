@@ -14,28 +14,24 @@
  * limitations under the License.
  */
 
-#pragma once
-
-#include "OrderBookBaseTest.h"
+#include "NasdaqReader.h"
 
 namespace exchange {
 namespace core2 {
-namespace core {
-namespace orderbook {
+namespace tests {
+namespace nasdaq {
 
-/**
- * OrderBookDirectImplTest - base class for Direct implementation tests
- * Adds additional tests specific to Direct implementation
- */
-class OrderBookDirectImplTest : public OrderBookBaseTest {
-protected:
-  // Additional test methods for Direct implementation
-  void TestSequentialAsks();
-  void TestSequentialBids();
-  void TestMultipleCommandsCompare();
-};
+int32_t NasdaqReader::HashToUid(int64_t orderId, int32_t numUsersMask) {
+  int64_t x = ((orderId * 0xcc9e2d51LL) << 15) * 0x1b873593LL;
+  return 1 + ((static_cast<int32_t>(x >> 32) ^ static_cast<int32_t>(x)) &
+              numUsersMask);
+}
 
-} // namespace orderbook
-} // namespace core
+int64_t NasdaqReader::ConvertTime(int32_t high, int64_t low) {
+  return low + (static_cast<int64_t>(high) << 32);
+}
+
+} // namespace nasdaq
+} // namespace tests
 } // namespace core2
 } // namespace exchange

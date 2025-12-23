@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2020 Maksim Zheravin
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,28 +14,26 @@
  * limitations under the License.
  */
 
-#pragma once
-
-#include "OrderBookBaseTest.h"
+#include "TestOrdersGeneratorConfig.h"
 
 namespace exchange {
 namespace core2 {
-namespace core {
-namespace orderbook {
+namespace tests {
+namespace util {
 
-/**
- * OrderBookDirectImplTest - base class for Direct implementation tests
- * Adds additional tests specific to Direct implementation
- */
-class OrderBookDirectImplTest : public OrderBookBaseTest {
-protected:
-  // Additional test methods for Direct implementation
-  void TestSequentialAsks();
-  void TestSequentialBids();
-  void TestMultipleCommandsCompare();
-};
+int TestOrdersGeneratorConfig::CalculateReadySeq() const {
+  switch (preFillMode) {
+  case PreFillMode::ORDERS_NUMBER:
+    return targetOrderBookOrdersTotal;
+  case PreFillMode::ORDERS_NUMBER_PLUS_QUARTER:
+    return targetOrderBookOrdersTotal * 5 / 4;
+  default:
+    return targetOrderBookOrdersTotal;
+  }
+}
 
-} // namespace orderbook
-} // namespace core
+} // namespace util
+} // namespace tests
 } // namespace core2
 } // namespace exchange
+

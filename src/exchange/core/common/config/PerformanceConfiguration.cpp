@@ -15,9 +15,10 @@
  */
 
 #include <exchange/core/collections/objpool/ObjectsPool.h>
+#include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
+#include <exchange/core/orderbook/OrderBookDirectImpl.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
-
 
 namespace exchange {
 namespace core {
@@ -41,6 +42,45 @@ PerformanceConfiguration PerformanceConfiguration::Default() {
         // interface consistency
         return std::make_unique<orderbook::OrderBookNaiveImpl>(
             spec, objectsPool, eventsHelper);
+      });
+}
+
+PerformanceConfiguration PerformanceConfiguration::LatencyPerformanceBuilder() {
+  return PerformanceConfiguration(
+      2 * 1024, // ringBufferSize
+      1,        // matchingEnginesNum
+      1,        // riskEnginesNum
+      256,      // msgsInGroupLimit
+      10'000,   // maxGroupDurationNs (10 microseconds)
+      false,    // sendL2ForEveryCmd
+      8,        // l2RefreshDepth
+      CoreWaitStrategy::BUSY_SPIN,
+      [](const CoreSymbolSpecification *spec,
+         ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
+         orderbook::OrderBookEventsHelper *eventsHelper) {
+        static const auto defaultLoggingCfg = LoggingConfiguration::Default();
+        return std::make_unique<orderbook::OrderBookDirectImpl>(
+            spec, objectsPool, eventsHelper, &defaultLoggingCfg);
+      });
+}
+
+PerformanceConfiguration
+PerformanceConfiguration::ThroughputPerformanceBuilder() {
+  return PerformanceConfiguration(
+      64 * 1024, // ringBufferSize
+      4,         // matchingEnginesNum
+      2,         // riskEnginesNum
+      4096,      // msgsInGroupLimit
+      4'000'000, // maxGroupDurationNs (4 milliseconds)
+      false,     // sendL2ForEveryCmd
+      8,         // l2RefreshDepth
+      CoreWaitStrategy::BUSY_SPIN,
+      [](const CoreSymbolSpecification *spec,
+         ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
+         orderbook::OrderBookEventsHelper *eventsHelper) {
+        static const auto defaultLoggingCfg = LoggingConfiguration::Default();
+        return std::make_unique<orderbook::OrderBookDirectImpl>(
+            spec, objectsPool, eventsHelper, &defaultLoggingCfg);
       });
 }
 

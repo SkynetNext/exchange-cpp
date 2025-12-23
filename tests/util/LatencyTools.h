@@ -16,26 +16,31 @@
 
 #pragma once
 
-#include "OrderBookBaseTest.h"
+#include <cstdint>
+#include <string>
 
 namespace exchange {
 namespace core2 {
-namespace core {
-namespace orderbook {
+namespace tests {
+namespace util {
 
 /**
- * OrderBookDirectImplTest - base class for Direct implementation tests
- * Adds additional tests specific to Direct implementation
+ * LatencyTools - utility class for latency measurement and formatting
  */
-class OrderBookDirectImplTest : public OrderBookBaseTest {
-protected:
-  // Additional test methods for Direct implementation
-  void TestSequentialAsks();
-  void TestSequentialBids();
-  void TestMultipleCommandsCompare();
+class LatencyTools {
+public:
+  /**
+   * Format nanoseconds to human-readable string (µs, ms, s)
+   * @param ns - nanoseconds
+   * @return formatted string
+   */
+  static std::string FormatNanos(int64_t ns);
+
+  // Note: createLatencyReportFast requires HdrHistogram library
+  // Will be implemented when needed for performance tests
 };
 
-} // namespace orderbook
-} // namespace core
+} // namespace util
+} // namespace tests
 } // namespace core2
 } // namespace exchange

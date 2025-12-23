@@ -16,6 +16,9 @@
 
 #include <chrono>
 #include <disruptor/AlertException.h>
+#include <disruptor/BlockingWaitStrategy.h>
+#include <disruptor/BusySpinWaitStrategy.h>
+#include <disruptor/YieldingWaitStrategy.h>
 #include <exchange/core/common/MatcherTradeEvent.h>
 #include <exchange/core/common/cmd/CommandResultCode.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
@@ -241,6 +244,24 @@ void GroupingProcessor::ProcessEvents() {
 }
 
 // Explicit template instantiations
+template GroupingProcessor::GroupingProcessor(
+    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand,
+                                       disruptor::BusySpinWaitStrategy> *,
+    disruptor::ProcessingSequenceBarrier<
+        disruptor::MultiProducerSequencer<disruptor::BusySpinWaitStrategy>,
+        disruptor::BusySpinWaitStrategy> *,
+    const common::config::PerformanceConfiguration *, common::CoreWaitStrategy,
+    SharedPool *);
+
+template GroupingProcessor::GroupingProcessor(
+    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand,
+                                       disruptor::YieldingWaitStrategy> *,
+    disruptor::ProcessingSequenceBarrier<
+        disruptor::MultiProducerSequencer<disruptor::YieldingWaitStrategy>,
+        disruptor::YieldingWaitStrategy> *,
+    const common::config::PerformanceConfiguration *, common::CoreWaitStrategy,
+    SharedPool *);
+
 template GroupingProcessor::GroupingProcessor(
     disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand,
                                        disruptor::BlockingWaitStrategy> *,

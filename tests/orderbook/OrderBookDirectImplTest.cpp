@@ -15,17 +15,21 @@
  */
 
 #include "OrderBookDirectImplTest.h"
+#include "../util/TestOrdersGenerator.h"
 #include <exchange/core/common/L2MarketData.h>
 #include <exchange/core/common/OrderAction.h>
 #include <exchange/core/common/OrderType.h>
 #include <exchange/core/common/cmd/CommandResultCode.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
+#include <exchange/core/common/config/LoggingConfiguration.h>
+#include <exchange/core/orderbook/IOrderBook.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
 #include <unordered_map>
 
 using namespace exchange::core::common;
 using namespace exchange::core::common::cmd;
 using namespace exchange::core::orderbook;
+using namespace exchange::core2::tests::util;
 
 namespace exchange {
 namespace core2 {
@@ -138,6 +142,51 @@ void OrderBookDirectImplTest::TestSequentialBids() {
 
   // Obviously no ask records expected (they all should be matched)
   ASSERT_EQ(snapshot->askSize, 0);
+}
+
+void OrderBookDirectImplTest::TestMultipleCommandsCompare() {
+  // TODO more efficient - multi-threaded executions with different seed and
+  // order book type
+
+  const int tranNum = 100000;
+  const int targetOrderBookOrders = 500;
+  const int numUsers = 100;
+
+  // Create test orderbook and reference orderbook
+  ClearOrderBook();
+  auto symbolSpec = GetCoreSymbolSpec();
+  auto orderBookRef =
+      std::make_unique<OrderBookNaiveImpl>(&symbolSpec, nullptr, nullptr);
+
+  ASSERT_EQ(orderBook_->GetStateHash(), orderBookRef->GetStateHash());
+
+  // Generate test commands
+  auto genResult = TestOrdersGenerator::GenerateCommands(
+      tranNum, targetOrderBookOrders, numUsers,
+      TestOrdersGenerator::UID_PLAIN_MAPPER, 0, true, false,
+      TestOrdersGenerator::CreateAsyncProgressLogger(tranNum), 1825793762);
+
+  auto &allCommands = genResult.GetCommands();
+  int64_t i = 0;
+  for (size_t idx = 0; idx < allCommands.size(); idx++) {
+    i++;
+    auto &cmd = allCommands[idx];
+    cmd.orderId += 100;
+
+    cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
+    IOrderBook::ProcessCommand(orderBook_.get(), &cmd);
+
+    cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
+    CommandResultCode commandResultCode =
+        IOrderBook::ProcessCommand(orderBookRef.get(), &cmd);
+
+    ASSERT_EQ(commandResultCode, CommandResultCode::SUCCESS);
+
+    // Compare state hash every 100 commands
+    if (i % 100 == 0) {
+      ASSERT_EQ(orderBook_->GetStateHash(), orderBookRef->GetStateHash());
+    }
+  }
 }
 
 } // namespace orderbook
