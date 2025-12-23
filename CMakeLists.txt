@@ -54,6 +54,8 @@ if(BUILD_TESTING)
         set(GTest_FOUND TRUE)
         message(STATUS "Using GoogleTest from disruptor-cpp")
     elseif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/googletest/CMakeLists.txt)
+        # Ensure BUILD_GMOCK is ON so gmock target is available
+        set(BUILD_GMOCK ON CACHE BOOL "Builds the googlemock subproject" FORCE)
         add_subdirectory(third_party/googletest)
         set(GTest_FOUND TRUE)
         message(STATUS "Using GoogleTest from submodule")
@@ -105,13 +107,16 @@ else()
 endif()
 
 # Collect source files from subdirectories
+# Note: GLOB_RECURSE recursively searches subdirectories
 file(GLOB_RECURSE EXCHANGE_SOURCES
+    # Files directly in core/ directory
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/*.cpp"
+    # Subdirectories (already covered by GLOB_RECURSE above, but kept for clarity)
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/common/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/orderbook/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/processors/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/collections/*.cpp"
-    # Add more patterns as development progresses:
-    # "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/utils/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/utils/*.cpp"
 )
 
 # Create library (placeholder for now)

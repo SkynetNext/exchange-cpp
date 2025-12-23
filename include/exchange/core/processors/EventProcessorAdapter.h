@@ -17,6 +17,7 @@
 #pragma once
 
 #include <disruptor/EventProcessor.h>
+#include <disruptor/EventHandlerIdentity.h>
 #include <disruptor/Sequence.h>
 
 namespace exchange {
@@ -25,9 +26,10 @@ namespace processors {
 
 /**
  * EventProcessorAdapter - adapter to make processors compatible with
- * disruptor::EventProcessor interface
+ * disruptor::EventProcessor interface and EventHandlerIdentity
  */
-class EventProcessorAdapter : public disruptor::EventProcessor {
+class EventProcessorAdapter : public disruptor::EventProcessor,
+                              public disruptor::EventHandlerIdentity {
 public:
   EventProcessorAdapter(disruptor::Sequence *sequence,
                         std::function<void()> runFunc,

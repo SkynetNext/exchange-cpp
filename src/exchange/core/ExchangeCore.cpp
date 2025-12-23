@@ -375,10 +375,20 @@ public:
 
     // Create afterR1 group (wait for all R1 processors to complete)
     // Java: disruptor.after(procR1.toArray(new TwoStepMasterProcessor[0]))
-    auto afterR1 =
-        disruptor_->after(const_cast<disruptor::EventProcessor *const *>(
-                              r1EventProcessors_.data()),
-                          static_cast<int>(r1EventProcessors_.size()));
+    // Since EventProcessorAdapter implements both EventProcessor and
+    // EventHandlerIdentity, we can cast EventProcessorAdapter* to
+    // EventHandlerIdentity*
+    std::vector<disruptor::EventHandlerIdentity *> r1Identities;
+    r1Identities.reserve(r1EventProcessors_.size());
+    for (auto *proc : r1EventProcessors_) {
+      // All processors in r1EventProcessors_ are EventProcessorAdapter
+      // instances which implement both EventProcessor and EventHandlerIdentity
+      auto *adapter = static_cast<processors::EventProcessorAdapter *>(proc);
+      r1Identities.push_back(
+          static_cast<disruptor::EventHandlerIdentity *>(adapter));
+    }
+    auto afterR1 = disruptor_->after(r1Identities.data(),
+                                     static_cast<int>(r1Identities.size()));
 
     for (auto &me : matchingEngines_) {
       auto handler = std::make_unique<MatchingEngineEventHandler>(me.get());
