@@ -66,8 +66,8 @@ void OrderBookNaiveImpl::NewOrderPlaceGtc(common::cmd::OrderCommand *cmd) {
   int64_t size = cmd->size;
 
   // Try to match instantly
-  auto *matchingBuckets = SubtreeForMatching(action, price);
-  int64_t filledSize = TryMatchInstantly(cmd, matchingBuckets, 0, cmd);
+  auto matchingRange = GetMatchingRange(action, price);
+  int64_t filledSize = TryMatchInstantly(cmd, matchingRange, 0, cmd);
 
   if (filledSize == size) {
     // Order was matched completely
@@ -87,20 +87,28 @@ void OrderBookNaiveImpl::NewOrderPlaceGtc(common::cmd::OrderCommand *cmd) {
                         cmd->reserveBidPrice, action, cmd->uid, cmd->timestamp);
 
   // Place in appropriate bucket
-  auto *buckets = GetBucketsByAction(action);
-  auto it = buckets->find(price);
-  if (it == buckets->end()) {
-    buckets->emplace(price, std::make_unique<OrdersBucket>(price));
-    it = buckets->find(price);
+  if (action == common::OrderAction::ASK) {
+    auto it = askBuckets_.find(price);
+    if (it == askBuckets_.end()) {
+      askBuckets_.emplace(price, std::make_unique<OrdersBucket>(price));
+      it = askBuckets_.find(price);
+    }
+    it->second->Put(orderRecord);
+  } else {
+    auto it = bidBuckets_.find(price);
+    if (it == bidBuckets_.end()) {
+      bidBuckets_.emplace(price, std::make_unique<OrdersBucket>(price));
+      it = bidBuckets_.find(price);
+    }
+    it->second->Put(orderRecord);
   }
-  it->second->Put(orderRecord);
 
   idMap_[newOrderId] = orderRecord;
 }
 
 void OrderBookNaiveImpl::NewOrderMatchIoc(common::cmd::OrderCommand *cmd) {
-  auto *matchingBuckets = SubtreeForMatching(cmd->action, cmd->price);
-  int64_t filledSize = TryMatchInstantly(cmd, matchingBuckets, 0, cmd);
+  auto matchingRange = GetMatchingRange(cmd->action, cmd->price);
+  int64_t filledSize = TryMatchInstantly(cmd, matchingRange, 0, cmd);
 
   int64_t rejectedSize = cmd->size - filledSize;
   if (rejectedSize != 0) {
@@ -111,10 +119,10 @@ void OrderBookNaiveImpl::NewOrderMatchIoc(common::cmd::OrderCommand *cmd) {
 void OrderBookNaiveImpl::NewOrderMatchFokBudget(
     common::cmd::OrderCommand *cmd) {
   int64_t size = cmd->size;
-  auto *matchingBuckets = SubtreeForMatching(cmd->action, cmd->price);
+  auto matchingRange = GetMatchingRange(cmd->action, cmd->price);
 
   int64_t budget = 0;
-  if (!CheckBudgetToFill(size, matchingBuckets, &budget)) {
+  if (!CheckBudgetToFill(size, matchingRange, &budget)) {
     eventsHelper_->AttachRejectEvent(cmd, size);
     return;
   }
@@ -131,42 +139,47 @@ void OrderBookNaiveImpl::NewOrderMatchFokBudget(
   }
 
   if (budgetOk) {
-    TryMatchInstantly(cmd, matchingBuckets, 0, cmd);
+    TryMatchInstantly(cmd, matchingRange, 0, cmd);
   } else {
     eventsHelper_->AttachRejectEvent(cmd, size);
   }
 }
 
-bool OrderBookNaiveImpl::CheckBudgetToFill(
-    int64_t size,
-    const std::map<int64_t, std::unique_ptr<OrdersBucket>> *matchingBuckets,
-    int64_t *budgetOut) {
+bool OrderBookNaiveImpl::CheckBudgetToFill(int64_t size,
+                                           MatchingRange &matchingRange,
+                                           int64_t *budgetOut) {
+  if (matchingRange.empty) {
+    return false;
+  }
+
   int64_t budget = 0;
   int64_t remainingSize = size;
+  bool found = false;
 
-  for (const auto &pair : *matchingBuckets) {
-    int64_t availableSize = pair.second->GetTotalVolume();
-    int64_t price = pair.first;
+  matchingRange.forEach([&](int64_t price, OrdersBucket *bucket) {
+    if (found) {
+      return; // Already found enough liquidity
+    }
+
+    int64_t availableSize = bucket->GetTotalVolume();
 
     if (remainingSize > availableSize) {
       remainingSize -= availableSize;
       budget += availableSize * price;
     } else {
       *budgetOut = budget + remainingSize * price;
-      return true;
+      found = true;
     }
-  }
+  });
 
-  // Not enough liquidity
-  return false;
+  return found;
 }
 
 int64_t OrderBookNaiveImpl::TryMatchInstantly(
-    const common::IOrder *activeOrder,
-    std::map<int64_t, std::unique_ptr<OrdersBucket>> *matchingBuckets,
+    const common::IOrder *activeOrder, MatchingRange &matchingRange,
     int64_t filled, common::cmd::OrderCommand *triggerCmd) {
 
-  if (matchingBuckets->empty()) {
+  if (matchingRange.empty) {
     return filled;
   }
 
@@ -175,8 +188,7 @@ int64_t OrderBookNaiveImpl::TryMatchInstantly(
 
   std::vector<int64_t> emptyBuckets;
 
-  for (auto &pair : *matchingBuckets) {
-    OrdersBucket *bucket = pair.second.get();
+  matchingRange.forEach([&](int64_t bucketPrice, OrdersBucket *bucket) {
     int64_t sizeLeft = orderSize - filled;
 
     OrdersBucket::MatcherResult bucketMatchings =
@@ -199,17 +211,13 @@ int64_t OrderBookNaiveImpl::TryMatchInstantly(
 
     // Mark empty buckets for removal
     if (bucket->GetTotalVolume() == 0) {
-      emptyBuckets.push_back(pair.first);
+      emptyBuckets.push_back(bucketPrice);
     }
-
-    if (filled == orderSize) {
-      break;
-    }
-  }
+  });
 
   // Remove empty buckets
   for (int64_t price : emptyBuckets) {
-    matchingBuckets->erase(price);
+    matchingRange.erasePrice(price);
   }
 
   return filled;
@@ -227,18 +235,29 @@ OrderBookNaiveImpl::CancelOrder(common::cmd::OrderCommand *cmd) {
   common::Order *order = it->second;
   idMap_.erase(it);
 
-  auto *buckets = GetBucketsByAction(order->action);
   int64_t price = order->price;
-  auto bucketIt = buckets->find(price);
-  if (bucketIt == buckets->end()) {
-    throw std::runtime_error("Cannot find bucket for order price=" +
-                             std::to_string(price));
-  }
-
-  OrdersBucket *ordersBucket = bucketIt->second.get();
-  ordersBucket->Remove(orderId, cmd->uid);
-  if (ordersBucket->GetTotalVolume() == 0) {
-    buckets->erase(price);
+  if (order->action == common::OrderAction::ASK) {
+    auto bucketIt = askBuckets_.find(price);
+    if (bucketIt == askBuckets_.end()) {
+      throw std::runtime_error("Cannot find bucket for order price=" +
+                               std::to_string(price));
+    }
+    OrdersBucket *ordersBucket = bucketIt->second.get();
+    ordersBucket->Remove(orderId, cmd->uid);
+    if (ordersBucket->GetTotalVolume() == 0) {
+      askBuckets_.erase(price);
+    }
+  } else {
+    auto bucketIt = bidBuckets_.find(price);
+    if (bucketIt == bidBuckets_.end()) {
+      throw std::runtime_error("Cannot find bucket for order price=" +
+                               std::to_string(price));
+    }
+    OrdersBucket *ordersBucket = bucketIt->second.get();
+    ordersBucket->Remove(orderId, cmd->uid);
+    if (ordersBucket->GetTotalVolume() == 0) {
+      bidBuckets_.erase(price);
+    }
   }
 
   // Send reduce event
@@ -270,21 +289,34 @@ OrderBookNaiveImpl::ReduceOrder(common::cmd::OrderCommand *cmd) {
   int64_t remainingSize = order->size - order->filled;
   int64_t reduceBy = std::min(remainingSize, requestedReduceSize);
 
-  auto *buckets = GetBucketsByAction(order->action);
-  auto bucketIt = buckets->find(order->price);
-  if (bucketIt == buckets->end()) {
-    throw std::runtime_error("Cannot find bucket for order price=" +
-                             std::to_string(order->price));
+  OrdersBucket *ordersBucket = nullptr;
+  int64_t orderPrice = order->price;
+  if (order->action == common::OrderAction::ASK) {
+    auto bucketIt = askBuckets_.find(orderPrice);
+    if (bucketIt == askBuckets_.end()) {
+      throw std::runtime_error("Cannot find bucket for order price=" +
+                               std::to_string(orderPrice));
+    }
+    ordersBucket = bucketIt->second.get();
+  } else {
+    auto bucketIt = bidBuckets_.find(orderPrice);
+    if (bucketIt == bidBuckets_.end()) {
+      throw std::runtime_error("Cannot find bucket for order price=" +
+                               std::to_string(orderPrice));
+    }
+    ordersBucket = bucketIt->second.get();
   }
-
-  OrdersBucket *ordersBucket = bucketIt->second.get();
   bool canRemove = (reduceBy == remainingSize);
 
   if (canRemove) {
     idMap_.erase(orderId);
     ordersBucket->Remove(orderId, cmd->uid);
     if (ordersBucket->GetTotalVolume() == 0) {
-      buckets->erase(order->price);
+      if (order->action == common::OrderAction::ASK) {
+        askBuckets_.erase(orderPrice);
+      } else {
+        bidBuckets_.erase(orderPrice);
+      }
     }
     delete order;
   } else {
@@ -311,8 +343,6 @@ OrderBookNaiveImpl::MoveOrder(common::cmd::OrderCommand *cmd) {
 
   common::Order *order = it->second;
   int64_t price = order->price;
-  auto *buckets = GetBucketsByAction(order->action);
-
   cmd->action = order->action;
 
   // Reserved price risk check for exchange bids
@@ -324,22 +354,34 @@ OrderBookNaiveImpl::MoveOrder(common::cmd::OrderCommand *cmd) {
   }
 
   // Remove from original bucket
-  auto bucketIt = buckets->find(price);
-  if (bucketIt == buckets->end()) {
-    throw std::runtime_error("Cannot find bucket for order price=" +
-                             std::to_string(price));
-  }
-
-  OrdersBucket *bucket = bucketIt->second.get();
-  bucket->Remove(orderId, cmd->uid);
-  if (bucket->GetTotalVolume() == 0) {
-    buckets->erase(price);
+  if (order->action == common::OrderAction::ASK) {
+    auto bucketIt = askBuckets_.find(price);
+    if (bucketIt == askBuckets_.end()) {
+      throw std::runtime_error("Cannot find bucket for order price=" +
+                               std::to_string(price));
+    }
+    OrdersBucket *bucket = bucketIt->second.get();
+    bucket->Remove(orderId, cmd->uid);
+    if (bucket->GetTotalVolume() == 0) {
+      askBuckets_.erase(price);
+    }
+  } else {
+    auto bucketIt = bidBuckets_.find(price);
+    if (bucketIt == bidBuckets_.end()) {
+      throw std::runtime_error("Cannot find bucket for order price=" +
+                               std::to_string(price));
+    }
+    OrdersBucket *bucket = bucketIt->second.get();
+    bucket->Remove(orderId, cmd->uid);
+    if (bucket->GetTotalVolume() == 0) {
+      bidBuckets_.erase(price);
+    }
   }
 
   order->price = newPrice;
 
   // Try match with new price
-  auto *matchingArea = SubtreeForMatching(order->action, newPrice);
+  auto matchingArea = GetMatchingRange(order->action, newPrice);
   int64_t filled = TryMatchInstantly(order, matchingArea, order->filled, cmd);
   if (filled == order->size) {
     // Order was fully matched
@@ -351,32 +393,55 @@ OrderBookNaiveImpl::MoveOrder(common::cmd::OrderCommand *cmd) {
   order->filled = filled;
 
   // Place in new bucket
-  auto newBucketIt = buckets->find(newPrice);
-  if (newBucketIt == buckets->end()) {
-    buckets->emplace(newPrice, std::make_unique<OrdersBucket>(newPrice));
-    newBucketIt = buckets->find(newPrice);
+  if (order->action == common::OrderAction::ASK) {
+    auto newBucketIt = askBuckets_.find(newPrice);
+    if (newBucketIt == askBuckets_.end()) {
+      askBuckets_.emplace(newPrice, std::make_unique<OrdersBucket>(newPrice));
+      newBucketIt = askBuckets_.find(newPrice);
+    }
+    newBucketIt->second->Put(order);
+  } else {
+    auto newBucketIt = bidBuckets_.find(newPrice);
+    if (newBucketIt == bidBuckets_.end()) {
+      bidBuckets_.emplace(newPrice, std::make_unique<OrdersBucket>(newPrice));
+      newBucketIt = bidBuckets_.find(newPrice);
+    }
+    newBucketIt->second->Put(order);
   }
-  newBucketIt->second->Put(order);
 
   return common::cmd::CommandResultCode::SUCCESS;
 }
 
 int32_t OrderBookNaiveImpl::GetOrdersNum(common::OrderAction action) {
-  const auto *buckets = GetBucketsByAction(action);
-  int32_t total = 0;
-  for (const auto &pair : *buckets) {
-    total += pair.second->GetNumOrders();
+  if (action == common::OrderAction::ASK) {
+    int32_t total = 0;
+    for (const auto &pair : askBuckets_) {
+      total += pair.second->GetNumOrders();
+    }
+    return total;
+  } else {
+    int32_t total = 0;
+    for (const auto &pair : bidBuckets_) {
+      total += pair.second->GetNumOrders();
+    }
+    return total;
   }
-  return total;
 }
 
 int64_t OrderBookNaiveImpl::GetTotalOrdersVolume(common::OrderAction action) {
-  const auto *buckets = GetBucketsByAction(action);
-  int64_t total = 0;
-  for (const auto &pair : *buckets) {
-    total += pair.second->GetTotalVolume();
+  if (action == common::OrderAction::ASK) {
+    int64_t total = 0;
+    for (const auto &pair : askBuckets_) {
+      total += pair.second->GetTotalVolume();
+    }
+    return total;
+  } else {
+    int64_t total = 0;
+    for (const auto &pair : bidBuckets_) {
+      total += pair.second->GetTotalVolume();
+    }
+    return total;
   }
-  return total;
 }
 
 common::IOrder *OrderBookNaiveImpl::GetOrderById(int64_t orderId) {
@@ -486,19 +551,39 @@ OrderBookNaiveImpl::GetBucketsByAction(common::OrderAction action) const {
   }
 }
 
-std::map<int64_t, std::unique_ptr<OrdersBucket>> *
-OrderBookNaiveImpl::SubtreeForMatching(common::OrderAction action,
-                                       int64_t price) {
+OrderBookNaiveImpl::MatchingRange
+OrderBookNaiveImpl::GetMatchingRange(common::OrderAction action,
+                                     int64_t price) {
   if (action == common::OrderAction::ASK) {
-    // For ASK orders, match against BID buckets with price <= order price
-    // bidBuckets_ is in descending order, so we need to iterate from beginning
-    // Need to cast because bidBuckets_ has different comparator
-    return reinterpret_cast<std::map<int64_t, std::unique_ptr<OrdersBucket>> *>(
-        &bidBuckets_);
+    // For ASK orders, match against BID buckets with price >= order price
+    // bidBuckets_ is in descending order (std::greater), so we iterate from
+    // highest to lowest, stopping when price < order price
+    auto begin = bidBuckets_.begin();
+    auto end = bidBuckets_.end();
+
+    auto shouldContinue = [price](int64_t bucketPrice) {
+      return bucketPrice >=
+             price; // For ASK: match BID with price >= order price
+    };
+
+    auto eraseFunc = [this](int64_t p) { bidBuckets_.erase(p); };
+
+    return MatchingRange(begin, end, shouldContinue, eraseFunc);
   } else {
-    // For BID orders, match against ASK buckets with price >= order price
-    // askBuckets_ is in ascending order, so we need to iterate from beginning
-    return &askBuckets_;
+    // For BID orders, match against ASK buckets with price <= order price
+    // askBuckets_ is in ascending order, so we iterate from lowest to highest,
+    // stopping when price > order price
+    auto begin = askBuckets_.begin();
+    auto end = askBuckets_.end();
+
+    auto shouldContinue = [price](int64_t bucketPrice) {
+      return bucketPrice <=
+             price; // For BID: match ASK with price <= order price
+    };
+
+    auto eraseFunc = [this](int64_t p) { askBuckets_.erase(p); };
+
+    return MatchingRange(begin, end, shouldContinue, eraseFunc);
   }
 }
 
@@ -550,6 +635,36 @@ OrderBookNaiveImpl::OrderBookNaiveImpl(
   eventsHelper_ = OrderBookEventsHelper::NonPooledEventsHelper();
   logDebug_ = loggingCfg->Contains(common::config::LoggingConfiguration::
                                        LoggingLevel::LOGGING_MATCHING_DEBUG);
+}
+
+void OrderBookNaiveImpl::WriteMarshallable(common::BytesOut &bytes) const {
+  // Match Java: bytes.writeByte(getImplementationType().getCode());
+  bytes.WriteByte(static_cast<int8_t>(GetImplementationType()));
+
+  // Match Java: symbolSpec.writeMarshallable(bytes);
+  if (symbolSpec_ != nullptr) {
+    // Create a non-const reference for WriteMarshallable call
+    // Since WriteMarshallable is not const in the interface, we need to call it
+    // on non-const
+    const_cast<common::CoreSymbolSpecification *>(symbolSpec_)
+        ->WriteMarshallable(bytes);
+  }
+
+  // Match Java: SerializationUtils.marshallLongMap(askBuckets, bytes);
+  // Convert std::map to ankerl::unordered_dense::map for marshalling
+  ankerl::unordered_dense::map<int64_t, OrdersBucket *> askBucketsMap;
+  for (const auto &pair : askBuckets_) {
+    askBucketsMap[pair.first] = pair.second.get();
+  }
+  utils::SerializationUtils::MarshallLongHashMap(askBucketsMap, bytes);
+
+  // Match Java: SerializationUtils.marshallLongMap(bidBuckets, bytes);
+  // Convert std::map to ankerl::unordered_dense::map for marshalling
+  ankerl::unordered_dense::map<int64_t, OrdersBucket *> bidBucketsMap;
+  for (const auto &pair : bidBuckets_) {
+    bidBucketsMap[pair.first] = pair.second.get();
+  }
+  utils::SerializationUtils::MarshallLongHashMap(bidBucketsMap, bytes);
 }
 
 } // namespace orderbook

@@ -39,9 +39,9 @@ OrderBookDirectImpl::OrderBookDirectImpl(
       symbolSpec_(symbolSpec), objectsPool_(objectsPool),
       orderIdIndex_(objectsPool), bestAskOrder_(nullptr),
       bestBidOrder_(nullptr), eventsHelper_(eventsHelper) {
-  logDebug_ =
-      loggingCfg->loggingLevels.count(common::config::LoggingConfiguration::
-                                          LoggingLevel::LOGGING_MATCHING_DEBUG);
+  logDebug_ = loggingCfg != nullptr &&
+              loggingCfg->Contains(common::config::LoggingConfiguration::
+                                       LoggingLevel::LOGGING_MATCHING_DEBUG);
 }
 
 OrderBookDirectImpl::OrderBookDirectImpl(
@@ -478,6 +478,25 @@ int32_t OrderBookDirectImpl::GetTotalAskBuckets(int32_t limit) {
 
 int32_t OrderBookDirectImpl::GetTotalBidBuckets(int32_t limit) {
   return bidPriceBuckets_.Size(limit);
+}
+
+std::unique_ptr<common::L2MarketData>
+OrderBookDirectImpl::GetL2MarketDataSnapshot(int32_t size) {
+  // Match Java default implementation in IOrderBook interface:
+  // default L2MarketData getL2MarketDataSnapshot(final int size) {
+  //     final int asksSize = getTotalAskBuckets(size);
+  //     final int bidsSize = getTotalBidBuckets(size);
+  //     final L2MarketData data = new L2MarketData(asksSize, bidsSize);
+  //     fillAsks(asksSize, data);
+  //     fillBids(bidsSize, data);
+  //     return data;
+  // }
+  int32_t asksSize = GetTotalAskBuckets(size);
+  int32_t bidsSize = GetTotalBidBuckets(size);
+  auto data = std::make_unique<common::L2MarketData>(asksSize, bidsSize);
+  FillAsks(asksSize, data.get());
+  FillBids(bidsSize, data.get());
+  return data;
 }
 
 std::vector<common::Order *> OrderBookDirectImpl::FindUserOrders(int64_t uid) {

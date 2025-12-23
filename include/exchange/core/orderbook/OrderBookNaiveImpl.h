@@ -23,6 +23,7 @@
 #include "OrderBookEventsHelper.h"
 #include "OrdersBucket.h"
 #include <ankerl/unordered_dense.h>
+#include <functional>
 #include <map>
 #include <memory>
 
@@ -100,22 +101,71 @@ private:
   // std::unordered_map) Equivalent to Java's LongObjectHashMap<Order>
   ankerl::unordered_dense::map<int64_t, common::Order *> idMap_;
 
-  // Helper methods
+  // Helper methods - use template to handle both map types safely
+  template <typename MapType>
+  MapType *GetBucketsByActionImpl(common::OrderAction action);
+
+  // Wrapper methods for backward compatibility
   std::map<int64_t, std::unique_ptr<OrdersBucket>> *
   GetBucketsByAction(common::OrderAction action);
 
   const std::map<int64_t, std::unique_ptr<OrdersBucket>> *
   GetBucketsByAction(common::OrderAction action) const;
 
-  // Get matching buckets (price <= limit for ASK, price >= limit for BID)
-  std::map<int64_t, std::unique_ptr<OrdersBucket>> *
-  SubtreeForMatching(common::OrderAction action, int64_t price);
+  // Direct access methods that return the correct type
+  std::map<int64_t, std::unique_ptr<OrdersBucket>> *GetAskBuckets() {
+    return &askBuckets_;
+  }
 
-  // Try to match order instantly against matching buckets
-  int64_t TryMatchInstantly(
-      const common::IOrder *activeOrder,
-      std::map<int64_t, std::unique_ptr<OrdersBucket>> *matchingBuckets,
-      int64_t filled, common::cmd::OrderCommand *triggerCmd);
+  std::map<int64_t, std::unique_ptr<OrdersBucket>, std::greater<int64_t>> *
+  GetBidBuckets() {
+    return &bidBuckets_;
+  }
+
+  // Iterator range for matching buckets (avoids type mismatch between ask/bid
+  // maps)
+  struct MatchingRange {
+    // Use type erasure to handle both ascending and descending maps
+    std::function<void(std::function<void(int64_t, OrdersBucket *)>)> forEach;
+    std::function<void(int64_t)> erasePrice;
+    bool empty;
+
+    MatchingRange() : empty(true) {}
+
+    template <typename Iterator>
+    MatchingRange(Iterator begin, Iterator end,
+                  std::function<bool(int64_t)> shouldContinue,
+                  std::function<void(int64_t)> eraseFunc)
+        : erasePrice(eraseFunc) {
+      // Check if range is empty or if first element doesn't satisfy condition
+      if (begin == end) {
+        empty = true;
+        forEach = [](std::function<void(int64_t, OrdersBucket *)>) {};
+      } else {
+        // Check if first element satisfies condition
+        int64_t firstPrice = begin->first;
+        empty = !shouldContinue(firstPrice);
+        forEach = [begin, end, shouldContinue](
+                      std::function<void(int64_t, OrdersBucket *)> callback) {
+          for (auto it = begin; it != end; ++it) {
+            int64_t price = it->first;
+            if (!shouldContinue(price)) {
+              break;
+            }
+            callback(price, it->second.get());
+          }
+        };
+      }
+    }
+  };
+
+  // Get matching buckets range (price <= limit for ASK, price >= limit for BID)
+  MatchingRange GetMatchingRange(common::OrderAction action, int64_t price);
+
+  // Try to match order instantly against matching buckets range
+  int64_t TryMatchInstantly(const common::IOrder *activeOrder,
+                            MatchingRange &matchingRange, int64_t filled,
+                            common::cmd::OrderCommand *triggerCmd);
 
   // Order type specific handlers
   void NewOrderPlaceGtc(common::cmd::OrderCommand *cmd);
@@ -123,10 +173,8 @@ private:
   void NewOrderMatchFokBudget(common::cmd::OrderCommand *cmd);
 
   // Check budget for FOK_BUDGET orders
-  bool CheckBudgetToFill(
-      int64_t size,
-      const std::map<int64_t, std::unique_ptr<OrdersBucket>> *matchingBuckets,
-      int64_t *budgetOut);
+  bool CheckBudgetToFill(int64_t size, MatchingRange &matchingRange,
+                         int64_t *budgetOut);
 };
 
 } // namespace orderbook
