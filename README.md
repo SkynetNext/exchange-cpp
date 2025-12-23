@@ -17,7 +17,7 @@ This project is a complete C++ rewrite of the Java-based exchange-core matching 
 
 ## Technology Stack
 
-- **C++17+**: Modern C++ features for performance and safety
+- **C++20**: Modern C++ features for performance and safety
 - **disruptor-cpp**: High-performance inter-thread communication ([SkynetNext/disruptor-cpp](https://github.com/SkynetNext/disruptor-cpp.git))
 - **CMake**: Build system
 - **Google Test**: Unit testing framework
@@ -88,7 +88,7 @@ graph TD
 | :--- | :--- | :--- | :--- |
 | **Gateway** | **K** | `ConnID` | **Producer (MP-Batch)**: Protocol parsing, authentication, and batch publishing into Ring Buffer. |
 | **Grouping (G)** | **1** | N/A | **Consumer**: Batching small orders and identifying cancel-replace patterns. |
-| **Journaling (J)** | **1** | N/A | **Consumer (Parallel Path)**: Binary persistence for state recovery (mmap). |
+| **Journaling (J)** | **1** | N/A | **Consumer (Parallel Path)**: Binary persistence for state recovery (FileChannel.write). |
 | **Risk (R1)** | **N** | `UID` | **Consumer (Serial Path)**: Pre-match balance checks and speculative freezing. |
 | **Matching (ME)** | **M** | `SymbolID` | **Consumer (Serial Path)**: OrderBook matching (Price-Time Priority). |
 | **Risk (R2)** | **N** | `UID` | **Consumer (Parallel Cleanup)**: Final settlement, fee deduction, and profit/loss release. |
@@ -145,7 +145,7 @@ exchange-cpp/
 ### Prerequisites
 
 - **CMake** 3.20 or higher
-- **C++17** compatible compiler (GCC 7+, Clang 5+, MSVC 2017+)
+- **C++20** compatible compiler (GCC 10+, Clang 10+, MSVC 2019+)
 - **Git** (for submodules)
 
 ### Build Steps
@@ -206,7 +206,19 @@ cd build
 
 ## License
 
-[To be determined - check original exchange-core license]
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+This project is a C++ port of [exchange-core](https://github.com/exchange-core/exchange-core), which is also licensed under Apache License 2.0.
 
 ## Contributing
 
