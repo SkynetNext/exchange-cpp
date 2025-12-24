@@ -127,6 +127,10 @@ public:
   // StateHash interface
   int32_t GetStateHash() const override;
 
+  // Debug methods
+  std::string PrintAskBucketsDiagram() const;
+  std::string PrintBidBucketsDiagram() const;
+
   // WriteBytesMarshallable interface
   void WriteMarshallable(common::BytesOut &bytes) const override;
 

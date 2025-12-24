@@ -14,6 +14,7 @@ if(BUILD_TESTING AND GTest_FOUND)
         util/TestConstants.cpp
         util/TestDataParameters.cpp
         util/TestOrdersGenerator.cpp
+        util/TestOrdersGeneratorSession.cpp
         util/TestOrdersGeneratorConfig.cpp
         util/ThroughputTestsModule.cpp
         util/UserCurrencyAccountsGenerator.cpp

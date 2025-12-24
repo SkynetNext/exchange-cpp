@@ -144,21 +144,23 @@ void OrderBookNaiveImpl::NewOrderMatchFokBudget(
   }
 
   // Check if budget limit is satisfied
-  bool budgetOk = false;
-  if (budget == cmd->price) {
-    budgetOk = true;
-  } else {
-    // For BID: budget should be <= price, for ASK: budget should be >= price
-    budgetOk = (cmd->action == common::OrderAction::BID)
-                   ? (budget <= cmd->price)
-                   : (budget >= cmd->price);
-  }
-
-  if (budgetOk) {
+  if (IsBudgetLimitSatisfied(cmd->action, budget, cmd->price)) {
     TryMatchInstantly(cmd, matchingRange, 0, cmd);
   } else {
     eventsHelper_->AttachRejectEvent(cmd, size);
   }
+}
+
+bool OrderBookNaiveImpl::IsBudgetLimitSatisfied(common::OrderAction orderAction,
+                                                int64_t calculated,
+                                                int64_t limit) {
+  // Match Java OrderBookNaiveImpl.isBudgetLimitSatisfied implementation:
+  // return calculated == limit || (orderAction == OrderAction.BID ^ calculated
+  // > limit); Note: No INT64_MAX check needed here because CheckBudgetToFill
+  // returns bool (unlike OrderBookDirectImpl which returns INT64_MAX on
+  // failure)
+  return calculated == limit ||
+         (orderAction == common::OrderAction::BID ^ calculated > limit);
 }
 
 bool OrderBookNaiveImpl::CheckBudgetToFill(int64_t size,

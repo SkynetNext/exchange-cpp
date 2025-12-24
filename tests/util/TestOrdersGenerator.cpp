@@ -16,12 +16,18 @@
 
 #include "TestOrdersGenerator.h"
 #include "TestConstants.h"
+#include "TestOrdersGeneratorSession.h"
+#include <algorithm>
+#include <cmath>
+#include <exchange/core/common/MatcherEventType.h>
 #include <exchange/core/common/OrderAction.h>
 #include <exchange/core/common/OrderType.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
+#include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/orderbook/IOrderBook.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
 #include <random>
+#include <unordered_map>
 
 using namespace exchange::core::common;
 using namespace exchange::core::common::cmd;
@@ -31,6 +37,10 @@ namespace exchange {
 namespace core2 {
 namespace tests {
 namespace util {
+
+// Constants matching Java implementation
+static constexpr double CENTRAL_MOVE_ALPHA = 0.01;
+static constexpr int32_t CHECK_ORDERBOOK_STAT_EVERY_NTH_COMMAND = 512;
 
 // UID mapper: i -> i + 1
 std::function<int32_t(int32_t)> TestOrdersGenerator::UID_PLAIN_MAPPER =
@@ -66,9 +76,370 @@ TestOrdersGenerator::CreateAsyncProgressLogger(int64_t total) {
   return [](int64_t) {};
 }
 
-// Simplified implementation - generates basic order commands
-// Full implementation would require TestOrdersGeneratorSession and more complex
-// logic
+// Forward declarations for helper functions
+static void MatcherTradeEventEventHandler(TestOrdersGeneratorSession *session,
+                                          const MatcherTradeEvent *ev,
+                                          const OrderCommand *orderCommand);
+static void UpdateOrderBookSizeStat(TestOrdersGeneratorSession *session);
+static OrderCommand GenerateRandomGtcOrder(TestOrdersGeneratorSession *session);
+static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession *session);
+static OrderCommand
+GenerateRandomInstantOrder(TestOrdersGeneratorSession *session);
+
+// Implementation of helper functions
+static void MatcherTradeEventEventHandler(TestOrdersGeneratorSession *session,
+                                          const MatcherTradeEvent *ev,
+                                          const OrderCommand *orderCommand) {
+  if (!session || !ev || !orderCommand) {
+    return; // Safety check
+  }
+
+  int32_t activeOrderId = static_cast<int32_t>(orderCommand->orderId);
+
+  if (ev->eventType == MatcherEventType::TRADE) {
+    if (ev->activeOrderCompleted) {
+      session->numCompleted++;
+    }
+    if (ev->matchedOrderCompleted) {
+      session->orderUids.erase(static_cast<int32_t>(ev->matchedOrderId));
+      session->numCompleted++;
+    }
+
+    // decrease size (important for reduce operation)
+    auto it =
+        session->orderSizes.find(static_cast<int32_t>(ev->matchedOrderId));
+    if (it != session->orderSizes.end()) {
+      it->second -= static_cast<int32_t>(ev->size);
+      if (it->second < 0) {
+        throw std::runtime_error("Negative order size");
+      }
+    }
+
+    session->lastTradePrice =
+        std::min(session->maxPrice, std::max(session->minPrice, ev->price));
+
+    if (ev->price <= session->minPrice) {
+      session->priceDirection = 1;
+    } else if (ev->price >= session->maxPrice) {
+      session->priceDirection = -1;
+    }
+
+  } else if (ev->eventType == MatcherEventType::REJECT) {
+    session->numRejected++;
+    // update order book stat if order get rejected
+    // that will trigger generator to issue more limit orders
+    UpdateOrderBookSizeStat(session);
+
+  } else if (ev->eventType == MatcherEventType::REDUCE) {
+    session->numReduced++;
+  } else {
+    return;
+  }
+
+  // decrease size (important for reduce operation)
+  auto it = session->orderSizes.find(activeOrderId);
+  if (it != session->orderSizes.end()) {
+    it->second -= static_cast<int32_t>(ev->size);
+    if (it->second < 0) {
+      throw std::runtime_error("Incorrect filled size for order " +
+                               std::to_string(activeOrderId));
+    }
+  }
+
+  if (ev->activeOrderCompleted) {
+    session->orderUids.erase(activeOrderId);
+  }
+}
+
+static void UpdateOrderBookSizeStat(TestOrdersGeneratorSession *session) {
+  int32_t ordersNumAsk = session->orderBook->GetOrdersNum(OrderAction::ASK);
+  int32_t ordersNumBid = session->orderBook->GetOrdersNum(OrderAction::BID);
+
+  // regulating OB size
+  session->lastOrderBookOrdersSizeAsk = ordersNumAsk;
+  session->lastOrderBookOrdersSizeBid = ordersNumBid;
+
+  if (session->initialOrdersPlaced || session->avalancheIOC) {
+    auto l2MarketDataSnapshot =
+        session->orderBook->GetL2MarketDataSnapshot(INT32_MAX);
+
+    if (session->avalancheIOC) {
+      session->lastTotalVolumeAsk =
+          l2MarketDataSnapshot->TotalOrderBookVolumeAsk();
+      session->lastTotalVolumeBid =
+          l2MarketDataSnapshot->TotalOrderBookVolumeBid();
+    }
+
+    if (session->initialOrdersPlaced) {
+      session->orderBookSizeAskStat.push_back(l2MarketDataSnapshot->askSize);
+      session->orderBookSizeBidStat.push_back(l2MarketDataSnapshot->bidSize);
+      session->orderBookNumOrdersAskStat.push_back(ordersNumAsk);
+      session->orderBookNumOrdersBidStat.push_back(ordersNumBid);
+    }
+  }
+}
+
+static OrderCommand
+GenerateRandomGtcOrder(TestOrdersGeneratorSession *session) {
+  std::uniform_int_distribution<int> dist(0, 3);
+  OrderAction action = (dist(session->rand) + session->priceDirection >= 2)
+                           ? OrderAction::BID
+                           : OrderAction::ASK;
+
+  std::uniform_int_distribution<int> userDist(0, session->numUsers - 1);
+  int32_t uid = session->uidMapper(userDist(session->rand));
+  int32_t newOrderId = session->seq;
+
+  std::uniform_real_distribution<double> doubleDist(0.0, 1.0);
+  int32_t dev =
+      1 + static_cast<int32_t>(std::pow(doubleDist(session->rand), 2) *
+                               session->priceDeviation);
+  if (dev <= 0) {
+    dev = 1; // Ensure dev is at least 1
+  }
+
+  int64_t p = 0;
+  const int x = 4;
+  std::uniform_int_distribution<int> devDist(0, dev - 1);
+  for (int i = 0; i < x; i++) {
+    p += devDist(session->rand);
+  }
+  p = p / x * 2 - dev;
+  if ((p > 0) ^ (action == OrderAction::ASK)) {
+    p = -p;
+  }
+
+  int64_t price = session->lastTradePrice + p;
+
+  std::uniform_int_distribution<int> sizeDist1(0, 5);
+  std::uniform_int_distribution<int> sizeDist2(0, 5);
+  std::uniform_int_distribution<int> sizeDist3(0, 5);
+  int32_t size = 1 + sizeDist1(session->rand) * sizeDist2(session->rand) *
+                         sizeDist3(session->rand);
+
+  session->orderPrices[newOrderId] = price;
+  session->orderSizes[newOrderId] = size;
+  session->orderUids[newOrderId] = uid;
+  session->counterPlaceLimit++;
+  session->seq++;
+
+  return OrderCommand::NewOrder(
+      OrderType::GTC, newOrderId, uid, price,
+      action == OrderAction::BID ? session->maxPrice : 0, size, action);
+}
+
+static OrderCommand
+GenerateRandomInstantOrder(TestOrdersGeneratorSession *session) {
+  std::uniform_int_distribution<int> dist(0, 3);
+  OrderAction action = (dist(session->rand) + session->priceDirection >= 2)
+                           ? OrderAction::BID
+                           : OrderAction::ASK;
+
+  std::uniform_int_distribution<int> userDist(0, session->numUsers - 1);
+  int32_t uid = session->uidMapper(userDist(session->rand));
+
+  int32_t newOrderId = session->seq;
+
+  int64_t priceLimit =
+      action == OrderAction::BID ? session->maxPrice : session->minPrice;
+
+  int64_t size;
+  OrderType orderType;
+  int64_t priceOrBudget;
+  int64_t reserveBidPrice;
+
+  if (session->avalancheIOC) {
+    // just match with available liquidity
+    orderType = OrderType::IOC;
+    priceOrBudget = priceLimit;
+    reserveBidPrice = action == OrderAction::BID ? session->maxPrice : 0;
+    int64_t availableVolume = action == OrderAction::ASK
+                                  ? session->lastTotalVolumeAsk
+                                  : session->lastTotalVolumeBid;
+
+    // Ensure availableVolume is non-negative
+    if (availableVolume < 0) {
+      availableVolume = 0;
+    }
+    std::uniform_int_distribution<int64_t> bigRandDist(0, availableVolume);
+    size = 1 + bigRandDist(session->rand);
+
+    if (action == OrderAction::ASK) {
+      session->lastTotalVolumeAsk =
+          std::max(session->lastTotalVolumeAsk - size, 0LL);
+    } else {
+      session->lastTotalVolumeBid =
+          std::max(session->lastTotalVolumeBid - size, 0LL);
+    }
+
+  } else {
+    std::uniform_int_distribution<int> fokDist(0, 31);
+    if (fokDist(session->rand) == 0) {
+      // IOC:FOKB = 31:1
+      orderType = OrderType::FOK_BUDGET;
+      std::uniform_int_distribution<int> sizeDist1(0, 7);
+      std::uniform_int_distribution<int> sizeDist2(0, 7);
+      std::uniform_int_distribution<int> sizeDist3(0, 7);
+      size = 1 + sizeDist1(session->rand) * sizeDist2(session->rand) *
+                     sizeDist3(session->rand);
+      priceOrBudget = size * priceLimit;
+      reserveBidPrice = priceOrBudget;
+    } else {
+      orderType = OrderType::IOC;
+      priceOrBudget = priceLimit;
+      reserveBidPrice = action == OrderAction::BID ? session->maxPrice : 0;
+      std::uniform_int_distribution<int> sizeDist1(0, 5);
+      std::uniform_int_distribution<int> sizeDist2(0, 5);
+      std::uniform_int_distribution<int> sizeDist3(0, 5);
+      size = 1 + sizeDist1(session->rand) * sizeDist2(session->rand) *
+                     sizeDist3(session->rand);
+    }
+  }
+
+  session->orderSizes[newOrderId] = static_cast<int32_t>(size);
+  session->counterPlaceMarket++;
+  session->seq++;
+
+  return OrderCommand::NewOrder(orderType, newOrderId, uid, priceOrBudget,
+                                reserveBidPrice, size, action);
+}
+
+static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession *session) {
+  // TODO move to lastOrderBookOrdersSize writer method
+  int32_t lackOfOrdersAsk =
+      session->targetOrderBookOrdersHalf - session->lastOrderBookOrdersSizeAsk;
+  int32_t lackOfOrdersBid =
+      session->targetOrderBookOrdersHalf - session->lastOrderBookOrdersSizeBid;
+
+  if (!session->initialOrdersPlaced && lackOfOrdersAsk <= 0 &&
+      lackOfOrdersBid <= 0) {
+    session->initialOrdersPlaced = true;
+
+    session->counterPlaceMarket = 0;
+    session->counterPlaceLimit = 0;
+    session->counterCancel = 0;
+    session->counterMove = 0;
+    session->counterReduce = 0;
+  }
+
+  std::uniform_int_distribution<int> actionDist(0, 3);
+  OrderAction action =
+      (actionDist(session->rand) + session->priceDirection >= 2)
+          ? OrderAction::BID
+          : OrderAction::ASK;
+
+  int32_t lackOfOrders =
+      (action == OrderAction::ASK) ? lackOfOrdersAsk : lackOfOrdersBid;
+
+  bool requireFastFill = session->filledAtSeq == -1 ||
+                         lackOfOrders > session->lackOrOrdersFastFillThreshold;
+
+  bool growOrders = lackOfOrders > 0;
+
+  if (session->filledAtSeq == -1 && !growOrders) {
+    session->filledAtSeq = session->seq;
+  }
+
+  int32_t q;
+  if (growOrders) {
+    std::uniform_int_distribution<int> qDist(0, requireFastFill ? 1 : 9);
+    q = qDist(session->rand);
+  } else {
+    std::uniform_int_distribution<int> qDist(0, 39);
+    q = qDist(session->rand);
+  }
+
+  if (q < 2 || session->orderUids.empty()) {
+    if (growOrders) {
+      return GenerateRandomGtcOrder(session);
+    } else {
+      return GenerateRandomInstantOrder(session);
+    }
+  }
+
+  // TODO improve random picking performance
+  int32_t size = std::min(static_cast<int32_t>(session->orderUids.size()), 512);
+  if (size <= 0) {
+    // Fallback: generate new order if map is empty
+    if (growOrders) {
+      return GenerateRandomGtcOrder(session);
+    } else {
+      return GenerateRandomInstantOrder(session);
+    }
+  }
+
+  std::uniform_int_distribution<int32_t> randPosDist(0, size - 1);
+  int32_t randPos = randPosDist(session->rand);
+
+  // Safely advance iterator
+  auto it = session->orderUids.begin();
+  for (int32_t i = 0; i < randPos && it != session->orderUids.end(); ++i) {
+    ++it;
+  }
+
+  if (it == session->orderUids.end()) {
+    // Fallback if iterator went out of bounds
+    if (growOrders) {
+      return GenerateRandomGtcOrder(session);
+    } else {
+      return GenerateRandomInstantOrder(session);
+    }
+  }
+
+  int32_t orderId = it->first;
+  int32_t uid = it->second;
+
+  if (uid == 0) {
+    throw std::runtime_error("Invalid uid");
+  }
+
+  if (q == 2) {
+    session->orderUids.erase(orderId);
+    session->counterCancel++;
+    return OrderCommand::Cancel(orderId, uid);
+
+  } else if (q == 3) {
+    session->counterReduce++;
+
+    auto sizeIt = session->orderSizes.find(orderId);
+    if (sizeIt == session->orderSizes.end()) {
+      throw std::runtime_error("Order size not found");
+    }
+    int32_t prevSize = sizeIt->second;
+    std::uniform_int_distribution<int32_t> reduceDist(1, prevSize);
+    int32_t reduceBy = reduceDist(session->rand);
+    return OrderCommand::Reduce(orderId, uid, reduceBy);
+
+  } else {
+    auto priceIt = session->orderPrices.find(orderId);
+    if (priceIt == session->orderPrices.end() || priceIt->second == 0) {
+      throw std::runtime_error("Order price not found");
+    }
+    int64_t prevPrice = priceIt->second;
+
+    double priceMove =
+        (session->lastTradePrice - prevPrice) * CENTRAL_MOVE_ALPHA;
+    int64_t priceMoveRounded;
+    if (prevPrice > session->lastTradePrice) {
+      priceMoveRounded = static_cast<int64_t>(std::floor(priceMove));
+    } else if (prevPrice < session->lastTradePrice) {
+      priceMoveRounded = static_cast<int64_t>(std::ceil(priceMove));
+    } else {
+      std::uniform_int_distribution<int> dirDist(0, 1);
+      priceMoveRounded = dirDist(session->rand) * 2 - 1;
+    }
+
+    int64_t newPrice =
+        std::min(prevPrice + priceMoveRounded, session->maxPrice);
+
+    session->counterMove++;
+    session->orderPrices[orderId] = newPrice;
+
+    return OrderCommand::Update(orderId, uid, newPrice);
+  }
+}
+
+// Main GenerateCommands implementation
 TestOrdersGenerator::GenResult TestOrdersGenerator::GenerateCommands(
     int benchmarkTransactionsNumber, int targetOrderBookOrders, int numUsers,
     std::function<int32_t(int32_t)> uidMapper, int32_t symbol,
@@ -84,127 +455,74 @@ TestOrdersGenerator::GenResult TestOrdersGenerator::GenerateCommands(
   std::unique_ptr<IOrderBook> orderBook =
       std::make_unique<OrderBookNaiveImpl>(&symbolSpec, nullptr, nullptr);
 
-  std::mt19937 rng(seed);
-  std::uniform_int_distribution<int> userDist(0, numUsers - 1);
-  std::uniform_int_distribution<int> sizeDist(1, 100);
-  std::uniform_int_distribution<int> priceOffsetDist(-100, 100);
+  // Create session
+  TestOrdersGeneratorSession session(
+      orderBook.get(), benchmarkTransactionsNumber,
+      targetOrderBookOrders / 2, // asks + bids
+      avalancheIOC, numUsers, uidMapper, symbol, enableSlidingPrice, seed);
 
-  const int64_t basePrice = 100000; // Base price for orders
-  int64_t currentPrice = basePrice;
-  int orderId = 1;
+  int32_t nextSizeCheck = std::min(CHECK_ORDERBOOK_STAT_EVERY_NTH_COMMAND,
+                                   targetOrderBookOrders + 1);
 
-  // Generate fill orders (GTC limit orders)
-  for (int i = 0; i < targetOrderBookOrders; i++) {
-    int32_t uid = uidMapper(userDist(rng));
-    OrderAction action = (rng() % 2 == 0) ? OrderAction::BID : OrderAction::ASK;
+  int32_t totalCommandsNumber =
+      benchmarkTransactionsNumber + targetOrderBookOrders;
 
-    int64_t price = currentPrice + priceOffsetDist(rng);
-    int64_t size = sizeDist(rng);
+  int32_t lastProgressReported = 0;
 
-    auto cmd = OrderCommand::NewOrder(
-        OrderType::GTC, orderId++, uid, price,
-        action == OrderAction::BID ? price * 2 : 0, size, action);
-    cmd.symbol = symbol;
-    cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
+  for (int32_t i = 0; i < totalCommandsNumber; i++) {
+    bool fillInProgress = i < targetOrderBookOrders;
 
-    // Process command in reference orderbook first (before pushing to vector)
-    IOrderBook::ProcessCommand(orderBook.get(), &cmd);
+    OrderCommand cmd;
 
-    // Use Copy() to create a copy for storage (OrderCommand contains
-    // unique_ptr)
-    result.commandsFill.push_back(cmd.Copy());
-
-    // Update price for sliding
-    if (enableSlidingPrice && i % 10 == 0) {
-      currentPrice += priceOffsetDist(rng);
-    }
-  }
-
-  // Generate benchmark orders (mix of GTC, IOC, cancel, move, reduce)
-  for (int i = 0; i < benchmarkTransactionsNumber; i++) {
-    int32_t uid = uidMapper(userDist(rng));
-    int cmdType = rng() % 10;
-
-    if (cmdType < 5) {
-      // Place GTC order
-      OrderAction action =
-          (rng() % 2 == 0) ? OrderAction::BID : OrderAction::ASK;
-      int64_t price = currentPrice + priceOffsetDist(rng);
-      int64_t size = sizeDist(rng);
-
-      auto cmd = OrderCommand::NewOrder(
-          OrderType::GTC, orderId++, uid, price,
-          action == OrderAction::BID ? price * 2 : 0, size, action);
-      cmd.symbol = symbol;
-      cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
-      IOrderBook::ProcessCommand(orderBook.get(), &cmd);
-      // Use Copy() to create a copy for storage (OrderCommand contains
-      // unique_ptr)
-      result.commandsBenchmark.push_back(cmd.Copy());
-
-    } else if (cmdType < 8) {
-      // Place IOC order
-      OrderAction action =
-          (rng() % 2 == 0) ? OrderAction::BID : OrderAction::ASK;
-      int64_t price = action == OrderAction::BID ? basePrice * 2 : basePrice;
-      int64_t size = sizeDist(rng);
-
-      auto cmd = OrderCommand::NewOrder(OrderType::IOC, orderId++, uid, price,
-                                        action == OrderAction::BID ? price : 0,
-                                        size, action);
-      cmd.symbol = symbol;
-      cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
-      IOrderBook::ProcessCommand(orderBook.get(), &cmd);
-      // Use Copy() to create a copy for storage (OrderCommand contains
-      // unique_ptr)
-      result.commandsBenchmark.push_back(cmd.Copy());
-
-    } else if (cmdType == 8 && !result.commandsFill.empty()) {
-      // Cancel order (simplified - cancel from fill orders)
-      int idx = rng() % result.commandsFill.size();
-      auto &fillCmd = result.commandsFill[idx];
-      if (fillCmd.command == OrderCommandType::PLACE_ORDER) {
-        auto cmd = OrderCommand::Cancel(fillCmd.orderId, fillCmd.uid);
-        cmd.symbol = symbol;
-        cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
-        IOrderBook::ProcessCommand(orderBook.get(), &cmd);
-        // Use Copy() to create a copy for storage (OrderCommand contains
-        // unique_ptr)
-        result.commandsBenchmark.push_back(cmd.Copy());
-      }
+    if (fillInProgress) {
+      cmd = GenerateRandomGtcOrder(&session);
+      result.commandsFill.push_back(cmd.Copy());
     } else {
-      // Move order (simplified)
-      if (!result.commandsFill.empty()) {
-        int idx = rng() % result.commandsFill.size();
-        auto &fillCmd = result.commandsFill[idx];
-        if (fillCmd.command == OrderCommandType::PLACE_ORDER) {
-          int64_t newPrice = currentPrice + priceOffsetDist(rng);
-          auto cmd =
-              OrderCommand::Update(fillCmd.orderId, fillCmd.uid, newPrice);
-          cmd.symbol = symbol;
-          cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
-          IOrderBook::ProcessCommand(orderBook.get(), &cmd);
-          // Use Copy() to create a copy for storage (OrderCommand contains
-          // unique_ptr)
-          result.commandsBenchmark.push_back(cmd.Copy());
+      cmd = GenerateRandomOrder(&session);
+      result.commandsBenchmark.push_back(cmd.Copy());
+    }
+
+    cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
+    cmd.symbol = session.symbol;
+
+    CommandResultCode resultCode =
+        IOrderBook::ProcessCommand(orderBook.get(), &cmd);
+    if (resultCode != CommandResultCode::SUCCESS) {
+      throw std::runtime_error("Unsuccessful result code: " +
+                               std::to_string(static_cast<int>(resultCode)) +
+                               " for command");
+    }
+
+    // process and cleanup matcher events
+    if (cmd.matcherEvent != nullptr) {
+      cmd.ProcessMatcherEvents([&session, &cmd](const MatcherTradeEvent *ev) {
+        if (ev != nullptr) {
+          MatcherTradeEventEventHandler(&session, ev, &cmd);
         }
+      });
+      cmd.matcherEvent = nullptr;
+    }
+
+    if (i >= nextSizeCheck) {
+      nextSizeCheck += std::min(CHECK_ORDERBOOK_STAT_EVERY_NTH_COMMAND,
+                                targetOrderBookOrders + 1);
+      UpdateOrderBookSizeStat(&session);
+    }
+
+    if (i % 10000 == 9999) {
+      if (asyncProgressConsumer) {
+        asyncProgressConsumer(i - lastProgressReported);
       }
-    }
-
-    if (enableSlidingPrice && i % 100 == 0) {
-      currentPrice += priceOffsetDist(rng);
-    }
-
-    if (asyncProgressConsumer && i % 10000 == 9999) {
-      asyncProgressConsumer(10000);
+      lastProgressReported = i;
     }
   }
 
   if (asyncProgressConsumer) {
-    asyncProgressConsumer(benchmarkTransactionsNumber % 10000);
+    asyncProgressConsumer(totalCommandsNumber - lastProgressReported);
   }
 
-  // Get final orderbook state
+  UpdateOrderBookSizeStat(&session);
+
   result.finalOrderBookSnapshot = orderBook->GetL2MarketDataSnapshot(INT32_MAX);
   result.finalOrderbookHash = orderBook->GetStateHash();
 

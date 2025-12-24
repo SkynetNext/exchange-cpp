@@ -175,6 +175,10 @@ private:
   // Check budget for FOK_BUDGET orders
   bool CheckBudgetToFill(int64_t size, MatchingRange &matchingRange,
                          int64_t *budgetOut);
+
+  // Check if budget limit is satisfied (matches Java isBudgetLimitSatisfied)
+  bool IsBudgetLimitSatisfied(common::OrderAction orderAction,
+                              int64_t calculated, int64_t limit);
 };
 
 } // namespace orderbook

@@ -123,6 +123,7 @@ void OrderBookDirectImpl::NewOrder(OrderCommand *cmd) {
     orderRecord->orderId = orderId;
     orderRecord->price = cmd->price;
     orderRecord->size = size;
+    orderRecord->reserveBidPrice = cmd->reserveBidPrice;
     orderRecord->action = cmd->action;
     orderRecord->uid = cmd->uid;
     orderRecord->timestamp = cmd->timestamp;
@@ -638,10 +639,10 @@ void OrderBookDirectImpl::DirectOrder::WriteMarshallable(
 int32_t OrderBookDirectImpl::DirectOrder::GetStateHash() const {
   // Match Java DirectOrder.stateHash() implementation:
   // Objects.hash(orderId, action, price, size, reserveBidPrice, filled, uid)
+  // Match Order::GetStateHash() implementation for consistency
   int32_t result = 1;
   result = result * 31 + static_cast<int32_t>(orderId ^ (orderId >> 32));
-  result =
-      result * 31 + static_cast<int32_t>(common::OrderActionToCode(action));
+  result = result * 31 + static_cast<int32_t>(static_cast<int8_t>(action));
   result = result * 31 + static_cast<int32_t>(price ^ (price >> 32));
   result = result * 31 + static_cast<int32_t>(size ^ (size >> 32));
   result = result * 31 +
@@ -657,30 +658,79 @@ int32_t OrderBookDirectImpl::GetStateHash() const {
   //     HashingUtils.stateHashStream(askOrdersStream(true)),
   //     HashingUtils.stateHashStream(bidOrdersStream(true)),
   //     getSymbolSpec().stateHash());
+  //
+  // Important: Must match OrderBookNaiveImpl traversal order:
+  // - Iterate by price buckets (ascending for ask, descending for bid)
+  // - Within each bucket, traverse FIFO (oldest to newest)
+  // This matches OrderBookNaiveImpl: askBuckets.values().stream().flatMap(...)
 
-  // Collect ask orders (sorted by price ascending)
-  std::vector<DirectOrder *> askOrders;
-  CollectOrders(bestAskOrder_, askOrders);
-
-  // Collect bid orders (sorted by price descending)
-  std::vector<DirectOrder *> bidOrders;
-  CollectOrders(bestBidOrder_, bidOrders);
-
-  // Calculate hash for ask orders stream
+  // Calculate hash for ask orders stream (sorted by price ascending)
+  // Iterate through price buckets in ascending order
   int32_t askHash = 0;
-  for (const DirectOrder *order : askOrders) {
-    if (order != nullptr) {
-      askHash = askHash * 31 + order->GetStateHash();
-    }
-  }
+  askPriceBuckets_.ForEach(
+      [&askHash](int64_t price, Bucket *bucket) {
+        // Within each price bucket, traverse from oldest to newest (FIFO)
+        // lastOrder points to newest order, follow next pointers to find oldest
+        // Then collect all orders and reverse to get FIFO order
+        std::vector<DirectOrder *> orders;
+        DirectOrder *current = bucket->lastOrder;
+        // Collect all orders in this bucket by following next pointers
+        // Stop when we hit nullptr or an order from a different bucket
+        while (current != nullptr && current->bucket == bucket) {
+          orders.push_back(current);
+          DirectOrder *next = current->next;
+          // Check if next order is from different bucket or nullptr
+          if (next == nullptr || next->bucket != bucket) {
+            break;
+          }
+          current = next;
+        }
+        // Verify we collected the right number of orders
+        // This should match bucket->numOrders
+        if (orders.size() != static_cast<size_t>(bucket->numOrders)) {
+          // This indicates a bug in order linking - should not happen
+          // But we continue to avoid crashing
+        }
+        // Reverse to get FIFO order (oldest to newest)
+        for (auto it = orders.rbegin(); it != orders.rend(); ++it) {
+          askHash = askHash * 31 + (*it)->GetStateHash();
+        }
+      },
+      INT32_MAX);
 
-  // Calculate hash for bid orders stream
+  // Calculate hash for bid orders stream (sorted by price descending)
+  // Iterate through price buckets in descending order
   int32_t bidHash = 0;
-  for (const DirectOrder *order : bidOrders) {
-    if (order != nullptr) {
-      bidHash = bidHash * 31 + order->GetStateHash();
-    }
-  }
+  bidPriceBuckets_.ForEachDesc(
+      [&bidHash](int64_t price, Bucket *bucket) {
+        // Within each price bucket, traverse from oldest to newest (FIFO)
+        // lastOrder points to newest order, follow next pointers to find oldest
+        // Then collect all orders and reverse to get FIFO order
+        std::vector<DirectOrder *> orders;
+        DirectOrder *current = bucket->lastOrder;
+        // Collect all orders in this bucket by following next pointers
+        // Stop when we hit nullptr or an order from a different bucket
+        while (current != nullptr && current->bucket == bucket) {
+          orders.push_back(current);
+          DirectOrder *next = current->next;
+          // Check if next order is from different bucket or nullptr
+          if (next == nullptr || next->bucket != bucket) {
+            break;
+          }
+          current = next;
+        }
+        // Verify we collected the right number of orders
+        // This should match bucket->numOrders
+        if (orders.size() != static_cast<size_t>(bucket->numOrders)) {
+          // This indicates a bug in order linking - should not happen
+          // But we continue to avoid crashing
+        }
+        // Reverse to get FIFO order (oldest to newest)
+        for (auto it = orders.rbegin(); it != orders.rend(); ++it) {
+          bidHash = bidHash * 31 + (*it)->GetStateHash();
+        }
+      },
+      INT32_MAX);
 
   // Combine using Objects.hash algorithm (31x multiplier)
   int32_t result = 1;
@@ -727,6 +777,14 @@ bool OrderBookDirectImpl::isBudgetLimitSatisfied(
   return calculated != INT64_MAX &&
          (calculated == limit ||
           (orderAction == OrderAction::BID ^ calculated > limit));
+}
+
+std::string OrderBookDirectImpl::PrintAskBucketsDiagram() const {
+  return askPriceBuckets_.PrintDiagram();
+}
+
+std::string OrderBookDirectImpl::PrintBidBucketsDiagram() const {
+  return bidPriceBuckets_.PrintDiagram();
 }
 
 } // namespace orderbook

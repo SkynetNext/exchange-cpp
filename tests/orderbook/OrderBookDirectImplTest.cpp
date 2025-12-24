@@ -23,7 +23,9 @@
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/orderbook/IOrderBook.h>
+#include <exchange/core/orderbook/OrderBookDirectImpl.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
+#include <iostream>
 #include <unordered_map>
 
 using namespace exchange::core::common;
@@ -184,6 +186,31 @@ void OrderBookDirectImplTest::TestMultipleCommandsCompare() {
 
     // Compare state hash every 100 commands
     if (i % 100 == 0) {
+      if (orderBook_->GetStateHash() != orderBookRef->GetStateHash()) {
+        // Print tree diagrams for debugging
+        auto *directImpl =
+            dynamic_cast<OrderBookDirectImpl *>(orderBook_.get());
+        if (directImpl != nullptr) {
+          std::cout << "\n=== State hash mismatch at command " << i << " ===\n";
+          std::cout << "OrderBookDirectImpl hash: "
+                    << orderBook_->GetStateHash() << "\n";
+          std::cout << "OrderBookNaiveImpl hash: "
+                    << orderBookRef->GetStateHash() << "\n";
+          std::cout << "\n--- Ask Buckets Tree ---\n";
+          std::cout << directImpl->PrintAskBucketsDiagram() << "\n";
+          std::cout << "\n--- Bid Buckets Tree ---\n";
+          std::cout << directImpl->PrintBidBucketsDiagram() << "\n";
+          std::cout << "\n--- Order counts ---\n";
+          std::cout << "DirectImpl Ask orders: "
+                    << orderBook_->GetOrdersNum(OrderAction::ASK) << "\n";
+          std::cout << "DirectImpl Bid orders: "
+                    << orderBook_->GetOrdersNum(OrderAction::BID) << "\n";
+          std::cout << "NaiveImpl Ask orders: "
+                    << orderBookRef->GetOrdersNum(OrderAction::ASK) << "\n";
+          std::cout << "NaiveImpl Bid orders: "
+                    << orderBookRef->GetOrdersNum(OrderAction::BID) << "\n";
+        }
+      }
       ASSERT_EQ(orderBook_->GetStateHash(), orderBookRef->GetStateHash());
     }
   }
