@@ -25,6 +25,7 @@
 #include <exchange/core/common/cmd/OrderCommandType.h>
 #include <exchange/core/processors/GroupingProcessor.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
+#include <iostream>
 
 namespace exchange {
 namespace core {
@@ -67,12 +68,14 @@ void GroupingProcessor::halt() {
 bool GroupingProcessor::isRunning() { return running_.load() != IDLE; }
 
 void GroupingProcessor::run() {
+  std::cout << "[GroupingProcessor] run() called" << std::endl;
   if (running_.compare_exchange_strong(const_cast<int32_t &>(IDLE), RUNNING)) {
     // Cast sequenceBarrier_ to call clearAlert()
     // For now, simplified
 
     try {
       if (running_.load() == RUNNING) {
+        std::cout << "[GroupingProcessor] Calling ProcessEvents()" << std::endl;
         ProcessEvents();
       }
     } catch (...) {
@@ -87,7 +90,9 @@ void GroupingProcessor::run() {
 }
 
 void GroupingProcessor::ProcessEvents() {
+  std::cout << "[GroupingProcessor] ProcessEvents() started" << std::endl;
   int64_t nextSequence = sequence_.get() + 1L;
+  std::cout << "[GroupingProcessor] Starting from sequence " << nextSequence << std::endl;
 
   int64_t groupCounter = 0;
   int64_t msgsInGroup = 0;
@@ -118,8 +123,10 @@ void GroupingProcessor::ProcessEvents() {
       int64_t availableSequence = waitHelper->TryWaitFor(nextSequence);
 
       if (nextSequence <= availableSequence) {
+        std::cout << "[GroupingProcessor] Processing sequences " << nextSequence << " to " << availableSequence << std::endl;
         while (nextSequence <= availableSequence) {
           common::cmd::OrderCommand *cmd = &ringBuffer->get(nextSequence);
+          std::cout << "[GroupingProcessor] Processing seq=" << nextSequence << ", cmd=" << static_cast<int>(cmd->command) << std::endl;
 
           nextSequence++;
 
@@ -202,6 +209,7 @@ void GroupingProcessor::ProcessEvents() {
           }
         }
         sequence_.set(availableSequence);
+        std::cout << "[GroupingProcessor] Updated sequence to " << availableSequence << ", sequence_.get()=" << sequence_.get() << ", &sequence_=" << &sequence_ << std::endl;
         waitHelper->SignalAllWhenBlocking();
         auto now = std::chrono::steady_clock::now();
         groupLastNs = std::chrono::duration_cast<std::chrono::nanoseconds>(

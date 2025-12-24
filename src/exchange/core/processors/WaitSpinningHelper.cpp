@@ -21,6 +21,8 @@
 #include <exchange/core/common/CoreWaitStrategy.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
+#include <iostream>
+#include <mutex>
 #include <thread>
 
 namespace exchange {
@@ -35,12 +37,23 @@ WaitSpinningHelper<T, WaitStrategyT>::WaitSpinningHelper(
         *sequenceBarrier,
     int32_t spinLimit, common::CoreWaitStrategy waitStrategy)
     : sequenceBarrier_(sequenceBarrier),
-      sequencer_(ExtractSequencer(ringBuffer)), spinLimit_(spinLimit),
+      sequencer_(&ringBuffer->getSequencer()), spinLimit_(spinLimit),
       yieldLimit_(ShouldYield(waitStrategy) ? spinLimit / 2 : 0),
       block_(ShouldBlock(waitStrategy)), blockingWaitStrategy_(nullptr),
       lock_(nullptr), processorNotifyCondition_(nullptr) {
-  // TODO: Extract blocking wait strategy and lock if needed for blocking mode
-  // For now, simplified implementation without reflection
+  // Matches Java: extract blocking wait strategy, lock, and condition variable if blocking mode
+  if (block_) {
+    // Extract waitStrategy from sequencer (matches Java: ReflectionUtils.extractField(AbstractSequencer.class, sequencer, "waitStrategy"))
+    auto &waitStrategy = sequencer_->getWaitStrategy();
+    
+    // Check if WaitStrategyT is BlockingWaitStrategy
+    if constexpr (std::is_same_v<WaitStrategyT, disruptor::BlockingWaitStrategy>) {
+      blockingWaitStrategy_ = &const_cast<disruptor::BlockingWaitStrategy &>(waitStrategy);
+      // Extract lock and condition variable (matches Java: ReflectionUtils.extractField(...))
+      lock_ = &blockingWaitStrategy_->getMutex();
+      processorNotifyCondition_ = &blockingWaitStrategy_->getConditionVariable();
+    }
+  }
 }
 
 template <typename T, typename WaitStrategyT>
@@ -49,49 +62,59 @@ int64_t WaitSpinningHelper<T, WaitStrategyT>::TryWaitFor(int64_t seq) {
 
   int64_t spin = spinLimit_;
   int64_t availableSequence;
-  while ((availableSequence = sequenceBarrier_->getCursor()) < seq &&
-         spin > 0) {
+  
+  // Matches Java: use getCursor() + spin, then blocking if needed
+  int64_t initialCursor = sequenceBarrier_->getCursor();
+  if (initialCursor < seq && spin > 0) {
+    std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq << "): cursor=" << initialCursor << ", spinning... (barrier cursor)" << std::endl;
+  }
+  while ((availableSequence = sequenceBarrier_->getCursor()) < seq && spin > 0) {
     if (spin < yieldLimit_ && spin > 1) {
       std::this_thread::yield();
-    } else if (block_) {
-      // TODO: Implement blocking wait with lock
-      // For now, simplified - just yield
-      std::this_thread::yield();
+    } else if (block_ && lock_ && processorNotifyCondition_) {
+      // Matches Java: lock.lock(); try { ... processorNotifyCondition.await(); } finally { lock.unlock(); }
+      std::unique_lock<std::mutex> uniqueLock(*lock_);
+      try {
+        sequenceBarrier_->checkAlert();
+        // lock only if sequence barrier did not progressed since last check
+        if (availableSequence == sequenceBarrier_->getCursor()) {
+          processorNotifyCondition_->wait(uniqueLock);
+        }
+      } catch (...) {
+        // uniqueLock will automatically unlock in destructor
+        throw;
+      }
+      // uniqueLock automatically unlocks here
     }
     spin--;
   }
 
   // Use sequencer to get highest published sequence if available
-  if (sequencer_ && availableSequence >= seq) {
-    return sequencer_->getHighestPublishedSequence(seq, availableSequence);
+  // Matches Java: return (availableSequence < seq) ? availableSequence : sequencer.getHighestPublishedSequence(seq, availableSequence);
+  if (availableSequence < seq) {
+    std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq << "): returning " << availableSequence << " (not available yet)" << std::endl;
+    return availableSequence;
+  }
+  
+  int64_t result;
+  if (sequencer_) {
+    result = sequencer_->getHighestPublishedSequence(seq, availableSequence);
+    std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq << "): sequencer returned " << result << std::endl;
+    return result;
   }
 
+  std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq << "): returning " << availableSequence << " (no sequencer)" << std::endl;
   return availableSequence;
 }
 
 template <typename T, typename WaitStrategyT>
 void WaitSpinningHelper<T, WaitStrategyT>::SignalAllWhenBlocking() {
+  // Matches Java: if (block) { blockingDisruptorWaitStrategy.signalAllWhenBlocking(); }
   if (block_ && blockingWaitStrategy_) {
-    // TODO: Call signalAllWhenBlocking on blocking wait strategy
-    // For now, simplified
+    blockingWaitStrategy_->signalAllWhenBlocking();
   }
 }
 
-template <typename T, typename WaitStrategyT>
-disruptor::MultiProducerSequencer<WaitStrategyT> *
-WaitSpinningHelper<T, WaitStrategyT>::ExtractSequencer(
-    disruptor::MultiProducerRingBuffer<T, WaitStrategyT> *ringBuffer) {
-  // In C++, we can't use reflection like Java
-  // We need to access the sequencer through RingBuffer's internal structure
-  // Since RingBuffer's sequencer() returns a reference, we can get its address
-  // However, this is not safe if the sequencer is stored in an optional or
-  // unique_ptr For now, we'll need to modify RingBuffer to provide sequencer
-  // access or use a friend class relationship
-  // TODO: Add getSequencer() method to RingBuffer or use friend classes
-  // For now, we'll try to get it from the ringBuffer's internal structure
-  // This is a workaround - in production, we should add proper accessor methods
-  return nullptr; // TODO: Implement proper sequencer extraction
-}
 
 // Explicit template instantiations for common types
 template class WaitSpinningHelper<common::cmd::OrderCommand,

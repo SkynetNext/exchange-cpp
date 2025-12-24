@@ -18,9 +18,13 @@
 
 #include "../common/CoreWaitStrategy.h"
 #include <cstdint>
+#include <disruptor/BlockingWaitStrategy.h>
 #include <disruptor/MultiProducerSequencer.h>
 #include <disruptor/ProcessingSequenceBarrier.h>
 #include <disruptor/RingBuffer.h>
+#include <condition_variable>
+#include <mutex>
+#include <type_traits>
 
 namespace exchange {
 namespace core {
@@ -57,13 +61,10 @@ private:
   int32_t yieldLimit_;
   bool block_;
 
-  // For blocking mode - simplified for now
-  void *blockingWaitStrategy_;     // Will be properly typed when needed
-  void *lock_;                     // Will be properly typed when needed
-  void *processorNotifyCondition_; // Will be properly typed when needed
-
-  static disruptor::MultiProducerSequencer<WaitStrategyT> *ExtractSequencer(
-      disruptor::MultiProducerRingBuffer<T, WaitStrategyT> *ringBuffer);
+  // For blocking mode - matches Java reflection access
+  disruptor::BlockingWaitStrategy *blockingWaitStrategy_;
+  std::mutex *lock_;
+  std::condition_variable *processorNotifyCondition_;
 };
 
 } // namespace processors

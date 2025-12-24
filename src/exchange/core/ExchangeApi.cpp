@@ -17,6 +17,7 @@
 #include <disruptor/EventTranslatorOneArg.h>
 #include <disruptor/RingBuffer.h>
 #include <exchange/core/ExchangeApi.h>
+#include <iostream>
 #include <exchange/core/common/BalanceAdjustmentType.h>
 #include <exchange/core/common/BytesOut.h>
 #include <exchange/core/common/OrderType.h>

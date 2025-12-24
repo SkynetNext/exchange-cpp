@@ -23,6 +23,7 @@
 #include <exchange/core/processors/TwoStepMasterProcessor.h>
 #include <exchange/core/processors/TwoStepSlaveProcessor.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
+#include <iostream>
 #include <thread>
 
 namespace exchange {
@@ -72,7 +73,9 @@ bool TwoStepMasterProcessor<WaitStrategyT>::isRunning() {
 
 template <typename WaitStrategyT>
 void TwoStepMasterProcessor<WaitStrategyT>::run() {
+  std::cout << "[TwoStepMasterProcessor:" << name_ << "] run() called" << std::endl;
   if (running_.compare_exchange_strong(const_cast<int32_t &>(IDLE), RUNNING)) {
+    std::cout << "[TwoStepMasterProcessor:" << name_ << "] Starting, clearing alert" << std::endl;
     auto *barrier = static_cast<disruptor::ProcessingSequenceBarrier<
         disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT> *>(
         sequenceBarrier_);
@@ -83,9 +86,13 @@ void TwoStepMasterProcessor<WaitStrategyT>::run() {
         ProcessEvents();
       }
     } catch (...) {
+      std::cout << "[TwoStepMasterProcessor:" << name_ << "] Exception in ProcessEvents" << std::endl;
       // Handle exception
     }
     running_.store(IDLE);
+    std::cout << "[TwoStepMasterProcessor:" << name_ << "] Exiting run()" << std::endl;
+  } else {
+    std::cout << "[TwoStepMasterProcessor:" << name_ << "] Already running, skipping" << std::endl;
   }
 }
 
@@ -99,14 +106,18 @@ template <typename WaitStrategyT>
 void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
   // Set thread name (simplified for C++)
   // std::thread::current_thread().set_name("Thread-" + name_);
+  std::cout << "[TwoStepMasterProcessor:" << name_ << "] ProcessEvents() started" << std::endl;
 
   int64_t nextSequence = sequence_.get() + 1L;
   int64_t currentSequenceGroup = 0;
+  std::cout << "[TwoStepMasterProcessor:" << name_ << "] Starting from sequence " << nextSequence << ", current sequence_=" << sequence_.get() << std::endl;
 
   // wait until slave processor has instructed to run
   while (slaveProcessor_ != nullptr && !slaveProcessor_->isRunning()) {
+    std::cout << "[TwoStepMasterProcessor:" << name_ << "] Waiting for slave processor to start..." << std::endl;
     std::this_thread::yield();
   }
+  std::cout << "[TwoStepMasterProcessor:" << name_ << "] Slave processor started, entering main loop" << std::endl;
 
   while (true) {
     common::cmd::OrderCommand *cmd = nullptr;
@@ -115,11 +126,16 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           common::cmd::OrderCommand, WaitStrategyT> *>(ringBuffer_);
 
       // should spin and also check another barrier
+      std::cout << "[TwoStepMasterProcessor:" << name_ << "] TryWaitFor(" << nextSequence << "), current sequence_=" << sequence_.get() << std::endl;
       int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
+      std::cout << "[TwoStepMasterProcessor:" << name_ << "] TryWaitFor returned " << availableSequence << ", nextSequence=" << nextSequence << std::endl;
 
       if (nextSequence <= availableSequence) {
+        std::cout << "[TwoStepMasterProcessor:" << name_ << "] Condition check: nextSequence(" << nextSequence << ") <= availableSequence(" << availableSequence << ") = TRUE" << std::endl;
+        std::cout << "[TwoStepMasterProcessor:" << name_ << "] Processing sequences " << nextSequence << " to " << availableSequence << std::endl;
         while (nextSequence <= availableSequence) {
           cmd = &ringBuffer->get(nextSequence);
+          std::cout << "[TwoStepMasterProcessor:" << name_ << "] Processing seq=" << nextSequence << ", cmd=" << static_cast<int>(cmd->command) << ", group=" << cmd->eventsGroup << std::endl;
 
           // switch to next group - let slave processor start doing its handling
           // cycle
@@ -131,6 +147,7 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           }
 
           bool forcedPublish = eventHandler_->OnEvent(nextSequence, cmd);
+          std::cout << "[TwoStepMasterProcessor:" << name_ << "] OnEvent completed, forcedPublish=" << forcedPublish << std::endl;
           nextSequence++;
 
           if (forcedPublish) {
@@ -148,7 +165,10 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           }
         }
         sequence_.set(availableSequence);
+        std::cout << "[TwoStepMasterProcessor:" << name_ << "] Updated sequence to " << availableSequence << ", sequence_.get()=" << sequence_.get() << std::endl;
         waitSpinningHelper_->SignalAllWhenBlocking();
+      } else {
+        std::cout << "[TwoStepMasterProcessor:" << name_ << "] No events available, nextSequence=" << nextSequence << ", availableSequence=" << availableSequence << std::endl;
       }
     } catch (const disruptor::AlertException &ex) {
       if (running_.load() != RUNNING) {
