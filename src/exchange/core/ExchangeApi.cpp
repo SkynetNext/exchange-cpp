@@ -298,9 +298,47 @@ void ExchangeApi<WaitStrategyT>::SubmitCommand(common::api::ApiCommand *cmd) {
 template <typename WaitStrategyT>
 std::future<common::cmd::CommandResultCode>
 ExchangeApi<WaitStrategyT>::SubmitCommandAsync(common::api::ApiCommand *cmd) {
+  if (!cmd) {
+    throw std::invalid_argument("SubmitCommandAsync: cmd is nullptr");
+  }
+  if (!ringBuffer_) {
+    throw std::runtime_error("SubmitCommandAsync: ringBuffer is nullptr");
+  }
+
   std::promise<common::cmd::CommandResultCode> promise;
   auto future = promise.get_future();
 
+  // Handle binary data and persist commands specially - they claim their own sequences
+  if (auto *binaryData =
+          dynamic_cast<common::api::ApiBinaryDataCommand *>(cmd)) {
+    // PublishBinaryData will claim its own sequences and set promises
+    // Use shared_ptr to make lambda copyable for std::function
+    auto promisePtr = std::make_shared<std::promise<common::cmd::CommandResultCode>>(std::move(promise));
+    PublishBinaryData(binaryData, [this, promisePtr](int64_t seq) {
+      // Move the promise from shared_ptr to promises_ map
+      promises_[seq] = std::move(*promisePtr);
+    });
+    return future;
+  } else if (auto *persistState =
+                 dynamic_cast<common::api::ApiPersistState *>(cmd)) {
+    // PublishPersistCmd will claim its own sequences and set promises
+    // For persist, we need to wait for both sequences
+    std::promise<common::cmd::CommandResultCode> promise2;
+    auto future2 = promise2.get_future();
+    // Use shared_ptr to make lambda copyable for std::function
+    auto promise1Ptr = std::make_shared<std::promise<common::cmd::CommandResultCode>>(std::move(promise));
+    auto promise2Ptr = std::make_shared<std::promise<common::cmd::CommandResultCode>>(std::move(promise2));
+    PublishPersistCmd(persistState, [this, promise1Ptr, promise2Ptr](int64_t seq1, int64_t seq2) {
+      // Move the promises from shared_ptr to promises_ map
+      promises_[seq1] = std::move(*promise1Ptr);
+      promises_[seq2] = std::move(*promise2Ptr);
+    });
+    // Return a combined future that waits for both
+    // For simplicity, just return the first future (both should complete with same result)
+    return future;
+  }
+
+  // For other commands, claim sequence and translate
   // Get sequence before publishing
   int64_t seq = ringBuffer_->next();
 
@@ -381,6 +419,9 @@ void ExchangeApi<WaitStrategyT>::PublishBinaryData(
   if (!apiCmd || !apiCmd->data) {
     throw std::invalid_argument("Invalid ApiBinaryDataCommand");
   }
+  if (!ringBuffer_) {
+    throw std::runtime_error("PublishBinaryData: ringBuffer is nullptr");
+  }
 
   // Serialize object to bytes
   std::vector<uint8_t> serializedBytes;
@@ -396,6 +437,16 @@ void ExchangeApi<WaitStrategyT>::PublishBinaryData(
 
   const int totalNumMessagesToClaim =
       static_cast<int>(longsArrayData.size()) / LONGS_PER_MESSAGE;
+
+  if (totalNumMessagesToClaim == 0) {
+    throw std::runtime_error("PublishBinaryData: empty data after serialization");
+  }
+
+  // Verify array size is a multiple of LONGS_PER_MESSAGE
+  const int expectedArraySize = totalNumMessagesToClaim * LONGS_PER_MESSAGE;
+  if (static_cast<int>(longsArrayData.size()) < expectedArraySize) {
+    throw std::runtime_error("PublishBinaryData: array size mismatch");
+  }
 
   // Max fragment size is quarter of ring buffer
   const int batchSize = ringBuffer_->getBufferSize() / 4;
@@ -414,9 +465,30 @@ void ExchangeApi<WaitStrategyT>::PublishBinaryData(
     const int64_t highSeq = ringBuffer_->next(fragmentSize);
     const int64_t lowSeq = highSeq - fragmentSize + 1;
 
+    // Verify sequence range is valid
+    if (lowSeq < 0 || highSeq < lowSeq) {
+      throw std::runtime_error("PublishBinaryData: invalid sequence range");
+    }
+
     try {
       int ptr = offset * LONGS_PER_MESSAGE;
+      // Verify ptr bounds before loop
+      const int maxPtr = static_cast<int>(longsArrayData.size()) - LONGS_PER_MESSAGE;
+      if (ptr < 0 || ptr > maxPtr) {
+        throw std::out_of_range("PublishBinaryData: ptr out of range");
+      }
+
       for (int64_t seq = lowSeq; seq <= highSeq; seq++) {
+        // Verify bounds before accessing array
+        if (ptr + 4 >= static_cast<int>(longsArrayData.size())) {
+          throw std::out_of_range("PublishBinaryData: array index out of bounds");
+        }
+
+        // Verify ringBuffer is still valid before accessing
+        if (!ringBuffer_) {
+          throw std::runtime_error("PublishBinaryData: ringBuffer became nullptr");
+        }
+
         auto &cmd = ringBuffer_->get(seq);
         cmd.command = common::cmd::OrderCommandType::BINARY_DATA_COMMAND;
         cmd.userCookie = apiCmd->transferId;

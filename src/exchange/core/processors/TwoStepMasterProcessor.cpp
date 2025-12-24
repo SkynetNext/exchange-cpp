@@ -47,16 +47,16 @@ TwoStepMasterProcessor<WaitStrategyT>::TwoStepMasterProcessor(
               coreWaitStrategy)),
       eventHandler_(eventHandler), exceptionHandler_(exceptionHandler),
       name_(name),
-      sequence_(new disruptor::Sequence(disruptor::Sequence::INITIAL_VALUE)),
+      sequence_(disruptor::Sequence::INITIAL_VALUE),
       slaveProcessor_(nullptr) {}
 
 template <typename WaitStrategyT>
-disruptor::Sequence *TwoStepMasterProcessor<WaitStrategyT>::GetSequence() {
+disruptor::Sequence &TwoStepMasterProcessor<WaitStrategyT>::getSequence() {
   return sequence_;
 }
 
 template <typename WaitStrategyT>
-void TwoStepMasterProcessor<WaitStrategyT>::Halt() {
+void TwoStepMasterProcessor<WaitStrategyT>::halt() {
   running_.store(HALTED);
   // Cast sequenceBarrier_ to call alert()
   auto *barrier = static_cast<disruptor::ProcessingSequenceBarrier<
@@ -66,12 +66,12 @@ void TwoStepMasterProcessor<WaitStrategyT>::Halt() {
 }
 
 template <typename WaitStrategyT>
-bool TwoStepMasterProcessor<WaitStrategyT>::IsRunning() const {
+bool TwoStepMasterProcessor<WaitStrategyT>::isRunning() {
   return running_.load() != IDLE;
 }
 
 template <typename WaitStrategyT>
-void TwoStepMasterProcessor<WaitStrategyT>::Run() {
+void TwoStepMasterProcessor<WaitStrategyT>::run() {
   if (running_.compare_exchange_strong(const_cast<int32_t &>(IDLE), RUNNING)) {
     auto *barrier = static_cast<disruptor::ProcessingSequenceBarrier<
         disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT> *>(
@@ -100,11 +100,11 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
   // Set thread name (simplified for C++)
   // std::thread::current_thread().set_name("Thread-" + name_);
 
-  int64_t nextSequence = sequence_->get() + 1L;
+  int64_t nextSequence = sequence_.get() + 1L;
   int64_t currentSequenceGroup = 0;
 
   // wait until slave processor has instructed to run
-  while (slaveProcessor_ != nullptr && !slaveProcessor_->IsRunning()) {
+  while (slaveProcessor_ != nullptr && !slaveProcessor_->isRunning()) {
     std::this_thread::yield();
   }
 
@@ -134,7 +134,7 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           nextSequence++;
 
           if (forcedPublish) {
-            sequence_->set(nextSequence - 1);
+            sequence_.set(nextSequence - 1);
             waitSpinningHelper_->SignalAllWhenBlocking();
           }
 
@@ -147,7 +147,7 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
             }
           }
         }
-        sequence_->set(availableSequence);
+        sequence_.set(availableSequence);
         waitSpinningHelper_->SignalAllWhenBlocking();
       }
     } catch (const disruptor::AlertException &ex) {
@@ -158,7 +158,7 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(ex, nextSequence, cmd);
       }
-      sequence_->set(nextSequence);
+      sequence_.set(nextSequence);
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;
     } catch (...) {
@@ -166,7 +166,7 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
         exceptionHandler_->HandleEventException(
             std::runtime_error("Unknown exception"), nextSequence, cmd);
       }
-      sequence_->set(nextSequence);
+      sequence_.set(nextSequence);
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;
     }

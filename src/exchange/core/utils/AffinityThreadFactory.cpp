@@ -18,6 +18,7 @@
 #include <exchange/core/utils/AffinityThreadFactory.h>
 #include <mutex>
 #include <thread>
+#include <memory>
 
 // Platform-specific includes for CPU affinity
 #ifdef _WIN32
@@ -38,11 +39,10 @@ AffinityThreadFactory::AffinityThreadFactory(
     ThreadAffinityMode threadAffinityMode)
     : threadAffinityMode_(threadAffinityMode) {}
 
-std::unique_ptr<std::thread>
-AffinityThreadFactory::NewThread(std::function<void()> runnable) {
+std::thread AffinityThreadFactory::newThread(std::function<void()> r) {
   if (threadAffinityMode_ == ThreadAffinityMode::THREAD_AFFINITY_DISABLE) {
     // No affinity - just create a regular thread
-    return std::make_unique<std::thread>(runnable);
+    return std::thread(r);
   }
 
   // Note: In Java version, it checks if runnable is TwoStepSlaveProcessor
@@ -54,8 +54,7 @@ AffinityThreadFactory::NewThread(std::function<void()> runnable) {
   // get a unique identifier, so we skip this check for now.
 
   // Create thread that will execute with affinity
-  return std::make_unique<std::thread>(
-      [this, runnable]() { ExecutePinned(runnable); });
+  return std::thread([this, r]() { ExecutePinned(r); });
 }
 
 bool AffinityThreadFactory::IsTaskPinned(void *task) const {

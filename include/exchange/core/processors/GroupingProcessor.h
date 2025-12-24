@@ -21,6 +21,7 @@
 #include "SharedPool.h"
 #include <atomic>
 #include <cstdint>
+#include <disruptor/EventProcessor.h>
 #include <disruptor/MultiProducerSequencer.h>
 #include <disruptor/ProcessingSequenceBarrier.h>
 #include <disruptor/RingBuffer.h>
@@ -31,9 +32,9 @@ namespace processors {
 
 /**
  * GroupingProcessor - groups small orders and identifies cancel-replace
- * patterns Implements EventProcessor interface
+ * patterns Implements EventProcessor interface (matches Java version)
  */
-class GroupingProcessor {
+class GroupingProcessor : public disruptor::EventProcessor {
 public:
   template <typename WaitStrategyT>
   GroupingProcessor(
@@ -45,25 +46,11 @@ public:
       const common::config::PerformanceConfiguration *perfCfg,
       common::CoreWaitStrategy coreWaitStrategy, SharedPool *sharedPool);
 
-  /**
-   * Get sequence
-   */
-  disruptor::Sequence *GetSequence();
-
-  /**
-   * Halt processor
-   */
-  void Halt();
-
-  /**
-   * Check if running
-   */
-  bool IsRunning() const;
-
-  /**
-   * Run processor (main loop)
-   */
-  void Run();
+  // EventProcessor interface implementation
+  disruptor::Sequence &getSequence() override;
+  void halt() override;
+  bool isRunning() override;
+  void run() override;
 
 private:
   static constexpr int32_t IDLE = 0;
@@ -76,7 +63,7 @@ private:
   void *ringBuffer_;         // Type-erased RingBuffer pointer
   void *sequenceBarrier_;    // Type-erased SequenceBarrier pointer
   void *waitSpinningHelper_; // Type-erased WaitSpinningHelper pointer
-  disruptor::Sequence *sequence_;
+  disruptor::Sequence sequence_;  // Changed from pointer to value (matches Java)
   SharedPool *sharedPool_;
   int32_t msgsInGroupLimit_;
   int64_t maxGroupDurationNs_;

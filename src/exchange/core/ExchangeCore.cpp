@@ -33,7 +33,6 @@
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
 #include <exchange/core/processors/DisruptorExceptionHandler.h>
-#include <exchange/core/processors/EventProcessorAdapter.h>
 #include <exchange/core/processors/GroupingProcessor.h>
 #include <exchange/core/processors/MatchingEngineRouter.h>
 #include <exchange/core/processors/ResultsHandler.h>
@@ -44,7 +43,7 @@
 #include <exchange/core/processors/TwoStepSlaveProcessor.h>
 #include <exchange/core/processors/journaling/DummySerializationProcessor.h>
 #include <exchange/core/processors/journaling/ISerializationProcessor.h>
-#include <exchange/core/utils/AffinityThreadFactory.h>
+#include <iostream>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -61,24 +60,6 @@ public:
   }
 };
 
-// Adapter from AffinityThreadFactory to disruptor::dsl::ThreadFactory
-class ThreadFactoryAdapter : public disruptor::dsl::ThreadFactory {
-public:
-  explicit ThreadFactoryAdapter(utils::AffinityThreadFactory *affinityFactory)
-      : affinityFactory_(affinityFactory) {}
-
-  std::thread newThread(std::function<void()> r) override {
-    if (affinityFactory_) {
-      auto thread = affinityFactory_->NewThread(r);
-      return std::move(*thread);
-    } else {
-      return std::thread(r);
-    }
-  }
-
-private:
-  utils::AffinityThreadFactory *affinityFactory_;
-};
 
 // Helper to get WaitStrategy based on CoreWaitStrategy
 template <typename WaitStrategyT> WaitStrategyT *GetWaitStrategyInstance();
@@ -138,7 +119,6 @@ public:
       ExchangeCore::ResultsConsumer resultsConsumer,
       const common::config::ExchangeConfiguration *exchangeConfiguration)
       : exchangeConfiguration_(exchangeConfiguration) {
-
     const auto &perfCfg = exchangeConfiguration_->performanceCfg;
     const auto &serializationCfg = exchangeConfiguration_->serializationCfg;
 
@@ -179,11 +159,16 @@ public:
 
     // 5. Disruptor Setup
     auto eventFactory = std::make_shared<OrderCommandEventFactory>();
-    ThreadFactoryAdapter threadFactoryAdapter(nullptr);
     auto *waitStrategyPtr = GetWaitStrategyInstance<WaitStrategyT>();
 
+    // Java: new Disruptor<>(..., threadFactory, ...)
+    // threadFactory comes from perfCfg.getThreadFactory()
+    if (!perfCfg.threadFactory) {
+      throw std::runtime_error("PerformanceConfiguration.threadFactory is null");
+    }
+
     disruptor_ = std::make_unique<DisruptorT>(
-        eventFactory, ringBufferSize, threadFactoryAdapter, *waitStrategyPtr);
+        eventFactory, ringBufferSize, *perfCfg.threadFactory, *waitStrategyPtr);
 
     auto &ringBuffer = disruptor_->getRingBuffer();
     api_ = std::make_unique<ExchangeApi<WaitStrategyT>>(&ringBuffer);
@@ -209,12 +194,9 @@ public:
           common::CoreWaitStrategy coreWaitStrategy,
           processors::SharedPool *sharedPool,
           std::vector<std::unique_ptr<processors::GroupingProcessor>>
-              &processors,
-          std::vector<std::unique_ptr<processors::EventProcessorAdapter>>
-              &adapters)
+              &processors)
           : perfCfg_(perfCfg), coreWaitStrategy_(coreWaitStrategy),
-            sharedPool_(sharedPool), processors_(processors),
-            adapters_(adapters) {}
+            sharedPool_(sharedPool), processors_(processors) {}
 
       disruptor::EventProcessor &
       createEventProcessor(RingBufferT &ringBuffer,
@@ -225,14 +207,8 @@ public:
             &ringBuffer, barrier.get(), perfCfg_, coreWaitStrategy_,
             sharedPool_);
 
-        auto adapter = std::make_unique<processors::EventProcessorAdapter>(
-            processor->GetSequence(), [p = processor.get()]() { p->Run(); },
-            [p = processor.get()]() { p->Halt(); },
-            [p = processor.get()]() { return p->IsRunning(); });
-
         processors_.push_back(std::move(processor));
-        adapters_.push_back(std::move(adapter));
-        return *adapters_.back();
+        return *processors_.back();
       }
 
     private:
@@ -240,13 +216,10 @@ public:
       common::CoreWaitStrategy coreWaitStrategy_;
       processors::SharedPool *sharedPool_;
       std::vector<std::unique_ptr<processors::GroupingProcessor>> &processors_;
-      std::vector<std::unique_ptr<processors::EventProcessorAdapter>>
-          &adapters_;
     };
 
     auto groupingFactory = GroupingProcessorFactory(
-        &perfCfg, perfCfg.waitStrategy, sharedPool_.get(), groupingProcessors_,
-        processorAdapters_);
+        &perfCfg, perfCfg.waitStrategy, sharedPool_.get(), groupingProcessors_);
     auto afterGrouping = disruptor_->handleEventsWith(groupingFactory);
 
     // Stage 2: Journaling (Optional)
@@ -300,13 +273,11 @@ public:
           std::vector<std::unique_ptr<
               processors::TwoStepMasterProcessor<WaitStrategyT>>>
               &r1ProcessorsOwned,
-          std::vector<std::unique_ptr<processors::EventProcessorAdapter>>
-              &adapters,
           std::vector<disruptor::EventProcessor *> &r1EventProcessors)
           : eventHandler_(eventHandler), exceptionHandler_(exceptionHandler),
             coreWaitStrategy_(coreWaitStrategy), name_(name),
             r1Processors_(r1Processors), r1ProcessorsOwned_(r1ProcessorsOwned),
-            adapters_(adapters), r1EventProcessors_(r1EventProcessors) {}
+            r1EventProcessors_(r1EventProcessors) {}
 
       disruptor::EventProcessor &
       createEventProcessor(RingBufferT &ringBuffer,
@@ -318,16 +289,10 @@ public:
                 &ringBuffer, barrier.get(), eventHandler_, exceptionHandler_,
                 coreWaitStrategy_, name_);
 
-        auto adapter = std::make_unique<processors::EventProcessorAdapter>(
-            processor->GetSequence(), [p = processor.get()]() { p->Run(); },
-            [p = processor.get()]() { p->Halt(); },
-            [p = processor.get()]() { return p->IsRunning(); });
-
         r1Processors_.push_back(processor.get());
         r1ProcessorsOwned_.push_back(std::move(processor));
-        adapters_.push_back(std::move(adapter));
-        r1EventProcessors_.push_back(adapters_.back().get());
-        return *adapters_.back();
+        r1EventProcessors_.push_back(r1ProcessorsOwned_.back().get());
+        return *r1EventProcessors_.back();
       }
 
     private:
@@ -340,8 +305,6 @@ public:
       std::vector<
           std::unique_ptr<processors::TwoStepMasterProcessor<WaitStrategyT>>>
           &r1ProcessorsOwned_;
-      std::vector<std::unique_ptr<processors::EventProcessorAdapter>>
-          &adapters_;
       std::vector<disruptor::EventProcessor *> &r1EventProcessors_;
     };
 
@@ -351,7 +314,7 @@ public:
       auto r1Factory = R1ProcessorFactory(
           handler.get(), exceptionHandler_.get(), perfCfg.waitStrategy,
           "R1_" + std::to_string(i), r1Processors_, r1ProcessorsOwned_,
-          processorAdapters_, r1EventProcessors_);
+          r1EventProcessors_);
       afterGrouping.handleEventsWith(r1Factory);
       riskHandlers_.push_back(std::move(handler));
     }
@@ -375,20 +338,9 @@ public:
 
     // Create afterR1 group (wait for all R1 processors to complete)
     // Java: disruptor.after(procR1.toArray(new TwoStepMasterProcessor[0]))
-    // Since EventProcessorAdapter implements both EventProcessor and
-    // EventHandlerIdentity, we can cast EventProcessorAdapter* to
-    // EventHandlerIdentity*
-    std::vector<disruptor::EventHandlerIdentity *> r1Identities;
-    r1Identities.reserve(r1EventProcessors_.size());
-    for (auto *proc : r1EventProcessors_) {
-      // All processors in r1EventProcessors_ are EventProcessorAdapter
-      // instances which implement both EventProcessor and EventHandlerIdentity
-      auto *adapter = static_cast<processors::EventProcessorAdapter *>(proc);
-      r1Identities.push_back(
-          static_cast<disruptor::EventHandlerIdentity *>(adapter));
-    }
-    auto afterR1 = disruptor_->after(r1Identities.data(),
-                                     static_cast<int>(r1Identities.size()));
+    // Java version uses after(EventProcessor...) which directly gets sequences
+    auto afterR1 = disruptor_->after(r1EventProcessors_.data(),
+                                     static_cast<int>(r1EventProcessors_.size()));
 
     for (auto &me : matchingEngines_) {
       auto handler = std::make_unique<MatchingEngineEventHandler>(me.get());
@@ -425,12 +377,10 @@ public:
           const std::string &name, std::vector<void *> &r2Processors,
           std::vector<
               std::unique_ptr<processors::TwoStepSlaveProcessor<WaitStrategyT>>>
-              &r2ProcessorsOwned,
-          std::vector<std::unique_ptr<processors::EventProcessorAdapter>>
-              &adapters)
+              &r2ProcessorsOwned)
           : eventHandler_(eventHandler), exceptionHandler_(exceptionHandler),
             name_(name), r2Processors_(r2Processors),
-            r2ProcessorsOwned_(r2ProcessorsOwned), adapters_(adapters) {}
+            r2ProcessorsOwned_(r2ProcessorsOwned) {}
 
       disruptor::EventProcessor &
       createEventProcessor(RingBufferT &ringBuffer,
@@ -442,15 +392,9 @@ public:
                 &ringBuffer, barrier.get(), eventHandler_, exceptionHandler_,
                 name_);
 
-        auto adapter = std::make_unique<processors::EventProcessorAdapter>(
-            processor->GetSequence(), [p = processor.get()]() { p->Run(); },
-            [p = processor.get()]() { p->Halt(); },
-            [p = processor.get()]() { return p->IsRunning(); });
-
         r2Processors_.push_back(processor.get());
         r2ProcessorsOwned_.push_back(std::move(processor));
-        adapters_.push_back(std::move(adapter));
-        return *adapters_.back();
+        return *r2ProcessorsOwned_.back();
       }
 
     private:
@@ -462,8 +406,6 @@ public:
       std::vector<
           std::unique_ptr<processors::TwoStepSlaveProcessor<WaitStrategyT>>>
           &r2ProcessorsOwned_;
-      std::vector<std::unique_ptr<processors::EventProcessorAdapter>>
-          &adapters_;
     };
 
     for (size_t i = 0; i < riskEngines_.size(); i++) {
@@ -471,7 +413,7 @@ public:
           std::make_unique<RiskPostProcessHandler>(riskEngines_[i].get());
       auto r2Factory = R2ProcessorFactory(
           handler.get(), exceptionHandler_.get(), "R2_" + std::to_string(i),
-          r2Processors_, r2ProcessorsOwned_, processorAdapters_);
+          r2Processors_, r2ProcessorsOwned_);
       afterME.handleEventsWith(r2Factory);
       riskHandlers_.push_back(std::move(handler));
     }
@@ -521,14 +463,18 @@ public:
          i < r1ProcessorsOwned_.size() && i < r2ProcessorsOwned_.size(); i++) {
       r1ProcessorsOwned_[i]->SetSlaveProcessor(r2ProcessorsOwned_[i].get());
     }
+    std::cout << "[ExchangeCoreImpl] Constructor: all stages completed" << std::endl;
   }
 
   void Startup() override {
+    std::cout << "[ExchangeCore] Startup: calling disruptor_->start()" << std::endl;
     disruptor_->start();
+    std::cout << "[ExchangeCore] Startup: disruptor_->start() completed" << std::endl;
     if (serializationProcessor_) {
       serializationProcessor_->ReplayJournalFullAndThenEnableJouraling(
           &exchangeConfiguration_->initStateCfg, api_.get());
     }
+    std::cout << "[ExchangeCore] Startup: completed" << std::endl;
   }
 
   void Shutdown(int64_t timeoutMs) override {
@@ -540,7 +486,9 @@ public:
       disruptor_->shutdown(timeoutMs);
   }
 
-  IExchangeApi *GetApi() override { return api_.get(); }
+  IExchangeApi *GetApi() override {
+    return api_.get();
+  }
 
 private:
   const common::config::ExchangeConfiguration *exchangeConfiguration_;
@@ -567,8 +515,6 @@ private:
       r1ProcessorsOwned_;
   std::vector<std::unique_ptr<processors::TwoStepSlaveProcessor<WaitStrategyT>>>
       r2ProcessorsOwned_;
-  std::vector<std::unique_ptr<processors::EventProcessorAdapter>>
-      processorAdapters_;
   std::vector<disruptor::EventProcessor *> r1EventProcessors_;
   std::vector<std::unique_ptr<processors::SimpleEventHandler>> riskHandlers_;
   std::vector<
@@ -583,7 +529,6 @@ ExchangeCore::ExchangeCore(
     ResultsConsumer resultsConsumer,
     const common::config::ExchangeConfiguration *exchangeConfiguration)
     : exchangeConfiguration_(exchangeConfiguration) {
-
   const auto &perfCfg = exchangeConfiguration_->performanceCfg;
 
   switch (perfCfg.waitStrategy) {
@@ -616,7 +561,8 @@ void ExchangeCore::Shutdown(int64_t timeoutMs) {
 }
 
 IExchangeApi *ExchangeCore::GetApi() {
-  return impl_ ? impl_->GetApi() : nullptr;
+  IExchangeApi *api = impl_ ? impl_->GetApi() : nullptr;
+  return api;
 }
 
 } // namespace core

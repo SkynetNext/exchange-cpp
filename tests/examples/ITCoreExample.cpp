@@ -85,16 +85,23 @@ TEST(ITCoreExample, SampleTest) {
   auto conf = exchange::core::common::config::ExchangeConfiguration::Default();
 
   // Build exchange core
+  std::cout << "[TEST] Building ExchangeCore" << std::endl;
   auto exchangeCore = std::make_unique<ExchangeCore>(
       [&eventsProcessor](exchange::core::common::cmd::OrderCommand *cmd,
                          int64_t seq) { eventsProcessor->Accept(cmd, seq); },
       &conf);
+  std::cout << "[TEST] ExchangeCore built" << std::endl;
 
   // Start up disruptor threads
+  std::cout << "[TEST] Calling Startup()" << std::endl;
   exchangeCore->Startup();
+  std::cout << "[TEST] Startup() completed" << std::endl;
 
   // Get exchange API for publishing commands
   auto api = exchangeCore->GetApi();
+  if (!api) {
+    FAIL() << "GetApi() returned nullptr";
+  }
 
   // Currency code constants
   const int32_t currencyCodeXbt = 11;

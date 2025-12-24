@@ -18,6 +18,7 @@
 
 #include "../../orderbook/IOrderBook.h"
 #include "../CoreWaitStrategy.h"
+#include <disruptor/dsl/ThreadFactory.h>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -66,6 +67,12 @@ public:
   // Wait strategy
   CoreWaitStrategy waitStrategy;
 
+  // ThreadFactory (matches Java version)
+  // Note: Disruptor only stores a reference to ThreadFactory, not ownership
+  // We use unique_ptr here to manage the lifetime of the concrete implementation
+  // (AffinityThreadFactory or SimpleThreadFactory), since ThreadFactory is abstract
+  std::unique_ptr<disruptor::dsl::ThreadFactory> threadFactory;
+
   // OrderBook factory (matches Java IOrderBook.OrderBookFactory signature)
   using OrderBookFactory = std::function<std::unique_ptr<orderbook::IOrderBook>(
       const CoreSymbolSpecification *spec,
@@ -78,12 +85,14 @@ public:
                            int64_t maxGroupDurationNs, bool sendL2ForEveryCmd,
                            int32_t l2RefreshDepth,
                            CoreWaitStrategy waitStrategy,
+                           std::unique_ptr<disruptor::dsl::ThreadFactory> threadFactory,
                            OrderBookFactory orderBookFactory)
       : ringBufferSize(ringBufferSize), matchingEnginesNum(matchingEnginesNum),
         riskEnginesNum(riskEnginesNum), msgsInGroupLimit(msgsInGroupLimit),
         maxGroupDurationNs(maxGroupDurationNs),
         sendL2ForEveryCmd(sendL2ForEveryCmd), l2RefreshDepth(l2RefreshDepth),
         waitStrategy(waitStrategy),
+        threadFactory(std::move(threadFactory)),
         orderBookFactory(std::move(orderBookFactory)) {}
 
   static PerformanceConfiguration Default();

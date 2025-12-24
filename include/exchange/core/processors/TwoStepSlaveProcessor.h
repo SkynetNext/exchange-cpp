@@ -21,6 +21,7 @@
 #include "WaitSpinningHelper.h"
 #include <atomic>
 #include <cstdint>
+#include <disruptor/EventProcessor.h>
 #include <disruptor/MultiProducerSequencer.h>
 #include <disruptor/ProcessingSequenceBarrier.h>
 #include <disruptor/RingBuffer.h>
@@ -32,9 +33,9 @@ namespace processors {
 
 /**
  * TwoStepSlaveProcessor - two-step processor (slave step)
- * Implements EventProcessor interface
+ * Implements EventProcessor interface (matches Java version)
  */
-template <typename WaitStrategyT> class TwoStepSlaveProcessor {
+template <typename WaitStrategyT> class TwoStepSlaveProcessor : public disruptor::EventProcessor {
 public:
   TwoStepSlaveProcessor(
       disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand,
@@ -46,25 +47,11 @@ public:
       DisruptorExceptionHandler<common::cmd::OrderCommand> *exceptionHandler,
       const std::string &name);
 
-  /**
-   * Get sequence
-   */
-  disruptor::Sequence *GetSequence();
-
-  /**
-   * Halt processor
-   */
-  void Halt();
-
-  /**
-   * Check if running
-   */
-  bool IsRunning() const;
-
-  /**
-   * Run processor (main loop)
-   */
-  void Run();
+  // EventProcessor interface implementation
+  disruptor::Sequence &getSequence() override;
+  void halt() override;
+  bool isRunning() override;
+  void run() override;
 
   /**
    * Set next sequence to process (called by master)
@@ -84,7 +71,7 @@ private:
   SimpleEventHandler *eventHandler_;
   DisruptorExceptionHandler<common::cmd::OrderCommand> *exceptionHandler_;
   std::string name_;
-  disruptor::Sequence *sequence_;
+  disruptor::Sequence sequence_;  // Changed from pointer to value (matches Java)
   int64_t nextSequence_;
 
   void ProcessEvents();

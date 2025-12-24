@@ -41,7 +41,7 @@ GroupingProcessor::GroupingProcessor(
     common::CoreWaitStrategy coreWaitStrategy, SharedPool *sharedPool)
     : running_(IDLE), ringBuffer_(ringBuffer),
       sequenceBarrier_(sequenceBarrier), waitSpinningHelper_(nullptr),
-      sequence_(new disruptor::Sequence(disruptor::Sequence::INITIAL_VALUE)),
+      sequence_(disruptor::Sequence::INITIAL_VALUE),
       sharedPool_(sharedPool), msgsInGroupLimit_(perfCfg->msgsInGroupLimit),
       maxGroupDurationNs_(perfCfg->maxGroupDurationNs) {
   if (msgsInGroupLimit_ > perfCfg->ringBufferSize / 4) {
@@ -55,18 +55,18 @@ GroupingProcessor::GroupingProcessor(
           ringBuffer, sequenceBarrier, GROUP_SPIN_LIMIT, coreWaitStrategy);
 }
 
-disruptor::Sequence *GroupingProcessor::GetSequence() { return sequence_; }
+disruptor::Sequence &GroupingProcessor::getSequence() { return sequence_; }
 
-void GroupingProcessor::Halt() {
+void GroupingProcessor::halt() {
   running_.store(HALTED);
   // Cast sequenceBarrier_ to call alert()
   // We need to cast to the correct type
   // For now, simplified - will be fixed when we have proper type erasure
 }
 
-bool GroupingProcessor::IsRunning() const { return running_.load() != IDLE; }
+bool GroupingProcessor::isRunning() { return running_.load() != IDLE; }
 
-void GroupingProcessor::Run() {
+void GroupingProcessor::run() {
   if (running_.compare_exchange_strong(const_cast<int32_t &>(IDLE), RUNNING)) {
     // Cast sequenceBarrier_ to call clearAlert()
     // For now, simplified
@@ -87,7 +87,7 @@ void GroupingProcessor::Run() {
 }
 
 void GroupingProcessor::ProcessEvents() {
-  int64_t nextSequence = sequence_->get() + 1L;
+  int64_t nextSequence = sequence_.get() + 1L;
 
   int64_t groupCounter = 0;
   int64_t msgsInGroup = 0;
@@ -201,7 +201,7 @@ void GroupingProcessor::ProcessEvents() {
             msgsInGroup = 0;
           }
         }
-        sequence_->set(availableSequence);
+        sequence_.set(availableSequence);
         waitHelper->SignalAllWhenBlocking();
         auto now = std::chrono::steady_clock::now();
         groupLastNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -232,7 +232,7 @@ void GroupingProcessor::ProcessEvents() {
         break;
       }
     } catch (...) {
-      sequence_->set(nextSequence);
+      sequence_.set(nextSequence);
       auto *waitHelper =
           static_cast<WaitSpinningHelper<common::cmd::OrderCommand,
                                          disruptor::BlockingWaitStrategy> *>(

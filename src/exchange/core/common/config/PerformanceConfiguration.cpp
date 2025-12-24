@@ -14,11 +14,15 @@
  * limitations under the License.
  */
 
+#include <disruptor/dsl/ThreadFactory.h>
 #include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <exchange/core/orderbook/OrderBookDirectImpl.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
+#include <exchange/core/utils/AffinityThreadFactory.h>
+#include <functional>
+#include <memory>
 
 namespace exchange {
 namespace core {
@@ -26,6 +30,14 @@ namespace common {
 namespace config {
 
 PerformanceConfiguration PerformanceConfiguration::Default() {
+  // Java: .threadFactory(Thread::new) - simple thread factory
+  class SimpleThreadFactory : public disruptor::dsl::ThreadFactory {
+  public:
+    std::thread newThread(std::function<void()> r) override {
+      return std::thread(r);
+    }
+  };
+
   return PerformanceConfiguration(
       16 * 1024, // ringBufferSize
       1,         // matchingEnginesNum
@@ -35,6 +47,7 @@ PerformanceConfiguration PerformanceConfiguration::Default() {
       false,     // sendL2ForEveryCmd
       8,         // l2RefreshDepth
       CoreWaitStrategy::BLOCKING,
+      std::make_unique<SimpleThreadFactory>(),
       [](const CoreSymbolSpecification *spec,
          ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
          orderbook::OrderBookEventsHelper *eventsHelper) {
@@ -46,6 +59,7 @@ PerformanceConfiguration PerformanceConfiguration::Default() {
 }
 
 PerformanceConfiguration PerformanceConfiguration::LatencyPerformanceBuilder() {
+  // Java: .threadFactory(new AffinityThreadFactory(THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE))
   return PerformanceConfiguration(
       2 * 1024, // ringBufferSize
       1,        // matchingEnginesNum
@@ -55,6 +69,8 @@ PerformanceConfiguration PerformanceConfiguration::LatencyPerformanceBuilder() {
       false,    // sendL2ForEveryCmd
       8,        // l2RefreshDepth
       CoreWaitStrategy::BUSY_SPIN,
+      std::make_unique<utils::AffinityThreadFactory>(
+          utils::ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE),
       [](const CoreSymbolSpecification *spec,
          ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
          orderbook::OrderBookEventsHelper *eventsHelper) {
@@ -66,6 +82,7 @@ PerformanceConfiguration PerformanceConfiguration::LatencyPerformanceBuilder() {
 
 PerformanceConfiguration
 PerformanceConfiguration::ThroughputPerformanceBuilder() {
+  // Java: .threadFactory(new AffinityThreadFactory(THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE))
   return PerformanceConfiguration(
       64 * 1024, // ringBufferSize
       4,         // matchingEnginesNum
@@ -75,6 +92,8 @@ PerformanceConfiguration::ThroughputPerformanceBuilder() {
       false,     // sendL2ForEveryCmd
       8,         // l2RefreshDepth
       CoreWaitStrategy::BUSY_SPIN,
+      std::make_unique<utils::AffinityThreadFactory>(
+          utils::ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE),
       [](const CoreSymbolSpecification *spec,
          ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
          orderbook::OrderBookEventsHelper *eventsHelper) {

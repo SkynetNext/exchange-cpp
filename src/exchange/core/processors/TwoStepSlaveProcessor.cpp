@@ -44,16 +44,16 @@ TwoStepSlaveProcessor<WaitStrategyT>::TwoStepSlaveProcessor(
               common::CoreWaitStrategy::SECOND_STEP_NO_WAIT)),
       eventHandler_(eventHandler), exceptionHandler_(exceptionHandler),
       name_(name),
-      sequence_(new disruptor::Sequence(disruptor::Sequence::INITIAL_VALUE)),
+      sequence_(disruptor::Sequence::INITIAL_VALUE),
       nextSequence_(-1) {}
 
 template <typename WaitStrategyT>
-disruptor::Sequence *TwoStepSlaveProcessor<WaitStrategyT>::GetSequence() {
+disruptor::Sequence &TwoStepSlaveProcessor<WaitStrategyT>::getSequence() {
   return sequence_;
 }
 
 template <typename WaitStrategyT>
-void TwoStepSlaveProcessor<WaitStrategyT>::Halt() {
+void TwoStepSlaveProcessor<WaitStrategyT>::halt() {
   running_.store(HALTED);
   auto *barrier = static_cast<disruptor::ProcessingSequenceBarrier<
       disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT> *>(
@@ -62,12 +62,12 @@ void TwoStepSlaveProcessor<WaitStrategyT>::Halt() {
 }
 
 template <typename WaitStrategyT>
-bool TwoStepSlaveProcessor<WaitStrategyT>::IsRunning() const {
+bool TwoStepSlaveProcessor<WaitStrategyT>::isRunning() {
   return running_.load() != IDLE;
 }
 
 template <typename WaitStrategyT>
-void TwoStepSlaveProcessor<WaitStrategyT>::Run() {
+void TwoStepSlaveProcessor<WaitStrategyT>::run() {
   if (running_.compare_exchange_strong(const_cast<int32_t &>(IDLE), RUNNING)) {
     auto *barrier = static_cast<disruptor::ProcessingSequenceBarrier<
         disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT> *>(
@@ -77,7 +77,7 @@ void TwoStepSlaveProcessor<WaitStrategyT>::Run() {
     throw std::runtime_error("Thread is already running (S)");
   }
 
-  nextSequence_ = sequence_->get() + 1L;
+  nextSequence_ = sequence_.get() + 1L;
 }
 
 template <typename WaitStrategyT>
@@ -109,7 +109,7 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
 
       // exit if finished processing entire group (up to specified sequence)
       if (nextSequence_ == processUpToSequence) {
-        sequence_->set(processUpToSequence - 1);
+        sequence_.set(processUpToSequence - 1);
         waitSpinningHelper_->SignalAllWhenBlocking();
         return;
       }
@@ -118,7 +118,7 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(ex, nextSequence_, event);
       }
-      sequence_->set(nextSequence_);
+      sequence_.set(nextSequence_);
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence_++;
     } catch (...) {
@@ -126,7 +126,7 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
         exceptionHandler_->HandleEventException(
             std::runtime_error("Unknown exception"), nextSequence_, event);
       }
-      sequence_->set(nextSequence_);
+      sequence_.set(nextSequence_);
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence_++;
     }

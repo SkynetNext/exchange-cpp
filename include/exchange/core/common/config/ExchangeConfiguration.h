@@ -47,7 +47,7 @@ public:
                         LoggingConfiguration loggingCfg,
                         SerializationConfiguration serializationCfg)
       : ordersProcessingCfg(ordersProcessingCfg),
-        performanceCfg(performanceCfg), initStateCfg(initStateCfg),
+        performanceCfg(std::move(performanceCfg)), initStateCfg(initStateCfg),
         reportsQueriesCfg(reportsQueriesCfg), loggingCfg(loggingCfg),
         serializationCfg(serializationCfg) {}
 
