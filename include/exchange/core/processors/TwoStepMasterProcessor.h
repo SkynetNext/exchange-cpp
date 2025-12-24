@@ -39,7 +39,8 @@ template <typename WaitStrategyT> class TwoStepSlaveProcessor;
  * TwoStepMasterProcessor - two-step processor (master step)
  * Implements EventProcessor interface (matches Java version)
  */
-template <typename WaitStrategyT> class TwoStepMasterProcessor : public disruptor::EventProcessor {
+template <typename WaitStrategyT>
+class TwoStepMasterProcessor : public disruptor::EventProcessor {
 public:
   TwoStepMasterProcessor(
       disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand,
@@ -76,10 +77,11 @@ private:
   SimpleEventHandler *eventHandler_;
   DisruptorExceptionHandler<common::cmd::OrderCommand> *exceptionHandler_;
   std::string name_;
-  disruptor::Sequence sequence_;  // Changed from pointer to value (matches Java)
+  disruptor::Sequence sequence_; // Changed from pointer to value (matches Java)
   TwoStepSlaveProcessor<WaitStrategyT> *slaveProcessor_;
 
   void ProcessEvents();
+  void PublishProgressAndTriggerSlaveProcessor(int64_t nextSequence);
 };
 
 } // namespace processors

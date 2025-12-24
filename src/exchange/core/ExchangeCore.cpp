@@ -41,6 +41,7 @@
 #include <exchange/core/processors/SimpleEventHandler.h>
 #include <exchange/core/processors/TwoStepMasterProcessor.h>
 #include <exchange/core/processors/TwoStepSlaveProcessor.h>
+#include <exchange/core/processors/WaitSpinningHelper.h>
 #include <exchange/core/processors/journaling/DummySerializationProcessor.h>
 #include <exchange/core/processors/journaling/ISerializationProcessor.h>
 #include <iostream>
@@ -390,10 +391,14 @@ public:
     public:
       MatchingEngineEventHandler(
           processors::MatchingEngineRouter *matchingEngine)
-          : matchingEngine_(matchingEngine) {}
+          : matchingEngine_(matchingEngine) {
+        std::cout << "[MatchingEngineEventHandler] Constructor called"
+                  << std::endl;
+      }
 
       void onEvent(common::cmd::OrderCommand &cmd, int64_t sequence,
                    bool endOfBatch) override {
+        std::lock_guard<std::mutex> lock(processors::log_mutex);
         std::cout << "[MatchingEngineEventHandler] onEvent: seq=" << sequence
                   << ", cmd=" << static_cast<int>(cmd.command) << std::endl;
         matchingEngine_->ProcessOrder(sequence, &cmd);
@@ -408,15 +413,75 @@ public:
     // Create afterR1 group (wait for all R1 processors to complete)
     // Java: disruptor.after(procR1.toArray(new TwoStepMasterProcessor[0]))
     // Java version uses after(EventProcessor...) which directly gets sequences
+    std::cout << "[ExchangeCoreImpl] Creating afterR1 with "
+              << r1EventProcessors_.size() << " R1 processors" << std::endl;
+    for (size_t i = 0; i < r1EventProcessors_.size(); i++) {
+      std::cout << "[ExchangeCoreImpl] R1 processor[" << i
+                << "] sequence value before afterR1: "
+                << r1EventProcessors_[i]->getSequence().get() << std::endl;
+    }
     auto afterR1 = disruptor_->after(
         r1EventProcessors_.data(), static_cast<int>(r1EventProcessors_.size()));
 
+    // Debug: Verify R1 sequence pointers are correct
+    std::cout << "[ExchangeCoreImpl] After creating afterR1, verifying R1 "
+                 "sequence pointers:"
+              << std::endl;
+    for (size_t i = 0; i < r1EventProcessors_.size(); i++) {
+      auto *seqPtr = &r1EventProcessors_[i]->getSequence();
+      std::cout << "[ExchangeCoreImpl]   R1[" << i
+                << "] sequence pointer: " << std::hex << seqPtr << std::dec
+                << ", value: " << seqPtr->get() << std::endl;
+    }
+
+    // Create all MatchingEngine handlers first (matches Java:
+    // matchingEngineHandlers array) Java: final EventHandler<OrderCommand>[]
+    // matchingEngineHandlers = ...
     for (auto &me : matchingEngines_) {
       auto handler = std::make_unique<MatchingEngineEventHandler>(me.get());
-      afterR1.handleEventsWith(*handler);
       matchingEngineHandlers_.push_back(std::move(handler));
-      std::cout << "[ExchangeCoreImpl] Added MatchingEngineEventHandler, total="
-                << matchingEngineHandlers_.size() << std::endl;
+    }
+
+    // Register all MatchingEngine handlers at once (matches Java:
+    // handleEventsWith(matchingEngineHandlers)) Java:
+    // disruptor.after(procR1.toArray(...)).handleEventsWith(matchingEngineHandlers)
+    if (!matchingEngineHandlers_.empty()) {
+      // Use a helper lambda to call handleEventsWith with all handlers
+      // Since C++ variadic templates require compile-time parameter count,
+      // we handle common cases (1-4 handlers) explicitly
+      auto registerHandlers = [&afterR1](auto &handlers) {
+        if (handlers.size() == 1) {
+          afterR1.handleEventsWith(*handlers[0].get());
+        } else if (handlers.size() == 2) {
+          afterR1.handleEventsWith(*handlers[0].get(), *handlers[1].get());
+        } else if (handlers.size() == 3) {
+          afterR1.handleEventsWith(*handlers[0].get(), *handlers[1].get(),
+                                   *handlers[2].get());
+        } else if (handlers.size() >= 4) {
+          // For 4+ handlers, register first 4 at once, then rest individually
+          afterR1.handleEventsWith(*handlers[0].get(), *handlers[1].get(),
+                                   *handlers[2].get(), *handlers[3].get());
+          for (size_t i = 4; i < handlers.size(); i++) {
+            afterR1.handleEventsWith(*handlers[i].get());
+          }
+        }
+      };
+
+      registerHandlers(matchingEngineHandlers_);
+
+      std::cout << "[ExchangeCoreImpl] Registered "
+                << matchingEngineHandlers_.size()
+                << " MatchingEngine handler(s) at once (matches Java behavior)"
+                << std::endl;
+
+      // Verify R1 sequence values after registration
+      std::cout << "[ExchangeCoreImpl] After MatchingEngine registration, R1 "
+                   "processor sequences:"
+                << std::endl;
+      for (size_t i = 0; i < r1EventProcessors_.size(); i++) {
+        std::cout << "[ExchangeCoreImpl]   R1[" << i << "] sequence value: "
+                  << r1EventProcessors_[i]->getSequence().get() << std::endl;
+      }
     }
 
     // Stage 5: Risk Post-Process (R2)
@@ -529,6 +594,7 @@ public:
                    bool endOfBatch) override {
         handler_->OnEvent(&cmd, sequence, endOfBatch);
         api_->ProcessResult(sequence, &cmd);
+        std::lock_guard<std::mutex> lock(processors::log_mutex);
         std::cout << "[ResultsEventHandler] Processed seq=" << sequence
                   << std::endl;
       }
@@ -576,6 +642,37 @@ public:
     disruptor_->start();
     std::cout << "[ExchangeCore] Startup: disruptor_->start() completed"
               << std::endl;
+
+    // Log MatchingEngine handler status after startup
+    for (size_t i = 0; i < matchingEngineHandlers_.size(); i++) {
+      try {
+        auto seqValue =
+            disruptor_->getSequenceValueFor(*matchingEngineHandlers_[i].get());
+        std::cout << "[ExchangeCore] After startup - MatchingEngine handler["
+                  << i << "] sequence value: " << seqValue << std::endl;
+        auto barrier =
+            disruptor_->getBarrierFor(*matchingEngineHandlers_[i].get());
+        if (barrier) {
+          std::cout << "[ExchangeCore] After startup - MatchingEngine handler["
+                    << i << "] barrier cursor: " << barrier->getCursor()
+                    << std::endl;
+        } else {
+          std::cout << "[ExchangeCore] After startup - MatchingEngine handler["
+                    << i << "] barrier is null" << std::endl;
+        }
+
+        // Also log R1 processor sequence to verify dependency
+        if (i < r1EventProcessors_.size()) {
+          std::cout << "[ExchangeCore] R1 processor[" << i
+                    << "] sequence value: "
+                    << r1EventProcessors_[i]->getSequence().get() << std::endl;
+        }
+      } catch (const std::exception &e) {
+        std::cout << "[ExchangeCore] ERROR: MatchingEngine handler[" << i
+                  << "] not found after startup: " << e.what() << std::endl;
+      }
+    }
+
     if (serializationProcessor_) {
       serializationProcessor_->ReplayJournalFullAndThenEnableJouraling(
           &exchangeConfiguration_->initStateCfg, api_.get());
@@ -584,12 +681,18 @@ public:
   }
 
   void Shutdown(int64_t timeoutMs) override {
+    std::lock_guard<std::mutex> lock(processors::log_mutex);
+    std::cout << "[ExchangeCore] Shutdown: publishing SHUTDOWN_SIGNAL"
+              << std::endl;
     static ShutdownSignalTranslator shutdownTranslator;
     disruptor_->getRingBuffer().publishEvent(shutdownTranslator);
+    std::cout << "[ExchangeCore] Shutdown: calling disruptor_->shutdown()"
+              << std::endl;
     if (timeoutMs < 0)
       disruptor_->shutdown();
     else
       disruptor_->shutdown(timeoutMs);
+    std::cout << "[ExchangeCore] Shutdown: completed" << std::endl;
   }
 
   IExchangeApi *GetApi() override { return api_.get(); }

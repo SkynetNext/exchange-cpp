@@ -22,6 +22,7 @@
 #include <exchange/core/processors/TwoStepSlaveProcessor.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
 #include <iostream>
+#include <mutex>
 
 namespace exchange {
 namespace core {
@@ -42,10 +43,9 @@ TwoStepSlaveProcessor<WaitStrategyT>::TwoStepSlaveProcessor(
       waitSpinningHelper_(
           new WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>(
               ringBuffer, sequenceBarrier, 0,
-              common::CoreWaitStrategy::SECOND_STEP_NO_WAIT)),
+              common::CoreWaitStrategy::SECOND_STEP_NO_WAIT, name)),
       eventHandler_(eventHandler), exceptionHandler_(exceptionHandler),
-      name_(name),
-      sequence_(disruptor::Sequence::INITIAL_VALUE),
+      name_(name), sequence_(disruptor::Sequence::INITIAL_VALUE),
       nextSequence_(-1) {}
 
 template <typename WaitStrategyT>
@@ -69,9 +69,7 @@ bool TwoStepSlaveProcessor<WaitStrategyT>::isRunning() {
 
 template <typename WaitStrategyT>
 void TwoStepSlaveProcessor<WaitStrategyT>::run() {
-  std::cout << "[TwoStepSlaveProcessor:" << name_ << "] run() called" << std::endl;
   if (running_.compare_exchange_strong(const_cast<int32_t &>(IDLE), RUNNING)) {
-    std::cout << "[TwoStepSlaveProcessor:" << name_ << "] Starting, clearing alert" << std::endl;
     auto *barrier = static_cast<disruptor::ProcessingSequenceBarrier<
         disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT> *>(
         sequenceBarrier_);
@@ -81,47 +79,52 @@ void TwoStepSlaveProcessor<WaitStrategyT>::run() {
   }
 
   nextSequence_ = sequence_.get() + 1L;
-  std::cout << "[TwoStepSlaveProcessor:" << name_ << "] Initial nextSequence_=" << nextSequence_ << std::endl;
-}
-
-template <typename WaitStrategyT>
-void TwoStepSlaveProcessor<WaitStrategyT>::SetNextSequence(
-    int64_t nextSequence) {
-  std::cout << "[TwoStepSlaveProcessor:" << name_ << "] SetNextSequence(" << nextSequence << ")" << std::endl;
-  nextSequence_ = nextSequence;
-  HandlingCycle(nextSequence);
+  std::lock_guard<std::mutex> lock(processors::log_mutex);
+  std::cout << "[TwoStepSlaveProcessor:" << name_ << "] run() completed, "
+            << "nextSequence_=" << nextSequence_ << std::endl;
 }
 
 template <typename WaitStrategyT>
 void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
     int64_t processUpToSequence) {
-  std::cout << "[TwoStepSlaveProcessor:" << name_ << "] HandlingCycle(" << processUpToSequence << "), nextSequence_=" << nextSequence_ << std::endl;
+  {
+    std::lock_guard<std::mutex> lock(processors::log_mutex);
+    std::cout << "[TwoStepSlaveProcessor:" << name_ << "] HandlingCycle("
+              << processUpToSequence
+              << ") called, nextSequence_=" << nextSequence_ << std::endl;
+  }
   while (true) {
     common::cmd::OrderCommand *event = nullptr;
     try {
       auto *ringBuffer = static_cast<disruptor::MultiProducerRingBuffer<
           common::cmd::OrderCommand, WaitStrategyT> *>(ringBuffer_);
 
-      std::cout << "[TwoStepSlaveProcessor:" << name_ << "] TryWaitFor(" << nextSequence_ << ")" << std::endl;
       int64_t availableSequence =
           waitSpinningHelper_->TryWaitFor(nextSequence_);
-      std::cout << "[TwoStepSlaveProcessor:" << name_ << "] TryWaitFor returned " << availableSequence << std::endl;
 
       // process batch
-      if (nextSequence_ <= availableSequence && nextSequence_ < processUpToSequence) {
-        std::cout << "[TwoStepSlaveProcessor:" << name_ << "] Processing sequences " << nextSequence_ << " to " << std::min(availableSequence, processUpToSequence - 1) << std::endl;
-      }
       while (nextSequence_ <= availableSequence &&
              nextSequence_ < processUpToSequence) {
         event = &ringBuffer->get(nextSequence_);
-        std::cout << "[TwoStepSlaveProcessor:" << name_ << "] Processing seq=" << nextSequence_ << ", cmd=" << static_cast<int>(event->command) << std::endl;
+        {
+          std::lock_guard<std::mutex> lock(processors::log_mutex);
+          std::cout << "[TwoStepSlaveProcessor:" << name_
+                    << "] Processing seq=" << nextSequence_ << std::endl;
+        }
         eventHandler_->OnEvent(nextSequence_, event);
-        std::cout << "[TwoStepSlaveProcessor:" << name_ << "] OnEvent completed" << std::endl;
         nextSequence_++;
       }
 
       // exit if finished processing entire group (up to specified sequence)
       if (nextSequence_ == processUpToSequence) {
+        {
+          std::lock_guard<std::mutex> lock(processors::log_mutex);
+          std::cout << "[TwoStepSlaveProcessor:" << name_
+                    << "] HandlingCycle completed, nextSequence_="
+                    << nextSequence_
+                    << ", processUpToSequence=" << processUpToSequence
+                    << std::endl;
+        }
         sequence_.set(processUpToSequence - 1);
         waitSpinningHelper_->SignalAllWhenBlocking();
         return;

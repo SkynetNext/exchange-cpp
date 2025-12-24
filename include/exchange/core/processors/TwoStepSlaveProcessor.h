@@ -35,7 +35,8 @@ namespace processors {
  * TwoStepSlaveProcessor - two-step processor (slave step)
  * Implements EventProcessor interface (matches Java version)
  */
-template <typename WaitStrategyT> class TwoStepSlaveProcessor : public disruptor::EventProcessor {
+template <typename WaitStrategyT>
+class TwoStepSlaveProcessor : public disruptor::EventProcessor {
 public:
   TwoStepSlaveProcessor(
       disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand,
@@ -54,9 +55,12 @@ public:
   void run() override;
 
   /**
-   * Set next sequence to process (called by master)
+   * Handling cycle (matches Java public handlingCycle method)
+   * Called by master processor to trigger slave processing
+   * In Java, handlingCycle uses member variable nextSequence (set in run()).
+   * The parameter processUpToSequence is the upper bound for processing.
    */
-  void SetNextSequence(int64_t nextSequence);
+  void HandlingCycle(int64_t processUpToSequence);
 
 private:
   static constexpr int32_t IDLE = 0;
@@ -71,11 +75,10 @@ private:
   SimpleEventHandler *eventHandler_;
   DisruptorExceptionHandler<common::cmd::OrderCommand> *exceptionHandler_;
   std::string name_;
-  disruptor::Sequence sequence_;  // Changed from pointer to value (matches Java)
+  disruptor::Sequence sequence_; // Changed from pointer to value (matches Java)
   int64_t nextSequence_;
 
   void ProcessEvents();
-  void HandlingCycle(int64_t processUpToSequence);
 };
 
 } // namespace processors

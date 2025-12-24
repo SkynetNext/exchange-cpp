@@ -17,14 +17,25 @@
 #pragma once
 
 #include "../common/CoreWaitStrategy.h"
+#include <condition_variable>
 #include <cstdint>
 #include <disruptor/BlockingWaitStrategy.h>
 #include <disruptor/MultiProducerSequencer.h>
 #include <disruptor/ProcessingSequenceBarrier.h>
 #include <disruptor/RingBuffer.h>
-#include <condition_variable>
 #include <mutex>
-#include <type_traits>
+#include <string>
+
+namespace exchange {
+namespace core {
+namespace processors {
+
+// Thread-safe logging mutex for all processors
+extern std::mutex log_mutex;
+
+} // namespace processors
+} // namespace core
+} // namespace exchange
 
 namespace exchange {
 namespace core {
@@ -40,7 +51,8 @@ public:
       disruptor::ProcessingSequenceBarrier<
           disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT>
           *sequenceBarrier,
-      int32_t spinLimit, common::CoreWaitStrategy waitStrategy);
+      int32_t spinLimit, common::CoreWaitStrategy waitStrategy,
+      const std::string &name = "");
 
   /**
    * Try to wait for sequence, with spinning and potentially blocking
@@ -65,6 +77,9 @@ private:
   disruptor::BlockingWaitStrategy *blockingWaitStrategy_;
   std::mutex *lock_;
   std::condition_variable *processorNotifyCondition_;
+
+  // Name for logging purposes
+  std::string name_;
 };
 
 } // namespace processors

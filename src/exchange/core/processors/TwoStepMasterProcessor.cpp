@@ -24,6 +24,7 @@
 #include <exchange/core/processors/TwoStepSlaveProcessor.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
 #include <iostream>
+#include <mutex>
 #include <thread>
 
 namespace exchange {
@@ -44,11 +45,10 @@ TwoStepMasterProcessor<WaitStrategyT>::TwoStepMasterProcessor(
       sequenceBarrier_(sequenceBarrier),
       waitSpinningHelper_(
           new WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>(
-              ringBuffer, sequenceBarrier, MASTER_SPIN_LIMIT,
-              coreWaitStrategy)),
+              ringBuffer, sequenceBarrier, MASTER_SPIN_LIMIT, coreWaitStrategy,
+              name)),
       eventHandler_(eventHandler), exceptionHandler_(exceptionHandler),
-      name_(name),
-      sequence_(disruptor::Sequence::INITIAL_VALUE),
+      name_(name), sequence_(disruptor::Sequence::INITIAL_VALUE),
       slaveProcessor_(nullptr) {}
 
 template <typename WaitStrategyT>
@@ -73,9 +73,7 @@ bool TwoStepMasterProcessor<WaitStrategyT>::isRunning() {
 
 template <typename WaitStrategyT>
 void TwoStepMasterProcessor<WaitStrategyT>::run() {
-  std::cout << "[TwoStepMasterProcessor:" << name_ << "] run() called" << std::endl;
   if (running_.compare_exchange_strong(const_cast<int32_t &>(IDLE), RUNNING)) {
-    std::cout << "[TwoStepMasterProcessor:" << name_ << "] Starting, clearing alert" << std::endl;
     auto *barrier = static_cast<disruptor::ProcessingSequenceBarrier<
         disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT> *>(
         sequenceBarrier_);
@@ -86,13 +84,9 @@ void TwoStepMasterProcessor<WaitStrategyT>::run() {
         ProcessEvents();
       }
     } catch (...) {
-      std::cout << "[TwoStepMasterProcessor:" << name_ << "] Exception in ProcessEvents" << std::endl;
       // Handle exception
     }
     running_.store(IDLE);
-    std::cout << "[TwoStepMasterProcessor:" << name_ << "] Exiting run()" << std::endl;
-  } else {
-    std::cout << "[TwoStepMasterProcessor:" << name_ << "] Already running, skipping" << std::endl;
   }
 }
 
@@ -104,20 +98,21 @@ void TwoStepMasterProcessor<WaitStrategyT>::SetSlaveProcessor(
 
 template <typename WaitStrategyT>
 void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
-  // Set thread name (simplified for C++)
-  // std::thread::current_thread().set_name("Thread-" + name_);
-  std::cout << "[TwoStepMasterProcessor:" << name_ << "] ProcessEvents() started" << std::endl;
-
   int64_t nextSequence = sequence_.get() + 1L;
   int64_t currentSequenceGroup = 0;
-  std::cout << "[TwoStepMasterProcessor:" << name_ << "] Starting from sequence " << nextSequence << ", current sequence_=" << sequence_.get() << std::endl;
+
+  {
+    std::lock_guard<std::mutex> lock(processors::log_mutex);
+    std::cout << "[TwoStepMasterProcessor:" << name_
+              << "] ProcessEvents() "
+                 "started, nextSequence="
+              << nextSequence << std::endl;
+  }
 
   // wait until slave processor has instructed to run
   while (slaveProcessor_ != nullptr && !slaveProcessor_->isRunning()) {
-    std::cout << "[TwoStepMasterProcessor:" << name_ << "] Waiting for slave processor to start..." << std::endl;
     std::this_thread::yield();
   }
-  std::cout << "[TwoStepMasterProcessor:" << name_ << "] Slave processor started, entering main loop" << std::endl;
 
   while (true) {
     common::cmd::OrderCommand *cmd = nullptr;
@@ -126,28 +121,45 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           common::cmd::OrderCommand, WaitStrategyT> *>(ringBuffer_);
 
       // should spin and also check another barrier
-      std::cout << "[TwoStepMasterProcessor:" << name_ << "] TryWaitFor(" << nextSequence << "), current sequence_=" << sequence_.get() << std::endl;
       int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
-      std::cout << "[TwoStepMasterProcessor:" << name_ << "] TryWaitFor returned " << availableSequence << ", nextSequence=" << nextSequence << std::endl;
+
+      {
+        std::lock_guard<std::mutex> lock(processors::log_mutex);
+        std::cout << "[TwoStepMasterProcessor:" << name_
+                  << "] TryWaitFor returned availableSequence="
+                  << availableSequence << ", nextSequence=" << nextSequence
+                  << std::endl;
+      }
 
       if (nextSequence <= availableSequence) {
-        std::cout << "[TwoStepMasterProcessor:" << name_ << "] Condition check: nextSequence(" << nextSequence << ") <= availableSequence(" << availableSequence << ") = TRUE" << std::endl;
-        std::cout << "[TwoStepMasterProcessor:" << name_ << "] Processing sequences " << nextSequence << " to " << availableSequence << std::endl;
         while (nextSequence <= availableSequence) {
           cmd = &ringBuffer->get(nextSequence);
-          std::cout << "[TwoStepMasterProcessor:" << name_ << "] Processing seq=" << nextSequence << ", cmd=" << static_cast<int>(cmd->command) << ", group=" << cmd->eventsGroup << std::endl;
+
+          {
+            std::lock_guard<std::mutex> lock(processors::log_mutex);
+            std::cout << "[TwoStepMasterProcessor:" << name_
+                      << "] Processing seq=" << nextSequence
+                      << ", cmd=" << static_cast<int>(cmd->command)
+                      << ", eventsGroup=" << cmd->eventsGroup
+                      << ", currentSequenceGroup=" << currentSequenceGroup
+                      << std::endl;
+          }
 
           // switch to next group - let slave processor start doing its handling
           // cycle
           if (cmd->eventsGroup != currentSequenceGroup) {
-            if (slaveProcessor_ != nullptr) {
-              slaveProcessor_->SetNextSequence(nextSequence);
+            {
+              std::lock_guard<std::mutex> lock(processors::log_mutex);
+              std::cout << "[TwoStepMasterProcessor:" << name_
+                        << "] Switching group, calling "
+                           "PublishProgressAndTriggerSlaveProcessor("
+                        << nextSequence << ")" << std::endl;
             }
+            PublishProgressAndTriggerSlaveProcessor(nextSequence);
             currentSequenceGroup = cmd->eventsGroup;
           }
 
           bool forcedPublish = eventHandler_->OnEvent(nextSequence, cmd);
-          std::cout << "[TwoStepMasterProcessor:" << name_ << "] OnEvent completed, forcedPublish=" << forcedPublish << std::endl;
           nextSequence++;
 
           if (forcedPublish) {
@@ -156,22 +168,50 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           }
 
           if (cmd->command == common::cmd::OrderCommandType::SHUTDOWN_SIGNAL) {
+            {
+              std::lock_guard<std::mutex> lock(processors::log_mutex);
+              std::cout << "[TwoStepMasterProcessor:" << name_
+                        << "] SHUTDOWN_SIGNAL detected, calling "
+                           "PublishProgressAndTriggerSlaveProcessor("
+                        << nextSequence << ")" << std::endl;
+            }
             // having all sequences aligned with the ringbuffer cursor is a
             // requirement for proper shutdown let following processors to catch
             // up
-            if (slaveProcessor_ != nullptr) {
-              slaveProcessor_->SetNextSequence(nextSequence);
-            }
+            PublishProgressAndTriggerSlaveProcessor(nextSequence);
           }
         }
         sequence_.set(availableSequence);
-        std::cout << "[TwoStepMasterProcessor:" << name_ << "] Updated sequence to " << availableSequence << ", sequence_.get()=" << sequence_.get() << std::endl;
         waitSpinningHelper_->SignalAllWhenBlocking();
+        {
+          std::lock_guard<std::mutex> lock(processors::log_mutex);
+          std::cout << "[TwoStepMasterProcessor:" << name_
+                    << "] Finished processing batch, sequence set to "
+                    << availableSequence << ", nextSequence=" << nextSequence
+                    << ", continuing loop..." << std::endl;
+        }
       } else {
-        std::cout << "[TwoStepMasterProcessor:" << name_ << "] No events available, nextSequence=" << nextSequence << ", availableSequence=" << availableSequence << std::endl;
+        {
+          std::lock_guard<std::mutex> lock(processors::log_mutex);
+          std::cout << "[TwoStepMasterProcessor:" << name_ << "] nextSequence("
+                    << nextSequence << ") > availableSequence("
+                    << availableSequence << "), waiting..." << std::endl;
+        }
       }
     } catch (const disruptor::AlertException &ex) {
+      {
+        std::lock_guard<std::mutex> lock(processors::log_mutex);
+        std::cout << "[TwoStepMasterProcessor:" << name_
+                  << "] AlertException caught, running_=" << running_.load()
+                  << std::endl;
+      }
       if (running_.load() != RUNNING) {
+        {
+          std::lock_guard<std::mutex> lock(processors::log_mutex);
+          std::cout << "[TwoStepMasterProcessor:" << name_
+                    << "] Exiting ProcessEvents() due to AlertException"
+                    << std::endl;
+        }
         break;
       }
     } catch (const std::exception &ex) {
@@ -190,6 +230,28 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;
     }
+  }
+}
+
+template <typename WaitStrategyT>
+void TwoStepMasterProcessor<WaitStrategyT>::
+    PublishProgressAndTriggerSlaveProcessor(int64_t nextSequence) {
+  {
+    std::lock_guard<std::mutex> lock(processors::log_mutex);
+    std::cout << "[TwoStepMasterProcessor:" << name_
+              << "] PublishProgressAndTriggerSlaveProcessor(" << nextSequence
+              << "): setting sequence to " << (nextSequence - 1) << std::endl;
+  }
+  sequence_.set(nextSequence - 1);
+  waitSpinningHelper_->SignalAllWhenBlocking();
+  if (slaveProcessor_ != nullptr) {
+    {
+      std::lock_guard<std::mutex> lock(processors::log_mutex);
+      std::cout << "[TwoStepMasterProcessor:" << name_
+                << "] Calling slaveProcessor_->HandlingCycle(" << nextSequence
+                << ")" << std::endl;
+    }
+    slaveProcessor_->HandlingCycle(nextSequence);
   }
 }
 

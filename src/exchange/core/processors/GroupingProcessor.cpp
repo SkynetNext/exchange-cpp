@@ -53,7 +53,8 @@ GroupingProcessor::GroupingProcessor(
   // Create WaitSpinningHelper
   waitSpinningHelper_ =
       new WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>(
-          ringBuffer, sequenceBarrier, GROUP_SPIN_LIMIT, coreWaitStrategy);
+          ringBuffer, sequenceBarrier, GROUP_SPIN_LIMIT, coreWaitStrategy,
+          "GroupingProcessor");
 }
 
 disruptor::Sequence &GroupingProcessor::getSequence() { return sequence_; }
@@ -236,7 +237,13 @@ void GroupingProcessor::ProcessEvents() {
       }
 
     } catch (const disruptor::AlertException &ex) {
+      std::lock_guard<std::mutex> lock(processors::log_mutex);
+      std::cout << "[GroupingProcessor] AlertException caught, running_="
+                << running_.load() << std::endl;
       if (running_.load() != RUNNING) {
+        std::cout << "[GroupingProcessor] Exiting ProcessEvents() due to "
+                     "AlertException"
+                  << std::endl;
         break;
       }
     } catch (...) {

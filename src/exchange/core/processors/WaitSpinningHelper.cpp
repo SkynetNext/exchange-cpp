@@ -29,29 +29,40 @@ namespace exchange {
 namespace core {
 namespace processors {
 
+// Thread-safe logging mutex for all processors
+std::mutex log_mutex;
+
 template <typename T, typename WaitStrategyT>
 WaitSpinningHelper<T, WaitStrategyT>::WaitSpinningHelper(
     disruptor::MultiProducerRingBuffer<T, WaitStrategyT> *ringBuffer,
     disruptor::ProcessingSequenceBarrier<
         disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT>
         *sequenceBarrier,
-    int32_t spinLimit, common::CoreWaitStrategy waitStrategy)
+    int32_t spinLimit, common::CoreWaitStrategy waitStrategy,
+    const std::string &name)
     : sequenceBarrier_(sequenceBarrier),
       sequencer_(&ringBuffer->getSequencer()), spinLimit_(spinLimit),
       yieldLimit_(ShouldYield(waitStrategy) ? spinLimit / 2 : 0),
       block_(ShouldBlock(waitStrategy)), blockingWaitStrategy_(nullptr),
-      lock_(nullptr), processorNotifyCondition_(nullptr) {
-  // Matches Java: extract blocking wait strategy, lock, and condition variable if blocking mode
+      lock_(nullptr), processorNotifyCondition_(nullptr), name_(name) {
+  // Matches Java: extract blocking wait strategy, lock, and condition variable
+  // if blocking mode
   if (block_) {
-    // Extract waitStrategy from sequencer (matches Java: ReflectionUtils.extractField(AbstractSequencer.class, sequencer, "waitStrategy"))
+    // Extract waitStrategy from sequencer (matches Java:
+    // ReflectionUtils.extractField(AbstractSequencer.class, sequencer,
+    // "waitStrategy"))
     auto &waitStrategy = sequencer_->getWaitStrategy();
-    
+
     // Check if WaitStrategyT is BlockingWaitStrategy
-    if constexpr (std::is_same_v<WaitStrategyT, disruptor::BlockingWaitStrategy>) {
-      blockingWaitStrategy_ = &const_cast<disruptor::BlockingWaitStrategy &>(waitStrategy);
-      // Extract lock and condition variable (matches Java: ReflectionUtils.extractField(...))
+    if constexpr (std::is_same_v<WaitStrategyT,
+                                 disruptor::BlockingWaitStrategy>) {
+      blockingWaitStrategy_ =
+          &const_cast<disruptor::BlockingWaitStrategy &>(waitStrategy);
+      // Extract lock and condition variable (matches Java:
+      // ReflectionUtils.extractField(...))
       lock_ = &blockingWaitStrategy_->getMutex();
-      processorNotifyCondition_ = &blockingWaitStrategy_->getConditionVariable();
+      processorNotifyCondition_ =
+          &blockingWaitStrategy_->getConditionVariable();
     }
   }
 }
@@ -62,17 +73,28 @@ int64_t WaitSpinningHelper<T, WaitStrategyT>::TryWaitFor(int64_t seq) {
 
   int64_t spin = spinLimit_;
   int64_t availableSequence;
-  
+
   // Matches Java: use getCursor() + spin, then blocking if needed
   int64_t initialCursor = sequenceBarrier_->getCursor();
   if (initialCursor < seq && spin > 0) {
-    std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq << "): cursor=" << initialCursor << ", spinning... (barrier cursor)" << std::endl;
+    std::lock_guard<std::mutex> lock(log_mutex);
+    if (!name_.empty()) {
+      std::cout << "[WaitSpinningHelper:" << name_ << "] TryWaitFor(" << seq
+                << "): cursor=" << initialCursor
+                << ", spinning... (barrier cursor)" << std::endl;
+    } else {
+      std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq
+                << "): cursor=" << initialCursor
+                << ", spinning... (barrier cursor)" << std::endl;
+    }
   }
-  while ((availableSequence = sequenceBarrier_->getCursor()) < seq && spin > 0) {
+  while ((availableSequence = sequenceBarrier_->getCursor()) < seq &&
+         spin > 0) {
     if (spin < yieldLimit_ && spin > 1) {
       std::this_thread::yield();
     } else if (block_ && lock_ && processorNotifyCondition_) {
-      // Matches Java: lock.lock(); try { ... processorNotifyCondition.await(); } finally { lock.unlock(); }
+      // Matches Java: lock.lock(); try { ... processorNotifyCondition.await();
+      // } finally { lock.unlock(); }
       std::unique_lock<std::mutex> uniqueLock(*lock_);
       try {
         sequenceBarrier_->checkAlert();
@@ -90,31 +112,55 @@ int64_t WaitSpinningHelper<T, WaitStrategyT>::TryWaitFor(int64_t seq) {
   }
 
   // Use sequencer to get highest published sequence if available
-  // Matches Java: return (availableSequence < seq) ? availableSequence : sequencer.getHighestPublishedSequence(seq, availableSequence);
+  // Matches Java: return (availableSequence < seq) ? availableSequence :
+  // sequencer.getHighestPublishedSequence(seq, availableSequence);
   if (availableSequence < seq) {
-    std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq << "): returning " << availableSequence << " (not available yet)" << std::endl;
+    std::lock_guard<std::mutex> lock(log_mutex);
+    if (!name_.empty()) {
+      std::cout << "[WaitSpinningHelper:" << name_ << "] TryWaitFor(" << seq
+                << "): returning " << availableSequence
+                << " (not available yet)" << std::endl;
+    } else {
+      std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq << "): returning "
+                << availableSequence << " (not available yet)" << std::endl;
+    }
     return availableSequence;
   }
-  
+
   int64_t result;
   if (sequencer_) {
     result = sequencer_->getHighestPublishedSequence(seq, availableSequence);
-    std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq << "): sequencer returned " << result << std::endl;
+    std::lock_guard<std::mutex> lock(log_mutex);
+    if (!name_.empty()) {
+      std::cout << "[WaitSpinningHelper:" << name_ << "] TryWaitFor(" << seq
+                << "): sequencer returned " << result << std::endl;
+    } else {
+      std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq
+                << "): sequencer returned " << result << std::endl;
+    }
     return result;
   }
 
-  std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq << "): returning " << availableSequence << " (no sequencer)" << std::endl;
+  std::lock_guard<std::mutex> lock(log_mutex);
+  if (!name_.empty()) {
+    std::cout << "[WaitSpinningHelper:" << name_ << "] TryWaitFor(" << seq
+              << "): returning " << availableSequence << " (no sequencer)"
+              << std::endl;
+  } else {
+    std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq << "): returning "
+              << availableSequence << " (no sequencer)" << std::endl;
+  }
   return availableSequence;
 }
 
 template <typename T, typename WaitStrategyT>
 void WaitSpinningHelper<T, WaitStrategyT>::SignalAllWhenBlocking() {
-  // Matches Java: if (block) { blockingDisruptorWaitStrategy.signalAllWhenBlocking(); }
+  // Matches Java: if (block) {
+  // blockingDisruptorWaitStrategy.signalAllWhenBlocking(); }
   if (block_ && blockingWaitStrategy_) {
     blockingWaitStrategy_->signalAllWhenBlocking();
   }
 }
-
 
 // Explicit template instantiations for common types
 template class WaitSpinningHelper<common::cmd::OrderCommand,
