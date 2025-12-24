@@ -174,12 +174,35 @@ public:
     api_ = std::make_unique<ExchangeApi<WaitStrategyT>>(&ringBuffer);
 
     // 6. Exception Handler
+    // Match Java behavior: publish SHUTDOWN_SIGNAL and call shutdown()
+    // Now that halt() matches Java (doesn't join threads), this won't deadlock
     exceptionHandler_ = std::make_unique<
         processors::DisruptorExceptionHandler<common::cmd::OrderCommand>>(
         "main", [this, &ringBuffer](const std::exception &ex, int64_t seq) {
+          {
+            std::lock_guard<std::mutex> lock(processors::log_mutex);
+            std::cout << "[ExceptionHandler] Handling exception: " << ex.what()
+                      << ", seq=" << seq << std::endl;
+            std::cout << "[ExceptionHandler] Publishing SHUTDOWN_SIGNAL"
+                      << std::endl;
+            std::cout.flush();
+          }
           static ShutdownSignalTranslator shutdownTranslator;
           ringBuffer.publishEvent(shutdownTranslator);
+          {
+            std::lock_guard<std::mutex> lock(processors::log_mutex);
+            std::cout << "[ExceptionHandler] SHUTDOWN_SIGNAL published, "
+                         "calling disruptor_->shutdown()"
+                      << std::endl;
+            std::cout.flush();
+          }
           disruptor_->shutdown();
+          {
+            std::lock_guard<std::mutex> lock(processors::log_mutex);
+            std::cout << "[ExceptionHandler] disruptor_->shutdown() completed"
+                      << std::endl;
+            std::cout.flush();
+          }
         });
 
     // 7. Pipeline Construction
