@@ -152,6 +152,27 @@ void OrderBookDirectImpl::NewOrder(OrderCommand *cmd) {
     }
     break;
   }
+  case OrderType::FOK_BUDGET: {
+    const int64_t budget = this->checkBudgetToFill(cmd->action, cmd->size);
+    if (this->isBudgetLimitSatisfied(cmd->action, budget, cmd->price)) {
+      // Create temporary DirectOrder for matching
+      DirectOrder tempOrder;
+      tempOrder.orderId = cmd->orderId;
+      tempOrder.price = cmd->price;
+      tempOrder.size = cmd->size;
+      tempOrder.filled = 0;
+      tempOrder.action = cmd->action;
+      tempOrder.uid = cmd->uid;
+      tempOrder.timestamp = cmd->timestamp;
+      tempOrder.next = nullptr;
+      tempOrder.prev = nullptr;
+      tempOrder.bucket = nullptr;
+      this->tryMatchInstantly(&tempOrder, cmd);
+    } else {
+      eventsHelper_->AttachRejectEvent(cmd, cmd->size);
+    }
+    break;
+  }
   default:
     eventsHelper_->AttachRejectEvent(cmd, cmd->size);
   }
@@ -249,7 +270,12 @@ CommandResultCode OrderBookDirectImpl::ReduceOrder(OrderCommand *cmd) {
 int64_t OrderBookDirectImpl::tryMatchInstantly(common::IOrder *takerOrder,
                                                OrderCommand *triggerCmd) {
   const bool isBidAction = takerOrder->GetAction() == OrderAction::BID;
-  const int64_t limitPrice = takerOrder->GetPrice();
+  // For FOK_BUDGET ASK orders, use 0 as limitPrice to match all available bids
+  const int64_t limitPrice =
+      (triggerCmd->command == common::cmd::OrderCommandType::PLACE_ORDER &&
+       triggerCmd->orderType == common::OrderType::FOK_BUDGET && !isBidAction)
+          ? 0L
+          : takerOrder->GetPrice();
 
   DirectOrder *makerOrder;
   if (isBidAction) {
@@ -271,6 +297,8 @@ int64_t OrderBookDirectImpl::tryMatchInstantly(common::IOrder *takerOrder,
   DirectOrder *priceBucketTail = makerOrder->bucket->lastOrder;
   MatcherTradeEvent *eventsTail = nullptr;
 
+  const int64_t takerReserveBidPrice = takerOrder->GetReserveBidPrice();
+
   do {
     const int64_t tradeSize =
         std::min(remainingSize, makerOrder->size - makerOrder->filled);
@@ -283,8 +311,11 @@ int64_t OrderBookDirectImpl::tryMatchInstantly(common::IOrder *takerOrder,
       makerOrder->bucket->numOrders--;
     }
 
+    const int64_t bidderHoldPrice =
+        isBidAction ? takerReserveBidPrice : makerOrder->reserveBidPrice;
     MatcherTradeEvent *tradeEvent = eventsHelper_->SendTradeEvent(
-        makerOrder, makerCompleted, remainingSize == 0, tradeSize, 0);
+        makerOrder, makerCompleted, remainingSize == 0, tradeSize,
+        bidderHoldPrice);
 
     if (eventsTail == nullptr) {
       triggerCmd->matcherEvent = tradeEvent;
@@ -526,13 +557,14 @@ OrderBookImplType OrderBookDirectImpl::GetImplementationType() const {
 }
 
 // Helper function to collect orders from a linked list
+// Note: Java OrdersSpliterator uses prev pointer, not next
 static void
 CollectOrders(OrderBookDirectImpl::DirectOrder *startOrder,
               std::vector<OrderBookDirectImpl::DirectOrder *> &orders) {
   OrderBookDirectImpl::DirectOrder *current = startOrder;
   while (current != nullptr) {
     orders.push_back(current);
-    current = current->next;
+    current = current->prev;
   }
 }
 
@@ -661,6 +693,40 @@ int32_t OrderBookDirectImpl::GetStateHash() const {
   }
 
   return result;
+}
+
+int64_t OrderBookDirectImpl::checkBudgetToFill(common::OrderAction action,
+                                               int64_t size) {
+  DirectOrder *makerOrder =
+      (action == OrderAction::BID) ? bestAskOrder_ : bestBidOrder_;
+
+  int64_t budget = 0L;
+
+  // iterate through all orders
+  while (makerOrder != nullptr) {
+    const Bucket *bucket = makerOrder->bucket;
+
+    const int64_t availableSize = bucket->totalVolume;
+    const int64_t price = makerOrder->price;
+
+    if (size > availableSize) {
+      size -= availableSize;
+      budget += availableSize * price;
+    } else {
+      return budget + size * price;
+    }
+
+    // switch to next order (can be null)
+    makerOrder = bucket->lastOrder->prev;
+  }
+  return INT64_MAX;
+}
+
+bool OrderBookDirectImpl::isBudgetLimitSatisfied(
+    common::OrderAction orderAction, int64_t calculated, int64_t limit) {
+  return calculated != INT64_MAX &&
+         (calculated == limit ||
+          (orderAction == OrderAction::BID ^ calculated > limit));
 }
 
 } // namespace orderbook

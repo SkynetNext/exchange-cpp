@@ -158,6 +158,9 @@ private:
   void insertOrder(DirectOrder *order, Bucket *freeBucket);
   int64_t tryMatchInstantly(common::IOrder *takerOrder,
                             common::cmd::OrderCommand *triggerCmd);
+  int64_t checkBudgetToFill(common::OrderAction action, int64_t size);
+  bool isBudgetLimitSatisfied(common::OrderAction orderAction,
+                              int64_t calculated, int64_t limit);
 };
 
 } // namespace orderbook

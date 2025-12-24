@@ -119,7 +119,23 @@ void OrderBookNaiveImpl::NewOrderMatchIoc(common::cmd::OrderCommand *cmd) {
 void OrderBookNaiveImpl::NewOrderMatchFokBudget(
     common::cmd::OrderCommand *cmd) {
   int64_t size = cmd->size;
-  auto matchingRange = GetMatchingRange(cmd->action, cmd->price);
+  // For FOK_BUDGET orders, cmd->price is the budget/expectation, not a price
+  // limit. So we need to get all matching buckets to check total liquidity.
+  // Directly use all buckets like Java version does
+  MatchingRange matchingRange;
+  if (cmd->action == common::OrderAction::ASK) {
+    auto begin = bidBuckets_.begin();
+    auto end = bidBuckets_.end();
+    auto shouldContinue = [](int64_t) { return true; };
+    auto eraseFunc = [this](int64_t p) { bidBuckets_.erase(p); };
+    matchingRange = MatchingRange(begin, end, shouldContinue, eraseFunc);
+  } else {
+    auto begin = askBuckets_.begin();
+    auto end = askBuckets_.end();
+    auto shouldContinue = [](int64_t) { return true; };
+    auto eraseFunc = [this](int64_t p) { askBuckets_.erase(p); };
+    matchingRange = MatchingRange(begin, end, shouldContinue, eraseFunc);
+  }
 
   int64_t budget = 0;
   if (!CheckBudgetToFill(size, matchingRange, &budget)) {
@@ -202,12 +218,14 @@ int64_t OrderBookNaiveImpl::TryMatchInstantly(
     filled += bucketMatchings.volume;
 
     // Attach event chain
-    if (eventsTail == nullptr) {
-      triggerCmd->matcherEvent = bucketMatchings.eventsChainHead;
-    } else {
-      eventsTail->nextEvent = bucketMatchings.eventsChainHead;
+    if (bucketMatchings.eventsChainHead != nullptr) {
+      if (eventsTail == nullptr) {
+        triggerCmd->matcherEvent = bucketMatchings.eventsChainHead;
+      } else {
+        eventsTail->nextEvent = bucketMatchings.eventsChainHead;
+      }
+      eventsTail = bucketMatchings.eventsChainTail;
     }
-    eventsTail = bucketMatchings.eventsChainTail;
 
     // Mark empty buckets for removal
     if (bucket->GetTotalVolume() == 0) {
@@ -514,17 +532,47 @@ int32_t OrderBookNaiveImpl::GetTotalBidBuckets(int32_t limit) {
 }
 
 int32_t OrderBookNaiveImpl::GetStateHash() const {
-  // Simple hash combining ask and bid buckets
-  int32_t hash = 0;
+  // Match Java IOrderBook.default stateHash() implementation:
+  // Objects.hash(
+  //     HashingUtils.stateHashStream(askOrdersStream(true)),
+  //     HashingUtils.stateHashStream(bidOrdersStream(true)),
+  //     getSymbolSpec().stateHash());
+
+  // Calculate hash for ask orders stream
+  int32_t askHash = 0;
   for (const auto &pair : askBuckets_) {
-    hash ^= static_cast<int32_t>(pair.first) ^
-            static_cast<int32_t>(pair.second->GetTotalVolume());
+    auto orders = pair.second->GetAllOrders();
+    for (const common::Order *order : orders) {
+      if (order != nullptr) {
+        askHash = askHash * 31 + order->GetStateHash();
+      }
+    }
   }
-  for (const auto &pair : bidBuckets_) {
-    hash ^= static_cast<int32_t>(pair.first) ^
-            static_cast<int32_t>(pair.second->GetTotalVolume());
+
+  // Calculate hash for bid orders stream
+  // Note: bidBuckets in Java uses Collections.reverseOrder(), so we need to
+  // iterate in reverse order (highest price first)
+  int32_t bidHash = 0;
+  for (auto it = bidBuckets_.rbegin(); it != bidBuckets_.rend(); ++it) {
+    auto orders = it->second->GetAllOrders();
+    for (const common::Order *order : orders) {
+      if (order != nullptr) {
+        bidHash = bidHash * 31 + order->GetStateHash();
+      }
+    }
   }
-  return hash;
+
+  // Combine using Objects.hash algorithm (31x multiplier)
+  int32_t result = 1;
+  result = result * 31 + askHash;
+  result = result * 31 + bidHash;
+  if (symbolSpec_ != nullptr) {
+    result = result * 31 + symbolSpec_->GetStateHash();
+  } else {
+    result = result * 31 + 0;
+  }
+
+  return result;
 }
 
 std::map<int64_t, std::unique_ptr<OrdersBucket>> *
