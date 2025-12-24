@@ -21,6 +21,7 @@
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <vector>
 
 namespace exchange {
@@ -247,6 +248,63 @@ public:
    */
   static std::vector<int64_t>
   BytesToLongArrayLz4(const std::vector<uint8_t> &bytes, int padding);
+
+  /**
+   * Convert bytes to long array with padding
+   * Match Java: SerializationUtils.bytesToLongArray()
+   *
+   * @param bytes Bytes to convert
+   * @param padding Padding for long array size (LONGS_PER_MESSAGE)
+   * @return Vector of int64_t containing the data
+   */
+  static std::vector<int64_t>
+  BytesToLongArray(const std::vector<uint8_t> &bytes, int padding);
+
+  /**
+   * Marshall generic map
+   * Match Java: SerializationUtils.marshallGenericMap()
+   */
+  template <typename K, typename V>
+  static void MarshallGenericMap(
+      const std::map<K, V> &map, common::BytesOut &bytes,
+      std::function<void(common::BytesOut &, const K &)> keyMarshaller,
+      std::function<void(common::BytesOut &, const V &)> valMarshaller) {
+    bytes.WriteInt(static_cast<int32_t>(map.size()));
+    for (const auto &pair : map) {
+      keyMarshaller(bytes, pair.first);
+      valMarshaller(bytes, pair.second);
+    }
+  }
+
+  /**
+   * Marshall nullable object
+   * Match Java: SerializationUtils.marshallNullable()
+   */
+  template <typename T>
+  static void MarshallNullable(
+      const T *object, common::BytesOut &bytes,
+      std::function<void(const T *, common::BytesOut &)> marshaller) {
+    bytes.WriteBoolean(object != nullptr);
+    if (object != nullptr) {
+      marshaller(object, bytes);
+    }
+  }
+
+  /**
+   * Marshall list
+   * Match Java: SerializationUtils.marshallList()
+   */
+  template <typename T>
+  static void
+  MarshallList(const std::vector<T *> &list, common::BytesOut &bytes,
+               std::function<void(T *, common::BytesOut &)> elementMarshaller) {
+    bytes.WriteInt(static_cast<int32_t>(list.size()));
+    for (T *element : list) {
+      if (element != nullptr) {
+        elementMarshaller(element, bytes);
+      }
+    }
+  }
 };
 
 } // namespace utils

@@ -194,6 +194,21 @@ SerializationUtils::BytesToLongArrayLz4(const std::vector<uint8_t> &bytes,
   return longArray;
 }
 
+std::vector<int64_t>
+SerializationUtils::BytesToLongArray(const std::vector<uint8_t> &bytes,
+                                     int padding) {
+  // Match Java: SerializationUtils.bytesToLongArray()
+  // Convert bytes to long array with padding
+  const int bytesSize = static_cast<int>(bytes.size());
+  const int longArraySize = RequiredLongArraySize(bytesSize, padding);
+  std::vector<int64_t> longArray(longArraySize, 0);
+
+  // Copy bytes to long array (little-endian)
+  std::memcpy(longArray.data(), bytes.data(), bytesSize);
+
+  return longArray;
+}
+
 } // namespace utils
 } // namespace core
 } // namespace exchange

@@ -58,6 +58,12 @@ public:
   // Attach a reject event to command
   void AttachRejectEvent(common::cmd::OrderCommand *cmd, int64_t rejectedSize);
 
+  // Create binary events chain from bytes
+  // Match Java: createBinaryEventsChain()
+  common::MatcherTradeEvent *CreateBinaryEventsChain(int64_t timestamp,
+                                                      int32_t section,
+                                                      const std::vector<uint8_t> &bytes);
+
   // Static instance for non-pooled events
   static OrderBookEventsHelper *NonPooledEventsHelper();
 

@@ -92,6 +92,9 @@ public:
 
   static std::unique_ptr<SingleUserReportResult>
   CreateFromRiskEngineNotFound(int64_t uid);
+
+  // Serialization method
+  void WriteMarshallable(BytesOut &bytes) const;
 };
 
 } // namespace reports

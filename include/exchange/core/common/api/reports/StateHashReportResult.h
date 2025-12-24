@@ -88,6 +88,9 @@ public:
       : hashCodes(hashCodes) {}
 
   int32_t GetStateHash() const;
+
+  // Serialization method
+  void WriteMarshallable(BytesOut &bytes) const;
 };
 
 } // namespace reports

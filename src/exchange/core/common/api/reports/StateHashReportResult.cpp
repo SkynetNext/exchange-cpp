@@ -17,6 +17,7 @@
 #include <exchange/core/common/BytesIn.h>
 #include <exchange/core/common/BytesOut.h>
 #include <exchange/core/common/api/reports/StateHashReportResult.h>
+#include <exchange/core/utils/SerializationUtils.h>
 
 namespace exchange {
 namespace core {
@@ -35,6 +36,17 @@ void StateHashReportResult::SubmoduleKey::WriteMarshallable(
     BytesOut &bytes) const {
   bytes.WriteInt(moduleId);
   bytes.WriteInt(static_cast<int32_t>(submodule));
+}
+
+void StateHashReportResult::WriteMarshallable(BytesOut &bytes) const {
+  // Match Java: SerializationUtils.marshallGenericMap(hashCodes, bytes, (b, k)
+  // -> k.writeMarshallable(b), BytesOut::writeInt) Directly implement to avoid
+  // lambda type inference issues
+  bytes.WriteInt(static_cast<int32_t>(hashCodes.size()));
+  for (const auto &pair : hashCodes) {
+    pair.first.WriteMarshallable(bytes);
+    bytes.WriteInt(pair.second);
+  }
 }
 
 } // namespace reports

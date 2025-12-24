@@ -20,6 +20,7 @@
 #include <exchange/core/common/PositionDirection.h>
 #include <exchange/core/common/UserStatus.h>
 #include <exchange/core/common/api/reports/SingleUserReportResult.h>
+#include <exchange/core/utils/SerializationUtils.h>
 
 namespace exchange {
 namespace core {
@@ -46,6 +47,51 @@ void SingleUserReportResult::Position::WriteMarshallable(
   bytes.WriteLong(profit);
   bytes.WriteLong(pendingSellSize);
   bytes.WriteLong(pendingBuySize);
+}
+
+void SingleUserReportResult::WriteMarshallable(BytesOut &bytes) const {
+  // Match Java: writeMarshallable()
+  bytes.WriteLong(uid);
+
+  // userStatus
+  bytes.WriteBoolean(userStatus != nullptr);
+  if (userStatus != nullptr) {
+    bytes.WriteByte(UserStatusToCode(*userStatus));
+  }
+
+  // accounts
+  bytes.WriteBoolean(accounts != nullptr);
+  if (accounts != nullptr) {
+    utils::SerializationUtils::MarshallIntLongHashMap(*accounts, bytes);
+  }
+
+  // positions
+  bytes.WriteBoolean(positions != nullptr);
+  if (positions != nullptr) {
+    bytes.WriteInt(static_cast<int32_t>(positions->size()));
+    for (const auto &pair : *positions) {
+      bytes.WriteInt(pair.first);
+      pair.second.WriteMarshallable(bytes);
+    }
+  }
+
+  // orders
+  bytes.WriteBoolean(orders != nullptr);
+  if (orders != nullptr) {
+    bytes.WriteInt(static_cast<int32_t>(orders->size()));
+    for (const auto &pair : *orders) {
+      bytes.WriteInt(pair.first);
+      bytes.WriteInt(static_cast<int32_t>(pair.second.size()));
+      for (Order *order : pair.second) {
+        if (order != nullptr) {
+          order->WriteMarshallable(bytes);
+        }
+      }
+    }
+  }
+
+  // queryExecutionStatus
+  bytes.WriteInt(static_cast<int32_t>(queryExecutionStatus));
 }
 
 } // namespace reports

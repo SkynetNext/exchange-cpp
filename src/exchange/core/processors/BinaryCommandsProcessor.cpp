@@ -16,7 +16,10 @@
 
 #include <cstring>
 #include <exchange/core/common/BytesIn.h>
+#include <exchange/core/common/BytesOut.h>
+#include <exchange/core/common/StateHash.h>
 #include <exchange/core/common/VectorBytesIn.h>
+#include <exchange/core/common/VectorBytesOut.h>
 #include <exchange/core/common/WriteBytesMarshallable.h>
 #include <exchange/core/common/api/binary/BinaryCommandType.h>
 #include <exchange/core/common/api/binary/BinaryDataCommandFactory.h>
@@ -34,6 +37,7 @@
 #include <exchange/core/processors/BinaryCommandsProcessor.h>
 #include <exchange/core/utils/HashingUtils.h>
 #include <exchange/core/utils/SerializationUtils.h>
+#include <exchange/core/utils/UnsafeUtils.h>
 #include <stdexcept>
 #include <vector>
 
@@ -42,7 +46,8 @@ namespace core {
 namespace processors {
 
 // TransferRecord - internal class for storing binary frame data
-class TransferRecord : public common::WriteBytesMarshallable {
+class TransferRecord : public common::WriteBytesMarshallable,
+                       public common::StateHash {
 public:
   std::vector<int64_t> dataArray;
   int wordsTransferred;
@@ -69,6 +74,18 @@ public:
   void WriteMarshallable(common::BytesOut &bytes) const override {
     bytes.WriteInt(wordsTransferred);
     utils::SerializationUtils::MarshallLongArray(dataArray, bytes);
+  }
+
+  int32_t GetStateHash() const override {
+    // Match Java: Objects.hash(Arrays.hashCode(dataArray), wordsTransfered)
+    std::size_t hash = 0;
+    // Hash the array
+    for (int i = 0; i < wordsTransferred; i++) {
+      hash = hash * 31 + std::hash<int64_t>{}(dataArray[i]);
+    }
+    // Hash wordsTransferred
+    hash = hash * 31 + std::hash<int>{}(wordsTransferred);
+    return static_cast<int32_t>(hash);
   }
 };
 
@@ -168,22 +185,24 @@ BinaryCommandsProcessor::AcceptBinaryFrame(common::cmd::OrderCommand *cmd) {
     common::VectorBytesIn bytesIn(decompressedBytes);
 
     if (cmd->command == common::cmd::OrderCommandType::BINARY_DATA_QUERY) {
-      // Handle report query
-      // Read class code and deserialize query
-      int32_t classCode = bytesIn.ReadInt();
-      common::api::reports::ReportType reportType =
-          common::api::reports::ReportTypeFromCode(classCode);
-
+      // Match Java:
+      // deserializeQuery(bytesIn).flatMap(reportQueriesHandler::handleReport).ifPresent(...)
       if (reportQueriesHandler_) {
-        // Use factory to create report query and handle based on type
+        // Read class code and deserialize query
+        int32_t classCode = bytesIn.ReadInt();
+        common::api::reports::ReportType reportType =
+            common::api::reports::ReportTypeFromCode(classCode);
+
+        // Use factory to create report query
         void *queryPtr =
             common::api::reports::ReportQueryFactory::getInstance().createQuery(
                 reportType, bytesIn);
+
         if (queryPtr != nullptr) {
           std::optional<std::unique_ptr<common::api::reports::ReportResult>>
               result;
 
-          // Cast to appropriate type and process
+          // Cast to appropriate type and process (flatMap equivalent)
           switch (reportType) {
           case common::api::reports::ReportType::STATE_HASH: {
             auto *query =
@@ -215,11 +234,50 @@ BinaryCommandsProcessor::AcceptBinaryFrame(common::cmd::OrderCommand *cmd) {
             break;
           }
 
-          // If result is available, create binary events chain
+          // ifPresent equivalent: if result is available, create binary events
+          // chain
           if (result.has_value() && eventsHelper_) {
             // Serialize result to bytes
-            // TODO: Implement eventsHelper_->CreateBinaryEventsChain
-            // For now, we'll need to check OrderBookEventsHelper interface
+            std::vector<uint8_t> serializedBytes;
+            serializedBytes.reserve(128);
+            common::VectorBytesOut bytesOut(serializedBytes);
+
+            // Serialize based on type
+            switch (reportType) {
+            case common::api::reports::ReportType::STATE_HASH: {
+              auto *stateHashResult =
+                  static_cast<common::api::reports::StateHashReportResult *>(
+                      result.value().get());
+              stateHashResult->WriteMarshallable(bytesOut);
+              break;
+            }
+            case common::api::reports::ReportType::SINGLE_USER_REPORT: {
+              auto *singleUserResult =
+                  static_cast<common::api::reports::SingleUserReportResult *>(
+                      result.value().get());
+              singleUserResult->WriteMarshallable(bytesOut);
+              break;
+            }
+            case common::api::reports::ReportType::TOTAL_CURRENCY_BALANCE: {
+              auto *totalCurrencyResult = static_cast<
+                  common::api::reports::TotalCurrencyBalanceReportResult *>(
+                  result.value().get());
+              totalCurrencyResult->WriteMarshallable(bytesOut);
+              break;
+            }
+            default:
+              break;
+            }
+
+            // Create binary events chain
+            common::MatcherTradeEvent *binaryEventsChain =
+                eventsHelper_->CreateBinaryEventsChain(cmd->timestamp, section_,
+                                                       serializedBytes);
+
+            // Append events to command using atomic operation
+            if (binaryEventsChain != nullptr) {
+              utils::UnsafeUtils::AppendEventsVolatile(cmd, binaryEventsChain);
+            }
           }
         }
       }
@@ -260,13 +318,21 @@ void BinaryCommandsProcessor::Reset() {
 }
 
 int32_t BinaryCommandsProcessor::GetStateHash() const {
-  // Calculate hash based on incoming data
-  // For now, use a simple hash of transfer IDs
-  std::size_t hash = 0;
+  // Match Java: HashingUtils.stateHash(incomingData)
+  // For each key-value pair: Objects.hash(k, v.stateHash())
+  // Sum all hashes, then return Long.hashCode(sum)
+  int64_t sum = 0;
   for (const auto &pair : incomingData_) {
-    hash ^= std::hash<int64_t>{}(pair.first) << 1;
+    int64_t k = pair.first;
+    TransferRecord *record = static_cast<TransferRecord *>(pair.second);
+    int32_t vHash = record ? record->GetStateHash() : 0;
+    // Objects.hash(k, vHash) equivalent
+    std::size_t pairHash = std::hash<int64_t>{}(k);
+    pairHash = pairHash * 31 + std::hash<int32_t>{}(vHash);
+    sum += static_cast<int64_t>(pairHash);
   }
-  return static_cast<int32_t>(hash);
+  // Long.hashCode(sum) equivalent
+  return static_cast<int32_t>(sum ^ (sum >> 32));
 }
 
 void BinaryCommandsProcessor::WriteMarshallable(common::BytesOut &bytes) const {

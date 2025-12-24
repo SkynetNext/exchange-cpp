@@ -19,11 +19,11 @@
 #include "ReportResult.h"
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
-#include <memory>
 
 namespace exchange {
 namespace core {
 namespace common {
+class BytesOut;
 namespace api {
 namespace reports {
 
@@ -51,15 +51,18 @@ public:
       ankerl::unordered_dense::map<int32_t, int64_t> *ordersBalances,
       ankerl::unordered_dense::map<int32_t, int64_t> *openInterestLong,
       ankerl::unordered_dense::map<int32_t, int64_t> *openInterestShort)
-      : accountBalances(accountBalances), fees(fees),
-        adjustments(adjustments), suspends(suspends),
-        ordersBalances(ordersBalances), openInterestLong(openInterestLong),
+      : accountBalances(accountBalances), fees(fees), adjustments(adjustments),
+        suspends(suspends), ordersBalances(ordersBalances),
+        openInterestLong(openInterestLong),
         openInterestShort(openInterestShort) {}
 
   static TotalCurrencyBalanceReportResult *CreateEmpty();
 
-  static TotalCurrencyBalanceReportResult *
-  OfOrderBalances(const ankerl::unordered_dense::map<int32_t, int64_t> &currencyBalance);
+  static TotalCurrencyBalanceReportResult *OfOrderBalances(
+      const ankerl::unordered_dense::map<int32_t, int64_t> &currencyBalance);
+
+  // Serialization method
+  void WriteMarshallable(BytesOut &bytes) const;
 };
 
 } // namespace reports
@@ -67,4 +70,3 @@ public:
 } // namespace common
 } // namespace core
 } // namespace exchange
-

@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+#include <cstring>
 #include <exchange/core/common/MatcherEventType.h>
 #include <exchange/core/common/MatcherTradeEvent.h>
 #include <exchange/core/orderbook/OrderBookEventsHelper.h>
+#include <exchange/core/utils/SerializationUtils.h>
 
 namespace exchange {
 namespace core {
@@ -84,6 +86,42 @@ void OrderBookEventsHelper::AttachRejectEvent(common::cmd::OrderCommand *cmd,
 ::exchange::core::common::MatcherTradeEvent *
 OrderBookEventsHelper::NewMatcherEvent() {
   return eventFactory_();
+}
+
+common::MatcherTradeEvent *OrderBookEventsHelper::CreateBinaryEventsChain(
+    int64_t timestamp, int32_t section, const std::vector<uint8_t> &bytes) {
+  // Match Java: createBinaryEventsChain()
+  // Convert bytes to long array with padding=5 (each message carries 5 longs)
+  const int padding = 5;
+  std::vector<int64_t> dataArray =
+      utils::SerializationUtils::BytesToLongArray(bytes, padding);
+
+  common::MatcherTradeEvent *firstEvent = nullptr;
+  common::MatcherTradeEvent *lastEvent = nullptr;
+
+  // Create events from long array (5 longs per event)
+  for (size_t i = 0; i < dataArray.size(); i += padding) {
+    common::MatcherTradeEvent *event = NewMatcherEvent();
+
+    event->eventType = common::MatcherEventType::BINARY_EVENT;
+    event->section = section;
+    event->matchedOrderId = dataArray[i];
+    event->matchedOrderUid = dataArray[i + 1];
+    event->price = dataArray[i + 2];
+    event->size = dataArray[i + 3];
+    event->bidderHoldPrice = dataArray[i + 4];
+    event->nextEvent = nullptr;
+
+    // Attach in direct order
+    if (firstEvent == nullptr) {
+      firstEvent = event;
+    } else {
+      lastEvent->nextEvent = event;
+    }
+    lastEvent = event;
+  }
+
+  return firstEvent;
 }
 
 OrderBookEventsHelper *OrderBookEventsHelper::NonPooledEventsHelper() {
