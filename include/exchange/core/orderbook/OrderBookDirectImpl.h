@@ -127,9 +127,9 @@ public:
   // StateHash interface
   int32_t GetStateHash() const override;
 
-  // Debug methods
-  std::string PrintAskBucketsDiagram() const;
-  std::string PrintBidBucketsDiagram() const;
+  // Debug methods (IOrderBook interface)
+  std::string PrintAskBucketsDiagram() const override;
+  std::string PrintBidBucketsDiagram() const override;
 
   // WriteBytesMarshallable interface
   void WriteMarshallable(common::BytesOut &bytes) const override;

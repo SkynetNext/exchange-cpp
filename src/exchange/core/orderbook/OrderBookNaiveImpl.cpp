@@ -22,6 +22,7 @@
 #include <exchange/core/orderbook/OrderBookEventsHelper.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
 #include <exchange/core/utils/SerializationUtils.h>
+#include <sstream>
 #include <stdexcept>
 
 namespace exchange {
@@ -552,11 +553,12 @@ int32_t OrderBookNaiveImpl::GetStateHash() const {
   }
 
   // Calculate hash for bid orders stream
-  // Note: bidBuckets in Java uses Collections.reverseOrder(), so we need to
-  // iterate in reverse order (highest price first)
+  // Note: bidBuckets in Java uses Collections.reverseOrder(), so values() is already descending
+  // In C++, bidBuckets_ uses std::greater<int64_t>, so begin() to end() is descending
+  // This matches Java bidBuckets.values().stream()
   int32_t bidHash = 0;
-  for (auto it = bidBuckets_.rbegin(); it != bidBuckets_.rend(); ++it) {
-    auto orders = it->second->GetAllOrders();
+  for (const auto &pair : bidBuckets_) {
+    auto orders = pair.second->GetAllOrders();
     for (const common::Order *order : orders) {
       if (order != nullptr) {
         bidHash = bidHash * 31 + order->GetStateHash();
@@ -715,6 +717,40 @@ void OrderBookNaiveImpl::WriteMarshallable(common::BytesOut &bytes) const {
     bidBucketsMap[pair.first] = pair.second.get();
   }
   utils::SerializationUtils::MarshallLongHashMap(bidBucketsMap, bytes);
+}
+
+std::string OrderBookNaiveImpl::PrintAskBucketsDiagram() const {
+  std::ostringstream oss;
+  oss << "NaiveImpl Ask Buckets (std::map, ascending order):\n";
+  if (askBuckets_.empty()) {
+    oss << "  (empty)\n";
+  } else {
+    for (const auto &pair : askBuckets_) {
+      int64_t price = pair.first;
+      const OrdersBucket *bucket = pair.second.get();
+      oss << "  Price: " << price << " -> Bucket: " << bucket
+          << " (orders: " << bucket->GetNumOrders()
+          << ", volume: " << bucket->GetTotalVolume() << ")\n";
+    }
+  }
+  return oss.str();
+}
+
+std::string OrderBookNaiveImpl::PrintBidBucketsDiagram() const {
+  std::ostringstream oss;
+  oss << "NaiveImpl Bid Buckets (std::map, descending order):\n";
+  if (bidBuckets_.empty()) {
+    oss << "  (empty)\n";
+  } else {
+    for (const auto &pair : bidBuckets_) {
+      int64_t price = pair.first;
+      const OrdersBucket *bucket = pair.second.get();
+      oss << "  Price: " << price << " -> Bucket: " << bucket
+          << " (orders: " << bucket->GetNumOrders()
+          << ", volume: " << bucket->GetTotalVolume() << ")\n";
+    }
+  }
+  return oss.str();
 }
 
 } // namespace orderbook

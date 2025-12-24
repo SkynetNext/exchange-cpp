@@ -86,6 +86,10 @@ public:
   // StateHash interface
   int32_t GetStateHash() const override;
 
+  // Debug methods (IOrderBook interface)
+  std::string PrintAskBucketsDiagram() const override;
+  std::string PrintBidBucketsDiagram() const override;
+
 private:
   const common::CoreSymbolSpecification *symbolSpec_;
   OrderBookEventsHelper *eventsHelper_;

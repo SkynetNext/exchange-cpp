@@ -120,6 +120,15 @@ protected:
   void TestShouldMoveOrderFullyMatchAsMarketable2Prices();
   void TestShouldMoveOrderMatchesAllLiquidity();
   void TestMultipleCommandsKeepInternalState();
+
+  // Debug helper methods for comparing implementations
+  void PrintOrderBookState(const std::string &label,
+                           exchange::core::orderbook::IOrderBook *orderBook);
+  void PrintOrderBookComparison(
+      exchange::core::orderbook::IOrderBook *orderBook1,
+      exchange::core::orderbook::IOrderBook *orderBook2,
+      const std::string &label1 = "OrderBook1",
+      const std::string &label2 = "OrderBook2");
 };
 
 } // namespace orderbook

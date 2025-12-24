@@ -145,6 +145,13 @@ public:
   virtual int32_t GetTotalBidBuckets(int32_t limit) = 0;
 
   /**
+   * Debug methods for testing - print internal state diagrams
+   * These methods are useful for debugging and comparing implementations
+   */
+  virtual std::string PrintAskBucketsDiagram() const = 0;
+  virtual std::string PrintBidBucketsDiagram() const = 0;
+
+  /**
    * Process command - static helper method
    */
   static common::cmd::CommandResultCode
