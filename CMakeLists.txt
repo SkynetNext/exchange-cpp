@@ -106,6 +106,18 @@ else()
     endif()
 endif()
 
+# spdlog: High-performance logging library (header-only, matches Java SLF4J+Logback)
+# Using FetchContent for easy integration
+include(FetchContent)
+FetchContent_Declare(
+    spdlog
+    GIT_REPOSITORY https://github.com/gabime/spdlog.git
+    GIT_TAG        v1.12.0
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(spdlog)
+message(STATUS "Using spdlog for logging (synchronous mode, stdout output, matches Java version)")
+
 # Collect source files from subdirectories
 # Note: GLOB_RECURSE recursively searches subdirectories
 file(GLOB_RECURSE EXCHANGE_SOURCES
@@ -146,6 +158,7 @@ target_link_libraries(exchange-cpp
     PUBLIC
         disruptor-cpp
         Threads::Threads
+        spdlog::spdlog
         # ART tree is custom implementation, no external dependency
 )
 

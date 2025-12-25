@@ -21,16 +21,12 @@
 #include <exchange/core/common/CoreWaitStrategy.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
-#include <iostream>
-#include <mutex>
+#include <exchange/core/utils/Logger.h>
 #include <thread>
 
 namespace exchange {
 namespace core {
 namespace processors {
-
-// Thread-safe logging mutex for all processors
-std::mutex log_mutex;
 
 template <typename T, typename WaitStrategyT>
 WaitSpinningHelper<T, WaitStrategyT>::WaitSpinningHelper(
@@ -76,18 +72,6 @@ int64_t WaitSpinningHelper<T, WaitStrategyT>::TryWaitFor(int64_t seq) {
 
   // Matches Java: use getCursor() + spin, then blocking if needed
   int64_t initialCursor = sequenceBarrier_->getCursor();
-  if (initialCursor < seq && spin > 0) {
-    std::lock_guard<std::mutex> lock(log_mutex);
-    if (!name_.empty()) {
-      std::cout << "[WaitSpinningHelper:" << name_ << "] TryWaitFor(" << seq
-                << "): cursor=" << initialCursor
-                << ", spinning... (barrier cursor)" << std::endl;
-    } else {
-      std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq
-                << "): cursor=" << initialCursor
-                << ", spinning... (barrier cursor)" << std::endl;
-    }
-  }
   while ((availableSequence = sequenceBarrier_->getCursor()) < seq &&
          spin > 0) {
     if (spin < yieldLimit_ && spin > 1) {
@@ -115,40 +99,11 @@ int64_t WaitSpinningHelper<T, WaitStrategyT>::TryWaitFor(int64_t seq) {
   // Matches Java: return (availableSequence < seq) ? availableSequence :
   // sequencer.getHighestPublishedSequence(seq, availableSequence);
   if (availableSequence < seq) {
-    std::lock_guard<std::mutex> lock(log_mutex);
-    if (!name_.empty()) {
-      std::cout << "[WaitSpinningHelper:" << name_ << "] TryWaitFor(" << seq
-                << "): returning " << availableSequence
-                << " (not available yet)" << std::endl;
-    } else {
-      std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq << "): returning "
-                << availableSequence << " (not available yet)" << std::endl;
-    }
     return availableSequence;
   }
 
-  int64_t result;
   if (sequencer_) {
-    result = sequencer_->getHighestPublishedSequence(seq, availableSequence);
-    std::lock_guard<std::mutex> lock(log_mutex);
-    if (!name_.empty()) {
-      std::cout << "[WaitSpinningHelper:" << name_ << "] TryWaitFor(" << seq
-                << "): sequencer returned " << result << std::endl;
-    } else {
-      std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq
-                << "): sequencer returned " << result << std::endl;
-    }
-    return result;
-  }
-
-  std::lock_guard<std::mutex> lock(log_mutex);
-  if (!name_.empty()) {
-    std::cout << "[WaitSpinningHelper:" << name_ << "] TryWaitFor(" << seq
-              << "): returning " << availableSequence << " (no sequencer)"
-              << std::endl;
-  } else {
-    std::cout << "[WaitSpinningHelper] TryWaitFor(" << seq << "): returning "
-              << availableSequence << " (no sequencer)" << std::endl;
+    return sequencer_->getHighestPublishedSequence(seq, availableSequence);
   }
   return availableSequence;
 }

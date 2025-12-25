@@ -23,8 +23,7 @@
 #include <exchange/core/processors/TwoStepMasterProcessor.h>
 #include <exchange/core/processors/TwoStepSlaveProcessor.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
-#include <iostream>
-#include <mutex>
+#include <exchange/core/utils/Logger.h>
 #include <thread>
 
 namespace exchange {
@@ -101,14 +100,6 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
   int64_t nextSequence = sequence_.get() + 1L;
   int64_t currentSequenceGroup = 0;
 
-  {
-    std::lock_guard<std::mutex> lock(processors::log_mutex);
-    std::cout << "[TwoStepMasterProcessor:" << name_
-              << "] ProcessEvents() "
-                 "started, nextSequence="
-              << nextSequence << std::endl;
-  }
-
   // wait until slave processor has instructed to run
   while (slaveProcessor_ != nullptr && !slaveProcessor_->isRunning()) {
     std::this_thread::yield();
@@ -123,97 +114,31 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       // should spin and also check another barrier
       int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
 
-      {
-        std::lock_guard<std::mutex> lock(processors::log_mutex);
-        std::cout << "[TwoStepMasterProcessor:" << name_
-                  << "] TryWaitFor returned availableSequence="
-                  << availableSequence << ", nextSequence=" << nextSequence
-                  << std::endl;
-        std::cout.flush();
-      }
-
       if (nextSequence <= availableSequence) {
         while (nextSequence <= availableSequence) {
           cmd = &ringBuffer->get(nextSequence);
 
-          {
-            std::lock_guard<std::mutex> lock(processors::log_mutex);
-            std::cout << "[TwoStepMasterProcessor:" << name_
-                      << "] Processing seq=" << nextSequence
-                      << ", cmd=" << static_cast<int>(cmd->command)
-                      << ", eventsGroup=" << cmd->eventsGroup
-                      << ", currentSequenceGroup=" << currentSequenceGroup
-                      << std::endl;
-          }
-
           // switch to next group - let slave processor start doing its handling
           // cycle
           if (cmd->eventsGroup != currentSequenceGroup) {
-            {
-              std::lock_guard<std::mutex> lock(processors::log_mutex);
-              std::cout << "[TwoStepMasterProcessor:" << name_
-                        << "] Switching group, calling "
-                           "PublishProgressAndTriggerSlaveProcessor("
-                        << nextSequence << ")" << std::endl;
-              std::cout.flush();
-            }
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
-            {
-              std::lock_guard<std::mutex> lock(processors::log_mutex);
-              std::cout << "[TwoStepMasterProcessor:" << name_
-                        << "] PublishProgressAndTriggerSlaveProcessor("
-                        << nextSequence << ") returned, continuing..."
-                        << std::endl;
-              std::cout.flush();
-            }
             currentSequenceGroup = cmd->eventsGroup;
-          }
-
-          {
-            std::lock_guard<std::mutex> lock(processors::log_mutex);
-            std::cout << "[TwoStepMasterProcessor:" << name_
-                      << "] About to call eventHandler_->OnEvent("
-                      << nextSequence << ", cmd)" << std::endl;
-            std::cout.flush();
           }
           bool forcedPublish = false;
           try {
             forcedPublish = eventHandler_->OnEvent(nextSequence, cmd);
           } catch (const std::exception &ex) {
-            {
-              std::lock_guard<std::mutex> lock(processors::log_mutex);
-              std::cout << "[TwoStepMasterProcessor:" << name_
-                        << "] Exception in eventHandler_->OnEvent("
-                        << nextSequence << "): " << ex.what() << std::endl;
-              std::cout.flush();
-            }
+            LOG_ERROR("[TwoStepMasterProcessor:{}] Exception in "
+                      "eventHandler_->OnEvent({}): {}",
+                      name_, nextSequence, ex.what());
             throw;
           } catch (...) {
-            {
-              std::lock_guard<std::mutex> lock(processors::log_mutex);
-              std::cout << "[TwoStepMasterProcessor:" << name_
-                        << "] Unknown exception in eventHandler_->OnEvent("
-                        << nextSequence << ")" << std::endl;
-              std::cout.flush();
-            }
+            LOG_ERROR("[TwoStepMasterProcessor:{}] Unknown exception in "
+                      "eventHandler_->OnEvent({})",
+                      name_, nextSequence);
             throw;
           }
-          {
-            std::lock_guard<std::mutex> lock(processors::log_mutex);
-            std::cout << "[TwoStepMasterProcessor:" << name_
-                      << "] eventHandler_->OnEvent(" << nextSequence
-                      << ") returned, forcedPublish=" << forcedPublish
-                      << std::endl;
-            std::cout.flush();
-          }
           nextSequence++;
-          {
-            std::lock_guard<std::mutex> lock(processors::log_mutex);
-            std::cout << "[TwoStepMasterProcessor:" << name_
-                      << "] nextSequence incremented to " << nextSequence
-                      << ", checking loop condition..." << std::endl;
-            std::cout.flush();
-          }
 
           if (forcedPublish) {
             sequence_.set(nextSequence - 1);
@@ -221,13 +146,9 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           }
 
           if (cmd->command == common::cmd::OrderCommandType::SHUTDOWN_SIGNAL) {
-            {
-              std::lock_guard<std::mutex> lock(processors::log_mutex);
-              std::cout << "[TwoStepMasterProcessor:" << name_
-                        << "] SHUTDOWN_SIGNAL detected, calling "
-                           "PublishProgressAndTriggerSlaveProcessor("
-                        << nextSequence << ")" << std::endl;
-            }
+            LOG_DEBUG("[TwoStepMasterProcessor:{}] SHUTDOWN_SIGNAL detected, "
+                      "calling PublishProgressAndTriggerSlaveProcessor({})",
+                      name_, nextSequence);
             // having all sequences aligned with the ringbuffer cursor is a
             // requirement for proper shutdown let following processors to catch
             // up
@@ -236,90 +157,43 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
         }
         sequence_.set(availableSequence);
         waitSpinningHelper_->SignalAllWhenBlocking();
-        {
-          std::lock_guard<std::mutex> lock(processors::log_mutex);
-          std::cout << "[TwoStepMasterProcessor:" << name_
-                    << "] Finished processing batch, sequence set to "
-                    << availableSequence << ", nextSequence=" << nextSequence
-                    << ", continuing loop..." << std::endl;
-          std::cout.flush();
-        }
-      } else {
-        {
-          std::lock_guard<std::mutex> lock(processors::log_mutex);
-          std::cout << "[TwoStepMasterProcessor:" << name_ << "] nextSequence("
-                    << nextSequence << ") > availableSequence("
-                    << availableSequence << "), waiting..." << std::endl;
-          std::cout.flush();
-        }
       }
     } catch (const disruptor::AlertException &ex) {
-      {
-        std::lock_guard<std::mutex> lock(processors::log_mutex);
-        std::cout << "[TwoStepMasterProcessor:" << name_
-                  << "] AlertException caught, running_=" << running_.load()
-                  << std::endl;
-      }
+      LOG_DEBUG(
+          "[TwoStepMasterProcessor:{}] AlertException caught, running_={}",
+          name_, running_.load());
       if (running_.load() != RUNNING) {
-        {
-          std::lock_guard<std::mutex> lock(processors::log_mutex);
-          std::cout << "[TwoStepMasterProcessor:" << name_
-                    << "] Exiting ProcessEvents() due to AlertException"
-                    << std::endl;
-        }
+        LOG_DEBUG("[TwoStepMasterProcessor:{}] Exiting ProcessEvents() due to "
+                  "AlertException",
+                  name_);
         break;
       }
     } catch (const std::exception &ex) {
-      {
-        std::lock_guard<std::mutex> lock(processors::log_mutex);
-        std::cout << "[TwoStepMasterProcessor:" << name_
-                  << "] std::exception caught in outer catch: " << ex.what()
-                  << ", nextSequence=" << nextSequence << std::endl;
-        std::cout.flush();
-      }
+      LOG_ERROR("[TwoStepMasterProcessor:{}] std::exception caught in outer "
+                "catch: {}, nextSequence={}",
+                name_, ex.what(), nextSequence);
       if (exceptionHandler_) {
-        {
-          std::lock_guard<std::mutex> lock(processors::log_mutex);
-          std::cout << "[TwoStepMasterProcessor:" << name_
-                    << "] Calling exceptionHandler_->HandleEventException"
-                    << std::endl;
-          std::cout.flush();
-        }
+        LOG_DEBUG("[TwoStepMasterProcessor:{}] Calling "
+                  "exceptionHandler_->HandleEventException",
+                  name_);
         exceptionHandler_->HandleEventException(ex, nextSequence, cmd);
-        {
-          std::lock_guard<std::mutex> lock(processors::log_mutex);
-          std::cout << "[TwoStepMasterProcessor:" << name_
-                    << "] exceptionHandler_->HandleEventException returned"
-                    << std::endl;
-          std::cout.flush();
-        }
+        LOG_DEBUG("[TwoStepMasterProcessor:{}] "
+                  "exceptionHandler_->HandleEventException returned",
+                  name_);
       }
-      {
-        std::lock_guard<std::mutex> lock(processors::log_mutex);
-        std::cout << "[TwoStepMasterProcessor:" << name_
-                  << "] Setting sequence to " << nextSequence
-                  << ", then incrementing to " << (nextSequence + 1)
-                  << std::endl;
-        std::cout.flush();
-      }
+      LOG_DEBUG("[TwoStepMasterProcessor:{}] Setting sequence to {}, then "
+                "incrementing to {}",
+                name_, nextSequence, nextSequence + 1);
       sequence_.set(nextSequence);
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;
-      {
-        std::lock_guard<std::mutex> lock(processors::log_mutex);
-        std::cout << "[TwoStepMasterProcessor:" << name_
-                  << "] Exception handled, nextSequence=" << nextSequence
-                  << ", continuing loop..." << std::endl;
-        std::cout.flush();
-      }
+      LOG_DEBUG("[TwoStepMasterProcessor:{}] Exception handled, "
+                "nextSequence={}, continuing loop...",
+                name_, nextSequence);
     } catch (...) {
-      {
-        std::lock_guard<std::mutex> lock(processors::log_mutex);
-        std::cout << "[TwoStepMasterProcessor:" << name_
-                  << "] Unknown exception caught in outer catch, nextSequence="
-                  << nextSequence << std::endl;
-        std::cout.flush();
-      }
+      LOG_ERROR("[TwoStepMasterProcessor:{}] Unknown exception caught in outer "
+                "catch, nextSequence={}",
+                name_, nextSequence);
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(
             std::runtime_error("Unknown exception"), nextSequence, cmd);
@@ -327,13 +201,9 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       sequence_.set(nextSequence);
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;
-      {
-        std::lock_guard<std::mutex> lock(processors::log_mutex);
-        std::cout << "[TwoStepMasterProcessor:" << name_
-                  << "] Unknown exception handled, nextSequence="
-                  << nextSequence << ", continuing loop..." << std::endl;
-        std::cout.flush();
-      }
+      LOG_DEBUG("[TwoStepMasterProcessor:{}] Unknown exception handled, "
+                "nextSequence={}, continuing loop...",
+                name_, nextSequence);
     }
   }
 }
@@ -341,21 +211,16 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
 template <typename WaitStrategyT>
 void TwoStepMasterProcessor<WaitStrategyT>::
     PublishProgressAndTriggerSlaveProcessor(int64_t nextSequence) {
-  {
-    std::lock_guard<std::mutex> lock(processors::log_mutex);
-    std::cout << "[TwoStepMasterProcessor:" << name_
-              << "] PublishProgressAndTriggerSlaveProcessor(" << nextSequence
-              << "): setting sequence to " << (nextSequence - 1) << std::endl;
-  }
+  LOG_DEBUG(
+      "[TwoStepMasterProcessor:{}] "
+      "PublishProgressAndTriggerSlaveProcessor({}): setting sequence to {}",
+      name_, nextSequence, nextSequence - 1);
   sequence_.set(nextSequence - 1);
   waitSpinningHelper_->SignalAllWhenBlocking();
   if (slaveProcessor_ != nullptr) {
-    {
-      std::lock_guard<std::mutex> lock(processors::log_mutex);
-      std::cout << "[TwoStepMasterProcessor:" << name_
-                << "] Calling slaveProcessor_->HandlingCycle(" << nextSequence
-                << ")" << std::endl;
-    }
+    LOG_DEBUG("[TwoStepMasterProcessor:{}] Calling "
+              "slaveProcessor_->HandlingCycle({})",
+              name_, nextSequence);
     slaveProcessor_->HandlingCycle(nextSequence);
   }
 }

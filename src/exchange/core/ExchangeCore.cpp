@@ -14,11 +14,13 @@
  * limitations under the License.
  */
 
+#include <atomic>
 #include <disruptor/BlockingWaitStrategy.h>
 #include <disruptor/BusySpinWaitStrategy.h>
 #include <disruptor/EventFactory.h>
 #include <disruptor/EventHandler.h>
 #include <disruptor/EventTranslator.h>
+#include <disruptor/TimeoutException.h>
 #include <disruptor/YieldingWaitStrategy.h>
 #include <disruptor/dsl/Disruptor.h>
 #include <disruptor/dsl/EventProcessorFactory.h>
@@ -44,8 +46,10 @@
 #include <exchange/core/processors/WaitSpinningHelper.h>
 #include <exchange/core/processors/journaling/DummySerializationProcessor.h>
 #include <exchange/core/processors/journaling/ISerializationProcessor.h>
+#include <exchange/core/utils/Logger.h>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 namespace exchange {
@@ -117,7 +121,8 @@ public:
   ExchangeCoreImpl(
       ExchangeCore::ResultsConsumer resultsConsumer,
       const common::config::ExchangeConfiguration *exchangeConfiguration)
-      : exchangeConfiguration_(exchangeConfiguration) {
+      : exchangeConfiguration_(exchangeConfiguration), started_(false),
+        stopped_(false) {
     const auto &perfCfg = exchangeConfiguration_->performanceCfg;
     const auto &serializationCfg = exchangeConfiguration_->serializationCfg;
 
@@ -179,30 +184,15 @@ public:
     exceptionHandler_ = std::make_unique<
         processors::DisruptorExceptionHandler<common::cmd::OrderCommand>>(
         "main", [this, &ringBuffer](const std::exception &ex, int64_t seq) {
-          {
-            std::lock_guard<std::mutex> lock(processors::log_mutex);
-            std::cout << "[ExceptionHandler] Handling exception: " << ex.what()
-                      << ", seq=" << seq << std::endl;
-            std::cout << "[ExceptionHandler] Publishing SHUTDOWN_SIGNAL"
-                      << std::endl;
-            std::cout.flush();
-          }
+          LOG_ERROR("[ExceptionHandler] Handling exception: {}, seq={}",
+                    ex.what(), seq);
+          LOG_INFO("[ExceptionHandler] Publishing SHUTDOWN_SIGNAL");
           static ShutdownSignalTranslator shutdownTranslator;
           ringBuffer.publishEvent(shutdownTranslator);
-          {
-            std::lock_guard<std::mutex> lock(processors::log_mutex);
-            std::cout << "[ExceptionHandler] SHUTDOWN_SIGNAL published, "
-                         "calling disruptor_->shutdown()"
-                      << std::endl;
-            std::cout.flush();
-          }
+          LOG_INFO("[ExceptionHandler] SHUTDOWN_SIGNAL published, calling "
+                   "disruptor_->shutdown()");
           disruptor_->shutdown();
-          {
-            std::lock_guard<std::mutex> lock(processors::log_mutex);
-            std::cout << "[ExceptionHandler] disruptor_->shutdown() completed"
-                      << std::endl;
-            std::cout.flush();
-          }
+          LOG_INFO("[ExceptionHandler] disruptor_->shutdown() completed");
         });
 
     // 7. Pipeline Construction
@@ -216,7 +206,8 @@ public:
           const common::config::PerformanceConfiguration *perfCfg,
           common::CoreWaitStrategy coreWaitStrategy,
           processors::SharedPool *sharedPool,
-          std::vector<std::shared_ptr<processors::GroupingProcessor<WaitStrategyT>>>
+          std::vector<
+              std::shared_ptr<processors::GroupingProcessor<WaitStrategyT>>>
               &processors,
           std::vector<BarrierPtr> &ownedBarriers)
           : perfCfg_(perfCfg), coreWaitStrategy_(coreWaitStrategy),
@@ -227,14 +218,6 @@ public:
       createEventProcessor(RingBufferT &ringBuffer,
                            disruptor::Sequence *const *barrierSequences,
                            int count) override {
-        std::cout << "[GroupingProcessorFactory] createEventProcessor: count="
-                  << count << std::endl;
-        for (int i = 0; i < count; i++) {
-          std::cout << "[GroupingProcessorFactory] barrierSequences[" << i
-                    << "]=" << barrierSequences[i] << ", value="
-                    << (barrierSequences[i] ? barrierSequences[i]->get() : -999)
-                    << std::endl;
-        }
         auto barrier = ringBuffer.newBarrier(barrierSequences, count);
         // CRITICAL: Save barrier to ensure it outlives the processor
         // The barrier contains FixedSequenceGroup which holds Sequence*
@@ -242,16 +225,12 @@ public:
         // processor. In Java, GC manages object lifetime. In C++, we must
         // explicitly manage ownership.
         ownedBarriers_.push_back(barrier);
-        auto processor = std::make_shared<processors::GroupingProcessor<WaitStrategyT>>(
-            &ringBuffer, barrier.get(), perfCfg_, coreWaitStrategy_,
-            sharedPool_);
+        auto processor =
+            std::make_shared<processors::GroupingProcessor<WaitStrategyT>>(
+                &ringBuffer, barrier.get(), perfCfg_, coreWaitStrategy_,
+                sharedPool_);
 
         processors_.push_back(processor);
-        std::cout
-            << "[GroupingProcessorFactory] Created processor, &getSequence()="
-            << &processors_.back()->getSequence()
-            << ", value=" << processors_.back()->getSequence().get()
-            << std::endl;
         return processor;
       }
 
@@ -259,7 +238,8 @@ public:
       const common::config::PerformanceConfiguration *perfCfg_;
       common::CoreWaitStrategy coreWaitStrategy_;
       processors::SharedPool *sharedPool_;
-      std::vector<std::shared_ptr<processors::GroupingProcessor<WaitStrategyT>>> &processors_;
+      std::vector<std::shared_ptr<processors::GroupingProcessor<WaitStrategyT>>>
+          &processors_;
       std::vector<BarrierPtr> &ownedBarriers_;
     };
 
@@ -331,14 +311,6 @@ public:
       createEventProcessor(RingBufferT &ringBuffer,
                            disruptor::Sequence *const *barrierSequences,
                            int count) override {
-        std::cout << "[R1ProcessorFactory:" << name_
-                  << "] createEventProcessor: count=" << count << std::endl;
-        for (int i = 0; i < count; i++) {
-          std::cout << "[R1ProcessorFactory:" << name_ << "] barrierSequences["
-                    << i << "]=" << barrierSequences[i] << ", value="
-                    << (barrierSequences[i] ? barrierSequences[i]->get() : -999)
-                    << std::endl;
-        }
         auto barrier = ringBuffer.newBarrier(barrierSequences, count);
         // CRITICAL: Save barrier to ensure it outlives the processor
         // The barrier contains FixedSequenceGroup which holds Sequence*
@@ -350,36 +322,10 @@ public:
                 &ringBuffer, barrier.get(), eventHandler_, exceptionHandler_,
                 coreWaitStrategy_, name_);
 
-        // CRITICAL: Get sequence pointer BEFORE moving processor
-        // After move, the Sequence object address will change, but we need
-        // the pointer to the moved Sequence for barrier creation.
-        // Actually, barrier is already created above, so we need to ensure
-        // the barrier's FixedSequenceGroup uses the correct pointer.
-        // The barrier was created with barrierSequences which point to other
-        // processors' sequences, not this processor's sequence, so those
-        // pointers should be fine. But we need to ensure this processor's
-        // sequence pointer is correct when it's used later.
-        auto *seqBeforeMove = &processor->getSequence();
-        std::cout << "[R1ProcessorFactory:" << name_
-                  << "] Sequence before move: " << std::hex << seqBeforeMove
-                  << std::dec << std::endl;
-
         r1Processors_.push_back(processor.get());
         r1ProcessorsOwned_.push_back(processor);
         r1EventProcessors_.push_back(processor.get());
 
-        auto *seqAfterMove = &processor->getSequence();
-        std::cout << "[R1ProcessorFactory:" << name_
-                  << "] Sequence after move: " << std::hex << seqAfterMove
-                  << std::dec << std::endl;
-        if (seqBeforeMove != seqAfterMove) {
-          std::cout << "[R1ProcessorFactory:" << name_
-                    << "] WARNING: Sequence address changed after move!"
-                    << std::endl;
-        }
-        std::cout << "[R1ProcessorFactory:" << name_
-                  << "] Created processor, &getSequence()=" << seqAfterMove
-                  << ", value=" << seqAfterMove->get() << std::endl;
         return processor;
       }
 
@@ -414,19 +360,11 @@ public:
     public:
       MatchingEngineEventHandler(
           processors::MatchingEngineRouter *matchingEngine)
-          : matchingEngine_(matchingEngine) {
-        std::cout << "[MatchingEngineEventHandler] Constructor called"
-                  << std::endl;
-      }
+          : matchingEngine_(matchingEngine) {}
 
       void onEvent(common::cmd::OrderCommand &cmd, int64_t sequence,
                    bool endOfBatch) override {
-        std::lock_guard<std::mutex> lock(processors::log_mutex);
-        std::cout << "[MatchingEngineEventHandler] onEvent: seq=" << sequence
-                  << ", cmd=" << static_cast<int>(cmd.command) << std::endl;
         matchingEngine_->ProcessOrder(sequence, &cmd);
-        std::cout << "[MatchingEngineEventHandler] ProcessOrder completed: seq="
-                  << sequence << std::endl;
       }
 
     private:
@@ -436,26 +374,8 @@ public:
     // Create afterR1 group (wait for all R1 processors to complete)
     // Java: disruptor.after(procR1.toArray(new TwoStepMasterProcessor[0]))
     // Java version uses after(EventProcessor...) which directly gets sequences
-    std::cout << "[ExchangeCoreImpl] Creating afterR1 with "
-              << r1EventProcessors_.size() << " R1 processors" << std::endl;
-    for (size_t i = 0; i < r1EventProcessors_.size(); i++) {
-      std::cout << "[ExchangeCoreImpl] R1 processor[" << i
-                << "] sequence value before afterR1: "
-                << r1EventProcessors_[i]->getSequence().get() << std::endl;
-    }
     auto afterR1 = disruptor_->after(
         r1EventProcessors_.data(), static_cast<int>(r1EventProcessors_.size()));
-
-    // Debug: Verify R1 sequence pointers are correct
-    std::cout << "[ExchangeCoreImpl] After creating afterR1, verifying R1 "
-                 "sequence pointers:"
-              << std::endl;
-    for (size_t i = 0; i < r1EventProcessors_.size(); i++) {
-      auto *seqPtr = &r1EventProcessors_[i]->getSequence();
-      std::cout << "[ExchangeCoreImpl]   R1[" << i
-                << "] sequence pointer: " << std::hex << seqPtr << std::dec
-                << ", value: " << seqPtr->get() << std::endl;
-    }
 
     // Create all MatchingEngine handlers first (matches Java:
     // matchingEngineHandlers array) Java: final EventHandler<OrderCommand>[]
@@ -491,20 +411,6 @@ public:
       };
 
       registerHandlers(matchingEngineHandlers_);
-
-      std::cout << "[ExchangeCoreImpl] Registered "
-                << matchingEngineHandlers_.size()
-                << " MatchingEngine handler(s) at once (matches Java behavior)"
-                << std::endl;
-
-      // Verify R1 sequence values after registration
-      std::cout << "[ExchangeCoreImpl] After MatchingEngine registration, R1 "
-                   "processor sequences:"
-                << std::endl;
-      for (size_t i = 0; i < r1EventProcessors_.size(); i++) {
-        std::cout << "[ExchangeCoreImpl]   R1[" << i << "] sequence value: "
-                  << r1EventProcessors_[i]->getSequence().get() << std::endl;
-      }
     }
 
     // Stage 5: Risk Post-Process (R2)
@@ -524,23 +430,21 @@ public:
     std::vector<disruptor::EventHandlerIdentity *> meIdentities;
     for (auto &h : matchingEngineHandlers_) {
       meIdentities.push_back(h.get());
-      std::cout << "[ExchangeCoreImpl] Adding handler identity: " << std::hex
-                << h.get() << std::dec << std::endl;
-      // Try to get sequence to verify it's registered
+    }
+    auto afterME = disruptor_->after(meIdentities.data(), meIdentities.size());
+    // Debug: Log MatchingEngine sequence values after creating afterME
+    // This is not in hot path, only executed once during initialization
+    for (size_t i = 0; i < meIdentities.size(); i++) {
       try {
-        auto seqValue = disruptor_->getSequenceValueFor(*h.get());
-        std::cout << "[ExchangeCoreImpl] Handler sequence value: " << seqValue
-                  << std::endl;
+        int64_t seqValue = disruptor_->getSequenceValueFor(*meIdentities[i]);
+        LOG_DEBUG("[ExchangeCore] afterME created: ME[{}] sequence={}", i,
+                  seqValue);
       } catch (const std::exception &e) {
-        std::cout
-            << "[ExchangeCoreImpl] ERROR: Handler not found in repository: "
-            << e.what() << std::endl;
+        LOG_DEBUG(
+            "[ExchangeCore] afterME created: ME[{}] sequence not available: {}",
+            i, e.what());
       }
     }
-    std::cout << "[ExchangeCoreImpl] Creating afterME with "
-              << meIdentities.size() << " matching engine handlers"
-              << std::endl;
-    auto afterME = disruptor_->after(meIdentities.data(), meIdentities.size());
 
     class R2ProcessorFactory : public disruptor::dsl::EventProcessorFactory<
                                    common::cmd::OrderCommand, RingBufferT> {
@@ -563,6 +467,14 @@ public:
       createEventProcessor(RingBufferT &ringBuffer,
                            disruptor::Sequence *const *barrierSequences,
                            int count) override {
+        std::cout << "[R2ProcessorFactory:" << name_
+                  << "] createEventProcessor: count=" << count << std::endl;
+        for (int i = 0; i < count; i++) {
+          std::cout << "[R2ProcessorFactory:" << name_ << "] barrierSequences["
+                    << i << "]=" << barrierSequences[i] << ", value="
+                    << (barrierSequences[i] ? barrierSequences[i]->get() : -999)
+                    << std::endl;
+        }
         auto barrier = ringBuffer.newBarrier(barrierSequences, count);
         // CRITICAL: Save barrier to ensure it outlives the processor
         // The barrier contains FixedSequenceGroup which holds Sequence*
@@ -617,9 +529,6 @@ public:
                    bool endOfBatch) override {
         handler_->OnEvent(&cmd, sequence, endOfBatch);
         api_->ProcessResult(sequence, &cmd);
-        std::lock_guard<std::mutex> lock(processors::log_mutex);
-        std::cout << "[ResultsEventHandler] Processed seq=" << sequence
-                  << std::endl;
       }
 
     private:
@@ -641,58 +550,35 @@ public:
 
     auto resHandler = std::make_unique<ResultsEventHandler>(
         resultsHandler_.get(), api_.get());
-    std::cout
-        << "[ExchangeCoreImpl] Adding ResultsEventHandler to mainHandlerGroup"
-        << std::endl;
     mainHandlerGroup.handleEventsWith(*resHandler);
     eventHandlers_.push_back(std::move(resHandler));
-    std::cout << "[ExchangeCoreImpl] ResultsEventHandler added, "
-                 "eventHandlers_.size()="
-              << eventHandlers_.size() << std::endl;
 
     // Final Stage: Link R1 and R2
     for (size_t i = 0;
          i < r1ProcessorsOwned_.size() && i < r2ProcessorsOwned_.size(); i++) {
       r1ProcessorsOwned_[i]->SetSlaveProcessor(r2ProcessorsOwned_[i].get());
     }
-    std::cout << "[ExchangeCoreImpl] Constructor: all stages completed"
-              << std::endl;
   }
 
   void Startup() override {
-    std::cout << "[ExchangeCore] Startup: calling disruptor_->start()"
-              << std::endl;
+    // Match Java: check if already started
+    bool expected = false;
+    if (!started_.compare_exchange_strong(expected, true)) {
+      return; // Already started
+    }
     disruptor_->start();
-    std::cout << "[ExchangeCore] Startup: disruptor_->start() completed"
-              << std::endl;
-
-    // Log MatchingEngine handler status after startup
+    // Debug: Log MatchingEngine sequence values after startup
+    // This is not in hot path, only executed once during initialization
     for (size_t i = 0; i < matchingEngineHandlers_.size(); i++) {
       try {
-        auto seqValue =
+        int64_t seqValue =
             disruptor_->getSequenceValueFor(*matchingEngineHandlers_[i].get());
-        std::cout << "[ExchangeCore] After startup - MatchingEngine handler["
-                  << i << "] sequence value: " << seqValue << std::endl;
-        auto barrier =
-            disruptor_->getBarrierFor(*matchingEngineHandlers_[i].get());
-        if (barrier) {
-          std::cout << "[ExchangeCore] After startup - MatchingEngine handler["
-                    << i << "] barrier cursor: " << barrier->getCursor()
-                    << std::endl;
-        } else {
-          std::cout << "[ExchangeCore] After startup - MatchingEngine handler["
-                    << i << "] barrier is null" << std::endl;
-        }
-
-        // Also log R1 processor sequence to verify dependency
-        if (i < r1EventProcessors_.size()) {
-          std::cout << "[ExchangeCore] R1 processor[" << i
-                    << "] sequence value: "
-                    << r1EventProcessors_[i]->getSequence().get() << std::endl;
-        }
+        LOG_DEBUG("[ExchangeCore] After startup: ME[{}] sequence={}", i,
+                  seqValue);
       } catch (const std::exception &e) {
-        std::cout << "[ExchangeCore] ERROR: MatchingEngine handler[" << i
-                  << "] not found after startup: " << e.what() << std::endl;
+        LOG_DEBUG(
+            "[ExchangeCore] After startup: ME[{}] sequence not available: {}",
+            i, e.what());
       }
     }
 
@@ -700,22 +586,37 @@ public:
       serializationProcessor_->ReplayJournalFullAndThenEnableJouraling(
           &exchangeConfiguration_->initStateCfg, api_.get());
     }
-    std::cout << "[ExchangeCore] Startup: completed" << std::endl;
   }
 
   void Shutdown(int64_t timeoutMs) override {
-    std::lock_guard<std::mutex> lock(processors::log_mutex);
-    std::cout << "[ExchangeCore] Shutdown: publishing SHUTDOWN_SIGNAL"
-              << std::endl;
+    // Match Java: check if already stopped
+    bool expected = false;
+    if (!stopped_.compare_exchange_strong(expected, true)) {
+      return; // Already stopped
+    }
+    LOG_INFO("[ExchangeCore] Shutdown: publishing SHUTDOWN_SIGNAL");
     static ShutdownSignalTranslator shutdownTranslator;
+    // Match Java: ringBuffer.publishEvent(SHUTDOWN_SIGNAL_TRANSLATOR);
     disruptor_->getRingBuffer().publishEvent(shutdownTranslator);
-    std::cout << "[ExchangeCore] Shutdown: calling disruptor_->shutdown()"
-              << std::endl;
-    if (timeoutMs < 0)
-      disruptor_->shutdown();
-    else
-      disruptor_->shutdown(timeoutMs);
-    std::cout << "[ExchangeCore] Shutdown: completed" << std::endl;
+    // Get sequence after publishing (cursor is the last published sequence)
+    int64_t shutdownSeq = disruptor_->getRingBuffer().getCursor();
+    LOG_INFO("[ExchangeCore] Shutdown: SHUTDOWN_SIGNAL published at "
+             "sequence={}, cursor={}",
+             shutdownSeq, shutdownSeq);
+    LOG_INFO("[ExchangeCore] Shutdown: calling disruptor_->shutdown()");
+    try {
+      if (timeoutMs < 0)
+        disruptor_->shutdown();
+      else
+        disruptor_->shutdown(timeoutMs);
+      LOG_INFO("[ExchangeCore] Shutdown: completed");
+    } catch (const disruptor::TimeoutException &e) {
+      // Match Java: throw IllegalStateException on timeout
+      // In C++, we use std::runtime_error as equivalent
+      throw std::runtime_error(
+          "could not stop a disruptor gracefully. Not all events may be "
+          "executed.");
+    }
   }
 
   IExchangeApi *GetApi() override { return api_.get(); }
@@ -759,6 +660,11 @@ private:
   // pointers that must remain valid.
   using BarrierPtr = typename DisruptorT::BarrierPtr;
   std::vector<BarrierPtr> ownedBarriers_;
+
+  // Lifecycle flags - match Java behavior
+  // core can be started and stopped only once
+  std::atomic<bool> started_;
+  std::atomic<bool> stopped_;
 };
 
 ExchangeCore::ExchangeCore(

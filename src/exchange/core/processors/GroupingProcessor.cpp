@@ -25,6 +25,7 @@
 #include <exchange/core/common/cmd/OrderCommandType.h>
 #include <exchange/core/processors/GroupingProcessor.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
+#include <exchange/core/utils/Logger.h>
 #include <iostream>
 
 namespace exchange {
@@ -73,14 +74,12 @@ bool GroupingProcessor<WaitStrategyT>::isRunning() {
 }
 
 template <typename WaitStrategyT> void GroupingProcessor<WaitStrategyT>::run() {
-  std::cout << "[GroupingProcessor] run() called" << std::endl;
   if (running_.compare_exchange_strong(const_cast<int32_t &>(IDLE), RUNNING)) {
     // Match Java: sequenceBarrier.clearAlert();
     sequenceBarrier_->clearAlert();
 
     try {
       if (running_.load() == RUNNING) {
-        std::cout << "[GroupingProcessor] Calling ProcessEvents()" << std::endl;
         ProcessEvents();
       }
     } catch (...) {
@@ -96,10 +95,7 @@ template <typename WaitStrategyT> void GroupingProcessor<WaitStrategyT>::run() {
 
 template <typename WaitStrategyT>
 void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
-  std::cout << "[GroupingProcessor] ProcessEvents() started" << std::endl;
   int64_t nextSequence = sequence_.get() + 1L;
-  std::cout << "[GroupingProcessor] Starting from sequence " << nextSequence
-            << std::endl;
 
   int64_t groupCounter = 0;
   int64_t msgsInGroup = 0;
@@ -124,12 +120,8 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
       int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
 
       if (nextSequence <= availableSequence) {
-        std::cout << "[GroupingProcessor] Processing sequences " << nextSequence
-                  << " to " << availableSequence << std::endl;
         while (nextSequence <= availableSequence) {
           common::cmd::OrderCommand *cmd = &ringBuffer_->get(nextSequence);
-          std::cout << "[GroupingProcessor] Processing seq=" << nextSequence
-                    << ", cmd=" << static_cast<int>(cmd->command) << std::endl;
 
           nextSequence++;
 
@@ -243,13 +235,11 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
       }
 
     } catch (const disruptor::AlertException &ex) {
-      std::lock_guard<std::mutex> lock(processors::log_mutex);
-      std::cout << "[GroupingProcessor] AlertException caught, running_="
-                << running_.load() << std::endl;
+      LOG_DEBUG("[GroupingProcessor] AlertException caught, running_={}",
+                running_.load());
       if (running_.load() != RUNNING) {
-        std::cout << "[GroupingProcessor] Exiting ProcessEvents() due to "
-                     "AlertException"
-                  << std::endl;
+        LOG_DEBUG("[GroupingProcessor] Exiting ProcessEvents() due to "
+                  "AlertException");
         break;
       }
     } catch (...) {

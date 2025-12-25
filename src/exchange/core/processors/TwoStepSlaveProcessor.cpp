@@ -21,8 +21,7 @@
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/processors/TwoStepSlaveProcessor.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
-#include <iostream>
-#include <mutex>
+#include <exchange/core/utils/Logger.h>
 
 namespace exchange {
 namespace core {
@@ -79,20 +78,13 @@ void TwoStepSlaveProcessor<WaitStrategyT>::run() {
   }
 
   nextSequence_ = sequence_.get() + 1L;
-  std::lock_guard<std::mutex> lock(processors::log_mutex);
-  std::cout << "[TwoStepSlaveProcessor:" << name_ << "] run() completed, "
-            << "nextSequence_=" << nextSequence_ << std::endl;
+  LOG_DEBUG("[TwoStepSlaveProcessor:{}] run() completed, nextSequence_={}",
+            name_, nextSequence_);
 }
 
 template <typename WaitStrategyT>
 void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
     int64_t processUpToSequence) {
-  {
-    std::lock_guard<std::mutex> lock(processors::log_mutex);
-    std::cout << "[TwoStepSlaveProcessor:" << name_ << "] HandlingCycle("
-              << processUpToSequence
-              << ") called, nextSequence_=" << nextSequence_ << std::endl;
-  }
   while (true) {
     common::cmd::OrderCommand *event = nullptr;
     try {
@@ -106,25 +98,12 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
       while (nextSequence_ <= availableSequence &&
              nextSequence_ < processUpToSequence) {
         event = &ringBuffer->get(nextSequence_);
-        {
-          std::lock_guard<std::mutex> lock(processors::log_mutex);
-          std::cout << "[TwoStepSlaveProcessor:" << name_
-                    << "] Processing seq=" << nextSequence_ << std::endl;
-        }
         eventHandler_->OnEvent(nextSequence_, event);
         nextSequence_++;
       }
 
       // exit if finished processing entire group (up to specified sequence)
       if (nextSequence_ == processUpToSequence) {
-        {
-          std::lock_guard<std::mutex> lock(processors::log_mutex);
-          std::cout << "[TwoStepSlaveProcessor:" << name_
-                    << "] HandlingCycle completed, nextSequence_="
-                    << nextSequence_
-                    << ", processUpToSequence=" << processUpToSequence
-                    << std::endl;
-        }
         sequence_.set(processUpToSequence - 1);
         waitSpinningHelper_->SignalAllWhenBlocking();
         return;

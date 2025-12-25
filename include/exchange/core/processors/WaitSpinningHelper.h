@@ -30,9 +30,6 @@ namespace exchange {
 namespace core {
 namespace processors {
 
-// Thread-safe logging mutex for all processors
-extern std::mutex log_mutex;
-
 } // namespace processors
 } // namespace core
 } // namespace exchange
