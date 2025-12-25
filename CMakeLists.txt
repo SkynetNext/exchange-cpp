@@ -114,6 +114,8 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tbb/CMakeLists.txt)
     if(WIN32)
         set(CMAKE_POSITION_INDEPENDENT_CODE OFF CACHE BOOL "Position independent code" FORCE)
     endif()
+    # Disable TBB tests to avoid ctest conflicts
+    set(TBB_TEST OFF CACHE BOOL "Enable testing" FORCE)
     # Build TBB as static library to avoid DLL dependency issues at runtime
     # Note: TBB warns about static library, but for HFT systems, static linking
     # is preferred (no DLL dependencies, better performance, easier deployment)
