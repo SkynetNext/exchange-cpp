@@ -18,6 +18,7 @@
 
 #include "../common/api/reports/ReportQueriesHandler.h"
 #include "../common/api/reports/ReportQuery.h"
+#include "../common/api/reports/ReportResult.h"
 #include "../utils/Logger.h"
 #include "MatchingEngineRouter.h"
 #include <memory>
@@ -30,10 +31,6 @@ namespace processors {
 /**
  * MatchingEngineReportQueriesHandler - adapter to connect
  * MatchingEngineRouter::HandleReportQuery to ReportQueriesHandler interface
- *
- * Since ReportQueriesHandler::HandleReport is a template method (not virtual),
- * we inherit from ReportQueriesHandler and provide template method
- * implementation that forwards to MatchingEngineRouter::HandleReportQuery.
  */
 class MatchingEngineReportQueriesHandler
     : public common::api::reports::ReportQueriesHandler {
@@ -42,9 +39,6 @@ public:
       MatchingEngineRouter *matchingEngine)
       : matchingEngine_(matchingEngine) {}
 
-  // Template method implementation - forwards to
-  // MatchingEngineRouter::HandleReportQuery Note: This is not a virtual
-  // override, but a template method specialization
   template <typename R>
   std::optional<std::unique_ptr<R>>
   HandleReport(common::api::reports::ReportQuery<R> *reportQuery) {
@@ -53,13 +47,21 @@ public:
                 "matchingEngine_ or reportQuery is nullptr");
       return std::nullopt;
     }
-    LOG_DEBUG("MatchingEngineReportQueriesHandler::HandleReport: calling "
+    LOG_DEBUG("MatchingEngineReportQueriesHandler::HandleReportImpl: calling "
               "matchingEngine_->HandleReportQuery");
-    auto result = matchingEngine_->HandleReportQuery(reportQuery);
-    LOG_DEBUG("MatchingEngineReportQueriesHandler::HandleReport: "
-              "HandleReportQuery returned has_value={}",
+    // Use type erasure: call Process with MatchingEngineRouter
+    // The actual type will be handled by the template HandleReport method
+    auto result = reportQuery->Process(matchingEngine_);
+    LOG_DEBUG("MatchingEngineReportQueriesHandler::HandleReportImpl: Process "
+              "returned has_value={}",
               result.has_value());
-    return result;
+    if (result.has_value()) {
+      // Convert to ReportResult*
+      return std::optional<std::unique_ptr<common::api::reports::ReportResult>>(
+          std::unique_ptr<common::api::reports::ReportResult>(
+              result.value().release()));
+    }
+    return std::nullopt;
   }
 
 private:

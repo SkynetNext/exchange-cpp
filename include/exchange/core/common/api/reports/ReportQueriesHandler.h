@@ -17,6 +17,7 @@
 #pragma once
 
 #include "ReportQuery.h"
+#include "ReportResult.h"
 #include <memory>
 #include <optional>
 
@@ -28,6 +29,10 @@ namespace reports {
 
 /**
  * ReportQueriesHandler - interface for handling report queries
+ *
+ * Note: In C++, template methods cannot be virtual, so we use a different
+ * approach. The HandleReport template method calls a virtual method
+ * HandleReportImpl that subclasses can override.
  */
 class ReportQueriesHandler {
 public:
@@ -35,7 +40,27 @@ public:
 
   template <typename R>
   std::optional<std::unique_ptr<R>> HandleReport(ReportQuery<R> *reportQuery) {
-    // Default implementation - to be overridden
+    // Call virtual method with type erasure
+    // Subclasses override HandleReportImpl to provide actual implementation
+    auto result = HandleReportImpl(reportQuery);
+    if (result.has_value()) {
+      // Cast from ReportResult* to R*
+      R *casted = dynamic_cast<R *>(result.value().get());
+      if (casted != nullptr) {
+        // Transfer ownership
+        result.value().release();
+        return std::make_optional(std::unique_ptr<R>(casted));
+      }
+    }
+    return std::nullopt;
+  }
+
+protected:
+  // Virtual method for type-erased handling
+  // Subclasses should override this to provide actual implementation
+  // reportQuery is a void* to ReportQuery<R>* for some R
+  virtual std::optional<std::unique_ptr<ReportResult>>
+  HandleReportImpl(void *reportQuery) {
     return std::nullopt;
   }
 };
