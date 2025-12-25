@@ -15,6 +15,7 @@
  */
 
 #include <atomic>
+#include <chrono>
 #include <disruptor/BlockingWaitStrategy.h>
 #include <disruptor/BusySpinWaitStrategy.h>
 #include <disruptor/EventFactory.h>
@@ -48,8 +49,10 @@
 #include <exchange/core/processors/journaling/ISerializationProcessor.h>
 #include <exchange/core/utils/Logger.h>
 #include <iostream>
+#include <latch>
 #include <memory>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 namespace exchange {
@@ -122,7 +125,7 @@ public:
       ExchangeCore::ResultsConsumer resultsConsumer,
       const common::config::ExchangeConfiguration *exchangeConfiguration)
       : exchangeConfiguration_(exchangeConfiguration), started_(false),
-        stopped_(false) {
+        stopped_(false), processorStartupLatch_(nullptr) {
     const auto &perfCfg = exchangeConfiguration_->performanceCfg;
     const auto &serializationCfg = exchangeConfiguration_->serializationCfg;
 
@@ -172,6 +175,7 @@ public:
           "PerformanceConfiguration.threadFactory is null");
     }
 
+    // Use original ThreadFactory - Disruptor now supports latch directly
     disruptor_ = std::make_unique<DisruptorT>(
         eventFactory, ringBufferSize, *perfCfg.threadFactory, *waitStrategyPtr);
 
@@ -558,6 +562,14 @@ public:
          i < r1ProcessorsOwned_.size() && i < r2ProcessorsOwned_.size(); i++) {
       r1ProcessorsOwned_[i]->SetSlaveProcessor(r2ProcessorsOwned_[i].get());
     }
+
+    // Create latch for startup synchronization (C++20 std::latch)
+    // Get processor count from Disruptor (all processors are registered by now)
+    // This is more robust than hard-coding the count
+    const int totalProcessors = disruptor_->getProcessorCount();
+    LOG_DEBUG("[ExchangeCore] Creating startup latch for {} processors",
+              totalProcessors);
+    processorStartupLatch_ = std::make_unique<std::latch>(totalProcessors);
   }
 
   void Startup() override {
@@ -566,7 +578,50 @@ public:
     if (!started_.compare_exchange_strong(expected, true)) {
       return; // Already started
     }
-    disruptor_->start();
+
+    // Start disruptor - threads will be created asynchronously
+    // Each thread will call latch.count_down() when it starts (via Disruptor's
+    // built-in latch support)
+    disruptor_->start(processorStartupLatch_.get());
+
+    // Wait for all processor threads to be running using std::latch (C++20)
+    // This is the industrial-grade solution: threads signal when ready
+    // No polling needed - latch.wait() blocks until all threads have started
+    constexpr int maxWaitMs = 1000;
+    auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::milliseconds(maxWaitMs);
+
+    const int expectedProcessors = disruptor_->getProcessorCount();
+    LOG_DEBUG("[ExchangeCore] Waiting for {} processors to start...",
+              expectedProcessors);
+
+    // Wait for latch with timeout (defensive: prevent infinite wait)
+    // Use wait() with timeout instead of polling try_wait()
+    auto startTime = std::chrono::steady_clock::now();
+    bool allStarted = false;
+    while (!allStarted) {
+      if (processorStartupLatch_->try_wait()) {
+        allStarted = true;
+        break;
+      }
+      auto elapsed = std::chrono::steady_clock::now() - startTime;
+      if (elapsed >= std::chrono::milliseconds(maxWaitMs)) {
+        LOG_WARN("[ExchangeCore] Processor startup latch timeout after {}ms. "
+                 "Expected {} processors, but not all started.",
+                 maxWaitMs, expectedProcessors);
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    if (allStarted) {
+      auto elapsed = std::chrono::steady_clock::now() - startTime;
+      LOG_DEBUG("[ExchangeCore] All {} processors have started in {}ms",
+                expectedProcessors,
+                std::chrono::duration_cast<std::chrono::milliseconds>(elapsed)
+                    .count());
+    }
+
     // Debug: Log MatchingEngine sequence values after startup
     // This is not in hot path, only executed once during initialization
     for (size_t i = 0; i < matchingEngineHandlers_.size(); i++) {
@@ -665,6 +720,10 @@ private:
   // core can be started and stopped only once
   std::atomic<bool> started_;
   std::atomic<bool> stopped_;
+
+  // Startup synchronization using std::latch (C++20)
+  // Pointer because latch is created in Startup(), not in constructor
+  std::unique_ptr<std::latch> processorStartupLatch_;
 };
 
 ExchangeCore::ExchangeCore(

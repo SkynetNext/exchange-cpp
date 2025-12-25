@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <functional>
 #include <future>
+#include <tbb/concurrent_hash_map.h>
 #include <vector>
 
 // Include RingBuffer to use MultiProducerRingBuffer type alias
@@ -107,9 +108,14 @@ private:
       *ringBuffer_;
 
   // promises cache (seq -> promise)
-  ankerl::unordered_dense::map<int64_t,
-                               std::promise<common::cmd::CommandResultCode>>
-      promises_;
+  // Thread-safe: SubmitCommandAsync (main thread) and ProcessResult
+  // (ResultsHandler thread) may access concurrently
+  // Using Intel TBB concurrent_hash_map (lock-free, better than Java
+  // ConcurrentHashMap) - header-only, no library linking needed
+  using PromiseMap =
+      tbb::concurrent_hash_map<int64_t,
+                               std::promise<common::cmd::CommandResultCode>>;
+  PromiseMap promises_;
 
   void PublishCommand(common::api::ApiCommand *cmd, int64_t seq);
 

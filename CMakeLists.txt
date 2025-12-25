@@ -106,6 +106,28 @@ else()
     endif()
 endif()
 
+# Intel TBB: High-performance concurrent data structures
+# Used for lock-free promise map (better than Java ConcurrentHashMap)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tbb/CMakeLists.txt)
+    message(STATUS "Using Intel TBB from submodule")
+    # Disable position-independent code on Windows (fPIC not supported on Windows/MSVC)
+    if(WIN32)
+        set(CMAKE_POSITION_INDEPENDENT_CODE OFF CACHE BOOL "Position independent code" FORCE)
+    endif()
+    # Build TBB as static library to avoid DLL dependency issues at runtime
+    # Note: TBB warns about static library, but for HFT systems, static linking
+    # is preferred (no DLL dependencies, better performance, easier deployment)
+    set(BUILD_SHARED_LIBS_SAVED ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
+    add_subdirectory(third_party/tbb)
+    set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_SAVED} CACHE BOOL "Build shared libraries" FORCE)
+    set(TBB_TARGET TBB::tbb)
+else()
+    message(WARNING "Intel TBB submodule not found. Please run:")
+    message(WARNING "  git submodule add https://github.com/oneapi-src/oneTBB.git third_party/tbb")
+    message(FATAL_ERROR "TBB is required for lock-free promise map")
+endif()
+
 # spdlog: High-performance logging library (header-only, matches Java SLF4J+Logback)
 # Using FetchContent for easy integration
 include(FetchContent)
@@ -150,6 +172,7 @@ target_include_directories(exchange-cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         # Third-party header-only libraries
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/unordered_dense/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tbb/include
     PRIVATE
         # Private includes if needed
 )
@@ -159,6 +182,7 @@ target_link_libraries(exchange-cpp
         disruptor-cpp
         Threads::Threads
         spdlog::spdlog
+        ${TBB_TARGET}
         # ART tree is custom implementation, no external dependency
 )
 

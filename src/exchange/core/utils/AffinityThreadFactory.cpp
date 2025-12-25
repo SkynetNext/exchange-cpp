@@ -16,9 +16,9 @@
 
 #include <atomic>
 #include <exchange/core/utils/AffinityThreadFactory.h>
+#include <exchange/core/utils/Logger.h>
 #include <mutex>
 #include <thread>
-#include <memory>
 
 // Platform-specific includes for CPU affinity
 #ifdef _WIN32
@@ -116,7 +116,22 @@ void AffinityThreadFactory::AcquireAffinityLock() {
     affinityMask &= processAffinityMask;
 
     if (affinityMask != 0) {
-      SetThreadAffinityMask(threadHandle, affinityMask);
+      // SetThreadAffinityMask returns previous affinity mask on success, 0 on
+      // failure If it fails, thread will still run but may not be on expected
+      // CPU
+      DWORD_PTR prevMask = SetThreadAffinityMask(threadHandle, affinityMask);
+      if (prevMask == 0) {
+        // Failed to set affinity - thread will still run but may not be pinned
+        LOG_WARN("[AffinityThreadFactory] Failed to set thread affinity mask "
+                 "0x{:x}, thread will run without CPU pinning",
+                 affinityMask);
+      }
+    } else {
+      // No available cores in affinity mask - thread will run without pinning
+      LOG_WARN("[AffinityThreadFactory] No available CPU cores in affinity "
+               "mask (processAffinityMask=0x{:x}), thread will run without "
+               "CPU pinning",
+               processAffinityMask);
     }
   }
 
@@ -128,7 +143,9 @@ void AffinityThreadFactory::AcquireAffinityLock() {
   // Get number of available CPUs
   int numCpus = sysconf(_SC_NPROCESSORS_ONLN);
   if (numCpus <= 0) {
-    return; // Cannot determine CPU count
+    LOG_WARN("[AffinityThreadFactory] Cannot determine CPU count, thread will "
+             "run without CPU pinning");
+    return;
   }
 
   // Calculate which CPU to use
@@ -147,7 +164,12 @@ void AffinityThreadFactory::AcquireAffinityLock() {
 
   // Apply the affinity mask to current thread
   pthread_t currentThread = pthread_self();
-  pthread_setaffinity_np(currentThread, sizeof(cpu_set_t), &cpuset);
+  int ret = pthread_setaffinity_np(currentThread, sizeof(cpu_set_t), &cpuset);
+  if (ret != 0) {
+    LOG_WARN("[AffinityThreadFactory] Failed to set thread affinity to CPU "
+             "{}, error={}, thread will run without CPU pinning",
+             cpuId, ret);
+  }
 
 #else
   // Unsupported platform - no-op

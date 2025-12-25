@@ -24,3 +24,6 @@
 [submodule "third_party/lz4"]
 	path = third_party/lz4
 	url = https://github.com/lz4/lz4.git
+[submodule "third_party/tbb"]
+	path = third_party/tbb
+	url = https://github.com/SkynetNext/oneTBB.git

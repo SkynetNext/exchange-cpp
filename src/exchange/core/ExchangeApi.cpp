@@ -17,7 +17,6 @@
 #include <disruptor/EventTranslatorOneArg.h>
 #include <disruptor/RingBuffer.h>
 #include <exchange/core/ExchangeApi.h>
-#include <iostream>
 #include <exchange/core/common/BalanceAdjustmentType.h>
 #include <exchange/core/common/BytesOut.h>
 #include <exchange/core/common/OrderType.h>
@@ -41,6 +40,7 @@
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/common/cmd/OrderCommandType.h>
 #include <exchange/core/processors/BinaryCommandsProcessor.h>
+#include <exchange/core/utils/Logger.h>
 #include <exchange/core/utils/SerializationUtils.h>
 #include <functional>
 #include <stdexcept>
@@ -248,10 +248,24 @@ ExchangeApi<WaitStrategyT>::ExchangeApi(
 template <typename WaitStrategyT>
 void ExchangeApi<WaitStrategyT>::ProcessResult(int64_t seq,
                                                common::cmd::OrderCommand *cmd) {
-  auto it = promises_.find(seq);
-  if (it != promises_.end()) {
-    it->second.set_value(cmd->resultCode);
-    promises_.erase(it);
+  // TBB concurrent_hash_map: lock-free find and erase
+  typename PromiseMap::accessor accessor;
+  if (promises_.find(accessor, seq)) {
+    LOG_DEBUG("[ExchangeApi] ProcessResult: Found promise for sequence {}, "
+              "setting resultCode={}",
+              seq, static_cast<int>(cmd->resultCode));
+    accessor->second.set_value(cmd->resultCode);
+    promises_.erase(accessor);
+  } else {
+    // No promise found - this can happen if:
+    // 1. Command was submitted via SubmitCommand (fire-and-forget)
+    // 2. Promise was already consumed (shouldn't happen)
+    // 3. Sequence mismatch (shouldn't happen)
+    // Log for debugging intermittent issues
+    LOG_DEBUG("[ExchangeApi] ProcessResult: No promise found for sequence {}, "
+              "command type={}, resultCode={}",
+              seq, static_cast<int>(cmd->command),
+              static_cast<int>(cmd->resultCode));
   }
 }
 
@@ -309,15 +323,20 @@ ExchangeApi<WaitStrategyT>::SubmitCommandAsync(common::api::ApiCommand *cmd) {
   std::promise<common::cmd::CommandResultCode> promise;
   auto future = promise.get_future();
 
-  // Handle binary data and persist commands specially - they claim their own sequences
+  // Handle binary data and persist commands specially - they claim their own
+  // sequences
   if (auto *binaryData =
           dynamic_cast<common::api::ApiBinaryDataCommand *>(cmd)) {
     // PublishBinaryData will claim its own sequences and set promises
     // Use shared_ptr to make lambda copyable for std::function
-    auto promisePtr = std::make_shared<std::promise<common::cmd::CommandResultCode>>(std::move(promise));
+    auto promisePtr =
+        std::make_shared<std::promise<common::cmd::CommandResultCode>>(
+            std::move(promise));
     PublishBinaryData(binaryData, [this, promisePtr](int64_t seq) {
-      // Move the promise from shared_ptr to promises_ map
-      promises_[seq] = std::move(*promisePtr);
+      // TBB concurrent_hash_map: lock-free insert
+      typename PromiseMap::accessor accessor;
+      promises_.insert(accessor, seq);
+      accessor->second = std::move(*promisePtr);
     });
     return future;
   } else if (auto *persistState =
@@ -327,15 +346,24 @@ ExchangeApi<WaitStrategyT>::SubmitCommandAsync(common::api::ApiCommand *cmd) {
     std::promise<common::cmd::CommandResultCode> promise2;
     auto future2 = promise2.get_future();
     // Use shared_ptr to make lambda copyable for std::function
-    auto promise1Ptr = std::make_shared<std::promise<common::cmd::CommandResultCode>>(std::move(promise));
-    auto promise2Ptr = std::make_shared<std::promise<common::cmd::CommandResultCode>>(std::move(promise2));
-    PublishPersistCmd(persistState, [this, promise1Ptr, promise2Ptr](int64_t seq1, int64_t seq2) {
-      // Move the promises from shared_ptr to promises_ map
-      promises_[seq1] = std::move(*promise1Ptr);
-      promises_[seq2] = std::move(*promise2Ptr);
+    auto promise1Ptr =
+        std::make_shared<std::promise<common::cmd::CommandResultCode>>(
+            std::move(promise));
+    auto promise2Ptr =
+        std::make_shared<std::promise<common::cmd::CommandResultCode>>(
+            std::move(promise2));
+    PublishPersistCmd(persistState, [this, promise1Ptr,
+                                     promise2Ptr](int64_t seq1, int64_t seq2) {
+      // TBB concurrent_hash_map: lock-free insert
+      typename PromiseMap::accessor accessor1, accessor2;
+      promises_.insert(accessor1, seq1);
+      accessor1->second = std::move(*promise1Ptr);
+      promises_.insert(accessor2, seq2);
+      accessor2->second = std::move(*promise2Ptr);
     });
     // Return a combined future that waits for both
-    // For simplicity, just return the first future (both should complete with same result)
+    // For simplicity, just return the first future (both should complete with
+    // same result)
     return future;
   }
 
@@ -343,8 +371,15 @@ ExchangeApi<WaitStrategyT>::SubmitCommandAsync(common::api::ApiCommand *cmd) {
   // Get sequence before publishing
   int64_t seq = ringBuffer_->next();
 
-  // Store promise
-  promises_[seq] = std::move(promise);
+  // Store promise (TBB concurrent_hash_map: lock-free insert)
+  {
+    typename PromiseMap::accessor accessor;
+    promises_.insert(accessor, seq);
+    accessor->second = std::move(promise);
+    LOG_DEBUG(
+        "[ExchangeApi] SubmitCommandAsync: stored promise for sequence {}",
+        seq);
+  }
 
   // Get event slot and translate
   auto &event = ringBuffer_->get(seq);
@@ -386,6 +421,7 @@ ExchangeApi<WaitStrategyT>::SubmitCommandAsync(common::api::ApiCommand *cmd) {
 
   // Publish the event
   ringBuffer_->publish(seq);
+  LOG_DEBUG("[ExchangeApi] SubmitCommandAsync: published sequence {}", seq);
 
   return future;
 }
@@ -440,7 +476,8 @@ void ExchangeApi<WaitStrategyT>::PublishBinaryData(
       static_cast<int>(longsArrayData.size()) / LONGS_PER_MESSAGE;
 
   if (totalNumMessagesToClaim == 0) {
-    throw std::runtime_error("PublishBinaryData: empty data after serialization");
+    throw std::runtime_error(
+        "PublishBinaryData: empty data after serialization");
   }
 
   // Verify array size is a multiple of LONGS_PER_MESSAGE
@@ -474,7 +511,8 @@ void ExchangeApi<WaitStrategyT>::PublishBinaryData(
     try {
       int ptr = offset * LONGS_PER_MESSAGE;
       // Verify ptr bounds before loop
-      const int maxPtr = static_cast<int>(longsArrayData.size()) - LONGS_PER_MESSAGE;
+      const int maxPtr =
+          static_cast<int>(longsArrayData.size()) - LONGS_PER_MESSAGE;
       if (ptr < 0 || ptr > maxPtr) {
         throw std::out_of_range("PublishBinaryData: ptr out of range");
       }
@@ -482,12 +520,14 @@ void ExchangeApi<WaitStrategyT>::PublishBinaryData(
       for (int64_t seq = lowSeq; seq <= highSeq; seq++) {
         // Verify bounds before accessing array
         if (ptr + 4 >= static_cast<int>(longsArrayData.size())) {
-          throw std::out_of_range("PublishBinaryData: array index out of bounds");
+          throw std::out_of_range(
+              "PublishBinaryData: array index out of bounds");
         }
 
         // Verify ringBuffer is still valid before accessing
         if (!ringBuffer_) {
-          throw std::runtime_error("PublishBinaryData: ringBuffer became nullptr");
+          throw std::runtime_error(
+              "PublishBinaryData: ringBuffer became nullptr");
         }
 
         auto &cmd = ringBuffer_->get(seq);

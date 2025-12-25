@@ -3,6 +3,7 @@
 | 组件 | Java 原实现 | C++ 方案 | 实现方式 | 状态 | 说明 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **哈希映射** | Eclipse Collections (`IntObjectHashMap`, `IntLongHashMap`) | `ankerl::unordered_dense` | 第三方库（Header-only） | ✅ 已集成 | 比 `std::unordered_map` 快 2-3 倍 |
+| **并发哈希映射** | `ConcurrentHashMap` | `tbb::concurrent_hash_map` | 第三方库（子模块，静态链接） | ✅ 已集成 | 无锁并发哈希表，性能优于 Java `ConcurrentHashMap`，用于 `promises_` 映射。使用静态库避免 DLL 依赖 |
 | **价格索引** | ART 树（`LongAdaptiveRadixTreeMap`，自实现） | **自定义 ART 树** | **直接翻译 Java 实现** | ⏳ 待实现 | 比 `std::map` 快 3-5 倍，固定 8 字节键，O(k) 常数时间 |
 | **对象池** | ObjectsPool（自实现） | **自定义 ObjectsPool** | **直接翻译 Java 实现** | ✅ 已实现 | 线程局部对象池，零分配设计，支持多种对象类型 |
 | **订单链** | 侵入式链表（`DirectOrder.next/prev`，自实现） | **自定义侵入式链表** | **直接翻译 Java 实现** | ✅ 已实现 | 同价格订单队列（FIFO），零额外内存分配 |
