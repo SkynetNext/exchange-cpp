@@ -23,6 +23,7 @@
 #include "../common/config/ExchangeConfiguration.h"
 #include "../orderbook/IOrderBook.h"
 #include "../orderbook/OrderBookEventsHelper.h"
+#include "../utils/Logger.h"
 #include "BinaryCommandsProcessor.h"
 #include "SymbolSpecificationProvider.h"
 #include "journaling/ISerializationProcessor.h"
@@ -177,7 +178,14 @@ private:
     if (query == nullptr) {
       return std::nullopt;
     }
-    return query->Process(this);
+    // Note: LOG_DEBUG is defined in Logger.h and can be used in headers
+    LOG_DEBUG("MatchingEngineRouter::HandleReportQuery: calling "
+              "query->Process(this)");
+    auto result = query->Process(this);
+    LOG_DEBUG("MatchingEngineRouter::HandleReportQuery: Process returned "
+              "has_value={}",
+              result.has_value());
+    return result;
   }
 };
 

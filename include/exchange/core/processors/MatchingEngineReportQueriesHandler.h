@@ -19,7 +19,7 @@
 #include "../common/api/reports/ReportQueriesHandler.h"
 #include "../common/api/reports/ReportQuery.h"
 #include "../utils/Logger.h"
-#include "RiskEngine.h"
+#include "MatchingEngineRouter.h"
 #include <memory>
 #include <optional>
 
@@ -28,40 +28,42 @@ namespace core {
 namespace processors {
 
 /**
- * RiskEngineReportQueriesHandler - adapter to connect
- * RiskEngine::HandleReportQuery to ReportQueriesHandler interface
+ * MatchingEngineReportQueriesHandler - adapter to connect
+ * MatchingEngineRouter::HandleReportQuery to ReportQueriesHandler interface
  *
  * Since ReportQueriesHandler::HandleReport is a template method (not virtual),
  * we inherit from ReportQueriesHandler and provide template method
- * implementation that forwards to RiskEngine::HandleReportQuery.
+ * implementation that forwards to MatchingEngineRouter::HandleReportQuery.
  */
-class RiskEngineReportQueriesHandler
+class MatchingEngineReportQueriesHandler
     : public common::api::reports::ReportQueriesHandler {
 public:
-  explicit RiskEngineReportQueriesHandler(RiskEngine *riskEngine)
-      : riskEngine_(riskEngine) {}
+  explicit MatchingEngineReportQueriesHandler(
+      MatchingEngineRouter *matchingEngine)
+      : matchingEngine_(matchingEngine) {}
 
-  // Template method implementation - forwards to RiskEngine::HandleReportQuery
-  // Note: This is not a virtual override, but a template method specialization
+  // Template method implementation - forwards to
+  // MatchingEngineRouter::HandleReportQuery Note: This is not a virtual
+  // override, but a template method specialization
   template <typename R>
   std::optional<std::unique_ptr<R>>
   HandleReport(common::api::reports::ReportQuery<R> *reportQuery) {
-    if (riskEngine_ == nullptr || reportQuery == nullptr) {
-      LOG_DEBUG("RiskEngineReportQueriesHandler::HandleReport: riskEngine_ or "
-                "reportQuery is nullptr");
+    if (matchingEngine_ == nullptr || reportQuery == nullptr) {
+      LOG_DEBUG("MatchingEngineReportQueriesHandler::HandleReport: "
+                "matchingEngine_ or reportQuery is nullptr");
       return std::nullopt;
     }
-    LOG_DEBUG("RiskEngineReportQueriesHandler::HandleReport: calling "
-              "riskEngine_->HandleReportQuery");
-    auto result = riskEngine_->HandleReportQuery(reportQuery);
-    LOG_DEBUG("RiskEngineReportQueriesHandler::HandleReport: HandleReportQuery "
-              "returned has_value={}",
+    LOG_DEBUG("MatchingEngineReportQueriesHandler::HandleReport: calling "
+              "matchingEngine_->HandleReportQuery");
+    auto result = matchingEngine_->HandleReportQuery(reportQuery);
+    LOG_DEBUG("MatchingEngineReportQueriesHandler::HandleReport: "
+              "HandleReportQuery returned has_value={}",
               result.has_value());
     return result;
   }
 
 private:
-  RiskEngine *riskEngine_;
+  MatchingEngineRouter *matchingEngine_;
 };
 
 } // namespace processors

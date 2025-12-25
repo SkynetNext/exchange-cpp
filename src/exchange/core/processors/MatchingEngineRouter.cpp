@@ -25,6 +25,7 @@
 #include <exchange/core/orderbook/OrderBookEventsHelper.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
 #include <exchange/core/processors/BinaryCommandsProcessor.h>
+#include <exchange/core/processors/MatchingEngineReportQueriesHandler.h>
 #include <exchange/core/processors/MatchingEngineRouter.h>
 #include <exchange/core/processors/SharedPool.h>
 #include <exchange/core/processors/journaling/DiskSerializationProcessorConfiguration.h>
@@ -113,16 +114,19 @@ MatchingEngineRouter::MatchingEngineRouter(
               throw std::runtime_error("wrong shardMask");
             }
 
+            // Create ReportQueriesHandler adapter to forward queries to
+            // MatchingEngineRouter
+            reportQueriesHandler_ =
+                std::make_unique<MatchingEngineReportQueriesHandler>(this);
+
             // Deserialize BinaryCommandsProcessor
             binaryCommandsProcessor_ =
                 std::make_unique<BinaryCommandsProcessor>(
                     [this](common::api::binary::BinaryDataCommand *msg) {
                       HandleBinaryMessage(msg);
                     },
-                    nullptr, // ReportQueriesHandler - will be set up by
-                             // BinaryCommandsProcessor
-                    sharedPool, &exchangeCfg->reportsQueriesCfg, bytesIn,
-                    shardId_ + 1024);
+                    reportQueriesHandler_.get(), sharedPool,
+                    &exchangeCfg->reportsQueriesCfg, bytesIn, shardId_ + 1024);
 
             // Deserialize orderBooks (int -> IOrderBook*)
             int orderBooksLength = bytesIn->ReadInt();
@@ -137,14 +141,18 @@ MatchingEngineRouter::MatchingEngineRouter(
             return nullptr; // Not used
           });
     } else {
+      // Create ReportQueriesHandler adapter to forward queries to
+      // MatchingEngineRouter
+      reportQueriesHandler_ =
+          std::make_unique<MatchingEngineReportQueriesHandler>(this);
+
       // Create BinaryCommandsProcessor normally
       binaryCommandsProcessor_ = std::make_unique<BinaryCommandsProcessor>(
           [this](common::api::binary::BinaryDataCommand *msg) {
             HandleBinaryMessage(msg);
           },
-          nullptr, // ReportQueriesHandler - will be set up by
-                   // BinaryCommandsProcessor
-          sharedPool, &exchangeCfg->reportsQueriesCfg, shardId + 1024);
+          reportQueriesHandler_.get(), sharedPool,
+          &exchangeCfg->reportsQueriesCfg, shardId + 1024);
     }
   } else {
     // Create with minimal configuration

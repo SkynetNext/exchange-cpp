@@ -195,7 +195,11 @@ TEST(ITCoreExample, SampleTest) {
       ProcessReportHelper<SingleUserReportQuery, SingleUserReportResult>(
           api, std::move(reportQuery1), 0);
   auto result1 = report1.get();
-  if (result1 && result1->accounts) {
+  if (!result1) {
+    std::cout << "SingleUserReportQuery 1: result is nullptr" << std::endl;
+  } else if (!result1->accounts) {
+    std::cout << "SingleUserReportQuery 1: accounts is nullptr" << std::endl;
+  } else {
     std::cout << "SingleUserReportQuery 1 accounts: ";
     for (const auto &pair : *result1->accounts) {
       std::cout << "currency=" << pair.first << ", balance=" << pair.second
@@ -210,7 +214,11 @@ TEST(ITCoreExample, SampleTest) {
       ProcessReportHelper<SingleUserReportQuery, SingleUserReportResult>(
           api, std::move(reportQuery2), 0);
   auto result2 = report2.get();
-  if (result2 && result2->accounts) {
+  if (!result2) {
+    std::cout << "SingleUserReportQuery 2: result is nullptr" << std::endl;
+  } else if (!result2->accounts) {
+    std::cout << "SingleUserReportQuery 2: accounts is nullptr" << std::endl;
+  } else {
     std::cout << "SingleUserReportQuery 2 accounts: ";
     for (const auto &pair : *result2->accounts) {
       std::cout << "currency=" << pair.first << ", balance=" << pair.second
@@ -231,10 +239,19 @@ TEST(ITCoreExample, SampleTest) {
                                           TotalCurrencyBalanceReportResult>(
       api, std::move(totalsReportQuery), 0);
   auto totalsResult = totalsReport.get();
-  if (totalsResult && totalsResult->fees) {
+  if (!totalsResult) {
+    std::cout << "TotalCurrencyBalanceReportQuery: result is nullptr"
+              << std::endl;
+  } else if (!totalsResult->fees) {
+    std::cout << "TotalCurrencyBalanceReportQuery: fees is nullptr"
+              << std::endl;
+  } else {
     auto it = totalsResult->fees->find(currencyCodeLtc);
     if (it != totalsResult->fees->end()) {
       std::cout << "LTC fees collected: " << it->second << std::endl;
+    } else {
+      std::cout << "TotalCurrencyBalanceReportQuery: LTC fees not found"
+                << std::endl;
     }
   }
 

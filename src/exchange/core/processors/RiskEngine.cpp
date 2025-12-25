@@ -36,6 +36,7 @@
 #include <exchange/core/processors/journaling/DiskSerializationProcessorConfiguration.h>
 #include <exchange/core/processors/journaling/ISerializationProcessor.h>
 #include <exchange/core/utils/CoreArithmeticUtils.h>
+#include <exchange/core/utils/Logger.h>
 #include <exchange/core/utils/SerializationUtils.h>
 #include <exchange/core/utils/UnsafeUtils.h>
 #include <stdexcept>
@@ -414,7 +415,12 @@ void RiskEngine::HandleBinaryMessage(
 template <typename R>
 std::optional<std::unique_ptr<R>> RiskEngine::HandleReportQuery(
     common::api::reports::ReportQuery<R> *reportQuery) {
-  return reportQuery->Process(this);
+  LOG_DEBUG(
+      "RiskEngine::HandleReportQuery: calling reportQuery->Process(this)");
+  auto result = reportQuery->Process(this);
+  LOG_DEBUG("RiskEngine::HandleReportQuery: Process returned has_value={}",
+            result.has_value());
+  return result;
 }
 
 // Private helper methods (simplified implementations)
