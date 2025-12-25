@@ -261,6 +261,13 @@ public:
   BytesToLongArray(const std::vector<uint8_t> &bytes, int padding);
 
   /**
+   * Convert long array to bytes (matches Java SerializationUtils.longsToWire)
+   * @param longs Vector of int64_t to convert
+   * @return Vector of bytes
+   */
+  static std::vector<uint8_t> LongsToBytes(const std::vector<int64_t> &longs);
+
+  /**
    * Marshall generic map
    * Match Java: SerializationUtils.marshallGenericMap()
    */

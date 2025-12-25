@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../../BytesIn.h"
+#include "../../BytesOut.h"
 #include "ReportQuery.h"
 #include "ReportType.h"
 #include "TotalCurrencyBalanceReportResult.h"
@@ -35,6 +36,7 @@ namespace reports {
 
 /**
  * TotalCurrencyBalanceReportQuery - total currency balance report query
+ * WriteBytesMarshallable is inherited from ReportQuery base class
  */
 class TotalCurrencyBalanceReportQuery
     : public ReportQuery<TotalCurrencyBalanceReportResult> {
@@ -49,10 +51,17 @@ public:
   }
 
   std::optional<std::unique_ptr<TotalCurrencyBalanceReportResult>>
-  Process(processors::MatchingEngineRouter *matchingEngine) override;
+  Process(::exchange::core::processors::MatchingEngineRouter *matchingEngine) override;
 
   std::optional<std::unique_ptr<TotalCurrencyBalanceReportResult>>
-  Process(processors::RiskEngine *riskEngine) override;
+  Process(::exchange::core::processors::RiskEngine *riskEngine) override;
+
+  // CreateResult implementation (matches Java createResult)
+  std::unique_ptr<TotalCurrencyBalanceReportResult>
+  CreateResult(const std::vector<BytesIn *> &sections) override;
+
+  // WriteMarshallable implementation (matches Java writeMarshallable)
+  void WriteMarshallable(BytesOut &bytes) const override;
 };
 
 } // namespace reports

@@ -661,9 +661,10 @@ int32_t OrderBookDirectImpl::GetStateHash() const {
   //     HashingUtils.stateHashStream(bidOrdersStream(true)),
   //     getSymbolSpec().stateHash());
   //
-  // Java askOrdersStream() uses OrdersSpliterator which starts from bestAskOrder
-  // and traverses via prev pointer (from best price to worst price, oldest to newest within each price)
-  // This matches the order chain structure where:
+  // Java askOrdersStream() uses OrdersSpliterator which starts from
+  // bestAskOrder and traverses via prev pointer (from best price to worst
+  // price, oldest to newest within each price) This matches the order chain
+  // structure where:
   // - bestAskOrder points to best price's first (oldest) order
   // - Following prev gives worse prices (and within same price, newer orders)
   // - Following next gives better prices (and within same price, older orders)
@@ -736,19 +737,20 @@ bool OrderBookDirectImpl::isBudgetLimitSatisfied(
 std::string OrderBookDirectImpl::PrintAskBucketsDiagram() const {
   std::ostringstream oss;
   oss << "DirectImpl Ask Buckets (ART tree, ascending order):\n";
-  
+
   // Print actual prices and bucket info
   auto entriesList = askPriceBuckets_.EntriesList();
   if (entriesList.empty()) {
     oss << "  (empty)\n";
   } else {
-    // Convert to vector for sorting (std::sort requires random access iterators)
+    // Convert to vector for sorting (std::sort requires random access
+    // iterators)
     std::vector<std::pair<int64_t, Bucket *>> entries(entriesList.begin(),
-                                                       entriesList.end());
+                                                      entriesList.end());
     // Sort by price (ascending for asks)
     std::sort(entries.begin(), entries.end(),
               [](const auto &a, const auto &b) { return a.first < b.first; });
-    
+
     for (const auto &entry : entries) {
       int64_t price = entry.first;
       const Bucket *bucket = entry.second;
@@ -759,28 +761,51 @@ std::string OrderBookDirectImpl::PrintAskBucketsDiagram() const {
       }
     }
   }
-  
+
   oss << "\nART Tree Structure:\n";
   oss << askPriceBuckets_.PrintDiagram();
   return oss.str();
 }
 
+void OrderBookDirectImpl::ProcessAskOrders(
+    std::function<void(const common::IOrder *)> consumer) const {
+  // Match Java: askOrdersStream() uses OrdersSpliterator which starts from
+  // bestAskOrder and traverses via prev pointer
+  DirectOrder *current = bestAskOrder_;
+  while (current != nullptr) {
+    consumer(current);
+    current = current->prev;
+  }
+}
+
+void OrderBookDirectImpl::ProcessBidOrders(
+    std::function<void(const common::IOrder *)> consumer) const {
+  // Match Java: bidOrdersStream() uses OrdersSpliterator which starts from
+  // bestBidOrder and traverses via prev pointer
+  DirectOrder *current = bestBidOrder_;
+  while (current != nullptr) {
+    consumer(current);
+    current = current->prev;
+  }
+}
+
 std::string OrderBookDirectImpl::PrintBidBucketsDiagram() const {
   std::ostringstream oss;
   oss << "DirectImpl Bid Buckets (ART tree, descending order):\n";
-  
+
   // Print actual prices and bucket info
   auto entriesList = bidPriceBuckets_.EntriesList();
   if (entriesList.empty()) {
     oss << "  (empty)\n";
   } else {
-    // Convert to vector for sorting (std::sort requires random access iterators)
+    // Convert to vector for sorting (std::sort requires random access
+    // iterators)
     std::vector<std::pair<int64_t, Bucket *>> entries(entriesList.begin(),
-                                                       entriesList.end());
+                                                      entriesList.end());
     // Sort by price (descending for bids)
     std::sort(entries.begin(), entries.end(),
               [](const auto &a, const auto &b) { return a.first > b.first; });
-    
+
     for (const auto &entry : entries) {
       int64_t price = entry.first;
       const Bucket *bucket = entry.second;
@@ -791,7 +816,7 @@ std::string OrderBookDirectImpl::PrintBidBucketsDiagram() const {
       }
     }
   }
-  
+
   oss << "\nART Tree Structure:\n";
   oss << bidPriceBuckets_.PrintDiagram();
   return oss.str();

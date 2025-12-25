@@ -25,6 +25,7 @@
 
 namespace exchange {
 namespace core {
+// Forward declarations
 namespace processors {
 class MatchingEngineRouter;
 class RiskEngine;
@@ -47,11 +48,17 @@ public:
     return static_cast<int32_t>(ReportType::STATE_HASH);
   }
 
-  std::optional<std::unique_ptr<StateHashReportResult>>
-  Process(processors::MatchingEngineRouter *matchingEngine) override;
+  std::unique_ptr<StateHashReportResult>
+  CreateResult(const std::vector<BytesIn *> &sections) override;
 
   std::optional<std::unique_ptr<StateHashReportResult>>
-  Process(processors::RiskEngine *riskEngine) override;
+  Process(::exchange::core::processors::MatchingEngineRouter *matchingEngine) override;
+
+  std::optional<std::unique_ptr<StateHashReportResult>>
+  Process(::exchange::core::processors::RiskEngine *riskEngine) override;
+
+  // WriteMarshallable implementation (matches Java writeMarshallable)
+  void WriteMarshallable(BytesOut &bytes) const override;
 };
 
 } // namespace reports

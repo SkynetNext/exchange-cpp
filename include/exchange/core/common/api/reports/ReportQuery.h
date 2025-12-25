@@ -16,9 +16,12 @@
 
 #pragma once
 
+#include "../../BytesIn.h"
+#include "../../WriteBytesMarshallable.h"
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <vector>
 
 namespace exchange {
 namespace core {
@@ -34,8 +37,10 @@ namespace reports {
 /**
  * ReportQuery - reports query interface
  * @tparam T corresponding result type
+ * Matches Java: public interface ReportQuery<T extends ReportResult> extends
+ * WriteBytesMarshallable
  */
-template <typename T> class ReportQuery {
+template <typename T> class ReportQuery : public WriteBytesMarshallable {
 public:
   virtual ~ReportQuery() = default;
 
@@ -51,8 +56,8 @@ public:
    * @param matchingEngine matcher engine instance
    * @return custom result
    */
-  virtual std::optional<std::unique_ptr<T>>
-  Process(processors::MatchingEngineRouter *matchingEngine) = 0;
+  virtual std::optional<std::unique_ptr<T>> Process(
+      ::exchange::core::processors::MatchingEngineRouter *matchingEngine) = 0;
 
   /**
    * Report main logic
@@ -62,7 +67,15 @@ public:
    * @return custom result
    */
   virtual std::optional<std::unique_ptr<T>>
-  Process(processors::RiskEngine *riskEngine) = 0;
+  Process(::exchange::core::processors::RiskEngine *riskEngine) = 0;
+
+  /**
+   * Create result from sections (matches Java createResult)
+   * @param sections Vector of BytesIn sections (one per shard/section)
+   * @return Merged result
+   */
+  virtual std::unique_ptr<T>
+  CreateResult(const std::vector<BytesIn *> &sections) = 0;
 };
 
 } // namespace reports

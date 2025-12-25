@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <exchange/core/common/BytesIn.h>
 #include <exchange/core/common/BytesOut.h>
 #include <exchange/core/common/api/reports/TotalCurrencyBalanceReportResult.h>
 #include <exchange/core/utils/SerializationUtils.h>
@@ -39,6 +40,43 @@ TotalCurrencyBalanceReportResult::OfOrderBalances(
       new ankerl::unordered_dense::map<int32_t, int64_t>(currencyBalance);
   return new TotalCurrencyBalanceReportResult(
       nullptr, nullptr, nullptr, nullptr, ordersBalances, nullptr, nullptr);
+}
+
+TotalCurrencyBalanceReportResult::TotalCurrencyBalanceReportResult(
+    BytesIn &bytes) {
+  // Match Java: TotalCurrencyBalanceReportResult(final BytesIn bytesIn)
+  accountBalances =
+      bytes.ReadBoolean()
+          ? new ankerl::unordered_dense::map<int32_t, int64_t>(
+                utils::SerializationUtils::ReadIntLongHashMap(bytes))
+          : nullptr;
+  fees = bytes.ReadBoolean()
+             ? new ankerl::unordered_dense::map<int32_t, int64_t>(
+                   utils::SerializationUtils::ReadIntLongHashMap(bytes))
+             : nullptr;
+  adjustments = bytes.ReadBoolean()
+                    ? new ankerl::unordered_dense::map<int32_t, int64_t>(
+                          utils::SerializationUtils::ReadIntLongHashMap(bytes))
+                    : nullptr;
+  suspends = bytes.ReadBoolean()
+                 ? new ankerl::unordered_dense::map<int32_t, int64_t>(
+                       utils::SerializationUtils::ReadIntLongHashMap(bytes))
+                 : nullptr;
+  ordersBalances =
+      bytes.ReadBoolean()
+          ? new ankerl::unordered_dense::map<int32_t, int64_t>(
+                utils::SerializationUtils::ReadIntLongHashMap(bytes))
+          : nullptr;
+  openInterestLong =
+      bytes.ReadBoolean()
+          ? new ankerl::unordered_dense::map<int32_t, int64_t>(
+                utils::SerializationUtils::ReadIntLongHashMap(bytes))
+          : nullptr;
+  openInterestShort =
+      bytes.ReadBoolean()
+          ? new ankerl::unordered_dense::map<int32_t, int64_t>(
+                utils::SerializationUtils::ReadIntLongHashMap(bytes))
+          : nullptr;
 }
 
 void TotalCurrencyBalanceReportResult::WriteMarshallable(
@@ -83,6 +121,48 @@ void TotalCurrencyBalanceReportResult::WriteMarshallable(
     utils::SerializationUtils::MarshallIntLongHashMap(*openInterestShort,
                                                       bytes);
   }
+}
+
+std::unique_ptr<TotalCurrencyBalanceReportResult>
+TotalCurrencyBalanceReportResult::Merge(const std::vector<BytesIn *> &pieces) {
+  // Match Java: merge(final Stream<BytesIn> pieces)
+  if (pieces.empty()) {
+    return std::unique_ptr<TotalCurrencyBalanceReportResult>(CreateEmpty());
+  }
+
+  // Start with first piece
+  auto result = std::make_unique<TotalCurrencyBalanceReportResult>(*pieces[0]);
+
+  // Merge remaining pieces
+  for (size_t i = 1; i < pieces.size(); i++) {
+    auto next = std::make_unique<TotalCurrencyBalanceReportResult>(*pieces[i]);
+
+    // Merge all maps using MergeSum
+    result->accountBalances =
+        new ankerl::unordered_dense::map<int32_t, int64_t>(
+            utils::SerializationUtils::MergeSum(result->accountBalances,
+                                                next->accountBalances));
+    result->fees = new ankerl::unordered_dense::map<int32_t, int64_t>(
+        utils::SerializationUtils::MergeSum(result->fees, next->fees));
+    result->adjustments = new ankerl::unordered_dense::map<int32_t, int64_t>(
+        utils::SerializationUtils::MergeSum(result->adjustments,
+                                            next->adjustments));
+    result->suspends = new ankerl::unordered_dense::map<int32_t, int64_t>(
+        utils::SerializationUtils::MergeSum(result->suspends, next->suspends));
+    result->ordersBalances = new ankerl::unordered_dense::map<int32_t, int64_t>(
+        utils::SerializationUtils::MergeSum(result->ordersBalances,
+                                            next->ordersBalances));
+    result->openInterestLong =
+        new ankerl::unordered_dense::map<int32_t, int64_t>(
+            utils::SerializationUtils::MergeSum(result->openInterestLong,
+                                                next->openInterestLong));
+    result->openInterestShort =
+        new ankerl::unordered_dense::map<int32_t, int64_t>(
+            utils::SerializationUtils::MergeSum(result->openInterestShort,
+                                                next->openInterestShort));
+  }
+
+  return result;
 }
 
 } // namespace reports

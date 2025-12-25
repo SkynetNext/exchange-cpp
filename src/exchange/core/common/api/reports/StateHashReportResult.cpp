@@ -38,6 +38,17 @@ void StateHashReportResult::SubmoduleKey::WriteMarshallable(
   bytes.WriteInt(static_cast<int32_t>(submodule));
 }
 
+StateHashReportResult::StateHashReportResult(BytesIn &bytes) {
+  // Match Java: SerializationUtils.readGenericMap(bytesIn, TreeMap::new,
+  // SubmoduleKey::new, BytesIn::readInt)
+  int32_t size = bytes.ReadInt();
+  for (int32_t i = 0; i < size; i++) {
+    SubmoduleKey key(bytes);
+    int32_t value = bytes.ReadInt();
+    hashCodes[key] = value;
+  }
+}
+
 void StateHashReportResult::WriteMarshallable(BytesOut &bytes) const {
   // Match Java: SerializationUtils.marshallGenericMap(hashCodes, bytes, (b, k)
   // -> k.writeMarshallable(b), BytesOut::writeInt) Directly implement to avoid
@@ -48,6 +59,33 @@ void StateHashReportResult::WriteMarshallable(BytesOut &bytes) const {
     bytes.WriteInt(pair.second);
   }
 }
+
+std::unique_ptr<StateHashReportResult>
+StateHashReportResult::Merge(const std::vector<BytesIn *> &pieces) {
+  // Match Java: merge(final Stream<BytesIn> pieces)
+  if (pieces.empty()) {
+    return std::make_unique<StateHashReportResult>(EMPTY);
+  }
+
+  // Start with first piece
+  auto result = std::make_unique<StateHashReportResult>(*pieces[0]);
+
+  // Merge remaining pieces
+  for (size_t i = 1; i < pieces.size(); i++) {
+    auto next = std::make_unique<StateHashReportResult>(*pieces[i]);
+
+    // Merge logic (matches Java reduce): putAll
+    for (const auto &pair : next->hashCodes) {
+      result->hashCodes[pair.first] = pair.second;
+    }
+  }
+
+  return result;
+}
+
+// Static EMPTY constant
+const StateHashReportResult StateHashReportResult::EMPTY =
+    StateHashReportResult(std::map<SubmoduleKey, int32_t>());
 
 } // namespace reports
 } // namespace api

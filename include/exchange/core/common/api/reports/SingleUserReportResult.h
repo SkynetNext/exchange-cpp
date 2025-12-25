@@ -56,6 +56,11 @@ public:
     int64_t pendingSellSize;
     int64_t pendingBuySize;
 
+    // Default constructor (needed for unordered_dense::map operator[])
+    Position()
+        : quoteCurrency(0), direction(PositionDirection::EMPTY), openVolume(0),
+          openPriceSum(0), profit(0), pendingSellSize(0), pendingBuySize(0) {}
+
     Position(int32_t quoteCurrency, PositionDirection direction,
              int64_t openVolume, int64_t openPriceSum, int64_t profit,
              int64_t pendingSellSize, int64_t pendingBuySize)
@@ -80,6 +85,19 @@ public:
       orders;
   QueryExecutionStatus queryExecutionStatus;
 
+  /**
+   * Default constructor (for static factory methods)
+   */
+  SingleUserReportResult()
+      : uid(0), userStatus(nullptr), accounts(nullptr), positions(nullptr),
+        orders(nullptr), queryExecutionStatus(QueryExecutionStatus::OK) {}
+
+  /**
+   * Constructor from BytesIn (deserialization, matches Java private
+   * constructor)
+   */
+  explicit SingleUserReportResult(BytesIn &bytes);
+
   static SingleUserReportResult *CreateFromMatchingEngine(
       int64_t uid,
       const ankerl::unordered_dense::map<int32_t, std::vector<Order *>>
@@ -92,6 +110,14 @@ public:
 
   static std::unique_ptr<SingleUserReportResult>
   CreateFromRiskEngineNotFound(int64_t uid);
+
+  /**
+   * Merge multiple results (matches Java merge method)
+   * @param pieces Vector of BytesIn sections (one per shard)
+   * @return Merged result
+   */
+  static std::unique_ptr<SingleUserReportResult>
+  Merge(const std::vector<BytesIn *> &pieces);
 
   // Serialization method
   void WriteMarshallable(BytesOut &bytes) const;

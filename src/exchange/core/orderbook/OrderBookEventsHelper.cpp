@@ -19,6 +19,8 @@
 #include <exchange/core/common/MatcherTradeEvent.h>
 #include <exchange/core/orderbook/OrderBookEventsHelper.h>
 #include <exchange/core/utils/SerializationUtils.h>
+#include <map>
+#include <vector>
 
 namespace exchange {
 namespace core {
@@ -127,6 +129,42 @@ common::MatcherTradeEvent *OrderBookEventsHelper::CreateBinaryEventsChain(
 OrderBookEventsHelper *OrderBookEventsHelper::NonPooledEventsHelper() {
   static OrderBookEventsHelper instance;
   return &instance;
+}
+
+std::map<int32_t, std::vector<uint8_t>>
+OrderBookEventsHelper::DeserializeEvents(const common::cmd::OrderCommand *cmd) {
+  // Match Java: deserializeEvents()
+  // Group events by section
+  std::map<int32_t, std::vector<common::MatcherTradeEvent *>> sections;
+
+  // Process all events in the chain
+  cmd->ProcessMatcherEvents([&sections](common::MatcherTradeEvent *evt) {
+    if (evt->eventType == common::MatcherEventType::BINARY_EVENT) {
+      sections[evt->section].push_back(evt);
+    }
+  });
+
+  // Convert each section's events to bytes (long array)
+  std::map<int32_t, std::vector<uint8_t>> result;
+
+  for (const auto &[section, events] : sections) {
+    // Build long array from events (5 longs per event)
+    std::vector<int64_t> dataArray;
+    dataArray.reserve(events.size() * 5);
+
+    for (const auto *evt : events) {
+      dataArray.push_back(evt->matchedOrderId);
+      dataArray.push_back(evt->matchedOrderUid);
+      dataArray.push_back(evt->price);
+      dataArray.push_back(evt->size);
+      dataArray.push_back(evt->bidderHoldPrice);
+    }
+
+    // Convert long array to bytes (matches Java SerializationUtils.longsToWire)
+    result[section] = utils::SerializationUtils::LongsToBytes(dataArray);
+  }
+
+  return result;
 }
 
 } // namespace orderbook

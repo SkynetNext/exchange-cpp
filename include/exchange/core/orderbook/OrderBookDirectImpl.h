@@ -121,7 +121,6 @@ public:
   void FillBids(int32_t size, common::L2MarketData *data) override;
   int32_t GetTotalAskBuckets(int32_t limit) override;
   int32_t GetTotalBidBuckets(int32_t limit) override;
-  std::vector<common::Order *> FindUserOrders(int64_t uid);
   void Reset();
 
   // StateHash interface
@@ -130,6 +129,15 @@ public:
   // Debug methods (IOrderBook interface)
   std::string PrintAskBucketsDiagram() const override;
   std::string PrintBidBucketsDiagram() const override;
+
+  // Process orders methods (IOrderBook interface)
+  void ProcessAskOrders(
+      std::function<void(const common::IOrder *)> consumer) const override;
+  void ProcessBidOrders(
+      std::function<void(const common::IOrder *)> consumer) const override;
+
+  // Find user orders (IOrderBook interface)
+  std::vector<common::Order *> FindUserOrders(int64_t uid) override;
 
   // WriteBytesMarshallable interface
   void WriteMarshallable(common::BytesOut &bytes) const override;

@@ -234,6 +234,16 @@ SerializationUtils::BytesToLongArray(const std::vector<uint8_t> &bytes,
   return longArray;
 }
 
+std::vector<uint8_t>
+SerializationUtils::LongsToBytes(const std::vector<int64_t> &longs) {
+  // Match Java: SerializationUtils.longsToWire()
+  // Convert long array to bytes (little-endian)
+  std::vector<uint8_t> bytes;
+  bytes.resize(longs.size() * sizeof(int64_t));
+  std::memcpy(bytes.data(), longs.data(), bytes.size());
+  return bytes;
+}
+
 } // namespace utils
 } // namespace core
 } // namespace exchange

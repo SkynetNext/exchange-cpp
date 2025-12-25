@@ -553,9 +553,10 @@ int32_t OrderBookNaiveImpl::GetStateHash() const {
   }
 
   // Calculate hash for bid orders stream
-  // Note: bidBuckets in Java uses Collections.reverseOrder(), so values() is already descending
-  // In C++, bidBuckets_ uses std::greater<int64_t>, so begin() to end() is descending
-  // This matches Java bidBuckets.values().stream()
+  // Note: bidBuckets in Java uses Collections.reverseOrder(), so values() is
+  // already descending In C++, bidBuckets_ uses std::greater<int64_t>, so
+  // begin() to end() is descending This matches Java
+  // bidBuckets.values().stream()
   int32_t bidHash = 0;
   for (const auto &pair : bidBuckets_) {
     auto orders = pair.second->GetAllOrders();
@@ -751,6 +752,54 @@ std::string OrderBookNaiveImpl::PrintBidBucketsDiagram() const {
     }
   }
   return oss.str();
+}
+
+void OrderBookNaiveImpl::ProcessAskOrders(
+    std::function<void(const common::IOrder *)> consumer) const {
+  // Match Java: askBuckets.values().stream().flatMap(bucket ->
+  // bucket.getAllOrders().stream())
+  for (const auto &pair : askBuckets_) {
+    pair.second->ForEachOrder([&consumer](common::Order *order) {
+      if (order != nullptr) {
+        consumer(order);
+      }
+    });
+  }
+}
+
+void OrderBookNaiveImpl::ProcessBidOrders(
+    std::function<void(const common::IOrder *)> consumer) const {
+  // Match Java: bidBuckets.values().stream().flatMap(bucket ->
+  // bucket.getAllOrders().stream())
+  for (const auto &pair : bidBuckets_) {
+    pair.second->ForEachOrder([&consumer](common::Order *order) {
+      if (order != nullptr) {
+        consumer(order);
+      }
+    });
+  }
+}
+
+std::vector<common::Order *> OrderBookNaiveImpl::FindUserOrders(int64_t uid) {
+  // Match Java: findUserOrders(final long uid)
+  std::vector<common::Order *> list;
+  // Process ask buckets
+  for (const auto &pair : askBuckets_) {
+    pair.second->ForEachOrder([&list, uid](common::Order *order) {
+      if (order != nullptr && order->uid == uid) {
+        list.push_back(order);
+      }
+    });
+  }
+  // Process bid buckets
+  for (const auto &pair : bidBuckets_) {
+    pair.second->ForEachOrder([&list, uid](common::Order *order) {
+      if (order != nullptr && order->uid == uid) {
+        list.push_back(order);
+      }
+    });
+  }
+  return list;
 }
 
 } // namespace orderbook

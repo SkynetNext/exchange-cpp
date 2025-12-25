@@ -21,6 +21,7 @@
 #include "../common/cmd/OrderCommand.h"
 #include <cstdint>
 #include <functional>
+#include <map>
 
 namespace exchange {
 namespace core {
@@ -60,12 +61,21 @@ public:
 
   // Create binary events chain from bytes
   // Match Java: createBinaryEventsChain()
-  common::MatcherTradeEvent *CreateBinaryEventsChain(int64_t timestamp,
-                                                      int32_t section,
-                                                      const std::vector<uint8_t> &bytes);
+  common::MatcherTradeEvent *
+  CreateBinaryEventsChain(int64_t timestamp, int32_t section,
+                          const std::vector<uint8_t> &bytes);
 
   // Static instance for non-pooled events
   static OrderBookEventsHelper *NonPooledEventsHelper();
+
+  /**
+   * Deserialize events from OrderCommand (matches Java deserializeEvents)
+   * Extracts binary events from matcherEvent chain and groups by section
+   * @param cmd OrderCommand with matcherEvent chain
+   * @return Map of section -> bytes (as vector of uint8_t)
+   */
+  static std::map<int32_t, std::vector<uint8_t>>
+  DeserializeEvents(const common::cmd::OrderCommand *cmd);
 
 private:
   EventFactory eventFactory_;

@@ -27,18 +27,20 @@
 #include <exchange/core/common/api/ApiAdjustUserBalance.h>
 #include <exchange/core/common/api/ApiCancelOrder.h>
 // ApiCommandResult is defined in IEventsHandler.h
+#include <disruptor/BlockingWaitStrategy.h>
+#include <disruptor/BusySpinWaitStrategy.h>
+#include <disruptor/YieldingWaitStrategy.h>
 #include <exchange/core/common/api/ApiBinaryDataCommand.h>
 #include <exchange/core/common/api/ApiMoveOrder.h>
 #include <exchange/core/common/api/ApiOrderBookRequest.h>
 #include <exchange/core/common/api/ApiPlaceOrder.h>
 #include <exchange/core/common/api/binary/BatchAddSymbolsCommand.h>
 
-// Report queries are complex and require ApiReportQuery wrapper
-// #include <exchange/core/common/api/reports/SingleUserReportQuery.h>
-// #include <exchange/core/common/api/reports/SingleUserReportResult.h>
-// #include <exchange/core/common/api/reports/TotalCurrencyBalanceReportQuery.h>
-// #include
-// <exchange/core/common/api/reports/TotalCurrencyBalanceReportResult.h>
+// Report queries - need to implement WriteMarshallable for ReportQuery classes
+#include <exchange/core/common/api/reports/SingleUserReportQuery.h>
+#include <exchange/core/common/api/reports/SingleUserReportResult.h>
+#include <exchange/core/common/api/reports/TotalCurrencyBalanceReportQuery.h>
+#include <exchange/core/common/api/reports/TotalCurrencyBalanceReportResult.h>
 #include <exchange/core/common/cmd/CommandResultCode.h>
 #include <exchange/core/common/config/ExchangeConfiguration.h>
 #include <gtest/gtest.h>
@@ -48,8 +50,7 @@ using namespace exchange::core;
 using namespace exchange::core::common;
 using namespace exchange::core::common::api;
 using namespace exchange::core::common::api::binary;
-// using namespace exchange::core::common::api::reports; // Commented out -
-// reports not used in this example
+using namespace exchange::core::common::api::reports;
 using namespace exchange::core::common::cmd;
 
 // Simple events handler for testing
@@ -188,10 +189,35 @@ TEST(ITCoreExample, SampleTest) {
             << std::endl;
 
   // Check balances
-  // Note: Report queries need to be submitted via ApiReportQuery wrapper
-  // For now, we'll skip the report queries as they require more complex setup
-  // TODO: Implement report query submission via ApiReportQuery and
-  // ApiBinaryDataCommand
+  // Check user 301 balances
+  auto reportQuery1 = std::make_unique<SingleUserReportQuery>(301L);
+  auto report1 =
+      ProcessReportHelper<SingleUserReportQuery, SingleUserReportResult>(
+          api, std::move(reportQuery1), 0);
+  auto result1 = report1.get();
+  if (result1 && result1->accounts) {
+    std::cout << "SingleUserReportQuery 1 accounts: ";
+    for (const auto &pair : *result1->accounts) {
+      std::cout << "currency=" << pair.first << ", balance=" << pair.second
+                << " ";
+    }
+    std::cout << std::endl;
+  }
+
+  // Check user 302 balances
+  auto reportQuery2 = std::make_unique<SingleUserReportQuery>(302L);
+  auto report2 =
+      ProcessReportHelper<SingleUserReportQuery, SingleUserReportResult>(
+          api, std::move(reportQuery2), 0);
+  auto result2 = report2.get();
+  if (result2 && result2->accounts) {
+    std::cout << "SingleUserReportQuery 2 accounts: ";
+    for (const auto &pair : *result2->accounts) {
+      std::cout << "currency=" << pair.first << ", balance=" << pair.second
+                << " ";
+    }
+    std::cout << std::endl;
+  }
 
   // First user withdraws 0.10 BTC
   auto future10 = api->SubmitCommandAsync(
@@ -200,7 +226,17 @@ TEST(ITCoreExample, SampleTest) {
             << static_cast<int>(future10.get()) << std::endl;
 
   // Check fees collected
-  // TODO: Implement report query submission
+  auto totalsReportQuery = std::make_unique<TotalCurrencyBalanceReportQuery>();
+  auto totalsReport = ProcessReportHelper<TotalCurrencyBalanceReportQuery,
+                                          TotalCurrencyBalanceReportResult>(
+      api, std::move(totalsReportQuery), 0);
+  auto totalsResult = totalsReport.get();
+  if (totalsResult && totalsResult->fees) {
+    auto it = totalsResult->fees->find(currencyCodeLtc);
+    if (it != totalsResult->fees->end()) {
+      std::cout << "LTC fees collected: " << it->second << std::endl;
+    }
+  }
 
   // Shutdown
   exchangeCore->Shutdown();

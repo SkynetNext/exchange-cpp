@@ -24,6 +24,7 @@
 #include "../common/cmd/CommandResultCode.h"
 #include "../common/cmd/OrderCommand.h"
 #include <cstdint>
+#include <functional>
 #include <memory>
 
 namespace exchange {
@@ -31,6 +32,7 @@ namespace core {
 namespace common {
 class CoreSymbolSpecification;
 class BytesIn;
+class Order;
 namespace config {
 class LoggingConfiguration;
 }
@@ -150,6 +152,31 @@ public:
    */
   virtual std::string PrintAskBucketsDiagram() const = 0;
   virtual std::string PrintBidBucketsDiagram() const = 0;
+
+  /**
+   * Process all ask orders with a callback function
+   * Matches Java askOrdersStream() - iterates over all ask orders
+   * @param consumer Callback function that receives each order
+   */
+  virtual void ProcessAskOrders(
+      std::function<void(const common::IOrder *)> consumer) const = 0;
+
+  /**
+   * Process all bid orders with a callback function
+   * Matches Java bidOrdersStream() - iterates over all bid orders
+   * @param consumer Callback function that receives each order
+   */
+  virtual void ProcessBidOrders(
+      std::function<void(const common::IOrder *)> consumer) const = 0;
+
+  /**
+   * Search for all orders for specified user
+   * Matches Java findUserOrders(long uid)
+   * Slow, because order book does not maintain uid-to-order index
+   * @param uid user id
+   * @return list of orders
+   */
+  virtual std::vector<common::Order *> FindUserOrders(int64_t uid) = 0;
 
   /**
    * Process command - static helper method

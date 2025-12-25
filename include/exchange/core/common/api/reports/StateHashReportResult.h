@@ -19,6 +19,8 @@
 #include "ReportResult.h"
 #include <cstdint>
 #include <map>
+#include <memory>
+#include <vector>
 
 namespace exchange {
 namespace core {
@@ -87,10 +89,19 @@ public:
       const std::map<SubmoduleKey, int32_t> &hashCodes = {})
       : hashCodes(hashCodes) {}
 
+  // Constructor from BytesIn (deserialization)
+  explicit StateHashReportResult(BytesIn &bytes);
+
   int32_t GetStateHash() const;
 
   // Serialization method
   void WriteMarshallable(BytesOut &bytes) const;
+
+  // Merge method (matches Java merge)
+  static std::unique_ptr<StateHashReportResult>
+  Merge(const std::vector<BytesIn *> &pieces);
+
+  static const StateHashReportResult EMPTY;
 };
 
 } // namespace reports

@@ -90,6 +90,15 @@ public:
   std::string PrintAskBucketsDiagram() const override;
   std::string PrintBidBucketsDiagram() const override;
 
+  // Process orders methods (IOrderBook interface)
+  void ProcessAskOrders(
+      std::function<void(const common::IOrder *)> consumer) const override;
+  void ProcessBidOrders(
+      std::function<void(const common::IOrder *)> consumer) const override;
+
+  // Find user orders (IOrderBook interface)
+  std::vector<common::Order *> FindUserOrders(int64_t uid) override;
+
 private:
   const common::CoreSymbolSpecification *symbolSpec_;
   OrderBookEventsHelper *eventsHelper_;
