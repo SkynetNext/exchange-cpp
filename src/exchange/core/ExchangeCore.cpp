@@ -216,7 +216,7 @@ public:
           const common::config::PerformanceConfiguration *perfCfg,
           common::CoreWaitStrategy coreWaitStrategy,
           processors::SharedPool *sharedPool,
-          std::vector<std::shared_ptr<processors::GroupingProcessor>>
+          std::vector<std::shared_ptr<processors::GroupingProcessor<WaitStrategyT>>>
               &processors,
           std::vector<BarrierPtr> &ownedBarriers)
           : perfCfg_(perfCfg), coreWaitStrategy_(coreWaitStrategy),
@@ -242,7 +242,7 @@ public:
         // processor. In Java, GC manages object lifetime. In C++, we must
         // explicitly manage ownership.
         ownedBarriers_.push_back(barrier);
-        auto processor = std::make_shared<processors::GroupingProcessor>(
+        auto processor = std::make_shared<processors::GroupingProcessor<WaitStrategyT>>(
             &ringBuffer, barrier.get(), perfCfg_, coreWaitStrategy_,
             sharedPool_);
 
@@ -259,7 +259,7 @@ public:
       const common::config::PerformanceConfiguration *perfCfg_;
       common::CoreWaitStrategy coreWaitStrategy_;
       processors::SharedPool *sharedPool_;
-      std::vector<std::shared_ptr<processors::GroupingProcessor>> &processors_;
+      std::vector<std::shared_ptr<processors::GroupingProcessor<WaitStrategyT>>> &processors_;
       std::vector<BarrierPtr> &ownedBarriers_;
     };
 
@@ -736,7 +736,7 @@ private:
   std::vector<std::unique_ptr<processors::MatchingEngineRouter>>
       matchingEngines_;
   std::vector<std::unique_ptr<processors::RiskEngine>> riskEngines_;
-  std::vector<std::shared_ptr<processors::GroupingProcessor>>
+  std::vector<std::shared_ptr<processors::GroupingProcessor<WaitStrategyT>>>
       groupingProcessors_;
   std::vector<void *> r1Processors_;
   std::vector<void *> r2Processors_;

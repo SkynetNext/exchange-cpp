@@ -140,17 +140,42 @@ SerializationUtils::LongsLz4ToBytes(const std::vector<int64_t> &dataArray,
   // Allocate buffer for decompressed data
   std::vector<uint8_t> decompressedData(originalSizeBytes);
 
-  // Decompress using LZ4
-  // Skip first 4 bytes (original size) when decompressing
-  const int compressedDataSize = compressedSizeBytes - sizeof(int32_t);
-  const int decompressedSize = LZ4_decompress_safe(
-      reinterpret_cast<const char *>(compressedData.data() + sizeof(int32_t)),
-      reinterpret_cast<char *>(decompressedData.data()), compressedDataSize,
-      originalSizeBytes);
+  // Match Java: lz4FastDecompressor.decompress(byteBuffer,
+  // byteBuffer.position(), ...) Java's LZ4 decompress method automatically
+  // reads from ByteBuffer until decompression is complete. It knows the target
+  // size (originalSizeBytes), so it reads compressed data until it decompresses
+  // to the target size.
+  //
+  // In C++, we can use LZ4_decompress_safe_partial() which handles the case
+  // where srcSize is larger than the actual compressed block size. According to
+  // LZ4 documentation (Note 5): "If srcSize is _larger_ than block's compressed
+  // size, then targetOutputSize **MUST** be <= block's decompressed size.
+  // Otherwise, *silent corruption will occur*."
+  //
+  // This is perfect for our use case: we provide the available data size
+  // (including padding) as srcSize, and originalSizeBytes as targetOutputSize.
+  // LZ4 will automatically stop when it decompresses to targetOutputSize.
+  const int availableCompressedBytes = compressedSizeBytes - sizeof(int32_t);
+  const char *compressedDataStart =
+      reinterpret_cast<const char *>(compressedData.data() + sizeof(int32_t));
+
+  // Use LZ4_decompress_safe_partial: it can handle srcSize larger than actual
+  // compressed size, as long as targetOutputSize is correct
+  const int decompressedSize = LZ4_decompress_safe_partial(
+      compressedDataStart, reinterpret_cast<char *>(decompressedData.data()),
+      availableCompressedBytes, // srcSize: available data (may include padding)
+      originalSizeBytes,        // targetOutputSize: we want exactly this much
+      originalSizeBytes);       // dstCapacity: same as targetOutputSize
 
   if (decompressedSize < 0 || decompressedSize != originalSizeBytes) {
     throw std::runtime_error(
-        "LZ4 decompression failed: invalid compressed data or size mismatch");
+        "LZ4 decompression failed: invalid compressed data or size mismatch. "
+        "originalSize=" +
+        std::to_string(originalSizeBytes) +
+        ", decompressedSize=" + std::to_string(decompressedSize) +
+        ", longsTransferred=" + std::to_string(longsTransferred) +
+        ", availableCompressedBytes=" +
+        std::to_string(availableCompressedBytes));
   }
 
   return decompressedData;

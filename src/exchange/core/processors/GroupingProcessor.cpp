@@ -32,7 +32,7 @@ namespace core {
 namespace processors {
 
 template <typename WaitStrategyT>
-GroupingProcessor::GroupingProcessor(
+GroupingProcessor<WaitStrategyT>::GroupingProcessor(
     disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>
         *ringBuffer,
     disruptor::ProcessingSequenceBarrier<
@@ -41,38 +41,42 @@ GroupingProcessor::GroupingProcessor(
     const common::config::PerformanceConfiguration *perfCfg,
     common::CoreWaitStrategy coreWaitStrategy, SharedPool *sharedPool)
     : running_(IDLE), ringBuffer_(ringBuffer),
-      sequenceBarrier_(sequenceBarrier), waitSpinningHelper_(nullptr),
-      sequence_(disruptor::Sequence::INITIAL_VALUE),
-      sharedPool_(sharedPool), msgsInGroupLimit_(perfCfg->msgsInGroupLimit),
+      sequenceBarrier_(sequenceBarrier),
+      waitSpinningHelper_(
+          new WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>(
+              ringBuffer, sequenceBarrier, GROUP_SPIN_LIMIT, coreWaitStrategy,
+              "GroupingProcessor")),
+      sequence_(disruptor::Sequence::INITIAL_VALUE), sharedPool_(sharedPool),
+      msgsInGroupLimit_(perfCfg->msgsInGroupLimit),
       maxGroupDurationNs_(perfCfg->maxGroupDurationNs) {
   if (msgsInGroupLimit_ > perfCfg->ringBufferSize / 4) {
     throw std::invalid_argument(
         "msgsInGroupLimit should be less than quarter ringBufferSize");
   }
-
-  // Create WaitSpinningHelper
-  waitSpinningHelper_ =
-      new WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>(
-          ringBuffer, sequenceBarrier, GROUP_SPIN_LIMIT, coreWaitStrategy,
-          "GroupingProcessor");
 }
 
-disruptor::Sequence &GroupingProcessor::getSequence() { return sequence_; }
+template <typename WaitStrategyT>
+disruptor::Sequence &GroupingProcessor<WaitStrategyT>::getSequence() {
+  return sequence_;
+}
 
-void GroupingProcessor::halt() {
+template <typename WaitStrategyT>
+void GroupingProcessor<WaitStrategyT>::halt() {
   running_.store(HALTED);
-  // Cast sequenceBarrier_ to call alert()
-  // We need to cast to the correct type
-  // For now, simplified - will be fixed when we have proper type erasure
+  // Match Java: sequenceBarrier.alert();
+  sequenceBarrier_->alert();
 }
 
-bool GroupingProcessor::isRunning() { return running_.load() != IDLE; }
+template <typename WaitStrategyT>
+bool GroupingProcessor<WaitStrategyT>::isRunning() {
+  return running_.load() != IDLE;
+}
 
-void GroupingProcessor::run() {
+template <typename WaitStrategyT> void GroupingProcessor<WaitStrategyT>::run() {
   std::cout << "[GroupingProcessor] run() called" << std::endl;
   if (running_.compare_exchange_strong(const_cast<int32_t &>(IDLE), RUNNING)) {
-    // Cast sequenceBarrier_ to call clearAlert()
-    // For now, simplified
+    // Match Java: sequenceBarrier.clearAlert();
+    sequenceBarrier_->clearAlert();
 
     try {
       if (running_.load() == RUNNING) {
@@ -90,10 +94,12 @@ void GroupingProcessor::run() {
   }
 }
 
-void GroupingProcessor::ProcessEvents() {
+template <typename WaitStrategyT>
+void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
   std::cout << "[GroupingProcessor] ProcessEvents() started" << std::endl;
   int64_t nextSequence = sequence_.get() + 1L;
-  std::cout << "[GroupingProcessor] Starting from sequence " << nextSequence << std::endl;
+  std::cout << "[GroupingProcessor] Starting from sequence " << nextSequence
+            << std::endl;
 
   int64_t groupCounter = 0;
   int64_t msgsInGroup = 0;
@@ -109,25 +115,21 @@ void GroupingProcessor::ProcessEvents() {
 
   bool groupingEnabled = true;
 
+  // Match Java: EVENTS_POOLING constant (currently false in C++ version)
+  constexpr bool EVENTS_POOLING = false;
+
   while (true) {
     try {
-      // Cast to correct types
-      auto *ringBuffer = static_cast<disruptor::MultiProducerRingBuffer<
-          common::cmd::OrderCommand, disruptor::BlockingWaitStrategy> *>(
-          ringBuffer_);
-      auto *waitHelper =
-          static_cast<WaitSpinningHelper<common::cmd::OrderCommand,
-                                         disruptor::BlockingWaitStrategy> *>(
-              waitSpinningHelper_);
-
       // should spin and also check another barrier
-      int64_t availableSequence = waitHelper->TryWaitFor(nextSequence);
+      int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
 
       if (nextSequence <= availableSequence) {
-        std::cout << "[GroupingProcessor] Processing sequences " << nextSequence << " to " << availableSequence << std::endl;
+        std::cout << "[GroupingProcessor] Processing sequences " << nextSequence
+                  << " to " << availableSequence << std::endl;
         while (nextSequence <= availableSequence) {
-          common::cmd::OrderCommand *cmd = &ringBuffer->get(nextSequence);
-          std::cout << "[GroupingProcessor] Processing seq=" << nextSequence << ", cmd=" << static_cast<int>(cmd->command) << std::endl;
+          common::cmd::OrderCommand *cmd = &ringBuffer_->get(nextSequence);
+          std::cout << "[GroupingProcessor] Processing seq=" << nextSequence
+                    << ", cmd=" << static_cast<int>(cmd->command) << std::endl;
 
           nextSequence++;
 
@@ -171,7 +173,8 @@ void GroupingProcessor::ProcessEvents() {
           }
 
           // cleaning attached events
-          if (cmd->matcherEvent != nullptr) {
+          // Match Java: if (EVENTS_POOLING && cmd.matcherEvent != null)
+          if (EVENTS_POOLING && cmd->matcherEvent != nullptr) {
             // update tail
             if (tradeEventTail == nullptr) {
               tradeEventHead = cmd->matcherEvent;
@@ -182,7 +185,7 @@ void GroupingProcessor::ProcessEvents() {
             tradeEventTail = cmd->matcherEvent;
             tradeEventCounter++;
 
-            // find last element in the chain
+            // find last element in the chain and update tail accordingly
             while (tradeEventTail->nextEvent != nullptr) {
               tradeEventTail = tradeEventTail->nextEvent;
               tradeEventCounter++;
@@ -210,8 +213,11 @@ void GroupingProcessor::ProcessEvents() {
           }
         }
         sequence_.set(availableSequence);
-        std::cout << "[GroupingProcessor] Updated sequence to " << availableSequence << ", sequence_.get()=" << sequence_.get() << ", &sequence_=" << &sequence_ << std::endl;
-        waitHelper->SignalAllWhenBlocking();
+        std::cout << "[GroupingProcessor] Updated sequence to "
+                  << availableSequence
+                  << ", sequence_.get()=" << sequence_.get()
+                  << ", &sequence_=" << &sequence_ << std::endl;
+        waitSpinningHelper_->SignalAllWhenBlocking();
         auto now = std::chrono::steady_clock::now();
         groupLastNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
                           now.time_since_epoch())
@@ -248,43 +254,16 @@ void GroupingProcessor::ProcessEvents() {
       }
     } catch (...) {
       sequence_.set(nextSequence);
-      auto *waitHelper =
-          static_cast<WaitSpinningHelper<common::cmd::OrderCommand,
-                                         disruptor::BlockingWaitStrategy> *>(
-              waitSpinningHelper_);
-      waitHelper->SignalAllWhenBlocking();
+      waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;
     }
   }
 }
 
 // Explicit template instantiations
-template GroupingProcessor::GroupingProcessor(
-    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand,
-                                       disruptor::BusySpinWaitStrategy> *,
-    disruptor::ProcessingSequenceBarrier<
-        disruptor::MultiProducerSequencer<disruptor::BusySpinWaitStrategy>,
-        disruptor::BusySpinWaitStrategy> *,
-    const common::config::PerformanceConfiguration *, common::CoreWaitStrategy,
-    SharedPool *);
-
-template GroupingProcessor::GroupingProcessor(
-    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand,
-                                       disruptor::YieldingWaitStrategy> *,
-    disruptor::ProcessingSequenceBarrier<
-        disruptor::MultiProducerSequencer<disruptor::YieldingWaitStrategy>,
-        disruptor::YieldingWaitStrategy> *,
-    const common::config::PerformanceConfiguration *, common::CoreWaitStrategy,
-    SharedPool *);
-
-template GroupingProcessor::GroupingProcessor(
-    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand,
-                                       disruptor::BlockingWaitStrategy> *,
-    disruptor::ProcessingSequenceBarrier<
-        disruptor::MultiProducerSequencer<disruptor::BlockingWaitStrategy>,
-        disruptor::BlockingWaitStrategy> *,
-    const common::config::PerformanceConfiguration *, common::CoreWaitStrategy,
-    SharedPool *);
+template class GroupingProcessor<disruptor::BusySpinWaitStrategy>;
+template class GroupingProcessor<disruptor::YieldingWaitStrategy>;
+template class GroupingProcessor<disruptor::BlockingWaitStrategy>;
 
 } // namespace processors
 } // namespace core
