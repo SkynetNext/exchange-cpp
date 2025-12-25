@@ -156,9 +156,9 @@ void OrderBookDirectImplTest::TestMultipleCommandsCompare() {
 
   // Create test orderbook and reference orderbook
   ClearOrderBook();
-  auto symbolSpec = GetCoreSymbolSpec();
+  // Use member variable symbolSpec_ from base class to ensure proper lifetime
   auto orderBookRef =
-      std::make_unique<OrderBookNaiveImpl>(&symbolSpec, nullptr, nullptr);
+      std::make_unique<OrderBookNaiveImpl>(&symbolSpec_, nullptr, nullptr);
 
   ASSERT_EQ(orderBook_->GetStateHash(), orderBookRef->GetStateHash());
 
@@ -190,8 +190,7 @@ void OrderBookDirectImplTest::TestMultipleCommandsCompare() {
         std::cout << "\n=== State hash mismatch at command " << i << " ===\n";
         // Use base class helper method to print both implementations
         PrintOrderBookComparison(orderBook_.get(), orderBookRef.get(),
-                                 "OrderBookDirectImpl",
-                                 "OrderBookNaiveImpl");
+                                 "OrderBookDirectImpl", "OrderBookNaiveImpl");
       }
       ASSERT_EQ(orderBook_->GetStateHash(), orderBookRef->GetStateHash());
     }
