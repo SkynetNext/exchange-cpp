@@ -99,6 +99,15 @@ public:
   virtual std::future<std::vector<std::vector<uint8_t>>>
   ProcessReportAny(int32_t queryTypeId, std::vector<uint8_t> queryBytes,
                    int32_t transferId) = 0;
+
+  /**
+   * Request order book snapshot async (matches Java requestOrderBookAsync)
+   * @param symbolId Symbol ID
+   * @param depth Maximum depth of order book
+   * @return Future with L2MarketData
+   */
+  virtual std::future<std::unique_ptr<common::L2MarketData>>
+  RequestOrderBookAsync(int32_t symbolId, int32_t depth) = 0;
 };
 
 /**
@@ -155,6 +164,15 @@ public:
   ProcessReportAny(int32_t queryTypeId, std::vector<uint8_t> queryBytes,
                    int32_t transferId) override;
 
+  /**
+   * Request order book snapshot async (matches Java requestOrderBookAsync)
+   * @param symbolId Symbol ID
+   * @param depth Maximum depth of order book
+   * @return Future with L2MarketData
+   */
+  std::future<std::unique_ptr<common::L2MarketData>>
+  RequestOrderBookAsync(int32_t symbolId, int32_t depth) override;
+
 private:
   disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>
       *ringBuffer_;
@@ -175,6 +193,13 @@ private:
   using ReportPromiseMap =
       tbb::concurrent_hash_map<int64_t, ReportResultPromise>;
   ReportPromiseMap reportPromises_;
+
+  // Order book request promises cache (seq -> promise for L2MarketData)
+  // Used for RequestOrderBookAsync to extract market data from OrderCommand
+  using OrderBookPromiseMap =
+      tbb::concurrent_hash_map<int64_t,
+                                std::promise<std::unique_ptr<common::L2MarketData>>>;
+  OrderBookPromiseMap orderBookPromises_;
 
   void PublishCommand(common::api::ApiCommand *cmd, int64_t seq);
 

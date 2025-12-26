@@ -47,6 +47,7 @@
 #include <exchange/core/processors/BinaryCommandsProcessor.h>
 #include <exchange/core/utils/Logger.h>
 #include <exchange/core/utils/SerializationUtils.h>
+#include <chrono>
 #include <functional>
 #include <stdexcept>
 #include <vector>
@@ -265,6 +266,27 @@ void ExchangeApi<WaitStrategyT>::ProcessResult(int64_t seq,
     return;
   }
 
+  // Check if this is an order book request result
+  // Match Java: promises.put(seq, cmd1 -> future.complete(cmd1.marketData))
+  // Note: For ORDER_BOOK_REQUEST, SimpleEventsProcessor::SendMarketData
+  // copies marketData instead of moving it, so cmd->marketData is still available here.
+  // We can directly move it to avoid an extra copy.
+  typename OrderBookPromiseMap::accessor orderBookAccessor;
+  if (orderBookPromises_.find(orderBookAccessor, seq)) {
+    // Extract marketData from OrderCommand and fulfill promise
+    if (cmd->marketData) {
+      // Move marketData directly (SimpleEventsProcessor already copied it for event handler)
+      // This avoids an extra copy compared to Copy()
+      orderBookAccessor->second.set_value(std::move(cmd->marketData));
+    } else {
+      // Market data was already moved - this shouldn't happen for ORDER_BOOK_REQUEST
+      // since SendMarketData copies instead of moving for this command type
+      orderBookAccessor->second.set_value(nullptr);
+    }
+    orderBookPromises_.erase(orderBookAccessor);
+    return;
+  }
+
   // Regular command result
   // TBB concurrent_hash_map: lock-free find and erase
   typename PromiseMap::accessor accessor;
@@ -426,6 +448,46 @@ ExchangeApi<WaitStrategyT>::SubmitCommandAsync(common::api::ApiCommand *cmd) {
   }
 
   // Publish the event
+  ringBuffer_->publish(seq);
+
+  return future;
+}
+
+template <typename WaitStrategyT>
+std::future<std::unique_ptr<common::L2MarketData>>
+ExchangeApi<WaitStrategyT>::RequestOrderBookAsync(int32_t symbolId,
+                                                  int32_t depth) {
+  if (!ringBuffer_) {
+    throw std::runtime_error("RequestOrderBookAsync: ringBuffer is nullptr");
+  }
+
+  std::promise<std::unique_ptr<common::L2MarketData>> promise;
+  auto future = promise.get_future();
+
+  // Get sequence before publishing (match Java: ringBuffer.publishEvent)
+  int64_t seq = ringBuffer_->next();
+
+  // Store promise (TBB concurrent_hash_map: lock-free insert)
+  {
+    typename OrderBookPromiseMap::accessor accessor;
+    orderBookPromises_.insert(accessor, seq);
+    accessor->second = std::move(promise);
+  }
+
+  // Get event slot and set up order book request
+  // Match Java: ringBuffer.publishEvent(((cmd, seq) -> { ... promises.put(seq, cmd1 -> future.complete(cmd1.marketData)); }))
+  auto &event = ringBuffer_->get(seq);
+  event.command = common::cmd::OrderCommandType::ORDER_BOOK_REQUEST;
+  event.orderId = -1;
+  event.symbol = symbolId;
+  event.uid = -1;
+  event.size = depth;
+  event.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::system_clock::now().time_since_epoch())
+                        .count();
+  event.resultCode = common::cmd::CommandResultCode::NEW;
+
+  // Publish event
   ringBuffer_->publish(seq);
 
   return future;

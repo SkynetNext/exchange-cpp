@@ -58,23 +58,73 @@ using namespace exchange::core::common::cmd;
 class TestEventsHandler : public IEventsHandler {
 public:
   void TradeEvent(const struct TradeEvent &tradeEvent) override {
-    LOG_INFO("Trade event: {}", static_cast<const void*>(&tradeEvent));
+    std::string tradesStr = "Trade event: symbol=" + std::to_string(tradeEvent.symbol) +
+                           ", totalVolume=" + std::to_string(tradeEvent.totalVolume) +
+                           ", takerOrderId=" + std::to_string(tradeEvent.takerOrderId) +
+                           ", takerUid=" + std::to_string(tradeEvent.takerUid) +
+                           ", takerAction=" + (tradeEvent.takerAction == common::OrderAction::BID ? "BID" : "ASK") +
+                           ", takeOrderCompleted=" + (tradeEvent.takeOrderCompleted ? "true" : "false") +
+                           ", trades=[";
+    for (size_t i = 0; i < tradeEvent.trades.size(); i++) {
+      const auto &trade = tradeEvent.trades[i];
+      tradesStr += "{makerOrderId=" + std::to_string(trade.makerOrderId) +
+                   ", makerUid=" + std::to_string(trade.makerUid) +
+                   ", price=" + std::to_string(trade.price) +
+                   ", volume=" + std::to_string(trade.volume) +
+                   ", makerOrderCompleted=" + (trade.makerOrderCompleted ? "true" : "false") + "}";
+      if (i < tradeEvent.trades.size() - 1) {
+        tradesStr += ", ";
+      }
+    }
+    tradesStr += "]";
+    LOG_INFO("{}", tradesStr);
   }
 
   void ReduceEvent(const struct ReduceEvent &reduceEvent) override {
-    LOG_INFO("Reduce event: {}", static_cast<const void*>(&reduceEvent));
+    LOG_INFO("Reduce event: symbol={}, reducedVolume={}, orderCompleted={}, price={}, orderId={}, uid={}, timestamp={}",
+             reduceEvent.symbol, reduceEvent.reducedVolume,
+             reduceEvent.orderCompleted ? "true" : "false",
+             reduceEvent.price, reduceEvent.orderId, reduceEvent.uid,
+             reduceEvent.timestamp);
   }
 
   void RejectEvent(const struct RejectEvent &rejectEvent) override {
-    LOG_INFO("Reject event: {}", static_cast<const void*>(&rejectEvent));
+    LOG_INFO("Reject event: symbol={}, rejectedVolume={}, price={}, orderId={}, uid={}, timestamp={}",
+             rejectEvent.symbol, rejectEvent.rejectedVolume,
+             rejectEvent.price, rejectEvent.orderId, rejectEvent.uid,
+             rejectEvent.timestamp);
   }
 
   void CommandResult(const struct ApiCommandResult &commandResult) override {
-    LOG_INFO("Command result: {}", static_cast<const void*>(&commandResult));
+    LOG_INFO("Command result: resultCode={}, seq={}",
+             static_cast<int>(commandResult.resultCode), commandResult.seq);
   }
 
   void OrderBook(const struct OrderBook &orderBook) override {
-    LOG_INFO("OrderBook event: {}", static_cast<const void*>(&orderBook));
+    std::string orderBookStr = "OrderBook event: symbol=" + std::to_string(orderBook.symbol) +
+                               ", timestamp=" + std::to_string(orderBook.timestamp) +
+                               ", asks=[";
+    for (size_t i = 0; i < orderBook.asks.size(); i++) {
+      const auto &ask = orderBook.asks[i];
+      orderBookStr += "{price=" + std::to_string(ask.price) +
+                     ", volume=" + std::to_string(ask.volume) +
+                     ", orders=" + std::to_string(ask.orders) + "}";
+      if (i < orderBook.asks.size() - 1) {
+        orderBookStr += ", ";
+      }
+    }
+    orderBookStr += "], bids=[";
+    for (size_t i = 0; i < orderBook.bids.size(); i++) {
+      const auto &bid = orderBook.bids[i];
+      orderBookStr += "{price=" + std::to_string(bid.price) +
+                     ", volume=" + std::to_string(bid.volume) +
+                     ", orders=" + std::to_string(bid.orders) + "}";
+      if (i < orderBook.bids.size() - 1) {
+        orderBookStr += ", ";
+      }
+    }
+    orderBookStr += "]";
+    LOG_INFO("{}", orderBookStr);
   }
 };
 
@@ -165,9 +215,36 @@ TEST(ITCoreExample, SampleTest) {
   LOG_INFO("ApiPlaceOrder 2 result: {}", static_cast<int>(future7.get()));
 
   // Request order book
-  auto futureOrderBook =
-      api->SubmitCommandAsync(new ApiOrderBookRequest(symbolXbtLtc, 10));
-  LOG_INFO("ApiOrderBookRequest result: {}", static_cast<int>(futureOrderBook.get()));
+  auto orderBookFuture = api->RequestOrderBookAsync(symbolXbtLtc, 10);
+  auto orderBookData = orderBookFuture.get();
+  if (orderBookData) {
+    std::string orderBookStr = "ApiOrderBookRequest result: askSize=" +
+                               std::to_string(orderBookData->askSize) +
+                               ", bidSize=" + std::to_string(orderBookData->bidSize);
+    if (orderBookData->askSize > 0) {
+      orderBookStr += ", askPrices=[";
+      for (int32_t i = 0; i < orderBookData->askSize && i < 5; i++) {
+        orderBookStr += std::to_string(orderBookData->askPrices[i]);
+        if (i < orderBookData->askSize - 1 && i < 4) {
+          orderBookStr += ", ";
+        }
+      }
+      orderBookStr += "]";
+    }
+    if (orderBookData->bidSize > 0) {
+      orderBookStr += ", bidPrices=[";
+      for (int32_t i = 0; i < orderBookData->bidSize && i < 5; i++) {
+        orderBookStr += std::to_string(orderBookData->bidPrices[i]);
+        if (i < orderBookData->bidSize - 1 && i < 4) {
+          orderBookStr += ", ";
+        }
+      }
+      orderBookStr += "]";
+    }
+    LOG_INFO("{}", orderBookStr);
+  } else {
+    LOG_INFO("ApiOrderBookRequest result: nullptr");
+  }
 
   // First user moves remaining order to price 1.53 LTC
   auto future8 = api->SubmitCommandAsync(
