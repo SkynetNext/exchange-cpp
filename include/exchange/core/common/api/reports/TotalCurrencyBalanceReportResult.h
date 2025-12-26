@@ -75,6 +75,17 @@ public:
   static std::unique_ptr<TotalCurrencyBalanceReportResult>
   Merge(const std::vector<BytesIn *> &pieces);
 
+  /**
+   * Get global balances sum (matches Java getGlobalBalancesSum)
+   * Merges accountBalances, ordersBalances, fees, adjustments, suspends
+   */
+  ankerl::unordered_dense::map<int32_t, int64_t> GetGlobalBalancesSum() const;
+
+  /**
+   * Check if all global balances are zero (matches Java isGlobalBalancesAllZero)
+   */
+  bool IsGlobalBalancesAllZero() const;
+
   // Serialization method
   void WriteMarshallable(BytesOut &bytes) const;
 };

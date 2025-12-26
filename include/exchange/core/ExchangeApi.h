@@ -266,15 +266,18 @@ std::future<std::unique_ptr<R>> ProcessReportHelper(IExchangeApi *api,
   auto sections = sectionsFuture.get();
 
   // Convert sections to BytesIn pointers for CreateResult
+  // Skip empty sections (matches Java behavior where empty sections are filtered)
   std::vector<common::BytesIn *> sectionBytes;
   sectionBytes.reserve(sections.size());
   std::vector<std::unique_ptr<common::VectorBytesIn>> sectionBytesOwners;
   sectionBytesOwners.reserve(sections.size());
 
   for (const auto &section : sections) {
-    sectionBytesOwners.push_back(
-        std::make_unique<common::VectorBytesIn>(section));
-    sectionBytes.push_back(sectionBytesOwners.back().get());
+    if (!section.empty()) {
+      sectionBytesOwners.push_back(
+          std::make_unique<common::VectorBytesIn>(section));
+      sectionBytes.push_back(sectionBytesOwners.back().get());
+    }
   }
 
   // Call CreateResult on the original query to merge sections

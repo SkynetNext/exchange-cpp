@@ -190,35 +190,10 @@ void ITExchangeCoreIntegration::BasicFullCycleTest(
   ASSERT_NE(actual, nullptr);
   EXPECT_EQ(*expected, *actual);
 
-  // Verify total balance is zero
+  // Verify total balance is zero (matches Java: container.totalBalanceReport().isGlobalBalancesAllZero())
   auto balanceReport = container->TotalBalanceReport();
   if (balanceReport) {
-    bool allZero = true;
-    if (balanceReport->accountBalances) {
-      for (const auto &pair : *balanceReport->accountBalances) {
-        if (pair.second != 0) {
-          allZero = false;
-          break;
-        }
-      }
-    }
-    if (allZero && balanceReport->fees) {
-      for (const auto &pair : *balanceReport->fees) {
-        if (pair.second != 0) {
-          allZero = false;
-          break;
-        }
-      }
-    }
-    if (allZero && balanceReport->ordersBalances) {
-      for (const auto &pair : *balanceReport->ordersBalances) {
-        if (pair.second != 0) {
-          allZero = false;
-          break;
-        }
-      }
-    }
-    EXPECT_TRUE(allZero);
+    EXPECT_TRUE(balanceReport->IsGlobalBalancesAllZero());
   }
 }
 
@@ -385,35 +360,10 @@ void ITExchangeCoreIntegration::ExchangeRiskBasicTest() {
         }
       });
 
-  // Verify total balance is zero
+  // Verify total balance is zero (matches Java: container.totalBalanceReport().isGlobalBalancesAllZero())
   auto balanceReport = container->TotalBalanceReport();
   if (balanceReport) {
-    bool allZero = true;
-    if (balanceReport->accountBalances) {
-      for (const auto &pair : *balanceReport->accountBalances) {
-        if (pair.second != 0) {
-          allZero = false;
-          break;
-        }
-      }
-    }
-    if (allZero && balanceReport->fees) {
-      for (const auto &pair : *balanceReport->fees) {
-        if (pair.second != 0) {
-          allZero = false;
-          break;
-        }
-      }
-    }
-    if (allZero && balanceReport->ordersBalances) {
-      for (const auto &pair : *balanceReport->ordersBalances) {
-        if (pair.second != 0) {
-          allZero = false;
-          break;
-        }
-      }
-    }
-    EXPECT_TRUE(allZero);
+    EXPECT_TRUE(balanceReport->IsGlobalBalancesAllZero());
   }
 }
 

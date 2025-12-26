@@ -16,6 +16,7 @@
 
 #include <cstring>
 #include <exchange/core/utils/SerializationUtils.h>
+#include <exchange/core/common/Wire.h>
 #include <lz4.h>
 #include <stdexcept>
 
@@ -61,6 +62,21 @@ ankerl::unordered_dense::map<int32_t, int64_t> SerializationUtils::MergeSum(
   auto result = MergeSum(map1, map2, map3);
   if (map4 != nullptr) {
     for (const auto &pair : *map4) {
+      result[pair.first] += pair.second;
+    }
+  }
+  return result;
+}
+
+ankerl::unordered_dense::map<int32_t, int64_t> SerializationUtils::MergeSum(
+    const ankerl::unordered_dense::map<int32_t, int64_t> *map1,
+    const ankerl::unordered_dense::map<int32_t, int64_t> *map2,
+    const ankerl::unordered_dense::map<int32_t, int64_t> *map3,
+    const ankerl::unordered_dense::map<int32_t, int64_t> *map4,
+    const ankerl::unordered_dense::map<int32_t, int64_t> *map5) {
+  auto result = MergeSum(map1, map2, map3, map4);
+  if (map5 != nullptr) {
+    for (const auto &pair : *map5) {
       result[pair.first] += pair.second;
     }
   }
@@ -242,6 +258,21 @@ SerializationUtils::LongsToBytes(const std::vector<int64_t> &longs) {
   bytes.resize(longs.size() * sizeof(int64_t));
   std::memcpy(bytes.data(), longs.data(), bytes.size());
   return bytes;
+}
+
+common::Wire
+SerializationUtils::LongsToWire(const std::vector<int64_t> &dataArray) {
+  // Match Java: SerializationUtils.longsToWire()
+  // 1:1 translation
+  const int sizeInBytes = static_cast<int>(dataArray.size() * sizeof(int64_t));
+  
+  // Convert long array to bytes (little-endian)
+  std::vector<uint8_t> bytesArray;
+  bytesArray.resize(sizeInBytes);
+  std::memcpy(bytesArray.data(), dataArray.data(), sizeInBytes);
+
+  // Create Wire with bytes
+  return common::Wire(bytesArray);
 }
 
 } // namespace utils

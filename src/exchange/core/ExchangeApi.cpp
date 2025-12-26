@@ -922,14 +922,19 @@ ExchangeApi<WaitStrategyT>::ProcessReport(std::unique_ptr<Q> query,
           orderbook::OrderBookEventsHelper::DeserializeEvents(cmd);
 
       // Convert map values to vector of BytesIn pointers
+      // Match Java: .map(Wire::bytes)
+      // Skip empty wires (matches Java behavior where empty sections are filtered)
       std::vector<common::BytesIn *> sections;
       sections.reserve(sectionsMap.size());
-      std::vector<std::unique_ptr<common::VectorBytesIn>> sectionBytes;
-      sectionBytes.reserve(sectionsMap.size());
+      std::vector<common::Wire> wireOwners;
+      wireOwners.reserve(sectionsMap.size());
 
-      for (const auto &[sectionId, bytes] : sectionsMap) {
-        sectionBytes.push_back(std::make_unique<common::VectorBytesIn>(bytes));
-        sections.push_back(sectionBytes.back().get());
+      for (const auto &[sectionId, wire] : sectionsMap) {
+        const auto &bytes = wire.GetBytes();
+        if (!bytes.empty()) {
+          wireOwners.push_back(wire);
+          sections.push_back(&wireOwners.back().bytes());
+        }
       }
 
       // Call query.createResult() to merge sections
@@ -1061,10 +1066,14 @@ ExchangeApi<WaitStrategyT>::ProcessReportAny(int32_t queryTypeId,
             orderbook::OrderBookEventsHelper::DeserializeEvents(cmd);
 
         // Convert map values to vector of byte vectors
+        // Match Java: .map(Wire::bytes) but for ProcessReportAny we need bytes
         std::vector<std::vector<uint8_t>> sections;
         sections.reserve(sectionsMap.size());
-        for (const auto &[sectionId, bytes] : sectionsMap) {
-          sections.push_back(bytes);
+        for (const auto &[sectionId, wire] : sectionsMap) {
+          const auto &bytes = wire.GetBytes();
+          if (!bytes.empty()) {
+            sections.push_back(bytes);
+          }
         }
 
         // Clean up query pointer (was created with new)

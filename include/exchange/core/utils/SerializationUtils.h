@@ -18,6 +18,7 @@
 
 #include "../common/BytesIn.h"
 #include "../common/BytesOut.h"
+#include "../common/Wire.h"
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
 #include <functional>
@@ -57,6 +58,16 @@ public:
            const ankerl::unordered_dense::map<int32_t, int64_t> *map2,
            const ankerl::unordered_dense::map<int32_t, int64_t> *map3,
            const ankerl::unordered_dense::map<int32_t, int64_t> *map4);
+
+  /**
+   * Merge sum of multiple maps (5 maps)
+   */
+  static ankerl::unordered_dense::map<int32_t, int64_t>
+  MergeSum(const ankerl::unordered_dense::map<int32_t, int64_t> *map1,
+           const ankerl::unordered_dense::map<int32_t, int64_t> *map2,
+           const ankerl::unordered_dense::map<int32_t, int64_t> *map3,
+           const ankerl::unordered_dense::map<int32_t, int64_t> *map4,
+           const ankerl::unordered_dense::map<int32_t, int64_t> *map5);
 
   /**
    * Prefer non-null value
@@ -266,6 +277,14 @@ public:
    * @return Vector of bytes
    */
   static std::vector<uint8_t> LongsToBytes(const std::vector<int64_t> &longs);
+
+  /**
+   * Convert long array to Wire
+   * Match Java: SerializationUtils.longsToWire()
+   * @param dataArray Vector of int64_t to convert
+   * @return Wire object
+   */
+  static common::Wire LongsToWire(const std::vector<int64_t> &dataArray);
 
   /**
    * Marshall generic map

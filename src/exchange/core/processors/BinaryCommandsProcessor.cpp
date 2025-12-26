@@ -272,6 +272,10 @@ BinaryCommandsProcessor::AcceptBinaryFrame(common::cmd::OrderCommand *cmd) {
               break;
             }
 
+            // Resize serializedBytes to actual written size (VectorBytesOut
+            // may have grown the vector beyond what was written)
+            serializedBytes.resize(bytesOut.GetPosition());
+
             // Create binary events chain
             common::MatcherTradeEvent *binaryEventsChain =
                 eventsHelper_->CreateBinaryEventsChain(cmd->timestamp, section_,

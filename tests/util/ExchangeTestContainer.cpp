@@ -27,10 +27,13 @@
 #include <exchange/core/common/api/ApiMoveOrder.h>
 #include <exchange/core/common/api/ApiPlaceOrder.h>
 #include <exchange/core/common/api/binary/BatchAddSymbolsCommand.h>
+#include <exchange/core/common/api/reports/SingleUserReportQuery.h>
+#include <exchange/core/common/api/reports/SingleUserReportResult.h>
 #include <exchange/core/common/api/reports/StateHashReportQuery.h>
 #include <exchange/core/common/api/reports/StateHashReportResult.h>
 #include <exchange/core/common/api/reports/TotalCurrencyBalanceReportQuery.h>
 #include <exchange/core/common/api/reports/TotalCurrencyBalanceReportResult.h>
+#include <exchange/core/ExchangeApi.h>
 #include <exchange/core/common/VectorBytesIn.h>
 #include <exchange/core/common/VectorBytesOut.h>
 #include <exchange/core/common/config/ExchangeConfiguration.h>
@@ -438,31 +441,19 @@ void ExchangeTestContainer::ValidateUserState(
 }
 
 // Get user profile
+// Match Java: return api.processReport(new SingleUserReportQuery(clientId), getRandomTransferId()).get();
 std::unique_ptr<exchange::core::common::api::reports::SingleUserReportResult>
 ExchangeTestContainer::GetUserProfile(int64_t clientId) {
   auto query = std::make_unique<
       exchange::core::common::api::reports::SingleUserReportQuery>(clientId);
   
-  // Serialize query using WriteMarshallable
-  std::vector<uint8_t> queryBytesVec;
-  exchange::core::common::VectorBytesOut queryBytesOut(queryBytesVec);
-  query->WriteMarshallable(queryBytesOut);
-  std::vector<uint8_t> queryBytes = queryBytesOut.GetData();
-  
-  // Use ProcessReportAny to handle type erasure
-  auto future = api_->ProcessReportAny(
-      query->GetReportTypeCode(),
-      std::move(queryBytes), GetRandomTransferId());
-  auto resultBytes = future.get();
-  if (resultBytes.empty() || resultBytes[0].empty()) {
-    return nullptr;
-  }
-  
-  // Deserialize result using constructor from BytesIn
-  exchange::core::common::VectorBytesIn resultBytesIn(resultBytes[0]);
-  auto result = std::make_unique<
-      exchange::core::common::api::reports::SingleUserReportResult>(resultBytesIn);
-  return result;
+  // Use ProcessReportHelper to match Java api.processReport behavior
+  // ProcessReportHelper handles serialization, ProcessReportAny, and CreateResult
+  return exchange::core::ProcessReportHelper<
+      exchange::core::common::api::reports::SingleUserReportQuery,
+      exchange::core::common::api::reports::SingleUserReportResult>(
+      api_, std::move(query), GetRandomTransferId())
+      .get();
 }
 
 // Helper function to check if all balances are zero
@@ -541,27 +532,16 @@ ExchangeTestContainer::TotalBalanceReport() {
   auto query = std::make_unique<
       exchange::core::common::api::reports::TotalCurrencyBalanceReportQuery>();
   
-  // Serialize query using WriteMarshallable
-  std::vector<uint8_t> queryBytesVec;
-  exchange::core::common::VectorBytesOut queryBytesOut(queryBytesVec);
-  query->WriteMarshallable(queryBytesOut);
-  std::vector<uint8_t> queryBytes = queryBytesOut.GetData();
-  
-  auto future = api_->ProcessReportAny(
-      query->GetReportTypeCode(),
-      std::move(queryBytes), GetRandomTransferId());
-  auto resultBytes = future.get();
-  if (resultBytes.empty() || resultBytes[0].empty()) {
-    return nullptr;
-  }
-  
-  // Deserialize result using constructor from BytesIn
-  exchange::core::common::VectorBytesIn resultBytesIn(resultBytes[0]);
-  auto result = std::make_unique<
-      exchange::core::common::api::reports::TotalCurrencyBalanceReportResult>(resultBytesIn);
+  // Use ProcessReportHelper to properly handle serialization and section merging
+  // This matches the Java api.processReport behavior
+  auto result = exchange::core::ProcessReportHelper<
+      exchange::core::common::api::reports::TotalCurrencyBalanceReportQuery,
+      exchange::core::common::api::reports::TotalCurrencyBalanceReportResult>(
+      api_, std::move(query), GetRandomTransferId())
+      .get();
   
   // Verify open interest balance (matching Java version behavior)
-  if (result->openInterestLong && result->openInterestShort) {
+  if (result && result->openInterestLong && result->openInterestShort) {
     for (const auto &pair : *result->openInterestLong) {
       auto it = result->openInterestShort->find(pair.first);
       int64_t diff = pair.second - (it != result->openInterestShort->end() ? it->second : 0);

@@ -131,7 +131,7 @@ OrderBookEventsHelper *OrderBookEventsHelper::NonPooledEventsHelper() {
   return &instance;
 }
 
-std::map<int32_t, std::vector<uint8_t>>
+std::map<int32_t, common::Wire>
 OrderBookEventsHelper::DeserializeEvents(const common::cmd::OrderCommand *cmd) {
   // Match Java: deserializeEvents()
   // Group events by section
@@ -144,10 +144,15 @@ OrderBookEventsHelper::DeserializeEvents(const common::cmd::OrderCommand *cmd) {
     }
   });
 
-  // Convert each section's events to bytes (long array)
-  std::map<int32_t, std::vector<uint8_t>> result;
+  // Convert each section's events to Wire (matches Java NavigableMap<Integer, Wire>)
+  std::map<int32_t, common::Wire> result;
 
   for (const auto &[section, events] : sections) {
+    // Skip empty events lists (matches Java behavior where empty sections are not added)
+    if (events.empty()) {
+      continue;
+    }
+    
     // Build long array from events (5 longs per event)
     std::vector<int64_t> dataArray;
     dataArray.reserve(events.size() * 5);
@@ -160,8 +165,8 @@ OrderBookEventsHelper::DeserializeEvents(const common::cmd::OrderCommand *cmd) {
       dataArray.push_back(evt->bidderHoldPrice);
     }
 
-    // Convert long array to bytes (matches Java SerializationUtils.longsToWire)
-    result[section] = utils::SerializationUtils::LongsToBytes(dataArray);
+    // Convert long array to Wire (matches Java SerializationUtils.longsToWire)
+    result[section] = utils::SerializationUtils::LongsToWire(dataArray);
   }
 
   return result;

@@ -298,7 +298,8 @@ void MatchingEngineRouter::HandleBinaryMessage(
 }
 
 bool MatchingEngineRouter::SymbolForThisHandler(int32_t symbolId) const {
-  return (symbolId & shardMask_) == shardId_;
+  // Match Java: return (shardMask == 0) || ((symbol & shardMask) == shardId);
+  return (shardMask_ == 0) || ((symbolId & shardMask_) == shardId_);
 }
 
 void MatchingEngineRouter::Reset() {

@@ -165,6 +165,24 @@ TotalCurrencyBalanceReportResult::Merge(const std::vector<BytesIn *> &pieces) {
   return result;
 }
 
+ankerl::unordered_dense::map<int32_t, int64_t>
+TotalCurrencyBalanceReportResult::GetGlobalBalancesSum() const {
+  // Match Java: getGlobalBalancesSum() - merges accountBalances, ordersBalances, fees, adjustments, suspends
+  return utils::SerializationUtils::MergeSum(
+      accountBalances, ordersBalances, fees, adjustments, suspends);
+}
+
+bool TotalCurrencyBalanceReportResult::IsGlobalBalancesAllZero() const {
+  // Match Java: isGlobalBalancesAllZero() - checks if all merged balances are zero
+  auto globalBalances = GetGlobalBalancesSum();
+  for (const auto &pair : globalBalances) {
+    if (pair.second != 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace reports
 } // namespace api
 } // namespace common

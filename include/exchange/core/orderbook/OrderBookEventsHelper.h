@@ -18,6 +18,7 @@
 
 #include "../common/IOrder.h"
 #include "../common/MatcherTradeEvent.h"
+#include "../common/Wire.h"
 #include "../common/cmd/OrderCommand.h"
 #include <cstdint>
 #include <functional>
@@ -72,9 +73,9 @@ public:
    * Deserialize events from OrderCommand (matches Java deserializeEvents)
    * Extracts binary events from matcherEvent chain and groups by section
    * @param cmd OrderCommand with matcherEvent chain
-   * @return Map of section -> bytes (as vector of uint8_t)
+   * @return Map of section -> Wire (matches Java NavigableMap<Integer, Wire>)
    */
-  static std::map<int32_t, std::vector<uint8_t>>
+  static std::map<int32_t, common::Wire>
   DeserializeEvents(const common::cmd::OrderCommand *cmd);
 
 private:
