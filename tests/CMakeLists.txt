@@ -8,9 +8,13 @@ if(BUILD_TESTING AND GTest_FOUND)
     # Test utility library - shared utilities for tests
     # ============================================================================
     add_library(test_utils STATIC
+        util/ExchangeTestContainer.cpp
         util/ExecutionTime.cpp
+        util/JournalingTestsModule.cpp
+        util/LatencyTestsModule.cpp
         util/LatencyTools.cpp
         util/L2MarketDataHelper.cpp
+        util/PersistenceTestsModule.cpp
         util/TestConstants.cpp
         util/TestDataParameters.cpp
         util/TestOrdersGenerator.cpp
@@ -155,22 +159,20 @@ if(BUILD_TESTING AND GTest_FOUND)
     # Integration Tests
     # ============================================================================
     
-    # Note: Integration tests require ExchangeTestContainer implementation
-    # These are currently framework-only and will be enabled when ExchangeTestContainer.cpp is implemented
-    
     # ITExchangeCoreIntegrationBasic
-    # add_executable(test_integration_basic
-    #     integration/ITExchangeCoreIntegrationBasic.cpp
-    # )
-    # target_link_libraries(test_integration_basic
-    #     PRIVATE
-    #         exchange-cpp
-    #         test_utils
-    #         GTest::gtest
-    #         GTest::gtest_main
-    # )
-    # add_test(NAME ITExchangeCoreIntegrationBasic COMMAND test_integration_basic)
-    # list(APPEND ALL_TEST_TARGETS test_integration_basic)
+    add_executable(test_integration_basic
+        integration/ITExchangeCoreIntegration.cpp
+        integration/ITExchangeCoreIntegrationBasic.cpp
+    )
+    target_link_libraries(test_integration_basic
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME ITExchangeCoreIntegrationBasic COMMAND test_integration_basic)
+    list(APPEND ALL_TEST_TARGETS test_integration_basic)
     
     # ITMultiOperation
     # add_executable(test_integration_multi_operation
@@ -190,36 +192,33 @@ if(BUILD_TESTING AND GTest_FOUND)
     # Performance Tests
     # ============================================================================
     
-    # Note: Performance tests require LatencyTestsModule, JournalingTestsModule, 
-    # PersistenceTestsModule implementations
-    
     # PerfThroughput
-    # add_executable(test_perf_throughput
-    #     perf/PerfThroughput.cpp
-    # )
-    # target_link_libraries(test_perf_throughput
-    #     PRIVATE
-    #         exchange-cpp
-    #         test_utils
-    #         GTest::gtest
-    #         GTest::gtest_main
-    # )
-    # add_test(NAME PerfThroughput COMMAND test_perf_throughput)
-    # list(APPEND ALL_TEST_TARGETS test_perf_throughput)
+    add_executable(test_perf_throughput
+        perf/PerfThroughput.cpp
+    )
+    target_link_libraries(test_perf_throughput
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME PerfThroughput COMMAND test_perf_throughput)
+    list(APPEND ALL_TEST_TARGETS test_perf_throughput)
     
     # PerfLatency
-    # add_executable(test_perf_latency
-    #     perf/PerfLatency.cpp
-    # )
-    # target_link_libraries(test_perf_latency
-    #     PRIVATE
-    #         exchange-cpp
-    #         test_utils
-    #         GTest::gtest
-    #         GTest::gtest_main
-    # )
-    # add_test(NAME PerfLatency COMMAND test_perf_latency)
-    # list(APPEND ALL_TEST_TARGETS test_perf_latency)
+    add_executable(test_perf_latency
+        perf/PerfLatency.cpp
+    )
+    target_link_libraries(test_perf_latency
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME PerfLatency COMMAND test_perf_latency)
+    list(APPEND ALL_TEST_TARGETS test_perf_latency)
 
     # ============================================================================
     # Example Tests

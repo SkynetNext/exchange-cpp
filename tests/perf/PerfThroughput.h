@@ -19,7 +19,7 @@
 #include <gtest/gtest.h>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace perf {
 
@@ -79,5 +79,5 @@ public:
 
 } // namespace perf
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

@@ -19,7 +19,7 @@
 #include <cstdint>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace nasdaq {
 
@@ -48,5 +48,5 @@ public:
 
 } // namespace nasdaq
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

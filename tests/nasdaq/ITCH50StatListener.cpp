@@ -21,7 +21,7 @@
 #include <sstream>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace nasdaq {
 
@@ -89,5 +89,5 @@ void ITCH50StatListener::UpdateStat(uint8_t msgType, int32_t stockLocate,
 
 } // namespace nasdaq
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

@@ -23,7 +23,7 @@
 #include <set>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -118,5 +118,5 @@ std::vector<int32_t> UserCurrencyAccountsGenerator::CreateUserListForSymbol(
 
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

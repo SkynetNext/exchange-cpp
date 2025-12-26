@@ -20,7 +20,7 @@
 #include <stdexcept>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -263,5 +263,5 @@ int L2MarketDataHelper::MaxWidth(int minWidth, const std::vector<int64_t> &arr1,
 
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

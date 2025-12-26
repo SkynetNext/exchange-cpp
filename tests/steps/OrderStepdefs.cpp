@@ -18,10 +18,10 @@
 #include "../util/TestConstants.h"
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 
-using namespace exchange::core2::tests::util;
+using namespace exchange::core::tests::util;
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace steps {
 
@@ -52,5 +52,5 @@ void OrderStepdefs::After() { container_.reset(); }
 
 } // namespace steps
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

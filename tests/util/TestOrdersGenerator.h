@@ -18,12 +18,26 @@
 
 #include <exchange/core/common/L2MarketData.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
+#include <exchange/core/common/api/ApiCommand.h>
 #include <functional>
 #include <memory>
+#include <unordered_map>
 #include <vector>
+#include <future>
 
 namespace exchange {
-namespace core2 {
+namespace core {
+namespace tests {
+namespace util {
+// Forward declaration - will be included in .cpp
+struct TestOrdersGeneratorConfig;
+} // namespace util
+} // namespace tests
+} // namespace core
+} // namespace exchange
+
+namespace exchange {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -86,9 +100,48 @@ public:
    * @return progress consumer function
    */
   static std::function<void(int64_t)> CreateAsyncProgressLogger(int64_t total);
+
+  /**
+   * MultiSymbolGenResult - result for multiple symbols generation
+   */
+  struct MultiSymbolGenResult {
+    // Map from symbolId to GenResult
+    std::unordered_map<int32_t, GenResult> genResults;
+    
+    // Combined benchmark commands (all symbols)
+    std::vector<exchange::core::common::cmd::OrderCommand> commandsBenchmark;
+    
+    // Combined fill commands (all symbols)
+    std::vector<exchange::core::common::cmd::OrderCommand> commandsFill;
+    
+    /**
+     * Get benchmark commands size
+     */
+    size_t GetBenchmarkCommandsSize() const {
+      return commandsBenchmark.size();
+    }
+    
+    /**
+     * Get fill commands (as future for async compatibility with Java version)
+     */
+    std::future<std::vector<exchange::core::common::api::ApiCommand*>> GetApiCommandsFill() const;
+    
+    /**
+     * Get benchmark commands (as future for async compatibility with Java version)
+     */
+    std::future<std::vector<exchange::core::common::api::ApiCommand*>> GetApiCommandsBenchmark() const;
+  };
+
+  /**
+   * Generate multiple symbols test commands
+   * @param config - test orders generator configuration
+   * @return multi-symbol generation result
+   */
+  static MultiSymbolGenResult GenerateMultipleSymbols(
+      const TestOrdersGeneratorConfig &config);
 };
 
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

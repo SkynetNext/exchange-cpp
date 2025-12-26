@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "../../tests/util/L2MarketDataHelper.h"
+#include "../util/L2MarketDataHelper.h"
 #include <exchange/core/common/CoreSymbolSpecification.h>
 #include <exchange/core/common/L2MarketData.h>
 #include <exchange/core/common/MatcherEventType.h>
@@ -30,8 +30,8 @@
 #include <memory>
 
 namespace exchange {
-namespace core2 {
 namespace core {
+namespace tests {
 namespace orderbook {
 
 /**
@@ -44,7 +44,7 @@ namespace orderbook {
 class OrderBookBaseTest : public ::testing::Test {
 protected:
   std::unique_ptr<exchange::core::orderbook::IOrderBook> orderBook_;
-  std::unique_ptr<exchange::core2::tests::util::L2MarketDataHelper>
+  std::unique_ptr<exchange::core::tests::util::L2MarketDataHelper>
       expectedState_;
   // Store symbol spec to prevent it from being destroyed
   exchange::core::common::CoreSymbolSpecification symbolSpec_;
@@ -132,6 +132,6 @@ protected:
 };
 
 } // namespace orderbook
+} // namespace tests
 } // namespace core
-} // namespace core2
 } // namespace exchange

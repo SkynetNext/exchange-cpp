@@ -21,7 +21,7 @@
 #include <string>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -69,5 +69,5 @@ private:
 
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

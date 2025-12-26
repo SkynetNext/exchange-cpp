@@ -20,7 +20,7 @@
 #include <vector>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -44,7 +44,7 @@ public:
 
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange
 
 // Template implementation
@@ -52,7 +52,7 @@ public:
 #include <random>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -137,5 +137,5 @@ std::vector<T> RandomCollectionsMerger::MergeCollections(
 
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

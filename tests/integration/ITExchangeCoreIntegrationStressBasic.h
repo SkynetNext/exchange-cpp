@@ -19,7 +19,7 @@
 #include "ITExchangeCoreIntegrationStress.h"
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace integration {
 
@@ -38,5 +38,5 @@ public:
 
 } // namespace integration
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

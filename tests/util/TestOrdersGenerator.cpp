@@ -16,7 +16,13 @@
 
 #include "TestOrdersGenerator.h"
 #include "TestConstants.h"
+#include "TestOrdersGeneratorConfig.h"
 #include "TestOrdersGeneratorSession.h"
+#include "UserCurrencyAccountsGenerator.h"
+#include <exchange/core/common/api/ApiCancelOrder.h>
+#include <exchange/core/common/api/ApiCommand.h>
+#include <exchange/core/common/api/ApiMoveOrder.h>
+#include <exchange/core/common/api/ApiPlaceOrder.h>
 #include <algorithm>
 #include <cmath>
 #include <exchange/core/common/MatcherEventType.h>
@@ -26,6 +32,7 @@
 #include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/orderbook/IOrderBook.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
+#include <future>
 #include <random>
 #include <unordered_map>
 
@@ -34,7 +41,7 @@ using namespace exchange::core::common::cmd;
 using namespace exchange::core::orderbook;
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -529,7 +536,131 @@ TestOrdersGenerator::GenResult TestOrdersGenerator::GenerateCommands(
   return result;
 }
 
+// Generate multiple symbols test commands
+TestOrdersGenerator::MultiSymbolGenResult
+TestOrdersGenerator::GenerateMultipleSymbols(
+    const TestOrdersGeneratorConfig &config) {
+  MultiSymbolGenResult multiResult;
+  
+  // Calculate transactions per symbol
+  int transactionsPerSymbol = config.totalTransactionsNumber / 
+                               static_cast<int>(config.coreSymbolSpecifications.size());
+  if (transactionsPerSymbol == 0) {
+    transactionsPerSymbol = 1;
+  }
+  
+  // Calculate target orders per symbol
+  int targetOrdersPerSymbol = config.targetOrderBookOrdersTotal / 
+                               static_cast<int>(config.coreSymbolSpecifications.size());
+  if (targetOrdersPerSymbol == 0) {
+    targetOrdersPerSymbol = 1;
+  }
+  
+  // Generate commands for each symbol
+  for (const auto &symbolSpec : config.coreSymbolSpecifications) {
+    // Get users that can trade this symbol
+    auto userList = UserCurrencyAccountsGenerator::CreateUserListForSymbol(
+        config.usersAccounts, symbolSpec, transactionsPerSymbol);
+    
+    if (userList.empty()) {
+      continue; // Skip symbols with no eligible users
+    }
+    
+    // Create UID mapper for this symbol
+    std::unordered_map<int32_t, int32_t> userIndexMap;
+    for (size_t i = 0; i < userList.size(); i++) {
+      userIndexMap[userList[i]] = static_cast<int32_t>(i);
+    }
+    
+    auto uidMapper = [&userList](int32_t index) -> int32_t {
+      if (index >= 0 && index < static_cast<int32_t>(userList.size())) {
+        return userList[index];
+      }
+      return index + 1; // Fallback to plain mapper
+    };
+    
+    // Generate commands for this symbol
+    int readySeq = config.CalculateReadySeq();
+    int targetOrders = (config.preFillMode == util::PreFillMode::ORDERS_NUMBER_PLUS_QUARTER) 
+                       ? targetOrdersPerSymbol * 5 / 4 
+                       : targetOrdersPerSymbol;
+    
+    auto genResult = GenerateCommands(
+        transactionsPerSymbol, targetOrders, static_cast<int>(userList.size()),
+        uidMapper, symbolSpec.symbolId, false, config.avalancheIOC,
+        CreateAsyncProgressLogger(transactionsPerSymbol + targetOrders),
+        config.seed);
+    
+    // Combine commands (use Copy() method for OrderCommand) before moving
+    for (const auto &cmd : genResult.commandsFill) {
+      multiResult.commandsFill.push_back(cmd.Copy());
+    }
+    for (const auto &cmd : genResult.commandsBenchmark) {
+      multiResult.commandsBenchmark.push_back(cmd.Copy());
+    }
+    
+    // Store per-symbol result (use try_emplace to avoid copy assignment)
+    multiResult.genResults.try_emplace(symbolSpec.symbolId, std::move(genResult));
+  }
+  
+  return multiResult;
+}
+
+// Implementation of MultiSymbolGenResult methods
+std::future<std::vector<exchange::core::common::api::ApiCommand*>>
+TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsFill() const {
+  // Convert to ApiCommand* and return as future (for async compatibility)
+  std::promise<std::vector<exchange::core::common::api::ApiCommand*>> promise;
+  auto future = promise.get_future();
+  
+  std::vector<exchange::core::common::api::ApiCommand*> apiCommands;
+  apiCommands.reserve(commandsFill.size());
+  
+  for (const auto &cmd : commandsFill) {
+    if (cmd.command == exchange::core::common::cmd::OrderCommandType::PLACE_ORDER) {
+      apiCommands.push_back(new exchange::core::common::api::ApiPlaceOrder(
+          cmd.price, cmd.size, cmd.orderId, cmd.action, cmd.orderType, cmd.uid,
+          cmd.symbol, cmd.userCookie, cmd.reserveBidPrice));
+    } else if (cmd.command == exchange::core::common::cmd::OrderCommandType::MOVE_ORDER) {
+      apiCommands.push_back(new exchange::core::common::api::ApiMoveOrder(
+          cmd.orderId, cmd.price, cmd.uid, cmd.symbol));
+    } else if (cmd.command == exchange::core::common::cmd::OrderCommandType::CANCEL_ORDER) {
+      apiCommands.push_back(new exchange::core::common::api::ApiCancelOrder(
+          cmd.orderId, cmd.uid, cmd.symbol));
+    }
+  }
+  
+  promise.set_value(std::move(apiCommands));
+  return future;
+}
+
+std::future<std::vector<exchange::core::common::api::ApiCommand*>>
+TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsBenchmark() const {
+  std::promise<std::vector<exchange::core::common::api::ApiCommand*>> promise;
+  auto future = promise.get_future();
+  
+  std::vector<exchange::core::common::api::ApiCommand*> apiCommands;
+  apiCommands.reserve(commandsBenchmark.size());
+  
+  for (const auto &cmd : commandsBenchmark) {
+    if (cmd.command == exchange::core::common::cmd::OrderCommandType::PLACE_ORDER) {
+      apiCommands.push_back(new exchange::core::common::api::ApiPlaceOrder(
+          cmd.price, cmd.size, cmd.orderId, cmd.action, cmd.orderType, cmd.uid,
+          cmd.symbol, cmd.userCookie, cmd.reserveBidPrice));
+    } else if (cmd.command == exchange::core::common::cmd::OrderCommandType::MOVE_ORDER) {
+      apiCommands.push_back(new exchange::core::common::api::ApiMoveOrder(
+          cmd.orderId, cmd.price, cmd.uid, cmd.symbol));
+    } else if (cmd.command == exchange::core::common::cmd::OrderCommandType::CANCEL_ORDER) {
+      apiCommands.push_back(new exchange::core::common::api::ApiCancelOrder(
+          cmd.orderId, cmd.uid, cmd.symbol));
+    }
+  }
+  
+  promise.set_value(std::move(apiCommands));
+  return future;
+}
+
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

@@ -19,7 +19,7 @@
 #include <chrono>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -60,5 +60,5 @@ int64_t ExecutionTime::GetTimeNs() const {
 
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

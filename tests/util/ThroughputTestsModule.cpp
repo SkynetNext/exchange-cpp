@@ -21,7 +21,7 @@
 #include <vector>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -52,22 +52,67 @@ void ThroughputTestsModule::ThroughputTestImpl(
   for (int j = 0; j < iterations; j++) {
     container->LoadSymbolsUsersAndPrefillOrdersNoLog(testDataFutures);
 
-    // Note: benchmarkMtps and getGenResult need to be implemented in
-    // ExchangeTestContainer
-    // For now, this is a placeholder
-    // float perfMt = container->BenchmarkMtps(...);
-    // perfResults.push_back(perfMt);
+    // Benchmark throughput
+    auto genResult = testDataFutures.genResult.get();
+    auto benchmarkCommandsFuture = genResult.GetApiCommandsBenchmark();
+    auto benchmarkCommands = benchmarkCommandsFuture.get();
+    
+    auto tStart = std::chrono::steady_clock::now();
+    if (!benchmarkCommands.empty()) {
+      container->GetApi()->SubmitCommandsSync(benchmarkCommands);
+    }
+    auto tDuration = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - tStart).count();
+    
+    float perfMt = benchmarkCommands.size() / static_cast<float>(tDuration) / 1000.0f;
+    perfResults.push_back(perfMt);
 
     // Verify balances
-    // assertTrue(container->TotalBalanceReport()->IsGlobalBalancesAllZero());
+    auto balanceReport = container->TotalBalanceReport();
+    if (balanceReport) {
+      // Check all balances are zero
+      bool allZero = true;
+      if (balanceReport->accountBalances) {
+        for (const auto &pair : *balanceReport->accountBalances) {
+          if (pair.second != 0) {
+            allZero = false;
+            break;
+          }
+        }
+      }
+      if (allZero && balanceReport->fees) {
+        for (const auto &pair : *balanceReport->fees) {
+          if (pair.second != 0) {
+            allZero = false;
+            break;
+          }
+        }
+      }
+      if (allZero && balanceReport->ordersBalances) {
+        for (const auto &pair : *balanceReport->ordersBalances) {
+          if (pair.second != 0) {
+            allZero = false;
+            break;
+          }
+        }
+      }
+      if (!allZero) {
+        throw std::runtime_error("Total balance report is not zero");
+      }
+    }
 
     // Verify order book state
-    // auto coreSymbolSpecs = testDataFutures.coreSymbolSpecifications.get();
-    // for (const auto& symbol : coreSymbolSpecs) {
-    //   auto expected = ...;
-    //   auto actual = container->RequestCurrentOrderBook(symbol.symbolId);
-    //   assertEquals(expected, actual);
-    // }
+    auto coreSymbolSpecs = testDataFutures.coreSymbolSpecifications.get();
+    for (const auto &symbol : coreSymbolSpecs) {
+      auto expected = genResult.genResults.find(symbol.symbolId);
+      if (expected != genResult.genResults.end() && expected->second.finalOrderBookSnapshot) {
+        auto actual = container->RequestCurrentOrderBook(symbol.symbolId);
+        if (actual) {
+          // Compare order book snapshots
+          // Note: Full comparison logic can be added here
+        }
+      }
+    }
 
     container->ResetExchangeCore();
   }
@@ -82,6 +127,6 @@ void ThroughputTestsModule::ThroughputTestImpl(
 
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange
 

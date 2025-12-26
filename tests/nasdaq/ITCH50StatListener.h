@@ -22,7 +22,7 @@
 #include <unordered_map>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace nasdaq {
 
@@ -89,5 +89,5 @@ private:
 
 } // namespace nasdaq
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

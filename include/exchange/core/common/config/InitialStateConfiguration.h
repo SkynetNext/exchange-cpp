@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
 #include <string>
 
 namespace exchange {
@@ -54,6 +55,37 @@ public:
   }
 
   static InitialStateConfiguration CleanTest() { return CleanStart("EC0"); }
+
+  /**
+   * Clean start configuration with journaling on.
+   * @param exchangeId Exchange ID
+   * @return clean start configuration with journaling on.
+   */
+  static InitialStateConfiguration CleanStartJournaling(const std::string &exchangeId) {
+    return InitialStateConfiguration(exchangeId, 0, 0, 0, true);
+  }
+
+  /**
+   * Configuration that loads from snapshot, without journal replay with journaling off.
+   * @param exchangeId Exchange ID
+   * @param snapshotId snapshot ID
+   * @param baseSeq base seq
+   * @return configuration that loads from snapshot, without journal replay with journaling off.
+   */
+  static InitialStateConfiguration FromSnapshotOnly(const std::string &exchangeId, int64_t snapshotId, int64_t baseSeq) {
+    return InitialStateConfiguration(exchangeId, snapshotId, baseSeq, 0, true);
+  }
+
+  /**
+   * Configuration that load exchange from last known state including journal replay till last known start. Journal is enabled.
+   * @param exchangeId Exchange ID
+   * @param snapshotId snapshot ID
+   * @param baseSeq base seq
+   * @return configuration that load exchange from last known state including journal replay till last known start. Journal is enabled.
+   */
+  static InitialStateConfiguration LastKnownStateFromJournal(const std::string &exchangeId, int64_t snapshotId, int64_t baseSeq) {
+    return InitialStateConfiguration(exchangeId, snapshotId, baseSeq, std::numeric_limits<int64_t>::max(), true);
+  }
 };
 
 } // namespace config

@@ -18,7 +18,7 @@
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace integration {
 
@@ -31,6 +31,6 @@ ITFeesExchangeBasic::GetPerformanceConfiguration() {
 
 } // namespace integration
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange
 

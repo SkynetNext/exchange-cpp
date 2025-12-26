@@ -17,7 +17,7 @@
 #include "NasdaqReader.h"
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace nasdaq {
 
@@ -33,5 +33,5 @@ int64_t NasdaqReader::ConvertTime(int32_t high, int64_t low) {
 
 } // namespace nasdaq
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

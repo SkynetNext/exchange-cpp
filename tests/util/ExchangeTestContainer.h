@@ -50,7 +50,7 @@
 #include <vector>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -61,9 +61,7 @@ struct TestDataFutures {
   std::future<std::vector<exchange::core::common::CoreSymbolSpecification>>
       coreSymbolSpecifications;
   std::future<std::vector<std::vector<bool>>> usersAccounts;
-  // Note: MultiSymbolGenResult will be added when TestOrdersGenerator is
-  // extended For now, using GenResult as placeholder
-  std::future<TestOrdersGenerator::GenResult> genResult;
+  std::future<TestOrdersGenerator::MultiSymbolGenResult> genResult;
 };
 
 /**
@@ -296,5 +294,5 @@ private:
 
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

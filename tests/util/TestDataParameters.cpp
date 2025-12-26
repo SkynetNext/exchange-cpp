@@ -18,7 +18,7 @@
 #include "TestConstants.h"
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -89,6 +89,6 @@ TestDataParameters TestDataParameters::Huge() {
 
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange
 

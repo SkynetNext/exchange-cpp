@@ -19,7 +19,7 @@
 #include <cmath>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -64,5 +64,5 @@ TestOrdersGeneratorSession::TestOrdersGeneratorSession(
 
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

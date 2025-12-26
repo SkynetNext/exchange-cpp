@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "ExchangeTestContainer.h"
 #include "TestDataParameters.h"
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
@@ -28,19 +27,19 @@ namespace tests {
 namespace util {
 
 /**
- * ThroughputTestsModule - module for throughput performance testing
+ * LatencyTestsModule - module for latency performance testing
  */
-class ThroughputTestsModule {
+class LatencyTestsModule {
 public:
   /**
-   * Run throughput test implementation
+   * Run latency test implementation
    * @param performanceCfg - performance configuration
    * @param testDataParameters - test data parameters
    * @param initialStateCfg - initial state configuration
    * @param serializationCfg - serialization configuration
-   * @param iterations - number of test iterations
+   * @param warmupCycles - number of warmup cycles
    */
-  static void ThroughputTestImpl(
+  static void LatencyTestImpl(
       const exchange::core::common::config::PerformanceConfiguration
           &performanceCfg,
       const TestDataParameters &testDataParameters,
@@ -48,7 +47,22 @@ public:
           &initialStateCfg,
       const exchange::core::common::config::SerializationConfiguration
           &serializationCfg,
-      int iterations);
+      int warmupCycles);
+
+  /**
+   * Run hiccup test implementation (latency jitter testing)
+   * @param performanceCfg - performance configuration
+   * @param testDataParameters - test data parameters
+   * @param initialStateCfg - initial state configuration
+   * @param warmupCycles - number of warmup cycles
+   */
+  static void HiccupTestImpl(
+      const exchange::core::common::config::PerformanceConfiguration
+          &performanceCfg,
+      const TestDataParameters &testDataParameters,
+      const exchange::core::common::config::InitialStateConfiguration
+          &initialStateCfg,
+      int warmupCycles);
 };
 
 } // namespace util

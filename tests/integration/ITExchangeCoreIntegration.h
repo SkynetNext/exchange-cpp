@@ -20,7 +20,7 @@
 #include <gtest/gtest.h>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace integration {
 
@@ -40,11 +40,34 @@ public:
   virtual exchange::core::common::config::PerformanceConfiguration
   GetPerformanceConfiguration() = 0;
 
-  // Note: Test methods will be implemented in .cpp file
-  // They require ExchangeTestContainer which needs to be implemented first
+  /**
+   * Basic full cycle test - tests complete order lifecycle
+   */
+  void BasicFullCycleTest(
+      const exchange::core::common::CoreSymbolSpecification &symbolSpec);
+
+  /**
+   * Test initialization of symbols
+   */
+  void ShouldInitSymbols();
+
+  /**
+   * Test initialization of users
+   */
+  void ShouldInitUsers();
+
+  /**
+   * Exchange risk basic test - tests risk management and order rejection
+   */
+  void ExchangeRiskBasicTest();
+
+  /**
+   * Exchange cancel bid test - tests order cancellation
+   */
+  void ExchangeCancelBid();
 };
 
 } // namespace integration
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

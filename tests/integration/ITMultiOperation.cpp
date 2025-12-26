@@ -21,10 +21,10 @@
 #include <exchange/core/common/config/SerializationConfiguration.h>
 #include <gtest/gtest.h>
 
-using namespace exchange::core2::tests::util;
+using namespace exchange::core::tests::util;
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace integration {
 
@@ -77,5 +77,5 @@ TEST(ITMultiOperation, ShouldPerformSharded) {
 
 } // namespace integration
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

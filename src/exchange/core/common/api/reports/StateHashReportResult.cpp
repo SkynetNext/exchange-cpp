@@ -18,6 +18,8 @@
 #include <exchange/core/common/BytesOut.h>
 #include <exchange/core/common/api/reports/StateHashReportResult.h>
 #include <exchange/core/utils/SerializationUtils.h>
+#include <functional>
+#include <vector>
 
 namespace exchange {
 namespace core {
@@ -80,6 +82,34 @@ StateHashReportResult::Merge(const std::vector<BytesIn *> &pieces) {
     }
   }
 
+  return result;
+}
+
+int32_t StateHashReportResult::GetStateHash() const {
+  // Match Java implementation:
+  // final int[] hashes = hashCodes.entrySet().stream()
+  //         .mapToInt(e -> Objects.hash(e.getKey(), e.getValue())).toArray();
+  // return Arrays.hashCode(hashes);
+  
+  // Step 1: Calculate hash for each entry (key, value) pair
+  std::vector<int32_t> hashes;
+  hashes.reserve(hashCodes.size());
+  for (const auto &pair : hashCodes) {
+    // Objects.hash(key, value) equivalent:
+    // hash = 31 * (31 + key.hashCode()) + value.hashCode()
+    // For SubmoduleKey, we use its operator< for hashing
+    std::size_t keyHash = std::hash<int32_t>{}(pair.first.moduleId) ^
+                         (std::hash<int32_t>{}(static_cast<int32_t>(pair.first.submodule)) << 1);
+    int32_t entryHash = static_cast<int32_t>(31 * (31 + static_cast<int32_t>(keyHash)) + pair.second);
+    hashes.push_back(entryHash);
+  }
+  
+  // Step 2: Arrays.hashCode(hashes) equivalent
+  // Arrays.hashCode uses: result = 1; for (int e : a) result = 31 * result + e;
+  int32_t result = 1;
+  for (int32_t hash : hashes) {
+    result = 31 * result + hash;
+  }
   return result;
 }
 

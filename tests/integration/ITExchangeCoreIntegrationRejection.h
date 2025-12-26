@@ -28,7 +28,7 @@
 #include <gtest/gtest.h>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace integration {
 
@@ -83,6 +83,6 @@ private:
 
 } // namespace integration
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange
 

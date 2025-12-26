@@ -19,8 +19,8 @@
 #include "OrderBookBaseTest.h"
 
 namespace exchange {
-namespace core2 {
 namespace core {
+namespace tests {
 namespace orderbook {
 
 /**
@@ -36,6 +36,6 @@ protected:
 };
 
 } // namespace orderbook
+} // namespace tests
 } // namespace core
-} // namespace core2
 } // namespace exchange

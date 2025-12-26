@@ -15,10 +15,14 @@
  */
 
 #include "ITExchangeCoreIntegrationBasic.h"
+#include "../util/TestConstants.h"
 #include <exchange/core/common/config/PerformanceConfiguration.h>
+#include <gtest/gtest.h>
+
+using namespace exchange::core::tests::util;
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace integration {
 
@@ -30,7 +34,32 @@ ITExchangeCoreIntegrationBasic::GetPerformanceConfiguration() {
   return exchange::core::common::config::PerformanceConfiguration::Default();
 }
 
+// Register tests
+TEST_F(ITExchangeCoreIntegrationBasic, BasicFullCycleTestMargin) {
+  BasicFullCycleTest(TestConstants::SYMBOLSPEC_EUR_USD());
+}
+
+TEST_F(ITExchangeCoreIntegrationBasic, BasicFullCycleTestExchange) {
+  BasicFullCycleTest(TestConstants::SYMBOLSPEC_ETH_XBT());
+}
+
+TEST_F(ITExchangeCoreIntegrationBasic, ShouldInitSymbols) {
+  ShouldInitSymbols();
+}
+
+TEST_F(ITExchangeCoreIntegrationBasic, ShouldInitUsers) {
+  ShouldInitUsers();
+}
+
+TEST_F(ITExchangeCoreIntegrationBasic, ExchangeRiskBasicTest) {
+  ExchangeRiskBasicTest();
+}
+
+TEST_F(ITExchangeCoreIntegrationBasic, ExchangeCancelBid) {
+  ExchangeCancelBid();
+}
+
 } // namespace integration
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

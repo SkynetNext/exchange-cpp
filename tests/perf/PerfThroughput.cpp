@@ -20,14 +20,16 @@
 #include "../util/TestDataParameters.h"
 #include "../util/TestOrdersGeneratorConfig.h"
 #include "../util/ThroughputTestsModule.h"
+
+using namespace exchange::core::tests::util;
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
 
-using namespace exchange::core2::tests::util;
+using namespace exchange::core::tests::util;
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace perf {
 
@@ -144,5 +146,5 @@ TEST_F(PerfThroughput, TestThroughputMultiSymbolHuge) {
 
 } // namespace perf
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

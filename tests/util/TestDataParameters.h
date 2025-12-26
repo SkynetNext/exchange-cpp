@@ -21,7 +21,7 @@
 #include <set>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -84,5 +84,5 @@ struct TestDataParameters {
 
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

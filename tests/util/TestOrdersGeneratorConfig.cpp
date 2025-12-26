@@ -17,7 +17,7 @@
 #include "TestOrdersGeneratorConfig.h"
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -34,6 +34,6 @@ int TestOrdersGeneratorConfig::CalculateReadySeq() const {
 
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange
 

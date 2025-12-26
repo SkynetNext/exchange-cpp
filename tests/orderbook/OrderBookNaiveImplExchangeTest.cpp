@@ -21,11 +21,11 @@
 
 using namespace exchange::core::common;
 using namespace exchange::core::orderbook;
-using namespace exchange::core2::tests::util;
+using namespace exchange::core::tests::util;
 
 namespace exchange {
-namespace core2 {
 namespace core {
+namespace tests {
 namespace orderbook {
 
 class OrderBookNaiveImplExchangeTest : public OrderBookBaseTest {
@@ -195,6 +195,6 @@ TEST_F(OrderBookNaiveImplExchangeTest, ShouldMoveOrderMatchesAllLiquidity) {
 }
 
 } // namespace orderbook
+} // namespace tests
 } // namespace core
-} // namespace core2
 } // namespace exchange

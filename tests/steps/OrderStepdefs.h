@@ -25,18 +25,18 @@
 #include <vector>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 class ExchangeTestContainer;
 class L2MarketDataHelper;
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace steps {
 
@@ -59,7 +59,7 @@ public:
   // when Cucumber C++ library is available
 
 private:
-  std::unique_ptr<exchange::core2::tests::util::ExchangeTestContainer>
+  std::unique_ptr<exchange::core::tests::util::ExchangeTestContainer>
       container_;
   std::vector<exchange::core::common::MatcherTradeEvent> matcherEvents_;
   std::map<int64_t, exchange::core::common::api::ApiPlaceOrder> orders_;
@@ -71,5 +71,5 @@ private:
 
 } // namespace steps
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange

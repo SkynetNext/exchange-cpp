@@ -19,7 +19,7 @@
 #include <stdexcept>
 
 namespace exchange {
-namespace core2 {
+namespace core {
 namespace tests {
 namespace util {
 
@@ -195,5 +195,5 @@ TestConstants::GetSymbolSpecFeeXbtLtc() {
 
 } // namespace util
 } // namespace tests
-} // namespace core2
+} // namespace core
 } // namespace exchange
