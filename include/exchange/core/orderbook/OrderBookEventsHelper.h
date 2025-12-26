@@ -57,6 +57,13 @@ public:
                                              int64_t reduceSize,
                                              bool completed);
 
+  // Create a reduce event (overload with price parameters to avoid use-after-free)
+  // Use this version when the order will be released/deleted after the call
+  common::MatcherTradeEvent *SendReduceEvent(int64_t price,
+                                             int64_t reserveBidPrice,
+                                             int64_t reduceSize,
+                                             bool completed);
+
   // Attach a reject event to command
   void AttachRejectEvent(common::cmd::OrderCommand *cmd, int64_t rejectedSize);
 

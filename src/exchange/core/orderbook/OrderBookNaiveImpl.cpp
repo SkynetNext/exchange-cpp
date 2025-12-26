@@ -281,14 +281,21 @@ OrderBookNaiveImpl::CancelOrder(common::cmd::OrderCommand *cmd) {
     }
   }
 
-  // Send reduce event
-  cmd->matcherEvent =
-      eventsHelper_->SendReduceEvent(order, order->size - order->filled, true);
+  // Save order data before deleting it to avoid use-after-free
+  int64_t orderPrice = order->price;
+  int64_t orderReserveBidPrice = order->reserveBidPrice;
+  int64_t reduceSize = order->size - order->filled;
+  common::OrderAction orderAction = order->action;
+
+  // Delete order before creating event
+  delete order;
+
+  // Use saved data to create event
+  cmd->matcherEvent = eventsHelper_->SendReduceEvent(
+      orderPrice, orderReserveBidPrice, reduceSize, true);
 
   // Fill action field
-  cmd->action = order->action;
-
-  delete order;
+  cmd->action = orderAction;
   return common::cmd::CommandResultCode::SUCCESS;
 }
 
@@ -330,6 +337,10 @@ OrderBookNaiveImpl::ReduceOrder(common::cmd::OrderCommand *cmd) {
   bool canRemove = (reduceBy == remainingSize);
 
   if (canRemove) {
+    // Save order data before deleting it to avoid use-after-free
+    int64_t orderReserveBidPrice = order->reserveBidPrice;
+    common::OrderAction orderAction = order->action;
+    
     idMap_.erase(orderId);
     ordersBucket->Remove(orderId, cmd->uid);
     if (ordersBucket->GetTotalVolume() == 0) {
@@ -339,15 +350,20 @@ OrderBookNaiveImpl::ReduceOrder(common::cmd::OrderCommand *cmd) {
         bidBuckets_.erase(orderPrice);
       }
     }
+    
+    // Delete order before creating event
     delete order;
+    
+    // Use saved data to create event
+    cmd->matcherEvent = eventsHelper_->SendReduceEvent(
+        orderPrice, orderReserveBidPrice, reduceBy, true);
+    cmd->action = orderAction;
   } else {
     order->size -= reduceBy;
     ordersBucket->ReduceSize(reduceBy);
+    cmd->matcherEvent = eventsHelper_->SendReduceEvent(order, reduceBy, false);
+    cmd->action = order->action;
   }
-
-  cmd->matcherEvent =
-      eventsHelper_->SendReduceEvent(order, reduceBy, canRemove);
-  cmd->action = order->action;
 
   return common::cmd::CommandResultCode::SUCCESS;
 }

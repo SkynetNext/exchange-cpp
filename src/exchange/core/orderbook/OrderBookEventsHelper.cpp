@@ -66,6 +66,23 @@ OrderBookEventsHelper::SendReduceEvent(const common::IOrder *order,
   return event;
 }
 
+common::MatcherTradeEvent *
+OrderBookEventsHelper::SendReduceEvent(int64_t price, int64_t reserveBidPrice,
+                                       int64_t reduceSize, bool completed) {
+
+  common::MatcherTradeEvent *event = NewMatcherEvent();
+  event->eventType = common::MatcherEventType::REDUCE;
+  event->section = 0;
+  event->activeOrderCompleted = completed;
+  event->matchedOrderId = 0;
+  event->matchedOrderCompleted = false;
+  event->price = price;
+  event->size = reduceSize;
+  event->bidderHoldPrice = reserveBidPrice;
+
+  return event;
+}
+
 void OrderBookEventsHelper::AttachRejectEvent(common::cmd::OrderCommand *cmd,
                                               int64_t rejectedSize) {
 

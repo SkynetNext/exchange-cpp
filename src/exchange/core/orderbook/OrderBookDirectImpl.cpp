@@ -186,6 +186,13 @@ CommandResultCode OrderBookDirectImpl::CancelOrder(OrderCommand *cmd) {
   if (order == nullptr || order->uid != cmd->uid) {
     return CommandResultCode::MATCHING_UNKNOWN_ORDER_ID;
   }
+  
+  // Save order data before releasing it to avoid use-after-free
+  int64_t orderPrice = order->GetPrice();
+  int64_t orderReserveBidPrice = order->GetReserveBidPrice();
+  int64_t reduceSize = order->size - order->filled;
+  OrderAction orderAction = order->action;
+  
   orderIdIndex_.Remove(cmd->orderId);
 
   Bucket *freeBucket = this->RemoveOrder(order);
@@ -195,12 +202,15 @@ CommandResultCode OrderBookDirectImpl::CancelOrder(OrderCommand *cmd) {
         freeBucket);
   }
 
-  cmd->action = order->action;
-  cmd->matcherEvent =
-      eventsHelper_->SendReduceEvent(order, order->size - order->filled, true);
-
+  // Release order before creating event
   objectsPool_->Put(
       ::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER, order);
+
+  // Use saved data to create event
+  cmd->action = orderAction;
+  cmd->matcherEvent = eventsHelper_->SendReduceEvent(
+      orderPrice, orderReserveBidPrice, reduceSize, true);
+
   return CommandResultCode::SUCCESS;
 }
 
@@ -250,23 +260,33 @@ CommandResultCode OrderBookDirectImpl::ReduceOrder(OrderCommand *cmd) {
   const bool canRemove = (reduceBy == remainingSize);
 
   if (canRemove) {
+    // Save order data before releasing it to avoid use-after-free
+    int64_t orderPrice = order->GetPrice();
+    int64_t orderReserveBidPrice = order->GetReserveBidPrice();
+    OrderAction orderAction = order->action;
+    
     orderIdIndex_.Remove(orderId);
     Bucket *freeBucket = this->RemoveOrder(order);
     if (freeBucket)
       objectsPool_->Put(
           ::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
           freeBucket);
-    cmd->matcherEvent = eventsHelper_->SendReduceEvent(order, reduceBy, true);
+    
+    // Release order before creating event
     objectsPool_->Put(
         ::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER,
         order);
+    
+    // Use saved data to create event
+    cmd->matcherEvent = eventsHelper_->SendReduceEvent(
+        orderPrice, orderReserveBidPrice, reduceBy, true);
+    cmd->action = orderAction;
   } else {
     order->size -= reduceBy;
     order->bucket->totalVolume -= reduceBy;
     cmd->matcherEvent = eventsHelper_->SendReduceEvent(order, reduceBy, false);
+    cmd->action = order->action;
   }
-
-  cmd->action = order->action;
   return CommandResultCode::SUCCESS;
 }
 
