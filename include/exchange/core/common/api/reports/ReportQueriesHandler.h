@@ -42,7 +42,8 @@ public:
   std::optional<std::unique_ptr<R>> HandleReport(ReportQuery<R> *reportQuery) {
     // Call virtual method with type erasure
     // Subclasses override HandleReportImpl to provide actual implementation
-    auto result = HandleReportImpl(reportQuery);
+    // ReportQuery<R>* can be safely cast to ReportQueryBase* since ReportQuery<R> inherits from ReportQueryBase
+    auto result = HandleReportImpl(static_cast<ReportQueryBase *>(reportQuery));
     if (result.has_value()) {
       // Cast from ReportResult* to R*
       R *casted = dynamic_cast<R *>(result.value().get());
@@ -58,9 +59,9 @@ public:
 protected:
   // Virtual method for type-erased handling
   // Subclasses should override this to provide actual implementation
-  // reportQuery is a void* to ReportQuery<R>* for some R
+  // Uses ReportQueryBase* for type erasure (non-template base class)
   virtual std::optional<std::unique_ptr<ReportResult>>
-  HandleReportImpl(void *reportQuery) {
+  HandleReportImpl(ReportQueryBase *reportQuery) {
     return std::nullopt;
   }
 };

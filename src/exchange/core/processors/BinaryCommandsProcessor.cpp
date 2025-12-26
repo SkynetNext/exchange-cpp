@@ -188,7 +188,9 @@ BinaryCommandsProcessor::AcceptBinaryFrame(common::cmd::OrderCommand *cmd) {
     if (cmd->command == common::cmd::OrderCommandType::BINARY_DATA_QUERY) {
       // Match Java:
       // deserializeQuery(bytesIn).flatMap(reportQueriesHandler::handleReport).ifPresent(...)
-      if (reportQueriesHandler_) {
+      if (!reportQueriesHandler_) {
+        LOG_WARN("[BinaryCommandsProcessor] BINARY_DATA_QUERY received but reportQueriesHandler_ is nullptr!");
+      } else {
         // Read class code and deserialize query
         int32_t classCode = bytesIn.ReadInt();
         common::api::reports::ReportType reportType =

@@ -18,6 +18,7 @@
 
 #include "../common/api/reports/ReportQueriesHandler.h"
 #include "../common/api/reports/ReportQuery.h"
+#include "../common/api/reports/ReportResult.h"
 #include "../utils/Logger.h"
 #include "RiskEngine.h"
 #include <memory>
@@ -31,9 +32,8 @@ namespace processors {
  * RiskEngineReportQueriesHandler - adapter to connect
  * RiskEngine::HandleReportQuery to ReportQueriesHandler interface
  *
- * Since ReportQueriesHandler::HandleReport is a template method (not virtual),
- * we inherit from ReportQueriesHandler and provide template method
- * implementation that forwards to RiskEngine::HandleReportQuery.
+ * Uses type erasure: overrides HandleReportImpl to work with ReportQueryBase*,
+ * then calls the type-erased ProcessTypeErased method.
  */
 class RiskEngineReportQueriesHandler
     : public common::api::reports::ReportQueriesHandler {
@@ -41,23 +41,16 @@ public:
   explicit RiskEngineReportQueriesHandler(RiskEngine *riskEngine)
       : riskEngine_(riskEngine) {}
 
-  // Template method implementation - forwards to RiskEngine::HandleReportQuery
-  // Note: This is not a virtual override, but a template method specialization
-  template <typename R>
-  std::optional<std::unique_ptr<R>>
-  HandleReport(common::api::reports::ReportQuery<R> *reportQuery) {
+protected:
+  // Override HandleReportImpl to use type erasure
+  std::optional<std::unique_ptr<common::api::reports::ReportResult>>
+  HandleReportImpl(common::api::reports::ReportQueryBase *reportQuery) override {
     if (riskEngine_ == nullptr || reportQuery == nullptr) {
-      LOG_DEBUG("RiskEngineReportQueriesHandler::HandleReport: riskEngine_ or "
-                "reportQuery is nullptr");
+      LOG_WARN("[RiskEngineReportQueriesHandler] HandleReportImpl: riskEngine_ or reportQuery is nullptr");
       return std::nullopt;
     }
-    LOG_DEBUG("RiskEngineReportQueriesHandler::HandleReport: calling "
-              "riskEngine_->HandleReportQuery");
-    auto result = riskEngine_->HandleReportQuery(reportQuery);
-    LOG_DEBUG("RiskEngineReportQueriesHandler::HandleReport: HandleReportQuery "
-              "returned has_value={}",
-              result.has_value());
-    return result;
+    
+    return reportQuery->ProcessTypeErased(riskEngine_);
   }
 
 private:

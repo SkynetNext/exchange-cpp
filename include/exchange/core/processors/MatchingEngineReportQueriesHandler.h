@@ -30,7 +30,10 @@ namespace processors {
 
 /**
  * MatchingEngineReportQueriesHandler - adapter to connect
- * MatchingEngineRouter::HandleReportQuery to ReportQueriesHandler interface
+ * MatchingEngineRouter to ReportQueriesHandler interface
+ *
+ * Uses type erasure: overrides HandleReportImpl to work with ReportQueryBase*,
+ * then calls the type-erased ProcessTypeErased method.
  */
 class MatchingEngineReportQueriesHandler
     : public common::api::reports::ReportQueriesHandler {
@@ -39,29 +42,16 @@ public:
       MatchingEngineRouter *matchingEngine)
       : matchingEngine_(matchingEngine) {}
 
-  template <typename R>
-  std::optional<std::unique_ptr<R>>
-  HandleReport(common::api::reports::ReportQuery<R> *reportQuery) {
+protected:
+  // Override HandleReportImpl to use type erasure
+  std::optional<std::unique_ptr<common::api::reports::ReportResult>>
+  HandleReportImpl(common::api::reports::ReportQueryBase *reportQuery) override {
     if (matchingEngine_ == nullptr || reportQuery == nullptr) {
-      LOG_DEBUG("MatchingEngineReportQueriesHandler::HandleReport: "
-                "matchingEngine_ or reportQuery is nullptr");
+      LOG_WARN("[MatchingEngineReportQueriesHandler] HandleReportImpl: matchingEngine_ or reportQuery is nullptr");
       return std::nullopt;
     }
-    LOG_DEBUG("MatchingEngineReportQueriesHandler::HandleReportImpl: calling "
-              "matchingEngine_->HandleReportQuery");
-    // Use type erasure: call Process with MatchingEngineRouter
-    // The actual type will be handled by the template HandleReport method
-    auto result = reportQuery->Process(matchingEngine_);
-    LOG_DEBUG("MatchingEngineReportQueriesHandler::HandleReportImpl: Process "
-              "returned has_value={}",
-              result.has_value());
-    if (result.has_value()) {
-      // Convert to ReportResult*
-      return std::optional<std::unique_ptr<common::api::reports::ReportResult>>(
-          std::unique_ptr<common::api::reports::ReportResult>(
-              result.value().release()));
-    }
-    return std::nullopt;
+    
+    return reportQuery->ProcessTypeErased(matchingEngine_);
   }
 
 private:

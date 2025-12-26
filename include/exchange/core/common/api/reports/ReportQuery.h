@@ -18,6 +18,7 @@
 
 #include "../../BytesIn.h"
 #include "../../WriteBytesMarshallable.h"
+#include "ReportResult.h"
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -35,19 +36,50 @@ namespace api {
 namespace reports {
 
 /**
- * ReportQuery - reports query interface
- * @tparam T corresponding result type
- * Matches Java: public interface ReportQuery<T extends ReportResult> extends
- * WriteBytesMarshallable
+ * ReportQueryBase - non-template base class for type erasure
+ * Provides virtual methods that work with ReportResult* instead of template types
  */
-template <typename T> class ReportQuery : public WriteBytesMarshallable {
+class ReportQueryBase : public WriteBytesMarshallable {
 public:
-  virtual ~ReportQuery() = default;
+  virtual ~ReportQueryBase() = default;
 
   /**
    * @return report type code (integer)
    */
   virtual int32_t GetReportTypeCode() const = 0;
+
+  /**
+   * Type-erased Process method for MatchingEngineRouter
+   * Returns ReportResult* instead of template type
+   */
+  virtual std::optional<std::unique_ptr<ReportResult>>
+  ProcessTypeErased(::exchange::core::processors::MatchingEngineRouter *matchingEngine) = 0;
+
+  /**
+   * Type-erased Process method for RiskEngine
+   * Returns ReportResult* instead of template type
+   */
+  virtual std::optional<std::unique_ptr<ReportResult>>
+  ProcessTypeErased(::exchange::core::processors::RiskEngine *riskEngine) = 0;
+
+  /**
+   * Create result from sections (matches Java createResult)
+   * @param sections Vector of BytesIn sections (one per shard/section)
+   * @return Merged result as ReportResult*
+   */
+  virtual std::unique_ptr<ReportResult>
+  CreateResultTypeErased(const std::vector<BytesIn *> &sections) = 0;
+};
+
+/**
+ * ReportQuery - reports query interface
+ * @tparam T corresponding result type
+ * Matches Java: public interface ReportQuery<T extends ReportResult> extends
+ * WriteBytesMarshallable
+ */
+template <typename T> class ReportQuery : public ReportQueryBase {
+public:
+  virtual ~ReportQuery() = default;
 
   /**
    * Report main logic.
@@ -76,6 +108,33 @@ public:
    */
   virtual std::unique_ptr<T>
   CreateResult(const std::vector<BytesIn *> &sections) = 0;
+
+  // Implementation of type-erased methods from ReportQueryBase
+  std::optional<std::unique_ptr<ReportResult>>
+  ProcessTypeErased(::exchange::core::processors::MatchingEngineRouter *matchingEngine) override {
+    auto result = Process(matchingEngine);
+    if (result.has_value()) {
+      return std::optional<std::unique_ptr<ReportResult>>(
+          std::unique_ptr<ReportResult>(result.value().release()));
+    }
+    return std::nullopt;
+  }
+
+  std::optional<std::unique_ptr<ReportResult>>
+  ProcessTypeErased(::exchange::core::processors::RiskEngine *riskEngine) override {
+    auto result = Process(riskEngine);
+    if (result.has_value()) {
+      return std::optional<std::unique_ptr<ReportResult>>(
+          std::unique_ptr<ReportResult>(result.value().release()));
+    }
+    return std::nullopt;
+  }
+
+  std::unique_ptr<ReportResult>
+  CreateResultTypeErased(const std::vector<BytesIn *> &sections) override {
+    auto result = CreateResult(sections);
+    return std::unique_ptr<ReportResult>(result.release());
+  }
 };
 
 } // namespace reports
