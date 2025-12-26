@@ -273,10 +273,10 @@ GenerateRandomInstantOrder(TestOrdersGeneratorSession *session) {
 
     if (action == OrderAction::ASK) {
       session->lastTotalVolumeAsk =
-          std::max(session->lastTotalVolumeAsk - size, 0LL);
+          std::max(session->lastTotalVolumeAsk - size, static_cast<int64_t>(0));
     } else {
       session->lastTotalVolumeBid =
-          std::max(session->lastTotalVolumeBid - size, 0LL);
+          std::max(session->lastTotalVolumeBid - size, static_cast<int64_t>(0));
     }
 
   } else {

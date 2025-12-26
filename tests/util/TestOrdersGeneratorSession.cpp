@@ -45,7 +45,7 @@ TestOrdersGeneratorSession::TestOrdersGeneratorSession(
 
   this->lastTradePrice = price;
   int64_t calculatedPriceDeviation =
-      std::min(static_cast<int64_t>(price * 0.05), 10000LL);
+      std::min(static_cast<int64_t>(price * 0.05), static_cast<int64_t>(10000));
   int64_t calculatedMinPrice = price - calculatedPriceDeviation * 5;
   int64_t calculatedMaxPrice = price + calculatedPriceDeviation * 5;
 
