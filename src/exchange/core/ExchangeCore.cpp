@@ -378,8 +378,10 @@ public:
     // Create afterR1 group (wait for all R1 processors to complete)
     // Java: disruptor.after(procR1.toArray(new TwoStepMasterProcessor[0]))
     // Java version uses after(EventProcessor...) which directly gets sequences
+    // Use the EventProcessor* overload of after() - convert EventProcessor** to EventProcessor *const *
     auto afterR1 = disruptor_->after(
-        r1EventProcessors_.data(), static_cast<int>(r1EventProcessors_.size()));
+        const_cast<disruptor::EventProcessor *const *>(r1EventProcessors_.data()), 
+        static_cast<int>(r1EventProcessors_.size()));
 
     // Create all MatchingEngine handlers first (matches Java:
     // matchingEngineHandlers array) Java: final EventHandler<OrderCommand>[]
