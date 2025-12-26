@@ -25,6 +25,7 @@
 #include <exchange/core/orderbook/IOrderBook.h>
 #include <exchange/core/orderbook/OrderBookDirectImpl.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
+#include <exchange/core/utils/Logger.h>
 #include <iostream>
 #include <unordered_map>
 
@@ -187,7 +188,7 @@ void OrderBookDirectImplTest::TestMultipleCommandsCompare() {
     // Compare state hash every 100 commands
     if (i % 100 == 0) {
       if (orderBook_->GetStateHash() != orderBookRef->GetStateHash()) {
-        std::cout << "\n=== State hash mismatch at command " << i << " ===\n";
+        LOG_ERROR("\n=== State hash mismatch at command {} ===\n", i);
         // Use base class helper method to print both implementations
         PrintOrderBookComparison(orderBook_.get(), orderBookRef.get(),
                                  "OrderBookDirectImpl", "OrderBookNaiveImpl");

@@ -471,13 +471,11 @@ public:
       createEventProcessor(RingBufferT &ringBuffer,
                            disruptor::Sequence *const *barrierSequences,
                            int count) override {
-        std::cout << "[R2ProcessorFactory:" << name_
-                  << "] createEventProcessor: count=" << count << std::endl;
+        LOG_DEBUG("[R2ProcessorFactory:{}] createEventProcessor: count={}", name_, count);
         for (int i = 0; i < count; i++) {
-          std::cout << "[R2ProcessorFactory:" << name_ << "] barrierSequences["
-                    << i << "]=" << barrierSequences[i] << ", value="
-                    << (barrierSequences[i] ? barrierSequences[i]->get() : -999)
-                    << std::endl;
+          LOG_DEBUG("[R2ProcessorFactory:{}] barrierSequences[{}]={}, value={}",
+                    name_, i, static_cast<const void*>(barrierSequences[i]),
+                    (barrierSequences[i] ? barrierSequences[i]->get() : -999));
         }
         auto barrier = ringBuffer.newBarrier(barrierSequences, count);
         // CRITICAL: Save barrier to ensure it outlives the processor

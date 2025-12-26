@@ -15,6 +15,7 @@
  */
 
 #include "ITCH50StatListener.h"
+#include <exchange/core/utils/Logger.h>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
@@ -46,9 +47,7 @@ void ITCH50StatListener::PrintStat() const {
     if (v.counter > 500000) {
       auto it = symbolDescr_.find(k);
       if (it != symbolDescr_.end()) {
-        // log.info equivalent would be used here
-        // std::cout << it->second.ToString() << " " << v.ToString() <<
-        // std::endl;
+        LOG_INFO("{} {}", it->second.ToString(), v.ToString());
       }
     }
   }

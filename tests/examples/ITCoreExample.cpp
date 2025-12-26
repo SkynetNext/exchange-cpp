@@ -43,6 +43,7 @@
 #include <exchange/core/common/api/reports/TotalCurrencyBalanceReportResult.h>
 #include <exchange/core/common/cmd/CommandResultCode.h>
 #include <exchange/core/common/config/ExchangeConfiguration.h>
+#include <exchange/core/utils/Logger.h>
 #include <gtest/gtest.h>
 #include <iostream>
 
@@ -57,23 +58,23 @@ using namespace exchange::core::common::cmd;
 class TestEventsHandler : public IEventsHandler {
 public:
   void TradeEvent(const struct TradeEvent &tradeEvent) override {
-    std::cout << "Trade event: " << &tradeEvent << std::endl;
+    LOG_INFO("Trade event: {}", static_cast<const void*>(&tradeEvent));
   }
 
   void ReduceEvent(const struct ReduceEvent &reduceEvent) override {
-    std::cout << "Reduce event: " << &reduceEvent << std::endl;
+    LOG_INFO("Reduce event: {}", static_cast<const void*>(&reduceEvent));
   }
 
   void RejectEvent(const struct RejectEvent &rejectEvent) override {
-    std::cout << "Reject event: " << &rejectEvent << std::endl;
+    LOG_INFO("Reject event: {}", static_cast<const void*>(&rejectEvent));
   }
 
   void CommandResult(const struct ApiCommandResult &commandResult) override {
-    std::cout << "Command result: " << &commandResult << std::endl;
+    LOG_INFO("Command result: {}", static_cast<const void*>(&commandResult));
   }
 
   void OrderBook(const struct OrderBook &orderBook) override {
-    std::cout << "OrderBook event: " << &orderBook << std::endl;
+    LOG_INFO("OrderBook event: {}", static_cast<const void*>(&orderBook));
   }
 };
 
@@ -86,17 +87,17 @@ TEST(ITCoreExample, SampleTest) {
   auto conf = exchange::core::common::config::ExchangeConfiguration::Default();
 
   // Build exchange core
-  std::cout << "[TEST] Building ExchangeCore" << std::endl;
+  LOG_INFO("[TEST] Building ExchangeCore");
   auto exchangeCore = std::make_unique<ExchangeCore>(
       [&eventsProcessor](exchange::core::common::cmd::OrderCommand *cmd,
                          int64_t seq) { eventsProcessor->Accept(cmd, seq); },
       &conf);
-  std::cout << "[TEST] ExchangeCore built" << std::endl;
+  LOG_INFO("[TEST] ExchangeCore built");
 
   // Start up disruptor threads
-  std::cout << "[TEST] Calling Startup()" << std::endl;
+  LOG_INFO("[TEST] Calling Startup()");
   exchangeCore->Startup();
-  std::cout << "[TEST] Startup() completed" << std::endl;
+  LOG_INFO("[TEST] Startup() completed");
 
   // Get exchange API for publishing commands
   auto api = exchangeCore->GetApi();
@@ -127,30 +128,25 @@ TEST(ITCoreExample, SampleTest) {
   auto binaryCmd =
       std::make_unique<ApiBinaryDataCommand>(1, std::move(batchCmd));
   auto future1 = api->SubmitCommandAsync(binaryCmd.release());
-  std::cout << "BatchAddSymbolsCommand result: "
-            << static_cast<int>(future1.get()) << std::endl;
+  LOG_INFO("BatchAddSymbolsCommand result: {}", static_cast<int>(future1.get()));
 
   // Create user uid=301
   auto future2 = api->SubmitCommandAsync(new ApiAddUser(301L));
-  std::cout << "ApiAddUser 1 result: " << static_cast<int>(future2.get())
-            << std::endl;
+  LOG_INFO("ApiAddUser 1 result: {}", static_cast<int>(future2.get()));
 
   // Create user uid=302
   auto future3 = api->SubmitCommandAsync(new ApiAddUser(302L));
-  std::cout << "ApiAddUser 2 result: " << static_cast<int>(future3.get())
-            << std::endl;
+  LOG_INFO("ApiAddUser 2 result: {}", static_cast<int>(future3.get()));
 
   // First user deposits 20 LTC
   auto future4 = api->SubmitCommandAsync(
       new ApiAdjustUserBalance(301L, currencyCodeLtc, 2'000'000'000L, 1L));
-  std::cout << "ApiAdjustUserBalance 1 result: "
-            << static_cast<int>(future4.get()) << std::endl;
+  LOG_INFO("ApiAdjustUserBalance 1 result: {}", static_cast<int>(future4.get()));
 
   // Second user deposits 0.10 BTC
   auto future5 = api->SubmitCommandAsync(
       new ApiAdjustUserBalance(302L, currencyCodeXbt, 10'000'000L, 2L));
-  std::cout << "ApiAdjustUserBalance 2 result: "
-            << static_cast<int>(future5.get()) << std::endl;
+  LOG_INFO("ApiAdjustUserBalance 2 result: {}", static_cast<int>(future5.get()));
 
   // First user places Good-till-Cancel Bid order
   // He assumes BTCLTC exchange rate 154 LTC for 1 BTC
@@ -159,34 +155,29 @@ TEST(ITCoreExample, SampleTest) {
   auto future6 = api->SubmitCommandAsync(
       new ApiPlaceOrder(15'400L, 12L, 5001L, OrderAction::BID, OrderType::GTC,
                         301L, symbolXbtLtc, 0, 15'600L));
-  std::cout << "ApiPlaceOrder 1 result: " << static_cast<int>(future6.get())
-            << std::endl;
+  LOG_INFO("ApiPlaceOrder 1 result: {}", static_cast<int>(future6.get()));
 
   // Second user places Immediate-or-Cancel Ask (Sell) order
   // He assumes worst rate to sell 152.5 LTC for 1 BTC
   auto future7 = api->SubmitCommandAsync(
       new ApiPlaceOrder(15'250L, 10L, 5002L, OrderAction::ASK, OrderType::IOC,
                         302L, symbolXbtLtc, 0, 0));
-  std::cout << "ApiPlaceOrder 2 result: " << static_cast<int>(future7.get())
-            << std::endl;
+  LOG_INFO("ApiPlaceOrder 2 result: {}", static_cast<int>(future7.get()));
 
   // Request order book
   auto futureOrderBook =
       api->SubmitCommandAsync(new ApiOrderBookRequest(symbolXbtLtc, 10));
-  std::cout << "ApiOrderBookRequest result: "
-            << static_cast<int>(futureOrderBook.get()) << std::endl;
+  LOG_INFO("ApiOrderBookRequest result: {}", static_cast<int>(futureOrderBook.get()));
 
   // First user moves remaining order to price 1.53 LTC
   auto future8 = api->SubmitCommandAsync(
       new ApiMoveOrder(5001L, 15'300L, 301L, symbolXbtLtc));
-  std::cout << "ApiMoveOrder 2 result: " << static_cast<int>(future8.get())
-            << std::endl;
+  LOG_INFO("ApiMoveOrder 2 result: {}", static_cast<int>(future8.get()));
 
   // First user cancel remaining order
   auto future9 =
       api->SubmitCommandAsync(new ApiCancelOrder(5001L, 301L, symbolXbtLtc));
-  std::cout << "ApiCancelOrder 2 result: " << static_cast<int>(future9.get())
-            << std::endl;
+  LOG_INFO("ApiCancelOrder 2 result: {}", static_cast<int>(future9.get()));
 
   // Check balances
   // Check user 301 balances
@@ -196,16 +187,15 @@ TEST(ITCoreExample, SampleTest) {
           api, std::move(reportQuery1), 0);
   auto result1 = report1.get();
   if (!result1) {
-    std::cout << "SingleUserReportQuery 1: result is nullptr" << std::endl;
+    LOG_INFO("SingleUserReportQuery 1: result is nullptr");
   } else if (!result1->accounts) {
-    std::cout << "SingleUserReportQuery 1: accounts is nullptr" << std::endl;
+    LOG_INFO("SingleUserReportQuery 1: accounts is nullptr");
   } else {
-    std::cout << "SingleUserReportQuery 1 accounts: ";
+    std::string accountsStr = "SingleUserReportQuery 1 accounts: ";
     for (const auto &pair : *result1->accounts) {
-      std::cout << "currency=" << pair.first << ", balance=" << pair.second
-                << " ";
+      accountsStr += "currency=" + std::to_string(pair.first) + ", balance=" + std::to_string(pair.second) + " ";
     }
-    std::cout << std::endl;
+    LOG_INFO("{}", accountsStr);
   }
 
   // Check user 302 balances
@@ -215,23 +205,21 @@ TEST(ITCoreExample, SampleTest) {
           api, std::move(reportQuery2), 0);
   auto result2 = report2.get();
   if (!result2) {
-    std::cout << "SingleUserReportQuery 2: result is nullptr" << std::endl;
+    LOG_INFO("SingleUserReportQuery 2: result is nullptr");
   } else if (!result2->accounts) {
-    std::cout << "SingleUserReportQuery 2: accounts is nullptr" << std::endl;
+    LOG_INFO("SingleUserReportQuery 2: accounts is nullptr");
   } else {
-    std::cout << "SingleUserReportQuery 2 accounts: ";
+    std::string accountsStr = "SingleUserReportQuery 2 accounts: ";
     for (const auto &pair : *result2->accounts) {
-      std::cout << "currency=" << pair.first << ", balance=" << pair.second
-                << " ";
+      accountsStr += "currency=" + std::to_string(pair.first) + ", balance=" + std::to_string(pair.second) + " ";
     }
-    std::cout << std::endl;
+    LOG_INFO("{}", accountsStr);
   }
 
   // First user withdraws 0.10 BTC
   auto future10 = api->SubmitCommandAsync(
       new ApiAdjustUserBalance(301L, currencyCodeXbt, -10'000'000L, 3L));
-  std::cout << "ApiAdjustUserBalance 1 result: "
-            << static_cast<int>(future10.get()) << std::endl;
+  LOG_INFO("ApiAdjustUserBalance 1 result: {}", static_cast<int>(future10.get()));
 
   // Check fees collected
   auto totalsReportQuery = std::make_unique<TotalCurrencyBalanceReportQuery>();
@@ -240,18 +228,15 @@ TEST(ITCoreExample, SampleTest) {
       api, std::move(totalsReportQuery), 0);
   auto totalsResult = totalsReport.get();
   if (!totalsResult) {
-    std::cout << "TotalCurrencyBalanceReportQuery: result is nullptr"
-              << std::endl;
+    LOG_INFO("TotalCurrencyBalanceReportQuery: result is nullptr");
   } else if (!totalsResult->fees) {
-    std::cout << "TotalCurrencyBalanceReportQuery: fees is nullptr"
-              << std::endl;
+    LOG_INFO("TotalCurrencyBalanceReportQuery: fees is nullptr");
   } else {
     auto it = totalsResult->fees->find(currencyCodeLtc);
     if (it != totalsResult->fees->end()) {
-      std::cout << "LTC fees collected: " << it->second << std::endl;
+      LOG_INFO("LTC fees collected: {}", it->second);
     } else {
-      std::cout << "TotalCurrencyBalanceReportQuery: LTC fees not found"
-                << std::endl;
+      LOG_INFO("TotalCurrencyBalanceReportQuery: LTC fees not found");
     }
   }
 

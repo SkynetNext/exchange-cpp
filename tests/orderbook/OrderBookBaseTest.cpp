@@ -16,6 +16,7 @@
 
 #include "OrderBookBaseTest.h"
 #include "../util/TestOrdersGenerator.h"
+#include <exchange/core/utils/Logger.h>
 #include <numeric>
 #include <sstream>
 
@@ -799,42 +800,34 @@ void OrderBookBaseTest::TestMultipleCommandsKeepInternalState() {
 void OrderBookBaseTest::PrintOrderBookState(
     const std::string &label, exchange::core::orderbook::IOrderBook *orderBook) {
   if (orderBook == nullptr) {
-    std::cout << label << ": (nullptr)\n";
+    LOG_INFO("{}: (nullptr)", label);
     return;
   }
 
-  std::cout << "\n=== " << label << " ===\n";
-  std::cout << "State Hash: " << orderBook->GetStateHash() << "\n";
-  std::cout << "Ask orders: " << orderBook->GetOrdersNum(OrderAction::ASK)
-            << "\n";
-  std::cout << "Bid orders: " << orderBook->GetOrdersNum(OrderAction::BID)
-            << "\n";
-  std::cout << "Implementation: "
-            << (orderBook->GetImplementationType() ==
+  LOG_INFO("\n=== {} ===\nState Hash: {}\nAsk orders: {}\nBid orders: {}\nImplementation: {}",
+           label, orderBook->GetStateHash(), 
+           orderBook->GetOrdersNum(OrderAction::ASK),
+           orderBook->GetOrdersNum(OrderAction::BID),
+           (orderBook->GetImplementationType() ==
                         exchange::core::orderbook::OrderBookImplType::DIRECT
                     ? "DirectImpl"
-                    : "NaiveImpl")
-            << "\n";
+                    : "NaiveImpl"));
 
   // Print diagrams using base class interface
-  std::cout << "\n--- Ask Buckets ---\n";
-  std::cout << orderBook->PrintAskBucketsDiagram() << "\n";
-  std::cout << "\n--- Bid Buckets ---\n";
-  std::cout << orderBook->PrintBidBucketsDiagram() << "\n";
+  LOG_INFO("\n--- Ask Buckets ---\n{}", orderBook->PrintAskBucketsDiagram());
+  LOG_INFO("\n--- Bid Buckets ---\n{}", orderBook->PrintBidBucketsDiagram());
 }
 
 void OrderBookBaseTest::PrintOrderBookComparison(
     exchange::core::orderbook::IOrderBook *orderBook1,
     exchange::core::orderbook::IOrderBook *orderBook2,
     const std::string &label1, const std::string &label2) {
-  std::cout << "\n========================================\n";
-  std::cout << "ORDER BOOK COMPARISON\n";
-  std::cout << "========================================\n";
+  LOG_INFO("\n========================================\nORDER BOOK COMPARISON\n========================================\n");
 
   PrintOrderBookState(label1, orderBook1);
   PrintOrderBookState(label2, orderBook2);
 
-  std::cout << "\n========================================\n";
+  LOG_INFO("\n========================================\n");
 }
 
 } // namespace orderbook
