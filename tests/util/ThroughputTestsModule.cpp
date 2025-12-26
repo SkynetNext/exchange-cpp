@@ -61,51 +61,41 @@ void ThroughputTestsModule::ThroughputTestImpl(
     if (!benchmarkCommands.empty()) {
       container->GetApi()->SubmitCommandsSync(benchmarkCommands);
     }
-    auto tDuration = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - tStart).count();
+    auto tEnd = std::chrono::steady_clock::now();
+    // Use microseconds for better precision to avoid truncation when duration < 1ms
+    auto tDurationUs = std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart).count();
     
-    // Avoid division by zero - if duration is 0, use 1ms minimum
-    if (tDuration == 0) {
-      tDuration = 1;
+    // Avoid division by zero - if duration is 0, use 1 microsecond minimum
+    if (tDurationUs == 0) {
+      tDurationUs = 1;
     }
     
-    float perfMt = benchmarkCommands.size() / static_cast<float>(tDuration) / 1000.0f;
+    // Calculate MT/s: commands / seconds / 1000000
+    // Match Java: commands / milliseconds / 1000.0
+    // Convert microseconds to milliseconds: tDurationUs / 1000.0
+    float tDurationMs = tDurationUs / 1000.0f;
+    float perfMt = benchmarkCommands.size() / tDurationMs / 1000.0f;
     perfResults.push_back(perfMt);
     
     // Log performance (matching Java: log.info("{}. {} MT/s", j, ...))
     printf("%d. %.3f MT/s\n", j, perfMt);
 
-    // Verify balances
+    // Verify balances - match Java: container.totalBalanceReport().isGlobalBalancesAllZero()
     auto balanceReport = container->TotalBalanceReport();
     if (balanceReport) {
-      // Check all balances are zero
-      bool allZero = true;
-      if (balanceReport->accountBalances) {
-        for (const auto &pair : *balanceReport->accountBalances) {
+      if (!balanceReport->IsGlobalBalancesAllZero()) {
+        // Log non-zero balances for debugging
+        auto globalBalances = balanceReport->GetGlobalBalancesSum();
+        std::string errorMsg = "Total balance report is not zero. Non-zero balances: ";
+        bool first = true;
+        for (const auto &pair : globalBalances) {
           if (pair.second != 0) {
-            allZero = false;
-            break;
+            if (!first) errorMsg += ", ";
+            errorMsg += "currency " + std::to_string(pair.first) + " = " + std::to_string(pair.second);
+            first = false;
           }
         }
-      }
-      if (allZero && balanceReport->fees) {
-        for (const auto &pair : *balanceReport->fees) {
-          if (pair.second != 0) {
-            allZero = false;
-            break;
-          }
-        }
-      }
-      if (allZero && balanceReport->ordersBalances) {
-        for (const auto &pair : *balanceReport->ordersBalances) {
-          if (pair.second != 0) {
-            allZero = false;
-            break;
-          }
-        }
-      }
-      if (!allZero) {
-        throw std::runtime_error("Total balance report is not zero");
+        throw std::runtime_error(errorMsg);
       }
     }
 
