@@ -20,6 +20,7 @@
 #include "../util/TestConstants.h"
 #include <exchange/core/common/MatcherEventType.h>
 #include <exchange/core/common/MatcherTradeEvent.h>
+#include <exchange/core/common/Order.h>
 #include <exchange/core/common/OrderAction.h>
 #include <exchange/core/common/OrderType.h>
 #include <exchange/core/common/SymbolType.h>
@@ -45,6 +46,22 @@ namespace integration {
 
 // Helper to check command result code
 static constexpr CommandResultCode CHECK_SUCCESS = CommandResultCode::SUCCESS;
+
+// Helper to find order by orderId from SingleUserReportResult
+static const exchange::core::common::Order *
+FindOrderById(const SingleUserReportResult &profile, int64_t orderId) {
+  if (!profile.orders) {
+    return nullptr;
+  }
+  for (const auto &[symbolId, orderList] : *profile.orders) {
+    for (const auto *order : orderList) {
+      if (order && order->orderId == orderId) {
+        return order;
+      }
+    }
+  }
+  return nullptr;
+}
 
 // Basic full cycle test implementation
 void ITExchangeCoreIntegration::BasicFullCycleTest(
@@ -371,35 +388,533 @@ void ITExchangeCoreIntegration::ExchangeRiskBasicTest() {
 void ITExchangeCoreIntegration::ExchangeCancelBid() {
   auto container = ExchangeTestContainer::Create(GetPerformanceConfiguration());
   container->InitBasicSymbols();
-  container->CreateUserWithMoney(TestConstants::UID_1, TestConstants::CURRENCY_XBT,
-                                  1'000'000);
 
-  // Place bid order
-  auto order101 = std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
-      30'000, 7, 101, OrderAction::BID, OrderType::GTC, TestConstants::UID_1,
-      TestConstants::SYMBOL_EXCHANGE, 0, 30'000);
+  // create user
+  container->CreateUserWithMoney(TestConstants::UID_2, TestConstants::CURRENCY_XBT,
+                                  94'000'000); // 94M satoshi (0.94 BTC)
 
-  container->SubmitCommandSync(std::move(order101), CHECK_SUCCESS);
+  // submit order with reservePrice below funds limit - should be placed
+  auto order203 = std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
+      18'000, 500, 203, OrderAction::BID, OrderType::GTC, TestConstants::UID_2,
+      TestConstants::SYMBOL_EXCHANGE, 0, 18'500);
 
-  // Cancel the order
-  auto cancelOrder =
-      std::make_unique<exchange::core::common::api::ApiCancelOrder>(
-      101, TestConstants::UID_1, TestConstants::SYMBOL_EXCHANGE);
-
-  container->SubmitCommandSync(std::move(cancelOrder), [](const OrderCommand &cmd) {
+  container->SubmitCommandSync(std::move(order203), [](const OrderCommand &cmd) {
     EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
   });
 
-  // Verify balance is restored
+  // verify order placed with correct reserve price and account balance is updated accordingly
+  const auto symbolSpec = TestConstants::SYMBOLSPEC_ETH_XBT();
+  const int64_t expectedBalanceAfterPlace =
+      94'000'000L - 18'500 * 500 * symbolSpec.quoteScaleK;
+
+  container->ValidateUserState(
+      TestConstants::UID_2,
+      [&expectedBalanceAfterPlace](const exchange::core::common::api::reports::SingleUserReportResult
+             &profile) {
+        ASSERT_NE(profile.accounts, nullptr);
+        auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
+        ASSERT_NE(it, profile.accounts->end());
+        EXPECT_EQ(it->second, expectedBalanceAfterPlace);
+        const auto *order = FindOrderById(profile, 203);
+        EXPECT_NE(order, nullptr);
+        if (order) {
+          EXPECT_EQ(order->reserveBidPrice, 18'500);
+        }
+      });
+
+  // cancel remaining order
+  auto cancelOrder =
+      std::make_unique<exchange::core::common::api::ApiCancelOrder>(
+      203, TestConstants::UID_2, TestConstants::SYMBOL_EXCHANGE);
+
+  container->SubmitCommandSync(std::move(cancelOrder), [](const OrderCommand &cmd) {
+    EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+    EXPECT_EQ(cmd.command, OrderCommandType::CANCEL_ORDER);
+    EXPECT_EQ(cmd.orderId, 203);
+    EXPECT_EQ(cmd.uid, TestConstants::UID_2);
+    EXPECT_EQ(cmd.symbol, TestConstants::SYMBOL_EXCHANGE);
+
+    EXPECT_EQ(cmd.action, OrderAction::BID);
+
+    const auto *evt = cmd.matcherEvent;
+    EXPECT_NE(evt, nullptr);
+    if (evt) {
+      EXPECT_EQ(evt->eventType, MatcherEventType::REDUCE);
+      EXPECT_EQ(evt->bidderHoldPrice, 18'500);
+      EXPECT_EQ(evt->size, 500);
+    }
+  });
+
+  // verify that all 94M satoshi were returned back
+  container->ValidateUserState(
+      TestConstants::UID_2,
+      [](const exchange::core::common::api::reports::SingleUserReportResult
+             &profile) {
+        ASSERT_NE(profile.accounts, nullptr);
+        auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
+        ASSERT_NE(it, profile.accounts->end());
+        EXPECT_EQ(it->second, 94'000'000);
+        // Verify no orders
+        if (profile.orders) {
+          bool hasOrders = false;
+          for (const auto &[symbolId, orderList] : *profile.orders) {
+            if (!orderList.empty()) {
+              hasOrders = true;
+              break;
+            }
+          }
+          EXPECT_FALSE(hasOrders);
+        }
+      });
+
+  // Verify total balance is zero
+  auto balanceReport = container->TotalBalanceReport();
+  if (balanceReport) {
+    EXPECT_TRUE(balanceReport->IsGlobalBalancesAllZero());
+  }
+}
+
+// Exchange risk move test
+void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
+  auto container = ExchangeTestContainer::Create(GetPerformanceConfiguration());
+  container->InitBasicSymbols();
+  container->CreateUserWithMoney(TestConstants::UID_1, TestConstants::CURRENCY_ETH,
+                                  100'000'000); // 100M szabo (100 ETH)
+
+  // try submit an order - sell 1001 lots, price 300K satoshi (30K x10 step) for
+  // each lot 100K szabo should be rejected
+  auto order202 = std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
+      30'000, 1001, 202, OrderAction::ASK, OrderType::GTC, TestConstants::UID_1,
+      TestConstants::SYMBOL_EXCHANGE, 0, 0);
+
+  container->SubmitCommandSync(std::move(order202), [](const OrderCommand &cmd) {
+    EXPECT_EQ(cmd.resultCode, CommandResultCode::RISK_NSF);
+  });
+
   container->ValidateUserState(
       TestConstants::UID_1,
       [](const exchange::core::common::api::reports::SingleUserReportResult
              &profile) {
-    ASSERT_NE(profile.accounts, nullptr);
-    auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
-    ASSERT_NE(it, profile.accounts->end());
-    EXPECT_EQ(it->second, 1'000'000);
+        ASSERT_NE(profile.accounts, nullptr);
+        auto it = profile.accounts->find(TestConstants::CURRENCY_ETH);
+        ASSERT_NE(it, profile.accounts->end());
+        EXPECT_EQ(it->second, 100'000'000);
+        // Verify no orders
+        if (profile.orders) {
+          bool hasOrders = false;
+          for (const auto &[symbolId, orderList] : *profile.orders) {
+            if (!orderList.empty()) {
+              hasOrders = true;
+              break;
+            }
+          }
+          EXPECT_FALSE(hasOrders);
+        }
+      });
+
+  // submit order again - should be placed (1000 lots)
+  auto order202_retry =
+      std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
+      30'000, 1000, 202, OrderAction::ASK, OrderType::GTC, TestConstants::UID_1,
+      TestConstants::SYMBOL_EXCHANGE, 0, 0);
+
+  container->SubmitCommandSync(
+      std::move(order202_retry), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+        EXPECT_EQ(cmd.command, OrderCommandType::PLACE_ORDER);
+        EXPECT_EQ(cmd.orderId, 202);
+        EXPECT_EQ(cmd.uid, TestConstants::UID_1);
+        EXPECT_EQ(cmd.price, 30'000);
+        EXPECT_EQ(cmd.size, 1000);
+        EXPECT_EQ(cmd.action, OrderAction::ASK);
+        EXPECT_EQ(cmd.orderType, OrderType::GTC);
+        EXPECT_EQ(cmd.symbol, TestConstants::SYMBOL_EXCHANGE);
+        EXPECT_EQ(cmd.matcherEvent, nullptr);
+      });
+
+  container->ValidateUserState(
+      TestConstants::UID_1,
+      [](const exchange::core::common::api::reports::SingleUserReportResult
+             &profile) {
+        ASSERT_NE(profile.accounts, nullptr);
+        auto it = profile.accounts->find(TestConstants::CURRENCY_ETH);
+        ASSERT_NE(it, profile.accounts->end());
+        EXPECT_EQ(it->second, 0);
+        // Verify order exists
+        const auto *order = FindOrderById(profile, 202);
+        EXPECT_NE(order, nullptr);
+      });
+
+  // move order to higher price - shouldn't be a problem for ASK order
+  auto moveOrder1 = std::make_unique<exchange::core::common::api::ApiMoveOrder>(
+      202, 40'000, TestConstants::UID_1, TestConstants::SYMBOL_EXCHANGE);
+
+  container->SubmitCommandSync(
+      std::move(moveOrder1), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+        EXPECT_EQ(cmd.command, OrderCommandType::MOVE_ORDER);
+        EXPECT_EQ(cmd.orderId, 202);
+        EXPECT_EQ(cmd.uid, TestConstants::UID_1);
+        EXPECT_EQ(cmd.price, 40'000);
+        EXPECT_EQ(cmd.symbol, TestConstants::SYMBOL_EXCHANGE);
+        EXPECT_EQ(cmd.matcherEvent, nullptr);
+      });
+
+  container->ValidateUserState(
+      TestConstants::UID_1,
+      [](const exchange::core::common::api::reports::SingleUserReportResult
+             &profile) {
+        ASSERT_NE(profile.accounts, nullptr);
+        auto it = profile.accounts->find(TestConstants::CURRENCY_ETH);
+        ASSERT_NE(it, profile.accounts->end());
+        EXPECT_EQ(it->second, 0);
+        // Verify order still exists
+        const auto *order = FindOrderById(profile, 202);
+        EXPECT_NE(order, nullptr);
+      });
+
+  // move order to lower price - shouldn't be a problem as well for ASK order
+  auto moveOrder2 = std::make_unique<exchange::core::common::api::ApiMoveOrder>(
+      202, 20'000, TestConstants::UID_1, TestConstants::SYMBOL_EXCHANGE);
+
+  container->SubmitCommandSync(
+      std::move(moveOrder2), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+        EXPECT_EQ(cmd.command, OrderCommandType::MOVE_ORDER);
+        EXPECT_EQ(cmd.orderId, 202);
+        EXPECT_EQ(cmd.uid, TestConstants::UID_1);
+        EXPECT_EQ(cmd.price, 20'000);
+        EXPECT_EQ(cmd.symbol, TestConstants::SYMBOL_EXCHANGE);
+        EXPECT_EQ(cmd.matcherEvent, nullptr);
+      });
+
+  container->ValidateUserState(
+      TestConstants::UID_1,
+      [](const exchange::core::common::api::reports::SingleUserReportResult
+             &profile) {
+        ASSERT_NE(profile.accounts, nullptr);
+        auto it = profile.accounts->find(TestConstants::CURRENCY_ETH);
+        ASSERT_NE(it, profile.accounts->end());
+        EXPECT_EQ(it->second, 0);
+        // Verify order still exists
+        const auto *order = FindOrderById(profile, 202);
+        EXPECT_NE(order, nullptr);
+      });
+
+  // create user
+  container->CreateUserWithMoney(TestConstants::UID_2, TestConstants::CURRENCY_XBT,
+                                  94'000'000); // 94M satoshi (0.94 BTC)
+
+  // try submit order with reservePrice above funds limit - rejected
+  auto order203 = std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
+      18'000, 500, 203, OrderAction::BID, OrderType::GTC, TestConstants::UID_2,
+      TestConstants::SYMBOL_EXCHANGE, 0, 19'000);
+
+  container->SubmitCommandSync(std::move(order203), [](const OrderCommand &cmd) {
+    EXPECT_EQ(cmd.resultCode, CommandResultCode::RISK_NSF);
   });
+
+  container->ValidateUserState(
+      TestConstants::UID_2,
+      [](const exchange::core::common::api::reports::SingleUserReportResult
+             &profile) {
+        ASSERT_NE(profile.accounts, nullptr);
+        auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
+        ASSERT_NE(it, profile.accounts->end());
+        EXPECT_EQ(it->second, 94'000'000);
+        // Verify no orders
+        if (profile.orders) {
+          bool hasOrders = false;
+          for (const auto &[symbolId, orderList] : *profile.orders) {
+            if (!orderList.empty()) {
+              hasOrders = true;
+              break;
+            }
+          }
+          EXPECT_FALSE(hasOrders);
+        }
+      });
+
+  // submit order with reservePrice below funds limit - should be placed
+  auto order203_retry =
+      std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
+      18'000, 500, 203, OrderAction::BID, OrderType::GTC, TestConstants::UID_2,
+      TestConstants::SYMBOL_EXCHANGE, 0, 18'500);
+
+  container->SubmitCommandSync(
+      std::move(order203_retry), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+        EXPECT_EQ(cmd.command, OrderCommandType::PLACE_ORDER);
+        EXPECT_EQ(cmd.orderId, 203);
+        EXPECT_EQ(cmd.uid, TestConstants::UID_2);
+        EXPECT_EQ(cmd.price, 18'000);
+        EXPECT_EQ(cmd.reserveBidPrice, 18'500);
+        EXPECT_EQ(cmd.size, 500);
+        EXPECT_EQ(cmd.action, OrderAction::BID);
+        EXPECT_EQ(cmd.orderType, OrderType::GTC);
+        EXPECT_EQ(cmd.symbol, TestConstants::SYMBOL_EXCHANGE);
+        EXPECT_EQ(cmd.matcherEvent, nullptr);
+      });
+
+  // expected balance when 203 placed with reserve price 18_500
+  // quoteScaleK = 10 for SYMBOL_EXCHANGE (ETH_XBT)
+  const auto symbolSpec = TestConstants::SYMBOLSPEC_ETH_XBT();
+  const int64_t ethUid2 = 94'000'000L - 18'500 * 500 * symbolSpec.quoteScaleK;
+
+  container->ValidateUserState(
+      TestConstants::UID_2,
+      [&ethUid2](const exchange::core::common::api::reports::SingleUserReportResult
+             &profile) {
+        ASSERT_NE(profile.accounts, nullptr);
+        auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
+        ASSERT_NE(it, profile.accounts->end());
+        EXPECT_EQ(it->second, ethUid2);
+        // Verify order exists
+        const auto *order = FindOrderById(profile, 203);
+        EXPECT_NE(order, nullptr);
+        if (order) {
+          EXPECT_EQ(order->reserveBidPrice, 18'500);
+        }
+      });
+
+  // move order to lower price - shouldn't be a problem for BID order
+  auto moveOrder3 = std::make_unique<exchange::core::common::api::ApiMoveOrder>(
+      203, 15'000, TestConstants::UID_2, TestConstants::SYMBOL_EXCHANGE);
+
+  container->SubmitCommandSync(
+      std::move(moveOrder3), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+        EXPECT_EQ(cmd.command, OrderCommandType::MOVE_ORDER);
+        EXPECT_EQ(cmd.orderId, 203);
+        EXPECT_EQ(cmd.uid, TestConstants::UID_2);
+        EXPECT_EQ(cmd.price, 15'000);
+        EXPECT_EQ(cmd.symbol, TestConstants::SYMBOL_EXCHANGE);
+        EXPECT_EQ(cmd.matcherEvent, nullptr);
+      });
+
+  container->ValidateUserState(
+      TestConstants::UID_2,
+      [&ethUid2](const exchange::core::common::api::reports::SingleUserReportResult
+             &profile) {
+        ASSERT_NE(profile.accounts, nullptr);
+        auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
+        ASSERT_NE(it, profile.accounts->end());
+        EXPECT_EQ(it->second, ethUid2);
+        const auto *order = FindOrderById(profile, 203);
+        EXPECT_NE(order, nullptr);
+        if (order) {
+          EXPECT_EQ(order->price, 15'000);
+        }
+      });
+
+  // move order to higher price (above limit) - should be rejected
+  auto moveOrder4 = std::make_unique<exchange::core::common::api::ApiMoveOrder>(
+      203, 18'501, TestConstants::UID_2, TestConstants::SYMBOL_EXCHANGE);
+
+  container->SubmitCommandSync(std::move(moveOrder4), [](const OrderCommand &cmd) {
+    EXPECT_EQ(cmd.resultCode,
+              CommandResultCode::MATCHING_MOVE_FAILED_PRICE_OVER_RISK_LIMIT);
+  });
+
+  container->ValidateUserState(
+      TestConstants::UID_2,
+      [&ethUid2](const exchange::core::common::api::reports::SingleUserReportResult
+             &profile) {
+        ASSERT_NE(profile.accounts, nullptr);
+        auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
+        ASSERT_NE(it, profile.accounts->end());
+        EXPECT_EQ(it->second, ethUid2);
+        const auto *order = FindOrderById(profile, 203);
+        EXPECT_NE(order, nullptr);
+        if (order) {
+          EXPECT_EQ(order->price, 15'000);
+        }
+      });
+
+  // move order to higher price (equals limit) - should be accepted
+  auto moveOrder5 = std::make_unique<exchange::core::common::api::ApiMoveOrder>(
+      203, 18'500, TestConstants::UID_2, TestConstants::SYMBOL_EXCHANGE);
+
+  container->SubmitCommandSync(
+      std::move(moveOrder5), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+        EXPECT_EQ(cmd.command, OrderCommandType::MOVE_ORDER);
+        EXPECT_EQ(cmd.orderId, 203);
+        EXPECT_EQ(cmd.uid, TestConstants::UID_2);
+        EXPECT_EQ(cmd.price, 18'500);
+        EXPECT_EQ(cmd.symbol, TestConstants::SYMBOL_EXCHANGE);
+        EXPECT_EQ(cmd.matcherEvent, nullptr);
+      });
+
+  container->ValidateUserState(
+      TestConstants::UID_2,
+      [&ethUid2](const exchange::core::common::api::reports::SingleUserReportResult
+             &profile) {
+        ASSERT_NE(profile.accounts, nullptr);
+        auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
+        ASSERT_NE(it, profile.accounts->end());
+        EXPECT_EQ(it->second, ethUid2);
+        const auto *order = FindOrderById(profile, 203);
+        EXPECT_NE(order, nullptr);
+        if (order) {
+          EXPECT_EQ(order->price, 18'500);
+        }
+      });
+
+  // set second order price to 17'500
+  auto moveOrder6 = std::make_unique<exchange::core::common::api::ApiMoveOrder>(
+      203, 17'500, TestConstants::UID_2, TestConstants::SYMBOL_EXCHANGE);
+
+  container->SubmitCommandSync(std::move(moveOrder6), CHECK_SUCCESS);
+
+  container->ValidateUserState(
+      TestConstants::UID_2,
+      [&ethUid2](const exchange::core::common::api::reports::SingleUserReportResult
+             &profile) {
+        ASSERT_NE(profile.accounts, nullptr);
+        auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
+        ASSERT_NE(it, profile.accounts->end());
+        EXPECT_EQ(it->second, ethUid2);
+        const auto *order = FindOrderById(profile, 203);
+        EXPECT_NE(order, nullptr);
+        if (order) {
+          EXPECT_EQ(order->price, 17'500);
+        }
+      });
+
+  // move ASK order to lower price 16'900 so it will trigger trades (by maker's
+  // price 17_500)
+  auto moveOrder7 = std::make_unique<exchange::core::common::api::ApiMoveOrder>(
+      202, 16'900, TestConstants::UID_1, TestConstants::SYMBOL_EXCHANGE);
+
+  container->SubmitCommandSync(
+      std::move(moveOrder7), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+        EXPECT_EQ(cmd.command, OrderCommandType::MOVE_ORDER);
+        EXPECT_EQ(cmd.orderId, 202);
+        EXPECT_EQ(cmd.uid, TestConstants::UID_1);
+        EXPECT_EQ(cmd.price, 16'900);
+        EXPECT_EQ(cmd.symbol, TestConstants::SYMBOL_EXCHANGE);
+
+        EXPECT_EQ(cmd.action, OrderAction::ASK);
+
+        const auto *evt = cmd.matcherEvent;
+        EXPECT_NE(evt, nullptr);
+        if (evt) {
+          EXPECT_EQ(evt->eventType, MatcherEventType::TRADE);
+          EXPECT_EQ(evt->activeOrderCompleted, false);
+          EXPECT_EQ(evt->matchedOrderId, 203);
+          EXPECT_EQ(evt->matchedOrderUid, TestConstants::UID_2);
+          EXPECT_EQ(evt->matchedOrderCompleted, true);
+          EXPECT_EQ(evt->price, 17'500); // user price from maker order
+          EXPECT_EQ(evt->bidderHoldPrice, 18'500); // user original reserve price from bidder order (203)
+          EXPECT_EQ(evt->size, 500);
+        }
+      });
+
+  // check UID_1 has 87.5M satoshi (17_500 * 10 * 500) and half-filled SELL order
+  container->ValidateUserState(
+      TestConstants::UID_1,
+      [](const exchange::core::common::api::reports::SingleUserReportResult
+             &profile) {
+        ASSERT_NE(profile.accounts, nullptr);
+        auto xbtIt = profile.accounts->find(TestConstants::CURRENCY_XBT);
+        auto ethIt = profile.accounts->find(TestConstants::CURRENCY_ETH);
+        if (xbtIt != profile.accounts->end()) {
+          EXPECT_EQ(xbtIt->second, 87'500'000);
+        }
+        if (ethIt != profile.accounts->end()) {
+          EXPECT_EQ(ethIt->second, 0);
+        }
+        const auto *order = FindOrderById(profile, 202);
+        EXPECT_NE(order, nullptr);
+        if (order) {
+          EXPECT_EQ(order->filled, 500);
+        }
+      });
+
+  // check UID_2 has 6.5M satoshi (after 94M), and 50M szabo (10_000 * 500)
+  container->ValidateUserState(
+      TestConstants::UID_2,
+      [](const exchange::core::common::api::reports::SingleUserReportResult
+             &profile) {
+        ASSERT_NE(profile.accounts, nullptr);
+        auto xbtIt = profile.accounts->find(TestConstants::CURRENCY_XBT);
+        auto ethIt = profile.accounts->find(TestConstants::CURRENCY_ETH);
+        if (xbtIt != profile.accounts->end()) {
+          EXPECT_EQ(xbtIt->second, 6'500'000);
+        }
+        if (ethIt != profile.accounts->end()) {
+          EXPECT_EQ(ethIt->second, 50'000'000);
+        }
+        // Verify no orders
+        if (profile.orders) {
+          bool hasOrders = false;
+          for (const auto &[symbolId, orderList] : *profile.orders) {
+            if (!orderList.empty()) {
+              hasOrders = true;
+              break;
+            }
+          }
+          EXPECT_FALSE(hasOrders);
+        }
+      });
+
+  // cancel remaining order
+  auto cancelOrder =
+      std::make_unique<exchange::core::common::api::ApiCancelOrder>(
+      202, TestConstants::UID_1, TestConstants::SYMBOL_EXCHANGE);
+
+  container->SubmitCommandSync(
+      std::move(cancelOrder), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+        EXPECT_EQ(cmd.command, OrderCommandType::CANCEL_ORDER);
+        EXPECT_EQ(cmd.orderId, 202);
+        EXPECT_EQ(cmd.uid, TestConstants::UID_1);
+        EXPECT_EQ(cmd.symbol, TestConstants::SYMBOL_EXCHANGE);
+
+        EXPECT_EQ(cmd.action, OrderAction::ASK);
+
+        const auto *evt = cmd.matcherEvent;
+        EXPECT_NE(evt, nullptr);
+        if (evt) {
+          EXPECT_EQ(evt->eventType, MatcherEventType::REDUCE);
+          EXPECT_EQ(evt->size, 500);
+        }
+      });
+
+  // check UID_1 has 87.5M satoshi (17_500 * 10 * 500) and 50M szabo (after 100M)
+  container->ValidateUserState(
+      TestConstants::UID_1,
+      [](const exchange::core::common::api::reports::SingleUserReportResult
+             &profile) {
+        ASSERT_NE(profile.accounts, nullptr);
+        auto xbtIt = profile.accounts->find(TestConstants::CURRENCY_XBT);
+        auto ethIt = profile.accounts->find(TestConstants::CURRENCY_ETH);
+        if (xbtIt != profile.accounts->end()) {
+          EXPECT_EQ(xbtIt->second, 87'500'000);
+        }
+        if (ethIt != profile.accounts->end()) {
+          EXPECT_EQ(ethIt->second, 50'000'000);
+        }
+        // Verify no orders
+        if (profile.orders) {
+          bool hasOrders = false;
+          for (const auto &[symbolId, orderList] : *profile.orders) {
+            if (!orderList.empty()) {
+              hasOrders = true;
+              break;
+            }
+          }
+          EXPECT_FALSE(hasOrders);
+        }
+      });
+
+  // Verify total balance is zero
+  auto balanceReport = container->TotalBalanceReport();
+  if (balanceReport) {
+    EXPECT_TRUE(balanceReport->IsGlobalBalancesAllZero());
+  }
 }
 
 } // namespace integration

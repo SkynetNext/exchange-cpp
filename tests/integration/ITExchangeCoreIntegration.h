@@ -65,6 +65,11 @@ public:
    * Exchange cancel bid test - tests order cancellation
    */
   void ExchangeCancelBid();
+
+  /**
+   * Exchange risk move test - tests risk management for order moves
+   */
+  void ExchangeRiskMoveTest();
 };
 
 } // namespace integration

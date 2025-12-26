@@ -59,6 +59,10 @@ TEST_F(ITExchangeCoreIntegrationBasic, ExchangeCancelBid) {
   ExchangeCancelBid();
 }
 
+TEST_F(ITExchangeCoreIntegrationBasic, ExchangeRiskMoveTest) {
+  ExchangeRiskMoveTest();
+}
+
 } // namespace integration
 } // namespace tests
 } // namespace core
