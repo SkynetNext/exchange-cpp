@@ -637,17 +637,14 @@ public:
     if (!stopped_.compare_exchange_strong(expected, true)) {
       return; // Already stopped
     }
-    LOG_INFO("[ExchangeCore] Shutdown: publishing SHUTDOWN_SIGNAL");
-    static ShutdownSignalTranslator shutdownTranslator;
-    // Match Java: ringBuffer.publishEvent(SHUTDOWN_SIGNAL_TRANSLATOR);
-    disruptor_->getRingBuffer().publishEvent(shutdownTranslator);
-    // Get sequence after publishing (cursor is the last published sequence)
-    int64_t shutdownSeq = disruptor_->getRingBuffer().getCursor();
-    LOG_INFO("[ExchangeCore] Shutdown: SHUTDOWN_SIGNAL published at "
-             "sequence={}, cursor={}",
-             shutdownSeq, shutdownSeq);
-    LOG_INFO("[ExchangeCore] Shutdown: calling disruptor_->shutdown()");
+    // Match Java: simple shutdown logic
+    // TODO stop accepting new events first
     try {
+      LOG_INFO("[ExchangeCore] Shutdown: publishing SHUTDOWN_SIGNAL");
+      static ShutdownSignalTranslator shutdownTranslator;
+      // Match Java: ringBuffer.publishEvent(SHUTDOWN_SIGNAL_TRANSLATOR);
+      disruptor_->getRingBuffer().publishEvent(shutdownTranslator);
+      // Match Java: disruptor.shutdown(timeout, timeUnit);
       if (timeoutMs < 0)
         disruptor_->shutdown();
       else

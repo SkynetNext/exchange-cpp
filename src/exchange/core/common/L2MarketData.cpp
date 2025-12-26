@@ -85,19 +85,44 @@ bool L2MarketData::operator==(const L2MarketData &other) const {
     return false;
   }
 
-  for (int32_t i = 0; i < askSize; i++) {
-    if (askPrices[i] != other.askPrices[i] ||
-        askVolumes[i] != other.askVolumes[i] ||
-        askOrders[i] != other.askOrders[i]) {
+  // Add bounds checking to prevent array out-of-bounds access
+  if (askSize > 0) {
+    // Check that vectors have enough capacity
+    if (static_cast<size_t>(askSize) > askPrices.size() ||
+        static_cast<size_t>(askSize) > askVolumes.size() ||
+        static_cast<size_t>(askSize) > askOrders.size() ||
+        static_cast<size_t>(askSize) > other.askPrices.size() ||
+        static_cast<size_t>(askSize) > other.askVolumes.size() ||
+        static_cast<size_t>(askSize) > other.askOrders.size()) {
       return false;
+    }
+    
+    for (int32_t i = 0; i < askSize; i++) {
+      if (askPrices[i] != other.askPrices[i] ||
+          askVolumes[i] != other.askVolumes[i] ||
+          askOrders[i] != other.askOrders[i]) {
+        return false;
+      }
     }
   }
 
-  for (int32_t i = 0; i < bidSize; i++) {
-    if (bidPrices[i] != other.bidPrices[i] ||
-        bidVolumes[i] != other.bidVolumes[i] ||
-        bidOrders[i] != other.bidOrders[i]) {
+  if (bidSize > 0) {
+    // Check that vectors have enough capacity
+    if (static_cast<size_t>(bidSize) > bidPrices.size() ||
+        static_cast<size_t>(bidSize) > bidVolumes.size() ||
+        static_cast<size_t>(bidSize) > bidOrders.size() ||
+        static_cast<size_t>(bidSize) > other.bidPrices.size() ||
+        static_cast<size_t>(bidSize) > other.bidVolumes.size() ||
+        static_cast<size_t>(bidSize) > other.bidOrders.size()) {
       return false;
+    }
+    
+    for (int32_t i = 0; i < bidSize; i++) {
+      if (bidPrices[i] != other.bidPrices[i] ||
+          bidVolumes[i] != other.bidVolumes[i] ||
+          bidOrders[i] != other.bidOrders[i]) {
+        return false;
+      }
     }
   }
 

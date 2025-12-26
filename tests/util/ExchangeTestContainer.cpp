@@ -449,11 +449,20 @@ ExchangeTestContainer::GetUserProfile(int64_t clientId) {
   
   // Use ProcessReportHelper to match Java api.processReport behavior
   // ProcessReportHelper handles serialization, ProcessReportAny, and CreateResult
-  return exchange::core::ProcessReportHelper<
-      exchange::core::common::api::reports::SingleUserReportQuery,
-      exchange::core::common::api::reports::SingleUserReportResult>(
-      api_, std::move(query), GetRandomTransferId())
-      .get();
+  try {
+    auto future = exchange::core::ProcessReportHelper<
+        exchange::core::common::api::reports::SingleUserReportQuery,
+        exchange::core::common::api::reports::SingleUserReportResult>(
+        api_, std::move(query), GetRandomTransferId());
+    return future.get();
+  } catch (const std::future_error &e) {
+    if (e.code() == std::future_errc::no_state) {
+      throw std::runtime_error("GetUserProfile failed for clientId " + std::to_string(clientId) + 
+                              ": " + std::string(e.what()) + 
+                              " - This usually means the promise was destroyed before set_value() was called");
+    }
+    throw;
+  }
 }
 
 // Helper function to check if all balances are zero
