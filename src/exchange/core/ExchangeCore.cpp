@@ -651,6 +651,11 @@ public:
         disruptor_->shutdown();
       else
         disruptor_->shutdown(timeoutMs);
+      // CRITICAL: Wait for all processor threads to exit before allowing
+      // destruction. This ensures eventHandler_ pointers remain valid during
+      // onShutdown() calls. In Java, GC keeps objects alive, but in C++ we
+      // must explicitly wait for threads to finish.
+      disruptor_->join();
       LOG_INFO("[ExchangeCore] Shutdown: completed");
     } catch (const disruptor::TimeoutException &e) {
       // Match Java: throw IllegalStateException on timeout
