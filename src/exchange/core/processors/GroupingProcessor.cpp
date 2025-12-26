@@ -205,8 +205,6 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
           }
         }
         sequence_.set(availableSequence);
-        LOG_DEBUG("[GroupingProcessor] Updated sequence to {}, sequence_.get()={}, &sequence_={}",
-                  availableSequence, sequence_.get(), static_cast<const void*>(&sequence_));
         waitSpinningHelper_->SignalAllWhenBlocking();
         auto now = std::chrono::steady_clock::now();
         groupLastNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -233,11 +231,7 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
       }
 
     } catch (const disruptor::AlertException &ex) {
-      LOG_DEBUG("[GroupingProcessor] AlertException caught, running_={}",
-                running_.load());
       if (running_.load() != RUNNING) {
-        LOG_DEBUG("[GroupingProcessor] Exiting ProcessEvents() due to "
-                  "AlertException");
         break;
       }
     } catch (...) {

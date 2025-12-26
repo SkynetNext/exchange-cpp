@@ -441,12 +441,9 @@ public:
     for (size_t i = 0; i < meIdentities.size(); i++) {
       try {
         int64_t seqValue = disruptor_->getSequenceValueFor(*meIdentities[i]);
-        LOG_DEBUG("[ExchangeCore] afterME created: ME[{}] sequence={}", i,
-                  seqValue);
+        // Sequence value logged only if needed for debugging
       } catch (const std::exception &e) {
-        LOG_DEBUG(
-            "[ExchangeCore] afterME created: ME[{}] sequence not available: {}",
-            i, e.what());
+        // Sequence not available - expected in some configurations
       }
     }
 
@@ -471,12 +468,7 @@ public:
       createEventProcessor(RingBufferT &ringBuffer,
                            disruptor::Sequence *const *barrierSequences,
                            int count) override {
-        LOG_DEBUG("[R2ProcessorFactory:{}] createEventProcessor: count={}", name_, count);
-        for (int i = 0; i < count; i++) {
-          LOG_DEBUG("[R2ProcessorFactory:{}] barrierSequences[{}]={}, value={}",
-                    name_, i, static_cast<const void*>(barrierSequences[i]),
-                    (barrierSequences[i] ? barrierSequences[i]->get() : -999));
-        }
+        // Processor creation details logged only if needed for debugging
         auto barrier = ringBuffer.newBarrier(barrierSequences, count);
         // CRITICAL: Save barrier to ensure it outlives the processor
         // The barrier contains FixedSequenceGroup which holds Sequence*
@@ -565,8 +557,6 @@ public:
     // Get processor count from Disruptor (all processors are registered by now)
     // This is more robust than hard-coding the count
     const int totalProcessors = disruptor_->getProcessorCount();
-    LOG_DEBUG("[ExchangeCore] Creating startup latch for {} processors",
-              totalProcessors);
     processorStartupLatch_ = std::make_unique<std::latch>(totalProcessors);
   }
 
@@ -590,8 +580,6 @@ public:
         std::chrono::steady_clock::now() + std::chrono::milliseconds(maxWaitMs);
 
     const int expectedProcessors = disruptor_->getProcessorCount();
-    LOG_DEBUG("[ExchangeCore] Waiting for {} processors to start...",
-              expectedProcessors);
 
     // Wait for latch with timeout (defensive: prevent infinite wait)
     // Use wait() with timeout instead of polling try_wait()
@@ -620,18 +608,15 @@ public:
                     .count());
     }
 
-    // Debug: Log MatchingEngine sequence values after startup
+    // MatchingEngine sequence values available after startup
     // This is not in hot path, only executed once during initialization
     for (size_t i = 0; i < matchingEngineHandlers_.size(); i++) {
       try {
         int64_t seqValue =
             disruptor_->getSequenceValueFor(*matchingEngineHandlers_[i].get());
-        LOG_DEBUG("[ExchangeCore] After startup: ME[{}] sequence={}", i,
-                  seqValue);
+        // Sequence value logged only if needed for debugging
       } catch (const std::exception &e) {
-        LOG_DEBUG(
-            "[ExchangeCore] After startup: ME[{}] sequence not available: {}",
-            i, e.what());
+        // Sequence not available - expected in some configurations
       }
     }
 

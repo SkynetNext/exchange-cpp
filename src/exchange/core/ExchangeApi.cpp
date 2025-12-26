@@ -269,22 +269,13 @@ void ExchangeApi<WaitStrategyT>::ProcessResult(int64_t seq,
   // TBB concurrent_hash_map: lock-free find and erase
   typename PromiseMap::accessor accessor;
   if (promises_.find(accessor, seq)) {
-    LOG_DEBUG("[ExchangeApi] ProcessResult: Found promise for sequence {}, "
-              "setting resultCode={}",
-              seq, static_cast<int>(cmd->resultCode));
     accessor->second.set_value(cmd->resultCode);
     promises_.erase(accessor);
-  } else {
-    // No promise found - this can happen if:
-    // 1. Command was submitted via SubmitCommand (fire-and-forget)
-    // 2. Promise was already consumed (shouldn't happen)
-    // 3. Sequence mismatch (shouldn't happen)
-    // Log for debugging intermittent issues
-    LOG_DEBUG("[ExchangeApi] ProcessResult: No promise found for sequence {}, "
-              "command type={}, resultCode={}",
-              seq, static_cast<int>(cmd->command),
-              static_cast<int>(cmd->resultCode));
   }
+  // No promise found - this can happen if:
+  // 1. Command was submitted via SubmitCommand (fire-and-forget)
+  // 2. Promise was already consumed (shouldn't happen)
+  // 3. Sequence mismatch (shouldn't happen)
 }
 
 template <typename WaitStrategyT>
@@ -394,9 +385,6 @@ ExchangeApi<WaitStrategyT>::SubmitCommandAsync(common::api::ApiCommand *cmd) {
     typename PromiseMap::accessor accessor;
     promises_.insert(accessor, seq);
     accessor->second = std::move(promise);
-    LOG_DEBUG(
-        "[ExchangeApi] SubmitCommandAsync: stored promise for sequence {}",
-        seq);
   }
 
   // Get event slot and translate
@@ -439,7 +427,6 @@ ExchangeApi<WaitStrategyT>::SubmitCommandAsync(common::api::ApiCommand *cmd) {
 
   // Publish the event
   ringBuffer_->publish(seq);
-  LOG_DEBUG("[ExchangeApi] SubmitCommandAsync: published sequence {}", seq);
 
   return future;
 }

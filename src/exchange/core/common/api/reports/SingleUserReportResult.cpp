@@ -63,11 +63,7 @@ void SingleUserReportResult::WriteMarshallable(BytesOut &bytes) const {
   // accounts
   bytes.WriteBoolean(accounts != nullptr);
   if (accounts != nullptr) {
-    LOG_DEBUG("WriteMarshallable: accounts != nullptr, size={}",
-              accounts->size());
     utils::SerializationUtils::MarshallIntLongHashMap(*accounts, bytes);
-  } else {
-    LOG_DEBUG("WriteMarshallable: accounts == nullptr");
   }
 
   // positions
@@ -111,12 +107,9 @@ SingleUserReportResult::SingleUserReportResult(BytesIn &bytes) {
   bool hasAccounts = bytes.ReadBoolean();
   if (hasAccounts) {
     auto accountsMap = utils::SerializationUtils::ReadIntLongHashMap(bytes);
-    LOG_DEBUG("SingleUserReportResult(BytesIn): hasAccounts=true, size={}",
-              accountsMap.size());
     accounts = std::make_unique<ankerl::unordered_dense::map<int32_t, int64_t>>(
         std::move(accountsMap));
   } else {
-    LOG_DEBUG("SingleUserReportResult(BytesIn): hasAccounts=false");
     accounts = nullptr;
   }
 
@@ -160,41 +153,29 @@ std::unique_ptr<SingleUserReportResult>
 SingleUserReportResult::Merge(const std::vector<BytesIn *> &pieces) {
   // Match Java: merge(final Stream<BytesIn> pieces)
   // Java uses reduce with IDENTITY, so empty stream returns IDENTITY
-  LOG_DEBUG("SingleUserReportResult::Merge: pieces.size()={}", pieces.size());
   if (pieces.empty()) {
     // Return IDENTITY-like result (matches Java IDENTITY)
-    LOG_DEBUG(
-        "SingleUserReportResult::Merge: pieces is empty, returning IDENTITY");
     return std::make_unique<SingleUserReportResult>();
   }
 
   // Start with first piece
   auto result = std::make_unique<SingleUserReportResult>(*pieces[0]);
-  LOG_DEBUG("Merge: first piece, uid={}, accounts={}", result->uid,
-            (result->accounts ? "non-null" : "null"));
 
   // Merge remaining pieces
   for (size_t i = 1; i < pieces.size(); i++) {
     auto next = std::make_unique<SingleUserReportResult>(*pieces[i]);
-    LOG_DEBUG("Merge: piece {}, uid={}, accounts={}", i, next->uid,
-              (next->accounts ? "non-null" : "null"));
 
     // Merge logic (matches Java reduce)
     result->userStatus = utils::SerializationUtils::PreferNotNull(
         result->userStatus, next->userStatus);
 
     if (result->accounts == nullptr) {
-      LOG_DEBUG("Merge: result->accounts is nullptr, moving from next");
       result->accounts = std::move(next->accounts);
     } else if (next->accounts != nullptr) {
       // Merge accounts (sum values)
-      LOG_DEBUG("Merge: merging accounts, result->size={}, next->size={}",
-                result->accounts->size(), next->accounts->size());
       for (const auto &pair : *next->accounts) {
         (*result->accounts)[pair.first] += pair.second;
       }
-    } else {
-      LOG_DEBUG("Merge: next->accounts is nullptr, keeping result->accounts");
     }
 
     if (result->positions == nullptr) {
@@ -264,12 +245,6 @@ SingleUserReportResult *SingleUserReportResult::CreateFromRiskEngineFound(
           positions);
   result->orders = nullptr;
   result->queryExecutionStatus = QueryExecutionStatus::OK;
-
-  // Debug: verify accounts was created
-  LOG_DEBUG("CreateFromRiskEngineFound: uid={}, accounts.get()={}, "
-            "accounts->size()={}",
-            uid, static_cast<void *>(result->accounts.get()),
-            (result->accounts ? result->accounts->size() : -1));
 
   return result;
 }

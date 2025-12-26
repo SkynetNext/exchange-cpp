@@ -78,8 +78,6 @@ void TwoStepSlaveProcessor<WaitStrategyT>::run() {
   }
 
   nextSequence_ = sequence_.get() + 1L;
-  LOG_DEBUG("[TwoStepSlaveProcessor:{}] run() completed, nextSequence_={}",
-            name_, nextSequence_);
 }
 
 template <typename WaitStrategyT>

@@ -58,22 +58,14 @@ SingleUserReportQuery::CreateResult(const std::vector<BytesIn *> &sections) {
 std::optional<std::unique_ptr<SingleUserReportResult>>
 SingleUserReportQuery::Process(MatchingEngineRouterType *matchingEngine) {
   // Match Java: process(MatchingEngineRouter matchingEngine)
-  LOG_DEBUG("SingleUserReportQuery::Process(MatchingEngineRouter): uid={}",
-            uid);
   ankerl::unordered_dense::map<int32_t, std::vector<common::Order *>> orders;
 
   const auto &orderBooks = matchingEngine->GetOrderBooks();
-  LOG_DEBUG("SingleUserReportQuery::Process(MatchingEngineRouter): "
-            "orderBooks.size()={}",
-            orderBooks.size());
   for (auto *orderBook : orderBooks) {
     if (!orderBook) {
       continue;
     }
     auto userOrders = orderBook->FindUserOrders(uid);
-    LOG_DEBUG("SingleUserReportQuery::Process(MatchingEngineRouter): "
-              "userOrders.size()={} for orderBook",
-              userOrders.size());
     // Don't put empty results, so that the report result merge procedure
     // would be simple
     if (!userOrders.empty()) {
@@ -84,37 +76,24 @@ SingleUserReportQuery::Process(MatchingEngineRouterType *matchingEngine) {
     }
   }
 
-  LOG_DEBUG("SingleUserReportQuery::Process(MatchingEngineRouter): final "
-            "orders.size()={}",
-            orders.size());
   auto result = std::make_optional(std::unique_ptr<SingleUserReportResult>(
       SingleUserReportResult::CreateFromMatchingEngine(uid, orders)));
-  LOG_DEBUG("SingleUserReportQuery::Process(MatchingEngineRouter): returning "
-            "result with has_value={}",
-            result.has_value());
   return result;
 }
 
 std::optional<std::unique_ptr<SingleUserReportResult>>
 SingleUserReportQuery::Process(RiskEngineType *riskEngine) {
   // Match Java: process(RiskEngine riskEngine)
-  LOG_DEBUG("SingleUserReportQuery::Process(RiskEngine): uid={}", uid);
   if (!riskEngine->UidForThisHandler(uid)) {
-    LOG_DEBUG("SingleUserReportQuery::Process: UidForThisHandler returned "
-              "false for uid={}",
-              uid);
     return std::nullopt;
   }
 
   auto *userProfileService = riskEngine->GetUserProfileService();
   if (!userProfileService) {
-    LOG_DEBUG("SingleUserReportQuery::Process: userProfileService is nullptr");
     return std::nullopt;
   }
 
   auto *userProfile = userProfileService->GetUserProfile(uid);
-  LOG_DEBUG("SingleUserReportQuery::Process: userProfile={} for uid={}",
-            static_cast<void *>(userProfile), uid);
   if (userProfile != nullptr) {
     // Found user
     ankerl::unordered_dense::map<int32_t, SingleUserReportResult::Position>
@@ -130,18 +109,11 @@ SingleUserReportQuery::Process(RiskEngineType *riskEngine) {
           pos->profit, pos->pendingSellSize, pos->pendingBuySize);
     }
 
-    // Debug: check accounts size
-    LOG_DEBUG("SingleUserReportQuery::Process: uid={}, accounts.size()={}", uid,
-              userProfile->accounts.size());
-
     return std::make_optional(std::unique_ptr<SingleUserReportResult>(
         SingleUserReportResult::CreateFromRiskEngineFound(
             uid, &userProfile->userStatus, userProfile->accounts, positions)));
   } else {
     // Not found
-    LOG_DEBUG(
-        "SingleUserReportQuery::Process: userProfile not found for uid={}",
-        uid);
     return std::make_optional(std::unique_ptr<SingleUserReportResult>(
         SingleUserReportResult::CreateFromRiskEngineNotFound(uid)));
   }

@@ -146,9 +146,8 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           }
 
           if (cmd->command == common::cmd::OrderCommandType::SHUTDOWN_SIGNAL) {
-            LOG_DEBUG("[TwoStepMasterProcessor:{}] SHUTDOWN_SIGNAL detected, "
-                      "calling PublishProgressAndTriggerSlaveProcessor({})",
-                      name_, nextSequence);
+            LOG_INFO("[TwoStepMasterProcessor:{}] SHUTDOWN_SIGNAL detected",
+                     name_);
             // having all sequences aligned with the ringbuffer cursor is a
             // requirement for proper shutdown let following processors to catch
             // up
@@ -159,13 +158,7 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
         waitSpinningHelper_->SignalAllWhenBlocking();
       }
     } catch (const disruptor::AlertException &ex) {
-      LOG_DEBUG(
-          "[TwoStepMasterProcessor:{}] AlertException caught, running_={}",
-          name_, running_.load());
       if (running_.load() != RUNNING) {
-        LOG_DEBUG("[TwoStepMasterProcessor:{}] Exiting ProcessEvents() due to "
-                  "AlertException",
-                  name_);
         break;
       }
     } catch (const std::exception &ex) {
@@ -173,23 +166,11 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
                 "catch: {}, nextSequence={}",
                 name_, ex.what(), nextSequence);
       if (exceptionHandler_) {
-        LOG_DEBUG("[TwoStepMasterProcessor:{}] Calling "
-                  "exceptionHandler_->HandleEventException",
-                  name_);
         exceptionHandler_->HandleEventException(ex, nextSequence, cmd);
-        LOG_DEBUG("[TwoStepMasterProcessor:{}] "
-                  "exceptionHandler_->HandleEventException returned",
-                  name_);
       }
-      LOG_DEBUG("[TwoStepMasterProcessor:{}] Setting sequence to {}, then "
-                "incrementing to {}",
-                name_, nextSequence, nextSequence + 1);
       sequence_.set(nextSequence);
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;
-      LOG_DEBUG("[TwoStepMasterProcessor:{}] Exception handled, "
-                "nextSequence={}, continuing loop...",
-                name_, nextSequence);
     } catch (...) {
       LOG_ERROR("[TwoStepMasterProcessor:{}] Unknown exception caught in outer "
                 "catch, nextSequence={}",
@@ -201,9 +182,6 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       sequence_.set(nextSequence);
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;
-      LOG_DEBUG("[TwoStepMasterProcessor:{}] Unknown exception handled, "
-                "nextSequence={}, continuing loop...",
-                name_, nextSequence);
     }
   }
 }
@@ -211,16 +189,9 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
 template <typename WaitStrategyT>
 void TwoStepMasterProcessor<WaitStrategyT>::
     PublishProgressAndTriggerSlaveProcessor(int64_t nextSequence) {
-  LOG_DEBUG(
-      "[TwoStepMasterProcessor:{}] "
-      "PublishProgressAndTriggerSlaveProcessor({}): setting sequence to {}",
-      name_, nextSequence, nextSequence - 1);
   sequence_.set(nextSequence - 1);
   waitSpinningHelper_->SignalAllWhenBlocking();
   if (slaveProcessor_ != nullptr) {
-    LOG_DEBUG("[TwoStepMasterProcessor:{}] Calling "
-              "slaveProcessor_->HandlingCycle({})",
-              name_, nextSequence);
     slaveProcessor_->HandlingCycle(nextSequence);
   }
 }
@@ -233,3 +204,4 @@ template class TwoStepMasterProcessor<disruptor::BusySpinWaitStrategy>;
 } // namespace processors
 } // namespace core
 } // namespace exchange
+

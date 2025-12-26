@@ -217,13 +217,7 @@ BinaryCommandsProcessor::AcceptBinaryFrame(common::cmd::OrderCommand *cmd) {
             auto *query =
                 static_cast<common::api::reports::SingleUserReportQuery *>(
                     queryPtr);
-            LOG_DEBUG("BinaryCommandsProcessor: calling HandleReport for       "
-                      "      SINGLE_USER_REPORT, uid={}",
-                      query->uid);
             result = reportQueriesHandler_->HandleReport(query);
-            LOG_DEBUG("BinaryCommandsProcessor: HandleReport returned          "
-                      "   has_value={}",
-                      result.has_value());
             delete query;
             break;
           }

@@ -415,11 +415,7 @@ void RiskEngine::HandleBinaryMessage(
 template <typename R>
 std::optional<std::unique_ptr<R>> RiskEngine::HandleReportQuery(
     common::api::reports::ReportQuery<R> *reportQuery) {
-  LOG_DEBUG(
-      "RiskEngine::HandleReportQuery: calling reportQuery->Process(this)");
   auto result = reportQuery->Process(this);
-  LOG_DEBUG("RiskEngine::HandleReportQuery: Process returned has_value={}",
-            result.has_value());
   return result;
 }
 
