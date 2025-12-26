@@ -331,7 +331,8 @@ void MatchingEngineRouter::ProcessMatchingCommand(
   }
 
   // Process command using static helper
-  orderbook::IOrderBook::ProcessCommand(orderBook, cmd);
+  // Match Java: cmd.resultCode = IOrderBook.processCommand(orderBook, cmd);
+  cmd->resultCode = orderbook::IOrderBook::ProcessCommand(orderBook, cmd);
 
   // Post market data if needed
   if ((cfgSendL2ForEveryCmd_ || (cmd->serviceFlags & 1) != 0) &&

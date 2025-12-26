@@ -75,6 +75,13 @@ public:
   SubmitCommandAsync(common::api::ApiCommand *cmd) = 0;
 
   /**
+   * Submit command async with full response (returns OrderCommand future)
+   * Matches Java submitCommandAsyncFullResponse
+   */
+  virtual std::future<common::cmd::OrderCommand>
+  SubmitCommandAsyncFullResponse(common::api::ApiCommand *cmd) = 0;
+
+  /**
    * Submit commands synchronously
    */
   virtual void
@@ -139,6 +146,13 @@ public:
   SubmitCommandAsync(common::api::ApiCommand *cmd) override;
 
   /**
+   * Submit command async with full response (returns OrderCommand future)
+   * Matches Java submitCommandAsyncFullResponse
+   */
+  std::future<common::cmd::OrderCommand>
+  SubmitCommandAsyncFullResponse(common::api::ApiCommand *cmd) override;
+
+  /**
    * Submit commands synchronously
    */
   void SubmitCommandsSync(
@@ -200,6 +214,13 @@ private:
       tbb::concurrent_hash_map<int64_t,
                                 std::promise<std::unique_ptr<common::L2MarketData>>>;
   OrderBookPromiseMap orderBookPromises_;
+
+  // Full response promises cache (seq -> promise for OrderCommand)
+  // Used for SubmitCommandAsyncFullResponse to return complete OrderCommand
+  using FullResponsePromiseMap =
+      tbb::concurrent_hash_map<int64_t,
+                                std::promise<common::cmd::OrderCommand>>;
+  FullResponsePromiseMap fullResponsePromises_;
 
   void PublishCommand(common::api::ApiCommand *cmd, int64_t seq);
 

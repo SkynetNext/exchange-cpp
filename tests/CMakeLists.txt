@@ -156,6 +156,24 @@ if(BUILD_TESTING AND GTest_FOUND)
     list(APPEND ALL_TEST_TARGETS test_orders_bucket)
 
     # ============================================================================
+    # Example Tests
+    # ============================================================================
+    
+    add_executable(test_examples_core
+        examples/ITCoreExample.cpp
+    )
+    
+    target_link_libraries(test_examples_core
+        PRIVATE
+            exchange-cpp
+            GTest::gtest
+            GTest::gtest_main
+    )
+    
+    add_test(NAME ITCoreExample COMMAND test_examples_core)
+    list(APPEND ALL_TEST_TARGETS test_examples_core)
+
+    # ============================================================================
     # Integration Tests
     # ============================================================================
     
@@ -220,25 +238,7 @@ if(BUILD_TESTING AND GTest_FOUND)
     add_test(NAME PerfLatency COMMAND test_perf_latency)
     list(APPEND ALL_TEST_TARGETS test_perf_latency)
 
-    # ============================================================================
-    # Example Tests
-    # ============================================================================
-    
-    add_executable(test_examples_core
-        examples/ITCoreExample.cpp
-    )
-    
-    target_link_libraries(test_examples_core
-        PRIVATE
-            exchange-cpp
-            GTest::gtest
-            GTest::gtest_main
-    )
-    
-    add_test(NAME ITCoreExample COMMAND test_examples_core)
-    list(APPEND ALL_TEST_TARGETS test_examples_core)
-
-        # Create a custom target that builds all tests
+    # Create a custom target that builds all tests
     # This allows CMake Tools to build all tests at once
     add_custom_target(all_tests
         DEPENDS ${ALL_TEST_TARGETS}

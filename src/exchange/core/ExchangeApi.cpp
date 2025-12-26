@@ -287,7 +287,16 @@ void ExchangeApi<WaitStrategyT>::ProcessResult(int64_t seq,
     return;
   }
 
-  // Regular command result
+  // Check for full response promise first (SubmitCommandAsyncFullResponse)
+  typename FullResponsePromiseMap::accessor fullResponseAccessor;
+  if (fullResponsePromises_.find(fullResponseAccessor, seq)) {
+    // Return complete OrderCommand copy
+    fullResponseAccessor->second.set_value(cmd->Copy());
+    fullResponsePromises_.erase(fullResponseAccessor);
+    return;
+  }
+
+  // Regular command result (SubmitCommandAsync)
   // TBB concurrent_hash_map: lock-free find and erase
   typename PromiseMap::accessor accessor;
   if (promises_.find(accessor, seq)) {
@@ -444,6 +453,91 @@ ExchangeApi<WaitStrategyT>::SubmitCommandAsync(common::api::ApiCommand *cmd) {
   } else {
     // Remove promise if command type is unsupported
     promises_.erase(seq);
+    throw std::invalid_argument("Unsupported command type");
+  }
+
+  // Publish the event
+  ringBuffer_->publish(seq);
+
+  return future;
+}
+
+template <typename WaitStrategyT>
+std::future<common::cmd::OrderCommand>
+ExchangeApi<WaitStrategyT>::SubmitCommandAsyncFullResponse(
+    common::api::ApiCommand *cmd) {
+  if (!cmd) {
+    throw std::invalid_argument("SubmitCommandAsyncFullResponse: cmd is nullptr");
+  }
+  if (!ringBuffer_) {
+    throw std::runtime_error(
+        "SubmitCommandAsyncFullResponse: ringBuffer is nullptr");
+  }
+
+  std::promise<common::cmd::OrderCommand> promise;
+  auto future = promise.get_future();
+
+  // Handle binary data and persist commands specially - they claim their own
+  // sequences
+  if (auto *binaryData =
+          dynamic_cast<common::api::ApiBinaryDataCommand *>(cmd)) {
+    // For binary data commands, we can't use full response (they don't return OrderCommand)
+    // Fall back to regular async
+    throw std::invalid_argument(
+        "SubmitCommandAsyncFullResponse: BinaryDataCommand not supported");
+  } else if (auto *persistState =
+                 dynamic_cast<common::api::ApiPersistState *>(cmd)) {
+    // For persist commands, we can't use full response
+    throw std::invalid_argument(
+        "SubmitCommandAsyncFullResponse: PersistState not supported");
+  }
+
+  // For other commands, claim sequence and translate
+  // Get sequence before publishing
+  int64_t seq = ringBuffer_->next();
+
+  // Store promise (TBB concurrent_hash_map: lock-free insert)
+  {
+    typename FullResponsePromiseMap::accessor accessor;
+    fullResponsePromises_.insert(accessor, seq);
+    accessor->second = std::move(promise);
+  }
+
+  // Get event slot and translate
+  auto &event = ringBuffer_->get(seq);
+
+  // Publish command (manually translate and publish to capture sequence)
+  if (auto *placeOrder = dynamic_cast<common::api::ApiPlaceOrder *>(cmd)) {
+    NEW_ORDER_TRANSLATOR.translateTo(event, seq, *placeOrder);
+  } else if (auto *moveOrder = dynamic_cast<common::api::ApiMoveOrder *>(cmd)) {
+    MOVE_ORDER_TRANSLATOR.translateTo(event, seq, *moveOrder);
+  } else if (auto *cancelOrder =
+                 dynamic_cast<common::api::ApiCancelOrder *>(cmd)) {
+    CANCEL_ORDER_TRANSLATOR.translateTo(event, seq, *cancelOrder);
+  } else if (auto *reduceOrder =
+                 dynamic_cast<common::api::ApiReduceOrder *>(cmd)) {
+    REDUCE_ORDER_TRANSLATOR.translateTo(event, seq, *reduceOrder);
+  } else if (auto *orderBookRequest =
+                 dynamic_cast<common::api::ApiOrderBookRequest *>(cmd)) {
+    ORDER_BOOK_REQUEST_TRANSLATOR.translateTo(event, seq, *orderBookRequest);
+  } else if (auto *addUser = dynamic_cast<common::api::ApiAddUser *>(cmd)) {
+    ADD_USER_TRANSLATOR.translateTo(event, seq, *addUser);
+  } else if (auto *suspendUser =
+                 dynamic_cast<common::api::ApiSuspendUser *>(cmd)) {
+    SUSPEND_USER_TRANSLATOR.translateTo(event, seq, *suspendUser);
+  } else if (auto *resumeUser =
+                 dynamic_cast<common::api::ApiResumeUser *>(cmd)) {
+    RESUME_USER_TRANSLATOR.translateTo(event, seq, *resumeUser);
+  } else if (auto *adjustBalance =
+                 dynamic_cast<common::api::ApiAdjustUserBalance *>(cmd)) {
+    ADJUST_USER_BALANCE_TRANSLATOR.translateTo(event, seq, *adjustBalance);
+  } else if (auto *reset = dynamic_cast<common::api::ApiReset *>(cmd)) {
+    RESET_TRANSLATOR.translateTo(event, seq, *reset);
+  } else if (auto *nop = dynamic_cast<common::api::ApiNop *>(cmd)) {
+    NOP_TRANSLATOR.translateTo(event, seq, *nop);
+  } else {
+    // Remove promise if command type is unsupported
+    fullResponsePromises_.erase(seq);
     throw std::invalid_argument("Unsupported command type");
   }
 

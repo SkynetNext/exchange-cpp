@@ -413,69 +413,8 @@ void ExchangeTestContainer::SubmitCommandSync(
     std::unique_ptr<exchange::core::common::api::ApiCommand> apiCommand,
     std::function<void(const exchange::core::common::cmd::OrderCommand &)>
         validator) {
-  // Use consumer callback to capture OrderCommand response
-  std::promise<exchange::core::common::cmd::OrderCommand> promise;
-  std::future<exchange::core::common::cmd::OrderCommand> future = promise.get_future();
-  
-  // Store original consumer
-  auto originalConsumer = consumer_;
-  
-  // Set temporary consumer to capture the response
-  int64_t commandOrderId = -1;
-  int64_t commandUid = -1;
-  int32_t commandSymbol = -1;
-  
-  if (auto *placeOrder = dynamic_cast<exchange::core::common::api::ApiPlaceOrder*>(apiCommand.get())) {
-    commandOrderId = placeOrder->orderId;
-    commandUid = placeOrder->uid;
-    commandSymbol = placeOrder->symbol;
-  } else if (auto *cancelOrder = dynamic_cast<exchange::core::common::api::ApiCancelOrder*>(apiCommand.get())) {
-    commandOrderId = cancelOrder->orderId;
-    commandUid = cancelOrder->uid;
-    commandSymbol = cancelOrder->symbol;
-  } else if (auto *moveOrder = dynamic_cast<exchange::core::common::api::ApiMoveOrder*>(apiCommand.get())) {
-    commandOrderId = moveOrder->orderId;
-    commandUid = moveOrder->uid;
-    commandSymbol = moveOrder->symbol;
-  }
-  
-  const int64_t targetOrderId = commandOrderId;
-  const int64_t targetUid = commandUid;
-  const int32_t targetSymbol = commandSymbol;
-  bool responseReceived = false;
-  
-  SetConsumer([&promise, &responseReceived, targetOrderId, targetUid, targetSymbol, &originalConsumer](
-      exchange::core::common::cmd::OrderCommand *cmd, int64_t seq) {
-    if (cmd && !responseReceived && 
-        cmd->orderId == targetOrderId && 
-        cmd->uid == targetUid && 
-        cmd->symbol == targetSymbol) {
-      promise.set_value(cmd->Copy());
-      responseReceived = true;
-    }
-    if (originalConsumer) {
-      originalConsumer(cmd, seq);
-    }
-  });
-  
-  // Submit command
-  auto resultFuture = api_->SubmitCommandAsync(apiCommand.release());
-  resultFuture.get(); // Wait for command to complete
-  
-  // Wait for OrderCommand response via consumer with timeout
-  auto status = future.wait_for(std::chrono::seconds(5));
-  if (status == std::future_status::timeout) {
-    SetConsumer(originalConsumer);
-    throw std::runtime_error("Timeout waiting for command response");
-  }
-  
-  auto orderCmd = future.get();
-  
-  // Restore original consumer
-  SetConsumer(originalConsumer);
-  
-  // Call validator
-  validator(orderCmd);
+  // Matches Java: validator.accept(api.submitCommandAsyncFullResponse(apiCommand).join())
+  validator(api_->SubmitCommandAsyncFullResponse(apiCommand.release()).get());
 }
 
 // Request current order book

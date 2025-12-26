@@ -530,7 +530,12 @@ public:
       ExchangeApi<WaitStrategyT> *api_;
     };
 
-    // Create mainHandlerGroup: wait for ME + J (if journaling enabled)
+    // Stage 6: Results Handler
+    // Java: mainHandlerGroup = enableJournaling
+    //   ? disruptor.after(arraysAddHandler(matchingEngineHandlers, jh))
+    //   : afterMatchingEngine;
+    // Match Java exactly: mainHandlerGroup depends on ME (or ME+J), same as R2.
+    // Both R2 and ResultsHandler run in parallel after ME (or ME+J) completes.
     auto mainHandlerGroup = afterME;
     if (serializationCfg.enableJournaling && journalingHandler) {
       // Wait for both ME and J
