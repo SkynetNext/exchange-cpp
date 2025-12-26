@@ -48,7 +48,6 @@
 #include <exchange/core/processors/journaling/DummySerializationProcessor.h>
 #include <exchange/core/processors/journaling/ISerializationProcessor.h>
 #include <exchange/core/utils/Logger.h>
-#include <iostream>
 #include <latch>
 #include <memory>
 #include <stdexcept>
@@ -126,6 +125,8 @@ public:
       const common::config::ExchangeConfiguration *exchangeConfiguration)
       : exchangeConfiguration_(exchangeConfiguration), started_(false),
         stopped_(false), processorStartupLatch_(nullptr) {
+    LOG_DEBUG("Building exchange core from configuration: "
+              "ExchangeConfiguration{{...}}");
     const auto &perfCfg = exchangeConfiguration_->performanceCfg;
     const auto &serializationCfg = exchangeConfiguration_->serializationCfg;
 
@@ -378,10 +379,12 @@ public:
     // Create afterR1 group (wait for all R1 processors to complete)
     // Java: disruptor.after(procR1.toArray(new TwoStepMasterProcessor[0]))
     // Java version uses after(EventProcessor...) which directly gets sequences
-    // Use the EventProcessor* overload of after() - convert EventProcessor** to EventProcessor *const *
-    auto afterR1 = disruptor_->after(
-        const_cast<disruptor::EventProcessor *const *>(r1EventProcessors_.data()), 
-        static_cast<int>(r1EventProcessors_.size()));
+    // Use the EventProcessor* overload of after() - convert EventProcessor** to
+    // EventProcessor *const *
+    auto afterR1 =
+        disruptor_->after(const_cast<disruptor::EventProcessor *const *>(
+                              r1EventProcessors_.data()),
+                          static_cast<int>(r1EventProcessors_.size()));
 
     // Create all MatchingEngine handlers first (matches Java:
     // matchingEngineHandlers array) Java: final EventHandler<OrderCommand>[]
@@ -574,6 +577,7 @@ public:
       return; // Already started
     }
 
+    LOG_DEBUG("Starting disruptor...");
     // Start disruptor - threads will be created asynchronously
     // Each thread will call latch.count_down() when it starts (via Disruptor's
     // built-in latch support)

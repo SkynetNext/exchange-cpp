@@ -15,24 +15,30 @@
  */
 
 #include "TestOrdersGenerator.h"
+#include "ExecutionTime.h"
 #include "TestConstants.h"
 #include "TestOrdersGeneratorConfig.h"
 #include "TestOrdersGeneratorSession.h"
 #include "UserCurrencyAccountsGenerator.h"
-#include <exchange/core/common/api/ApiCancelOrder.h>
-#include <exchange/core/common/api/ApiCommand.h>
-#include <exchange/core/common/api/ApiMoveOrder.h>
-#include <exchange/core/common/api/ApiPlaceOrder.h>
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <climits>
 #include <cmath>
 #include <exchange/core/common/MatcherEventType.h>
 #include <exchange/core/common/OrderAction.h>
 #include <exchange/core/common/OrderType.h>
+#include <exchange/core/common/api/ApiCancelOrder.h>
+#include <exchange/core/common/api/ApiCommand.h>
+#include <exchange/core/common/api/ApiMoveOrder.h>
+#include <exchange/core/common/api/ApiPlaceOrder.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/orderbook/IOrderBook.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
+#include <exchange/core/utils/Logger.h>
 #include <future>
+#include <memory>
 #include <random>
 #include <unordered_map>
 
@@ -79,8 +85,36 @@ size_t TestOrdersGenerator::GenResult::Size() const {
 
 std::function<void(int64_t)>
 TestOrdersGenerator::CreateAsyncProgressLogger(int64_t total) {
-  // Simple no-op progress logger for now
-  return [](int64_t) {};
+  // Progress logger that logs every 5 seconds (matching Java implementation)
+  constexpr int64_t progressLogIntervalNs =
+      5'000'000'000LL; // 5 seconds in nanoseconds
+  auto nextUpdateTime = std::make_shared<std::atomic<int64_t>>(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+          std::chrono::steady_clock::now().time_since_epoch())
+          .count() +
+      progressLogIntervalNs);
+  auto progress = std::make_shared<std::atomic<int64_t>>(0);
+
+  return [total, nextUpdateTime, progress,
+          progressLogIntervalNs](int64_t processed) {
+    progress->fetch_add(processed);
+    int64_t whenLogNext = nextUpdateTime->load();
+    const int64_t timeNow =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count();
+    if (timeNow > whenLogNext) {
+      int64_t expected = whenLogNext;
+      if (nextUpdateTime->compare_exchange_strong(
+              expected, timeNow + progressLogIntervalNs)) {
+        // Whichever thread won - it should print progress
+        const int64_t done = progress->load();
+        const float progressPercent = (done * 100.0f) / total;
+        LOG_DEBUG("Generating commands progress: {:.1f}% done ({} of {})...",
+                  progressPercent, done, total);
+      }
+    }
+  };
 }
 
 // Forward declarations for helper functions
@@ -540,57 +574,66 @@ TestOrdersGenerator::GenResult TestOrdersGenerator::GenerateCommands(
 TestOrdersGenerator::MultiSymbolGenResult
 TestOrdersGenerator::GenerateMultipleSymbols(
     const TestOrdersGeneratorConfig &config) {
+  // Use ExecutionTime to log total generation time (matching Java
+  // implementation)
+  ExecutionTime executionTime([](const std::string &timeStr) {
+    LOG_DEBUG("All test commands generated in {}", timeStr);
+  });
+
   MultiSymbolGenResult multiResult;
-  
+
   // Calculate transactions per symbol
-  int transactionsPerSymbol = config.totalTransactionsNumber / 
-                               static_cast<int>(config.coreSymbolSpecifications.size());
+  int transactionsPerSymbol =
+      config.totalTransactionsNumber /
+      static_cast<int>(config.coreSymbolSpecifications.size());
   if (transactionsPerSymbol == 0) {
     transactionsPerSymbol = 1;
   }
-  
+
   // Calculate target orders per symbol
-  int targetOrdersPerSymbol = config.targetOrderBookOrdersTotal / 
-                               static_cast<int>(config.coreSymbolSpecifications.size());
+  int targetOrdersPerSymbol =
+      config.targetOrderBookOrdersTotal /
+      static_cast<int>(config.coreSymbolSpecifications.size());
   if (targetOrdersPerSymbol == 0) {
     targetOrdersPerSymbol = 1;
   }
-  
+
   // Generate commands for each symbol
   for (const auto &symbolSpec : config.coreSymbolSpecifications) {
     // Get users that can trade this symbol
     auto userList = UserCurrencyAccountsGenerator::CreateUserListForSymbol(
         config.usersAccounts, symbolSpec, transactionsPerSymbol);
-    
+
     if (userList.empty()) {
       continue; // Skip symbols with no eligible users
     }
-    
+
     // Create UID mapper for this symbol
     std::unordered_map<int32_t, int32_t> userIndexMap;
     for (size_t i = 0; i < userList.size(); i++) {
       userIndexMap[userList[i]] = static_cast<int32_t>(i);
     }
-    
+
     auto uidMapper = [&userList](int32_t index) -> int32_t {
       if (index >= 0 && index < static_cast<int32_t>(userList.size())) {
         return userList[index];
       }
       return index + 1; // Fallback to plain mapper
     };
-    
+
     // Generate commands for this symbol
     int readySeq = config.CalculateReadySeq();
-    int targetOrders = (config.preFillMode == util::PreFillMode::ORDERS_NUMBER_PLUS_QUARTER) 
-                       ? targetOrdersPerSymbol * 5 / 4 
-                       : targetOrdersPerSymbol;
-    
+    int targetOrders =
+        (config.preFillMode == util::PreFillMode::ORDERS_NUMBER_PLUS_QUARTER)
+            ? targetOrdersPerSymbol * 5 / 4
+            : targetOrdersPerSymbol;
+
     auto genResult = GenerateCommands(
         transactionsPerSymbol, targetOrders, static_cast<int>(userList.size()),
         uidMapper, symbolSpec.symbolId, false, config.avalancheIOC,
         CreateAsyncProgressLogger(transactionsPerSymbol + targetOrders),
         config.seed);
-    
+
     // Combine commands (use Copy() method for OrderCommand) before moving
     for (const auto &cmd : genResult.commandsFill) {
       multiResult.commandsFill.push_back(cmd.Copy());
@@ -598,64 +641,149 @@ TestOrdersGenerator::GenerateMultipleSymbols(
     for (const auto &cmd : genResult.commandsBenchmark) {
       multiResult.commandsBenchmark.push_back(cmd.Copy());
     }
-    
+
     // Store per-symbol result (use try_emplace to avoid copy assignment)
-    multiResult.genResults.try_emplace(symbolSpec.symbolId, std::move(genResult));
+    multiResult.genResults.try_emplace(symbolSpec.symbolId,
+                                       std::move(genResult));
   }
-  
+
+  // Log merging commands
+  LOG_DEBUG("Merging {} commands for {} symbols (preFill)...",
+            multiResult.commandsFill.size(),
+            config.coreSymbolSpecifications.size());
+  LOG_DEBUG("Merging {} commands for {} symbols (benchmark)...",
+            multiResult.commandsBenchmark.size(),
+            config.coreSymbolSpecifications.size());
+
   return multiResult;
 }
 
 // Implementation of MultiSymbolGenResult methods
-std::future<std::vector<exchange::core::common::api::ApiCommand*>>
+std::future<std::vector<exchange::core::common::api::ApiCommand *>>
 TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsFill() const {
   // Convert to ApiCommand* and return as future (for async compatibility)
-  std::promise<std::vector<exchange::core::common::api::ApiCommand*>> promise;
+  std::promise<std::vector<exchange::core::common::api::ApiCommand *>> promise;
   auto future = promise.get_future();
-  
-  std::vector<exchange::core::common::api::ApiCommand*> apiCommands;
+
+  ExecutionTime executionTime;
+  std::vector<exchange::core::common::api::ApiCommand *> apiCommands;
   apiCommands.reserve(commandsFill.size());
-  
+
   for (const auto &cmd : commandsFill) {
-    if (cmd.command == exchange::core::common::cmd::OrderCommandType::PLACE_ORDER) {
+    if (cmd.command ==
+        exchange::core::common::cmd::OrderCommandType::PLACE_ORDER) {
       apiCommands.push_back(new exchange::core::common::api::ApiPlaceOrder(
           cmd.price, cmd.size, cmd.orderId, cmd.action, cmd.orderType, cmd.uid,
           cmd.symbol, cmd.userCookie, cmd.reserveBidPrice));
-    } else if (cmd.command == exchange::core::common::cmd::OrderCommandType::MOVE_ORDER) {
+    } else if (cmd.command ==
+               exchange::core::common::cmd::OrderCommandType::MOVE_ORDER) {
       apiCommands.push_back(new exchange::core::common::api::ApiMoveOrder(
           cmd.orderId, cmd.price, cmd.uid, cmd.symbol));
-    } else if (cmd.command == exchange::core::common::cmd::OrderCommandType::CANCEL_ORDER) {
+    } else if (cmd.command ==
+               exchange::core::common::cmd::OrderCommandType::CANCEL_ORDER) {
       apiCommands.push_back(new exchange::core::common::api::ApiCancelOrder(
           cmd.orderId, cmd.uid, cmd.symbol));
     }
   }
-  
+
+  LOG_DEBUG("Converted {} commands to API commands in: {}", apiCommands.size(),
+            executionTime.GetTimeFormatted());
   promise.set_value(std::move(apiCommands));
   return future;
 }
 
-std::future<std::vector<exchange::core::common::api::ApiCommand*>>
+std::future<std::vector<exchange::core::common::api::ApiCommand *>>
 TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsBenchmark() const {
-  std::promise<std::vector<exchange::core::common::api::ApiCommand*>> promise;
+  std::promise<std::vector<exchange::core::common::api::ApiCommand *>> promise;
   auto future = promise.get_future();
-  
-  std::vector<exchange::core::common::api::ApiCommand*> apiCommands;
+
+  ExecutionTime executionTime;
+  std::vector<exchange::core::common::api::ApiCommand *> apiCommands;
   apiCommands.reserve(commandsBenchmark.size());
-  
+
+  // Count command types for statistics
+  int counterPlaceGTC = 0;
+  int counterPlaceIOC = 0;
+  int counterPlaceFOKB = 0;
+  int counterCancel = 0;
+  int counterMove = 0;
+  int counterReduce = 0;
+  std::unordered_map<int32_t, int> symbolCounters;
+
   for (const auto &cmd : commandsBenchmark) {
-    if (cmd.command == exchange::core::common::cmd::OrderCommandType::PLACE_ORDER) {
-      apiCommands.push_back(new exchange::core::common::api::ApiPlaceOrder(
+    exchange::core::common::api::ApiCommand *apiCmd = nullptr;
+    if (cmd.command ==
+        exchange::core::common::cmd::OrderCommandType::PLACE_ORDER) {
+      apiCmd = new exchange::core::common::api::ApiPlaceOrder(
           cmd.price, cmd.size, cmd.orderId, cmd.action, cmd.orderType, cmd.uid,
-          cmd.symbol, cmd.userCookie, cmd.reserveBidPrice));
-    } else if (cmd.command == exchange::core::common::cmd::OrderCommandType::MOVE_ORDER) {
-      apiCommands.push_back(new exchange::core::common::api::ApiMoveOrder(
-          cmd.orderId, cmd.price, cmd.uid, cmd.symbol));
-    } else if (cmd.command == exchange::core::common::cmd::OrderCommandType::CANCEL_ORDER) {
-      apiCommands.push_back(new exchange::core::common::api::ApiCancelOrder(
-          cmd.orderId, cmd.uid, cmd.symbol));
+          cmd.symbol, cmd.userCookie, cmd.reserveBidPrice);
+      if (cmd.orderType == exchange::core::common::OrderType::GTC) {
+        counterPlaceGTC++;
+      } else if (cmd.orderType == exchange::core::common::OrderType::IOC) {
+        counterPlaceIOC++;
+      } else if (cmd.orderType ==
+                 exchange::core::common::OrderType::FOK_BUDGET) {
+        counterPlaceFOKB++;
+      }
+    } else if (cmd.command ==
+               exchange::core::common::cmd::OrderCommandType::MOVE_ORDER) {
+      apiCmd = new exchange::core::common::api::ApiMoveOrder(
+          cmd.orderId, cmd.price, cmd.uid, cmd.symbol);
+      counterMove++;
+    } else if (cmd.command ==
+               exchange::core::common::cmd::OrderCommandType::CANCEL_ORDER) {
+      apiCmd = new exchange::core::common::api::ApiCancelOrder(
+          cmd.orderId, cmd.uid, cmd.symbol);
+      counterCancel++;
+    } else if (cmd.command ==
+               exchange::core::common::cmd::OrderCommandType::REDUCE_ORDER) {
+      counterReduce++;
+      // REDUCE_ORDER not yet supported in API
+    }
+    if (apiCmd) {
+      apiCommands.push_back(apiCmd);
+      symbolCounters[cmd.symbol]++;
     }
   }
-  
+
+  // Log statistics
+  int totalCommands = static_cast<int>(commandsBenchmark.size());
+  if (totalCommands > 0) {
+    float gtcPercent = (counterPlaceGTC * 100.0f) / totalCommands;
+    float iocPercent = (counterPlaceIOC * 100.0f) / totalCommands;
+    float fokbPercent = (counterPlaceFOKB * 100.0f) / totalCommands;
+    float cancelPercent = (counterCancel * 100.0f) / totalCommands;
+    float movePercent = (counterMove * 100.0f) / totalCommands;
+    float reducePercent = (counterReduce * 100.0f) / totalCommands;
+
+    LOG_INFO("GTC:{:.2f}% IOC:{:.2f}% FOKB:{:.2f}% cancel:{:.2f}% move:{:.2f}% "
+             "reduce:{:.2f}%",
+             gtcPercent, iocPercent, fokbPercent, cancelPercent, movePercent,
+             reducePercent);
+
+    // Calculate per-symbol statistics
+    if (!symbolCounters.empty()) {
+      int maxCommands = 0, minCommands = INT_MAX, sumCommands = 0;
+      for (const auto &pair : symbolCounters) {
+        maxCommands = std::max(maxCommands, pair.second);
+        minCommands = std::min(minCommands, pair.second);
+        sumCommands += pair.second;
+      }
+      float avgCommands =
+          static_cast<float>(sumCommands) / symbolCounters.size();
+      float maxPercent = (maxCommands * 100.0f) / totalCommands;
+      float avgPercent = (avgCommands * 100.0f) / totalCommands;
+      float minPercent = (minCommands * 100.0f) / totalCommands;
+
+      LOG_INFO("commands per symbol: max:{} ({:.2f}%); avg:{:.0f} ({:.2f}%); "
+               "min:{} ({:.2f}%)",
+               maxCommands, maxPercent, avgCommands, avgPercent, minCommands,
+               minPercent);
+    }
+  }
+
+  LOG_DEBUG("Converted {} commands to API commands in: {}", apiCommands.size(),
+            executionTime.GetTimeFormatted());
   promise.set_value(std::move(apiCommands));
   return future;
 }

@@ -19,8 +19,10 @@
 #include <algorithm>
 #include <cmath>
 #include <exchange/core/common/SymbolType.h>
+#include <exchange/core/utils/Logger.h>
 #include <random>
 #include <set>
+
 
 namespace exchange {
 namespace core {
@@ -29,6 +31,8 @@ namespace util {
 
 std::vector<std::vector<bool>> UserCurrencyAccountsGenerator::GenerateUsers(
     int accountsToCreate, const std::set<int32_t> &currencies) {
+  LOG_DEBUG("Generating users with {} accounts ({} currencies)...",
+            accountsToCreate, currencies.size());
   ExecutionTime executionTime;
 
   std::vector<std::vector<bool>> result;
@@ -69,6 +73,10 @@ std::vector<std::vector<bool>> UserCurrencyAccountsGenerator::GenerateUsers(
     result.push_back(bitSet);
   }
 
+  LOG_DEBUG(
+      "Generated {} users with {} accounts up to {} different currencies in {}",
+      result.size(), accountsToCreate, currencies.size(),
+      executionTime.GetTimeFormatted());
   return result;
 }
 

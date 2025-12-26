@@ -63,15 +63,51 @@ bool AffinityThreadFactory::IsTaskPinned(void *task) const {
 }
 
 void AffinityThreadFactory::ExecutePinned(std::function<void()> runnable) {
-  // Acquire affinity lock (if enabled)
+  // Increment thread counter before acquiring lock to get thread ID
+  int32_t threadId = threadsCounter_.fetch_add(1) + 1;
+
+  // Acquire affinity lock (if enabled) - this sets CPU affinity
+  int cpuId = -1;
+#ifdef _WIN32
+  // Get CPU ID from Windows affinity mask (simplified)
+  DWORD_PTR processAffinityMask = 0;
+  DWORD_PTR systemAffinityMask = 0;
+  if (GetProcessAffinityMask(GetCurrentProcess(), &processAffinityMask,
+                             &systemAffinityMask)) {
+    cpuId = threadId % (sizeof(DWORD_PTR) * 8);
+    if (threadAffinityMode_ ==
+        ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_PHYSICAL_CORE) {
+      cpuId = (cpuId / 2) * 2;
+    }
+  }
+#elif defined(__linux__)
+  int numCpus = sysconf(_SC_NPROCESSORS_ONLN);
+  if (numCpus > 0) {
+    cpuId = threadId % numCpus;
+    if (threadAffinityMode_ ==
+        ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_PHYSICAL_CORE) {
+      cpuId = (cpuId / 2) * 2;
+    }
+  }
+#endif
+
   AcquireAffinityLock();
 
   try {
-    // Increment thread counter
-    int32_t threadId = threadsCounter_.fetch_add(1) + 1;
+    // Format thread name similar to Java: "Thread-AF-{threadId}-cpu{cpuId}"
+    std::string threadName = "Thread-AF-" + std::to_string(threadId);
+    if (cpuId >= 0) {
+      threadName += "-cpu" + std::to_string(cpuId);
+    }
+
     // Note: Thread naming is platform-specific and not implemented here
     // On Windows: SetThreadDescription API (Windows 10+)
     // On Linux: pthread_setname_np
+
+    if (cpuId >= 0) {
+      LOG_DEBUG("{} will be running on thread={} pinned to cpu {}", "Task",
+                threadName, cpuId);
+    }
 
     // Execute the runnable
     runnable();
@@ -83,6 +119,7 @@ void AffinityThreadFactory::ExecutePinned(std::function<void()> runnable) {
   }
 
   // Cleanup: CPU affinity is automatically restored when thread exits
+  LOG_DEBUG("Removing cpu lock/reservation from {}", "Task");
 }
 
 void AffinityThreadFactory::AcquireAffinityLock() {

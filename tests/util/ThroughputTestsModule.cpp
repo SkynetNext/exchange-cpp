@@ -15,8 +15,7 @@
  */
 
 #include "ThroughputTestsModule.h"
-#include <algorithm>
-#include <cstdio>
+#include <exchange/core/utils/Logger.h>
 #include <numeric>
 #include <vector>
 
@@ -43,8 +42,8 @@ void ThroughputTestsModule::ThroughputTestImpl(
   auto testDataFutures =
       ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, 1);
 
-  auto container = ExchangeTestContainer::Create(performanceCfg, initialStateCfg,
-                                                  serializationCfg);
+  auto container = ExchangeTestContainer::Create(
+      performanceCfg, initialStateCfg, serializationCfg);
 
   std::vector<float> perfResults;
   perfResults.reserve(iterations);
@@ -56,42 +55,54 @@ void ThroughputTestsModule::ThroughputTestImpl(
     auto genResult = testDataFutures.genResult.get();
     auto benchmarkCommandsFuture = genResult->GetApiCommandsBenchmark();
     auto benchmarkCommands = benchmarkCommandsFuture.get();
-    
+
+    // Match Java: System.currentTimeMillis() - use milliseconds precision
     auto tStart = std::chrono::steady_clock::now();
     if (!benchmarkCommands.empty()) {
       container->GetApi()->SubmitCommandsSync(benchmarkCommands);
     }
     auto tEnd = std::chrono::steady_clock::now();
-    // Use microseconds for better precision to avoid truncation when duration < 1ms
-    auto tDurationUs = std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart).count();
-    
-    // Avoid division by zero - if duration is 0, use 1 microsecond minimum
-    if (tDurationUs == 0) {
-      tDurationUs = 1;
-    }
-    
-    // Calculate MT/s: commands / seconds / 1000000
-    // Match Java: commands / milliseconds / 1000.0
-    // Convert microseconds to milliseconds: tDurationUs / 1000.0
-    float tDurationMs = tDurationUs / 1000.0f;
-    float perfMt = benchmarkCommands.size() / tDurationMs / 1000.0f;
-    perfResults.push_back(perfMt);
-    
-    // Log performance (matching Java: log.info("{}. {} MT/s", j, ...))
-    printf("%d. %.3f MT/s\n", j, perfMt);
+    // Use milliseconds to match Java: System.currentTimeMillis()
+    auto tDurationMs =
+        std::chrono::duration_cast<std::chrono::milliseconds>(tEnd - tStart)
+            .count();
 
-    // Verify balances - match Java: container.totalBalanceReport().isGlobalBalancesAllZero()
+    // Avoid division by zero - if duration is 0, use 1 millisecond minimum
+    if (tDurationMs == 0) {
+      tDurationMs = 1;
+    }
+
+    // Calculate MT/s: Match Java exactly: size / (float) tDuration / 1000.0f
+    // where tDuration is in milliseconds
+    // This gives: (commands / ms) / 1000 = commands / (ms * 1000) = commands /
+    // s / 1000000 = MT/s
+    float perfMt =
+        benchmarkCommands.size() / static_cast<float>(tDurationMs) / 1000.0f;
+    float tDurationS = tDurationMs / 1000.0f;
+    perfResults.push_back(perfMt);
+
+    // Log performance with debug info (matching Java: log.info("{}. {} MT/s",
+    // j, ...))
+    LOG_INFO("{}. {:.3f} MT/s ({} commands in {:.3f}s = {}ms)", j, perfMt,
+             benchmarkCommands.size(), tDurationS,
+             static_cast<long long>(tDurationMs));
+
+    // Verify balances - match Java:
+    // container.totalBalanceReport().isGlobalBalancesAllZero()
     auto balanceReport = container->TotalBalanceReport();
     if (balanceReport) {
       if (!balanceReport->IsGlobalBalancesAllZero()) {
         // Log non-zero balances for debugging
         auto globalBalances = balanceReport->GetGlobalBalancesSum();
-        std::string errorMsg = "Total balance report is not zero. Non-zero balances: ";
+        std::string errorMsg =
+            "Total balance report is not zero. Non-zero balances: ";
         bool first = true;
         for (const auto &pair : globalBalances) {
           if (pair.second != 0) {
-            if (!first) errorMsg += ", ";
-            errorMsg += "currency " + std::to_string(pair.first) + " = " + std::to_string(pair.second);
+            if (!first)
+              errorMsg += ", ";
+            errorMsg += "currency " + std::to_string(pair.first) + " = " +
+                        std::to_string(pair.second);
             first = false;
           }
         }
@@ -99,33 +110,37 @@ void ThroughputTestsModule::ThroughputTestImpl(
       }
     }
 
-    // Verify order book state - compare final state to make sure all commands executed same way
-    // Match Java: testDataFutures.coreSymbolSpecifications.join().forEach(
+    // Verify order book state - compare final state to make sure all commands
+    // executed same way Match Java:
+    // testDataFutures.coreSymbolSpecifications.join().forEach(
     //     symbol -> assertEquals(expected, actual))
     auto coreSymbolSpecs = testDataFutures.coreSymbolSpecifications.get();
     for (const auto &symbol : coreSymbolSpecs) {
       auto expectedIt = genResult->genResults.find(symbol.symbolId);
       if (expectedIt != genResult->genResults.end()) {
         const auto &expectedPtr = expectedIt->second.finalOrderBookSnapshot;
-        
+
         // If expected is null, skip comparison (shouldn't happen, but be safe)
         if (!expectedPtr) {
           continue;
         }
-        
-        // Get actual order book - this may return nullptr if symbol doesn't exist
+
+        // Get actual order book - this may return nullptr if symbol doesn't
+        // exist
         auto actual = container->RequestCurrentOrderBook(symbol.symbolId);
-        
+
         // If actual is null, that's an error (Java assertEquals would fail)
         if (!actual) {
-          throw std::runtime_error("Failed to get order book for symbol " + std::to_string(symbol.symbolId));
+          throw std::runtime_error("Failed to get order book for symbol " +
+                                   std::to_string(symbol.symbolId));
         }
-        
+
         // Both pointers should be valid at this point
         // Compare order book snapshots using operator==
         // Match Java assertEquals behavior: both must be equal
         if (*expectedPtr != *actual) {
-          throw std::runtime_error("Order book state mismatch for symbol " + std::to_string(symbol.symbolId));
+          throw std::runtime_error("Order book state mismatch for symbol " +
+                                   std::to_string(symbol.symbolId));
         }
       }
     }
@@ -135,9 +150,10 @@ void ThroughputTestsModule::ThroughputTestImpl(
 
   // Calculate average
   if (!perfResults.empty()) {
-    float avgMt = std::accumulate(perfResults.begin(), perfResults.end(), 0.0f) /
-                  perfResults.size();
-    printf("Average: %.3f MT/s\n", avgMt);
+    float avgMt =
+        std::accumulate(perfResults.begin(), perfResults.end(), 0.0f) /
+        perfResults.size();
+    LOG_INFO("Average: {:.3f} MT/s", avgMt);
   }
 }
 
@@ -145,4 +161,3 @@ void ThroughputTestsModule::ThroughputTestImpl(
 } // namespace tests
 } // namespace core
 } // namespace exchange
-
