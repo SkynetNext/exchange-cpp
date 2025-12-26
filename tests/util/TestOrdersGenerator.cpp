@@ -517,14 +517,20 @@ TestOrdersGenerator::GenResult TestOrdersGenerator::GenerateCommands(
 
     if (fillInProgress) {
       cmd = GenerateRandomGtcOrder(&session);
-      result.commandsFill.push_back(cmd.Copy());
     } else {
       cmd = GenerateRandomOrder(&session);
-      result.commandsBenchmark.push_back(cmd.Copy());
     }
 
+    // Set symbol and resultCode BEFORE copying
     cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
     cmd.symbol = session.symbol;
+
+    // Now copy the command with correct symbol
+    if (fillInProgress) {
+      result.commandsFill.push_back(cmd.Copy());
+    } else {
+      result.commandsBenchmark.push_back(cmd.Copy());
+    }
 
     CommandResultCode resultCode =
         IOrderBook::ProcessCommand(orderBook.get(), &cmd);

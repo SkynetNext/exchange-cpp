@@ -186,13 +186,13 @@ CommandResultCode OrderBookDirectImpl::CancelOrder(OrderCommand *cmd) {
   if (order == nullptr || order->uid != cmd->uid) {
     return CommandResultCode::MATCHING_UNKNOWN_ORDER_ID;
   }
-  
+
   // Save order data before releasing it to avoid use-after-free
   int64_t orderPrice = order->GetPrice();
   int64_t orderReserveBidPrice = order->GetReserveBidPrice();
   int64_t reduceSize = order->size - order->filled;
   OrderAction orderAction = order->action;
-  
+
   orderIdIndex_.Remove(cmd->orderId);
 
   Bucket *freeBucket = this->RemoveOrder(order);
@@ -218,6 +218,13 @@ CommandResultCode OrderBookDirectImpl::MoveOrder(OrderCommand *cmd) {
   DirectOrder *orderToMove = orderIdIndex_.Get(cmd->orderId);
   if (orderToMove == nullptr || orderToMove->uid != cmd->uid) {
     return CommandResultCode::MATCHING_UNKNOWN_ORDER_ID;
+  }
+
+  // Risk check for exchange bids
+  if (symbolSpec_->type == common::SymbolType::CURRENCY_EXCHANGE_PAIR &&
+      orderToMove->action == common::OrderAction::BID &&
+      cmd->price > orderToMove->GetReserveBidPrice()) {
+    return CommandResultCode::MATCHING_MOVE_FAILED_PRICE_OVER_RISK_LIMIT;
   }
 
   Bucket *freeBucket = this->RemoveOrder(orderToMove);
@@ -264,19 +271,19 @@ CommandResultCode OrderBookDirectImpl::ReduceOrder(OrderCommand *cmd) {
     int64_t orderPrice = order->GetPrice();
     int64_t orderReserveBidPrice = order->GetReserveBidPrice();
     OrderAction orderAction = order->action;
-    
+
     orderIdIndex_.Remove(orderId);
     Bucket *freeBucket = this->RemoveOrder(order);
     if (freeBucket)
       objectsPool_->Put(
           ::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
           freeBucket);
-    
+
     // Release order before creating event
     objectsPool_->Put(
         ::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER,
         order);
-    
+
     // Use saved data to create event
     cmd->matcherEvent = eventsHelper_->SendReduceEvent(
         orderPrice, orderReserveBidPrice, reduceBy, true);

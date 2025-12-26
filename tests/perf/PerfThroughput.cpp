@@ -15,7 +15,6 @@
  */
 
 #include "PerfThroughput.h"
-#include "../util/ExchangeTestContainer.h"
 #include "../util/TestConstants.h"
 #include "../util/TestDataParameters.h"
 #include "../util/TestOrdersGeneratorConfig.h"

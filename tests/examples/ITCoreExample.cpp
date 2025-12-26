@@ -45,7 +45,6 @@
 #include <exchange/core/common/config/ExchangeConfiguration.h>
 #include <exchange/core/utils/Logger.h>
 #include <gtest/gtest.h>
-#include <iostream>
 
 using namespace exchange::core;
 using namespace exchange::core::common;
@@ -58,20 +57,22 @@ using namespace exchange::core::common::cmd;
 class TestEventsHandler : public IEventsHandler {
 public:
   void TradeEvent(const struct TradeEvent &tradeEvent) override {
-    std::string tradesStr = "Trade event: symbol=" + std::to_string(tradeEvent.symbol) +
-                           ", totalVolume=" + std::to_string(tradeEvent.totalVolume) +
-                           ", takerOrderId=" + std::to_string(tradeEvent.takerOrderId) +
-                           ", takerUid=" + std::to_string(tradeEvent.takerUid) +
-                           ", takerAction=" + (tradeEvent.takerAction == common::OrderAction::BID ? "BID" : "ASK") +
-                           ", takeOrderCompleted=" + (tradeEvent.takeOrderCompleted ? "true" : "false") +
-                           ", trades=[";
+    std::string tradesStr =
+        "Trade event: symbol=" + std::to_string(tradeEvent.symbol) +
+        ", totalVolume=" + std::to_string(tradeEvent.totalVolume) +
+        ", takerOrderId=" + std::to_string(tradeEvent.takerOrderId) +
+        ", takerUid=" + std::to_string(tradeEvent.takerUid) + ", takerAction=" +
+        (tradeEvent.takerAction == common::OrderAction::BID ? "BID" : "ASK") +
+        ", takeOrderCompleted=" +
+        (tradeEvent.takeOrderCompleted ? "true" : "false") + ", trades=[";
     for (size_t i = 0; i < tradeEvent.trades.size(); i++) {
       const auto &trade = tradeEvent.trades[i];
       tradesStr += "{makerOrderId=" + std::to_string(trade.makerOrderId) +
                    ", makerUid=" + std::to_string(trade.makerUid) +
                    ", price=" + std::to_string(trade.price) +
                    ", volume=" + std::to_string(trade.volume) +
-                   ", makerOrderCompleted=" + (trade.makerOrderCompleted ? "true" : "false") + "}";
+                   ", makerOrderCompleted=" +
+                   (trade.makerOrderCompleted ? "true" : "false") + "}";
       if (i < tradeEvent.trades.size() - 1) {
         tradesStr += ", ";
       }
@@ -81,18 +82,18 @@ public:
   }
 
   void ReduceEvent(const struct ReduceEvent &reduceEvent) override {
-    LOG_INFO("Reduce event: symbol={}, reducedVolume={}, orderCompleted={}, price={}, orderId={}, uid={}, timestamp={}",
+    LOG_INFO("Reduce event: symbol={}, reducedVolume={}, orderCompleted={}, "
+             "price={}, orderId={}, uid={}, timestamp={}",
              reduceEvent.symbol, reduceEvent.reducedVolume,
-             reduceEvent.orderCompleted ? "true" : "false",
-             reduceEvent.price, reduceEvent.orderId, reduceEvent.uid,
-             reduceEvent.timestamp);
+             reduceEvent.orderCompleted ? "true" : "false", reduceEvent.price,
+             reduceEvent.orderId, reduceEvent.uid, reduceEvent.timestamp);
   }
 
   void RejectEvent(const struct RejectEvent &rejectEvent) override {
-    LOG_INFO("Reject event: symbol={}, rejectedVolume={}, price={}, orderId={}, uid={}, timestamp={}",
-             rejectEvent.symbol, rejectEvent.rejectedVolume,
-             rejectEvent.price, rejectEvent.orderId, rejectEvent.uid,
-             rejectEvent.timestamp);
+    LOG_INFO("Reject event: symbol={}, rejectedVolume={}, price={}, "
+             "orderId={}, uid={}, timestamp={}",
+             rejectEvent.symbol, rejectEvent.rejectedVolume, rejectEvent.price,
+             rejectEvent.orderId, rejectEvent.uid, rejectEvent.timestamp);
   }
 
   void CommandResult(const struct ApiCommandResult &commandResult) override {
@@ -101,14 +102,14 @@ public:
   }
 
   void OrderBook(const struct OrderBook &orderBook) override {
-    std::string orderBookStr = "OrderBook event: symbol=" + std::to_string(orderBook.symbol) +
-                               ", timestamp=" + std::to_string(orderBook.timestamp) +
-                               ", asks=[";
+    std::string orderBookStr =
+        "OrderBook event: symbol=" + std::to_string(orderBook.symbol) +
+        ", timestamp=" + std::to_string(orderBook.timestamp) + ", asks=[";
     for (size_t i = 0; i < orderBook.asks.size(); i++) {
       const auto &ask = orderBook.asks[i];
       orderBookStr += "{price=" + std::to_string(ask.price) +
-                     ", volume=" + std::to_string(ask.volume) +
-                     ", orders=" + std::to_string(ask.orders) + "}";
+                      ", volume=" + std::to_string(ask.volume) +
+                      ", orders=" + std::to_string(ask.orders) + "}";
       if (i < orderBook.asks.size() - 1) {
         orderBookStr += ", ";
       }
@@ -117,8 +118,8 @@ public:
     for (size_t i = 0; i < orderBook.bids.size(); i++) {
       const auto &bid = orderBook.bids[i];
       orderBookStr += "{price=" + std::to_string(bid.price) +
-                     ", volume=" + std::to_string(bid.volume) +
-                     ", orders=" + std::to_string(bid.orders) + "}";
+                      ", volume=" + std::to_string(bid.volume) +
+                      ", orders=" + std::to_string(bid.orders) + "}";
       if (i < orderBook.bids.size() - 1) {
         orderBookStr += ", ";
       }
@@ -178,7 +179,8 @@ TEST(ITCoreExample, SampleTest) {
   auto binaryCmd =
       std::make_unique<ApiBinaryDataCommand>(1, std::move(batchCmd));
   auto future1 = api->SubmitCommandAsync(binaryCmd.release());
-  LOG_INFO("BatchAddSymbolsCommand result: {}", static_cast<int>(future1.get()));
+  LOG_INFO("BatchAddSymbolsCommand result: {}",
+           static_cast<int>(future1.get()));
 
   // Create user uid=301
   auto future2 = api->SubmitCommandAsync(new ApiAddUser(301L));
@@ -191,12 +193,14 @@ TEST(ITCoreExample, SampleTest) {
   // First user deposits 20 LTC
   auto future4 = api->SubmitCommandAsync(
       new ApiAdjustUserBalance(301L, currencyCodeLtc, 2'000'000'000L, 1L));
-  LOG_INFO("ApiAdjustUserBalance 1 result: {}", static_cast<int>(future4.get()));
+  LOG_INFO("ApiAdjustUserBalance 1 result: {}",
+           static_cast<int>(future4.get()));
 
   // Second user deposits 0.10 BTC
   auto future5 = api->SubmitCommandAsync(
       new ApiAdjustUserBalance(302L, currencyCodeXbt, 10'000'000L, 2L));
-  LOG_INFO("ApiAdjustUserBalance 2 result: {}", static_cast<int>(future5.get()));
+  LOG_INFO("ApiAdjustUserBalance 2 result: {}",
+           static_cast<int>(future5.get()));
 
   // First user places Good-till-Cancel Bid order
   // He assumes BTCLTC exchange rate 154 LTC for 1 BTC
@@ -218,9 +222,10 @@ TEST(ITCoreExample, SampleTest) {
   auto orderBookFuture = api->RequestOrderBookAsync(symbolXbtLtc, 10);
   auto orderBookData = orderBookFuture.get();
   if (orderBookData) {
-    std::string orderBookStr = "ApiOrderBookRequest result: askSize=" +
-                               std::to_string(orderBookData->askSize) +
-                               ", bidSize=" + std::to_string(orderBookData->bidSize);
+    std::string orderBookStr =
+        "ApiOrderBookRequest result: askSize=" +
+        std::to_string(orderBookData->askSize) +
+        ", bidSize=" + std::to_string(orderBookData->bidSize);
     if (orderBookData->askSize > 0) {
       orderBookStr += ", askPrices=[";
       for (int32_t i = 0; i < orderBookData->askSize && i < 5; i++) {
@@ -270,7 +275,8 @@ TEST(ITCoreExample, SampleTest) {
   } else {
     std::string accountsStr = "SingleUserReportQuery 1 accounts: ";
     for (const auto &pair : *result1->accounts) {
-      accountsStr += "currency=" + std::to_string(pair.first) + ", balance=" + std::to_string(pair.second) + " ";
+      accountsStr += "currency=" + std::to_string(pair.first) +
+                     ", balance=" + std::to_string(pair.second) + " ";
     }
     LOG_INFO("{}", accountsStr);
   }
@@ -288,7 +294,8 @@ TEST(ITCoreExample, SampleTest) {
   } else {
     std::string accountsStr = "SingleUserReportQuery 2 accounts: ";
     for (const auto &pair : *result2->accounts) {
-      accountsStr += "currency=" + std::to_string(pair.first) + ", balance=" + std::to_string(pair.second) + " ";
+      accountsStr += "currency=" + std::to_string(pair.first) +
+                     ", balance=" + std::to_string(pair.second) + " ";
     }
     LOG_INFO("{}", accountsStr);
   }
@@ -296,7 +303,8 @@ TEST(ITCoreExample, SampleTest) {
   // First user withdraws 0.10 BTC
   auto future10 = api->SubmitCommandAsync(
       new ApiAdjustUserBalance(301L, currencyCodeXbt, -10'000'000L, 3L));
-  LOG_INFO("ApiAdjustUserBalance 1 result: {}", static_cast<int>(future10.get()));
+  LOG_INFO("ApiAdjustUserBalance 1 result: {}",
+           static_cast<int>(future10.get()));
 
   // Check fees collected
   auto totalsReportQuery = std::make_unique<TotalCurrencyBalanceReportQuery>();

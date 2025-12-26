@@ -677,7 +677,7 @@ void RiskEngine::HandleMatcherEventMargin(
     }
 
     if (takerSpr->IsEmpty()) {
-      takerUp->positions.erase(spec->symbolId);
+      RemovePositionRecord(takerSpr, takerUp);
     }
   }
 
@@ -693,7 +693,7 @@ void RiskEngine::HandleMatcherEventMargin(
     maker->accounts[spec->quoteCurrency] -= fee;
     fees_[spec->quoteCurrency] += fee;
     if (makerSpr->IsEmpty()) {
-      maker->positions.erase(spec->symbolId);
+      RemovePositionRecord(makerSpr, maker);
     }
   }
 }

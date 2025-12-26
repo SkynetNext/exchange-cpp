@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include <exchange/core/utils/CoreArithmeticUtils.h>
 #include <exchange/core/common/CoreSymbolSpecification.h>
+#include <exchange/core/utils/CoreArithmeticUtils.h>
 
 namespace exchange {
 namespace core {
@@ -39,7 +39,8 @@ int64_t CoreArithmeticUtils::CalculateAmountBidTakerFee(
 int64_t CoreArithmeticUtils::CalculateAmountBidReleaseCorrMaker(
     int64_t size, int64_t priceDiff,
     const common::CoreSymbolSpecification *spec) {
-  return size * (priceDiff * spec->quoteScaleK + (spec->takerFee - spec->makerFee));
+  return size *
+         (priceDiff * spec->quoteScaleK + (spec->takerFee - spec->makerFee));
 }
 
 int64_t CoreArithmeticUtils::CalculateAmountBidTakerFeeForBudget(
@@ -51,4 +52,3 @@ int64_t CoreArithmeticUtils::CalculateAmountBidTakerFeeForBudget(
 } // namespace utils
 } // namespace core
 } // namespace exchange
-
