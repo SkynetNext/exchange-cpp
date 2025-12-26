@@ -70,7 +70,7 @@ void JournalingTestsModule::JournalingTestImpl(
 
       // Run benchmark commands
       auto genResult = testDataFutures.genResult.get();
-      auto benchmarkCommandsFuture = genResult.GetApiCommandsBenchmark();
+      auto benchmarkCommandsFuture = genResult->GetApiCommandsBenchmark();
       auto benchmarkCommands = benchmarkCommandsFuture.get();
       if (!benchmarkCommands.empty()) {
         container->GetApi()->SubmitCommandsSync(benchmarkCommands);

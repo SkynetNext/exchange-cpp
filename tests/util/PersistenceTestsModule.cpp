@@ -80,7 +80,7 @@ void PersistenceTestsModule::PersistenceTestImpl(
 
       // Benchmark original state and measure throughput
       auto genResult = testDataFutures.genResult.get();
-      auto benchmarkCommandsFuture = genResult.GetApiCommandsBenchmark();
+      auto benchmarkCommandsFuture = genResult->GetApiCommandsBenchmark();
       auto benchmarkCommands = benchmarkCommandsFuture.get();
       
       auto tStart = std::chrono::steady_clock::now();
@@ -183,7 +183,7 @@ void PersistenceTestsModule::PersistenceTestImpl(
 
       // Benchmark restored state and compare with original
       auto genResult2 = testDataFutures.genResult.get();
-      auto benchmarkCommandsFuture2 = genResult2.GetApiCommandsBenchmark();
+      auto benchmarkCommandsFuture2 = genResult2->GetApiCommandsBenchmark();
       auto benchmarkCommands2 = benchmarkCommandsFuture2.get();
       
       auto tStart2 = std::chrono::steady_clock::now();

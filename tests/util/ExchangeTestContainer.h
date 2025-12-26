@@ -56,12 +56,21 @@ namespace util {
 
 /**
  * TestDataFutures - futures for async test data preparation
+ * 
+ * Note: Using std::shared_future instead of std::future to allow multiple calls to get()
+ * This matches Java CompletableFuture behavior where join() can be called multiple times.
+ * std::future.get() can only be called once, but std::shared_future.get() can be called
+ * multiple times, making it more similar to Java's CompletableFuture.
+ * 
+ * Note: genResult uses std::shared_ptr because MultiSymbolGenResult contains non-copyable
+ * OrderCommand objects. Using shared_ptr allows the future to return a pointer copy instead
+ * of trying to copy the entire structure.
  */
 struct TestDataFutures {
-  std::future<std::vector<exchange::core::common::CoreSymbolSpecification>>
+  std::shared_future<std::vector<exchange::core::common::CoreSymbolSpecification>>
       coreSymbolSpecifications;
-  std::future<std::vector<std::vector<bool>>> usersAccounts;
-  std::future<TestOrdersGenerator::MultiSymbolGenResult> genResult;
+  std::shared_future<std::vector<std::vector<bool>>> usersAccounts;
+  std::shared_future<std::shared_ptr<TestOrdersGenerator::MultiSymbolGenResult>> genResult;
 };
 
 /**

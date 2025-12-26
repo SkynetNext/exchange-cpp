@@ -57,7 +57,7 @@ void LatencyTestsModule::LatencyTestImpl(
     container->LoadSymbolsUsersAndPrefillOrdersNoLog(testDataFutures);
     
     auto genResult = testDataFutures.genResult.get();
-    auto benchmarkCommandsFuture = genResult.GetApiCommandsBenchmark();
+    auto benchmarkCommandsFuture = genResult->GetApiCommandsBenchmark();
     auto benchmarkCommands = benchmarkCommandsFuture.get();
     
     // Run warmup at high TPS
@@ -85,7 +85,7 @@ void LatencyTestsModule::LatencyTestImpl(
     container->LoadSymbolsUsersAndPrefillOrdersNoLog(testDataFutures);
     
     auto genResult = testDataFutures.genResult.get();
-    auto benchmarkCommandsFuture = genResult.GetApiCommandsBenchmark();
+    auto benchmarkCommandsFuture = genResult->GetApiCommandsBenchmark();
     auto benchmarkCommands = benchmarkCommandsFuture.get();
     
     // Simple latency tracking
@@ -170,7 +170,7 @@ void LatencyTestsModule::HiccupTestImpl(
     container->LoadSymbolsUsersAndPrefillOrdersNoLog(testDataFutures);
     
     auto genResult = testDataFutures.genResult.get();
-    auto benchmarkCommandsFuture = genResult.GetApiCommandsBenchmark();
+    auto benchmarkCommandsFuture = genResult->GetApiCommandsBenchmark();
     auto benchmarkCommands = benchmarkCommandsFuture.get();
     
     const int nanosPerCmd = 1'000'000'000 / targetTps;
@@ -199,7 +199,7 @@ void LatencyTestsModule::HiccupTestImpl(
     container->LoadSymbolsUsersAndPrefillOrdersNoLog(testDataFutures);
     
     auto genResult = testDataFutures.genResult.get();
-    auto benchmarkCommandsFuture = genResult.GetApiCommandsBenchmark();
+    auto benchmarkCommandsFuture = genResult->GetApiCommandsBenchmark();
     auto benchmarkCommands = benchmarkCommandsFuture.get();
     
     std::mutex hiccupMutex;

@@ -633,7 +633,7 @@ void ExchangeTestContainer::LoadSymbolsUsersAndPrefillOrders(
 
   // Prefill orders - get fill commands from genResult
   auto genResult = const_cast<TestDataFutures&>(testDataFutures).genResult.get();
-  auto fillCommandsFuture = genResult.GetApiCommandsFill();
+  auto fillCommandsFuture = genResult->GetApiCommandsFill();
   auto fillCommands = fillCommandsFuture.get();
   
   if (!fillCommands.empty()) {
@@ -697,20 +697,22 @@ ExchangeTestContainer::PrepareTestDataAsync(const util::TestDataParameters &para
   TestDataFutures futures;
 
   // Prepare symbols asynchronously
+  // Convert std::future to std::shared_future to allow multiple get() calls
   futures.coreSymbolSpecifications = std::async(
       std::launch::async, [&parameters]() {
         return ExchangeTestContainer::GenerateRandomSymbols(parameters.numSymbols,
                                       parameters.currenciesAllowed,
                                       parameters.allowedSymbolTypes);
-      });
+      }).share();  // Convert to shared_future
 
   // Prepare user accounts asynchronously
   futures.usersAccounts = std::async(std::launch::async, [&parameters]() {
     return UserCurrencyAccountsGenerator::GenerateUsers(
         parameters.numAccounts, parameters.currenciesAllowed);
-  });
+  }).share();  // Convert to shared_future
 
   // Prepare test orders generator result
+  // Wrap in shared_ptr because MultiSymbolGenResult contains non-copyable OrderCommand
   futures.genResult = std::async(std::launch::async, [&parameters, seed]() {
     // Wait for symbols and users to be ready
     // Note: In a real async implementation, we'd combine the futures
@@ -731,9 +733,10 @@ ExchangeTestContainer::PrepareTestDataAsync(const util::TestDataParameters &para
     config.avalancheIOC = parameters.avalancheIOC;
     config.preFillMode = parameters.preFillMode;
     
-    // Generate multiple symbols
-    return util::TestOrdersGenerator::GenerateMultipleSymbols(config);
-  });
+    // Generate multiple symbols and wrap in shared_ptr
+    return std::make_shared<util::TestOrdersGenerator::MultiSymbolGenResult>(
+        util::TestOrdersGenerator::GenerateMultipleSymbols(config));
+  }).share();  // Convert to shared_future
 
   return futures;
 }

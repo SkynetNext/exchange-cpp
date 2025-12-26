@@ -54,7 +54,7 @@ void ThroughputTestsModule::ThroughputTestImpl(
 
     // Benchmark throughput
     auto genResult = testDataFutures.genResult.get();
-    auto benchmarkCommandsFuture = genResult.GetApiCommandsBenchmark();
+    auto benchmarkCommandsFuture = genResult->GetApiCommandsBenchmark();
     auto benchmarkCommands = benchmarkCommandsFuture.get();
     
     auto tStart = std::chrono::steady_clock::now();
@@ -114,8 +114,8 @@ void ThroughputTestsModule::ThroughputTestImpl(
     //     symbol -> assertEquals(expected, actual))
     auto coreSymbolSpecs = testDataFutures.coreSymbolSpecifications.get();
     for (const auto &symbol : coreSymbolSpecs) {
-      auto expectedIt = genResult.genResults.find(symbol.symbolId);
-      if (expectedIt != genResult.genResults.end()) {
+      auto expectedIt = genResult->genResults.find(symbol.symbolId);
+      if (expectedIt != genResult->genResults.end()) {
         const auto &expectedPtr = expectedIt->second.finalOrderBookSnapshot;
         
         // If expected is null, skip comparison (shouldn't happen, but be safe)
