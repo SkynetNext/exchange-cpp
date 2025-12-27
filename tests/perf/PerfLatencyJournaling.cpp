@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#include "PerfLatency.h"
+#include "PerfLatencyJournaling.h"
+#include "../util/ExchangeTestContainer.h"
 #include "../util/LatencyTestsModule.h"
 #include "../util/TestDataParameters.h"
 #include <exchange/core/common/config/InitialStateConfiguration.h>
@@ -28,10 +29,10 @@ namespace core {
 namespace tests {
 namespace perf {
 
-void PerfLatency::TestLatencyMargin() {
+void PerfLatencyJournaling::TestLatencyMarginJournaling() {
   auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
       LatencyPerformanceBuilder();
-  perfCfg.ringBufferSize = 2 * 1024;
+  perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
   perfCfg.msgsInGroupLimit = 256;
@@ -40,15 +41,17 @@ void PerfLatency::TestLatencyMargin() {
 
   LatencyTestsModule::LatencyTestImpl(
       perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(),
-      16);
+      exchange::core::common::config::InitialStateConfiguration::
+          CleanStartJournaling(ExchangeTestContainer::TimeBasedExchangeId()),
+      exchange::core::common::config::SerializationConfiguration::
+          DiskJournaling(),
+      6);
 }
 
-void PerfLatency::TestLatencyExchange() {
+void PerfLatencyJournaling::TestLatencyExchangeJournaling() {
   auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
       LatencyPerformanceBuilder();
-  perfCfg.ringBufferSize = 2 * 1024;
+  perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
   perfCfg.msgsInGroupLimit = 256;
@@ -57,12 +60,14 @@ void PerfLatency::TestLatencyExchange() {
 
   LatencyTestsModule::LatencyTestImpl(
       perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(),
-      16);
+      exchange::core::common::config::InitialStateConfiguration::
+          CleanStartJournaling(ExchangeTestContainer::TimeBasedExchangeId()),
+      exchange::core::common::config::SerializationConfiguration::
+          DiskJournaling(),
+      6);
 }
 
-void PerfLatency::TestLatencyMultiSymbolMedium() {
+void PerfLatencyJournaling::TestLatencyMultiSymbolMediumJournaling() {
   auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
       LatencyPerformanceBuilder();
   perfCfg.ringBufferSize = 32 * 1024;
@@ -74,11 +79,14 @@ void PerfLatency::TestLatencyMultiSymbolMedium() {
 
   LatencyTestsModule::LatencyTestImpl(
       perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(), 8);
+      exchange::core::common::config::InitialStateConfiguration::
+          CleanStartJournaling(ExchangeTestContainer::TimeBasedExchangeId()),
+      exchange::core::common::config::SerializationConfiguration::
+          DiskJournaling(),
+      3);
 }
 
-void PerfLatency::TestLatencyMultiSymbolLarge() {
+void PerfLatencyJournaling::TestLatencyMultiSymbolLargeJournaling() {
   auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
       LatencyPerformanceBuilder();
   perfCfg.ringBufferSize = 32 * 1024;
@@ -90,11 +98,14 @@ void PerfLatency::TestLatencyMultiSymbolLarge() {
 
   LatencyTestsModule::LatencyTestImpl(
       perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(), 4);
+      exchange::core::common::config::InitialStateConfiguration::
+          CleanStartJournaling(ExchangeTestContainer::TimeBasedExchangeId()),
+      exchange::core::common::config::SerializationConfiguration::
+          DiskJournaling(),
+      3);
 }
 
-void PerfLatency::TestLatencyMultiSymbolHuge() {
+void PerfLatencyJournaling::TestLatencyMultiSymbolHugeJournaling() {
   auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
       LatencyPerformanceBuilder();
   perfCfg.ringBufferSize = 64 * 1024;
@@ -106,23 +117,30 @@ void PerfLatency::TestLatencyMultiSymbolHuge() {
 
   LatencyTestsModule::LatencyTestImpl(
       perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(), 2);
+      exchange::core::common::config::InitialStateConfiguration::
+          CleanStartJournaling(ExchangeTestContainer::TimeBasedExchangeId()),
+      exchange::core::common::config::SerializationConfiguration::
+          DiskJournaling(),
+      2);
 }
 
 // Register tests
-TEST_F(PerfLatency, TestLatencyMargin) { TestLatencyMargin(); }
-TEST_F(PerfLatency, TestLatencyExchange) { TestLatencyExchange(); }
-TEST_F(PerfLatency, TestLatencyMultiSymbolMedium) {
-  TestLatencyMultiSymbolMedium();
+TEST_F(PerfLatencyJournaling, TestLatencyMarginJournaling) {
+  TestLatencyMarginJournaling();
 }
-TEST_F(PerfLatency, TestLatencyMultiSymbolLarge) {
-  TestLatencyMultiSymbolLarge();
+TEST_F(PerfLatencyJournaling, TestLatencyExchangeJournaling) {
+  TestLatencyExchangeJournaling();
+}
+TEST_F(PerfLatencyJournaling, TestLatencyMultiSymbolMediumJournaling) {
+  TestLatencyMultiSymbolMediumJournaling();
+}
+TEST_F(PerfLatencyJournaling, TestLatencyMultiSymbolLargeJournaling) {
+  TestLatencyMultiSymbolLargeJournaling();
 }
 // Disabled by default - requires 12+ threads CPU, 32GB RAM, and takes hours to
 // complete Run with: --gtest_also_run_disabled_tests to enable
-TEST_F(PerfLatency, DISABLED_TestLatencyMultiSymbolHuge) {
-  TestLatencyMultiSymbolHuge();
+TEST_F(PerfLatencyJournaling, DISABLED_TestLatencyMultiSymbolHugeJournaling) {
+  TestLatencyMultiSymbolHugeJournaling();
 }
 
 } // namespace perf

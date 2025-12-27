@@ -439,6 +439,62 @@ if(BUILD_TESTING AND GTest_FOUND)
     )
     add_test(NAME PerfLatency COMMAND test_perf_latency)
     list(APPEND ALL_TEST_TARGETS test_perf_latency)
+    
+    # PerfJournaling
+    add_executable(test_perf_journaling
+        perf/PerfJournaling.cpp
+    )
+    target_link_libraries(test_perf_journaling
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME PerfJournaling COMMAND test_perf_journaling)
+    list(APPEND ALL_TEST_TARGETS test_perf_journaling)
+    
+    # PerfPersistence
+    add_executable(test_perf_persistence
+        perf/PerfPersistence.cpp
+    )
+    target_link_libraries(test_perf_persistence
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME PerfPersistence COMMAND test_perf_persistence)
+    list(APPEND ALL_TEST_TARGETS test_perf_persistence)
+    
+    # PerfLatencyJournaling
+    add_executable(test_perf_latency_journaling
+        perf/PerfLatencyJournaling.cpp
+    )
+    target_link_libraries(test_perf_latency_journaling
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME PerfLatencyJournaling COMMAND test_perf_latency_journaling)
+    list(APPEND ALL_TEST_TARGETS test_perf_latency_journaling)
+    
+    # PerfThroughputJournaling
+    add_executable(test_perf_throughput_journaling
+        perf/PerfThroughputJournaling.cpp
+    )
+    target_link_libraries(test_perf_throughput_journaling
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME PerfThroughputJournaling COMMAND test_perf_throughput_journaling)
+    list(APPEND ALL_TEST_TARGETS test_perf_throughput_journaling)
 
     # Create a custom target that builds all tests
     # This allows CMake Tools to build all tests at once

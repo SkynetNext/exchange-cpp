@@ -145,7 +145,9 @@ TEST_F(PerfThroughput, TestThroughputMultiSymbolMedium) {
 TEST_F(PerfThroughput, TestThroughputMultiSymbolLarge) {
   TestThroughputMultiSymbolLarge();
 }
-TEST_F(PerfThroughput, TestThroughputMultiSymbolHuge) {
+// Disabled by default - requires 12+ threads CPU, 32GB RAM, and takes hours to
+// complete Run with: --gtest_also_run_disabled_tests to enable
+TEST_F(PerfThroughput, DISABLED_TestThroughputMultiSymbolHuge) {
   TestThroughputMultiSymbolHuge();
 }
 
