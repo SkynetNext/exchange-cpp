@@ -31,6 +31,7 @@
 #include <exchange/core/common/api/reports/SingleUserReportResult.h>
 #include <exchange/core/common/cmd/CommandResultCode.h>
 #include <exchange/core/common/cmd/OrderCommandType.h>
+#include <exchange/core/utils/Logger.h>
 #include <gtest/gtest.h>
 
 using namespace exchange::core::tests::util;
@@ -76,6 +77,14 @@ void ITExchangeCoreIntegration::BasicFullCycleTest(
       1600, 7, 101, OrderAction::ASK, OrderType::GTC, TestConstants::UID_1,
       symbolSpec.symbolId, 0, 0);
 
+  LOG_DEBUG("PLACE 101: [ADD o{} s{} u{} {}:{}:{}:{}]", order101->orderId,
+            order101->symbol, order101->uid,
+            order101->action == OrderAction::ASK ? "A" : "B",
+            order101->orderType == OrderType::IOC
+                ? "IOC"
+                : "GTC", // Java only handles IOC and GTC in toString
+            order101->price, order101->size);
+
   container->SubmitCommandSync(
       std::move(order101), [&symbolSpec](const OrderCommand &cmd) {
         EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
@@ -97,6 +106,14 @@ void ITExchangeCoreIntegration::BasicFullCycleTest(
       1550, 4, 102, OrderAction::BID, OrderType::GTC, TestConstants::UID_1,
       symbolSpec.symbolId, 0, reserve102);
 
+  LOG_DEBUG("PLACE 102: [ADD o{} s{} u{} {}:{}:{}:{}]", order102->orderId,
+            order102->symbol, order102->uid,
+            order102->action == OrderAction::ASK ? "A" : "B",
+            order102->orderType == OrderType::IOC
+                ? "IOC"
+                : "GTC", // Java only handles IOC and GTC in toString
+            order102->price, order102->size);
+
   container->SubmitCommandSync(
       std::move(order102), [](const OrderCommand &cmd) {
         EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
@@ -117,6 +134,14 @@ void ITExchangeCoreIntegration::BasicFullCycleTest(
   auto order201 = std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
       1700, 2, 201, OrderAction::BID, OrderType::IOC, TestConstants::UID_2,
       symbolSpec.symbolId, 0, reserve201);
+
+  LOG_DEBUG("PLACE 201: [ADD o{} s{} u{} {}:{}:{}:{}]", order201->orderId,
+            order201->symbol, order201->uid,
+            order201->action == OrderAction::ASK ? "A" : "B",
+            order201->orderType == OrderType::IOC
+                ? "IOC"
+                : "GTC", // Java only handles IOC and GTC in toString
+            order201->price, order201->size);
 
   container->SubmitCommandSync(
       std::move(order201), [](const OrderCommand &cmd) {
@@ -162,6 +187,14 @@ void ITExchangeCoreIntegration::BasicFullCycleTest(
       1583, 4, 202, OrderAction::BID, OrderType::GTC, TestConstants::UID_2,
       symbolSpec.symbolId, 0, reserve202);
 
+  LOG_DEBUG("PLACE 202: [ADD o{} s{} u{} {}:{}:{}:{}]", order202->orderId,
+            order202->symbol, order202->uid,
+            order202->action == OrderAction::ASK ? "A" : "B",
+            order202->orderType == OrderType::IOC
+                ? "IOC"
+                : "GTC", // Java only handles IOC and GTC in toString
+            order202->price, order202->size);
+
   container->SubmitCommandSync(
       std::move(order202), [](const OrderCommand &cmd) {
         EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
@@ -179,6 +212,9 @@ void ITExchangeCoreIntegration::BasicFullCycleTest(
   // but not entirely
   auto moveOrder = std::make_unique<exchange::core::common::api::ApiMoveOrder>(
       101, 1580, TestConstants::UID_1, symbolSpec.symbolId);
+
+  LOG_DEBUG("MOVE 101: [MOVE {} {} u{} s{}]", moveOrder->orderId,
+            moveOrder->newPrice, moveOrder->uid, moveOrder->symbol);
 
   container->SubmitCommandSync(
       std::move(moveOrder), [](const OrderCommand &cmd) {

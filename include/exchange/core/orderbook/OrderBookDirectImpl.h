@@ -39,28 +39,28 @@ public:
   struct DirectOrder;
 
   struct Bucket {
-    int64_t price;
-    OrderBookDirectImpl::DirectOrder
-        *lastOrder; // tail order (worst priority in this price level)
-    int64_t totalVolume;
-    int32_t numOrders;
+    int64_t price = 0;
+    OrderBookDirectImpl::DirectOrder *lastOrder =
+        nullptr; // tail order (worst priority in this price level)
+    int64_t totalVolume = 0;
+    int32_t numOrders = 0;
   };
 
   struct DirectOrder : public common::IOrder,
                        public common::WriteBytesMarshallable,
                        public common::StateHash {
-    int64_t orderId;
-    int64_t price;
-    int64_t size;
-    int64_t filled;
-    int64_t reserveBidPrice; // Reserved price for fast moves
-    int64_t uid;
-    common::OrderAction action;
-    int64_t timestamp;
+    int64_t orderId = 0;
+    int64_t price = 0;
+    int64_t size = 0;
+    int64_t filled = 0;
+    int64_t reserveBidPrice = 0; // Reserved price for fast moves
+    int64_t uid = 0;
+    common::OrderAction action = common::OrderAction::ASK;
+    int64_t timestamp = 0;
 
-    DirectOrder *next;
-    DirectOrder *prev;
-    Bucket *bucket;
+    DirectOrder *next = nullptr;
+    DirectOrder *prev = nullptr;
+    Bucket *bucket = nullptr;
 
     DirectOrder() = default;
 

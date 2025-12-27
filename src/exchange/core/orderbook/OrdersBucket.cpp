@@ -21,6 +21,7 @@
 #include <exchange/core/common/Order.h>
 #include <exchange/core/orderbook/OrderBookEventsHelper.h>
 #include <exchange/core/orderbook/OrdersBucket.h>
+#include <exchange/core/utils/Logger.h>
 #include <exchange/core/utils/SerializationUtils.h>
 #include <stdexcept>
 #include <vector>

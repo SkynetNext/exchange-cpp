@@ -105,6 +105,7 @@ void OrderBookDirectImpl::NewOrder(OrderCommand *cmd) {
     tempOrder.action = cmd->action;
     tempOrder.uid = cmd->uid;
     tempOrder.timestamp = cmd->timestamp;
+    tempOrder.reserveBidPrice = cmd->reserveBidPrice;
     tempOrder.next = nullptr;
     tempOrder.prev = nullptr;
     tempOrder.bucket = nullptr;
@@ -145,6 +146,7 @@ void OrderBookDirectImpl::NewOrder(OrderCommand *cmd) {
     tempOrder.action = cmd->action;
     tempOrder.uid = cmd->uid;
     tempOrder.timestamp = cmd->timestamp;
+    tempOrder.reserveBidPrice = cmd->reserveBidPrice;
     tempOrder.next = nullptr;
     tempOrder.prev = nullptr;
     tempOrder.bucket = nullptr;
@@ -167,6 +169,7 @@ void OrderBookDirectImpl::NewOrder(OrderCommand *cmd) {
       tempOrder.action = cmd->action;
       tempOrder.uid = cmd->uid;
       tempOrder.timestamp = cmd->timestamp;
+      tempOrder.reserveBidPrice = cmd->reserveBidPrice;
       tempOrder.next = nullptr;
       tempOrder.prev = nullptr;
       tempOrder.bucket = nullptr;

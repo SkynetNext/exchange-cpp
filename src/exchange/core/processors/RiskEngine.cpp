@@ -648,8 +648,9 @@ void RiskEngine::HandleMatcherEventsExchangeBuy(
 
     // Return the difference between held amount and actual execution amount
     // Match Java: (takerSizePriceHeldSum - takerSizePriceSum) *
-    taker->accounts[quoteCurrency] +=
+    int64_t balanceDiff =
         (takerSizePriceHeldSum - takerSizePriceSum) * spec->quoteScaleK;
+    taker->accounts[quoteCurrency] += balanceDiff;
     taker->accounts[spec->baseCurrency] +=
         takerSizeForThisHandler * spec->baseScaleK;
   }
