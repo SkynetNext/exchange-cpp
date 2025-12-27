@@ -63,11 +63,14 @@ std::thread AffinityThreadFactory::newThread(std::function<void()> r) {
   }
 
   // Create thread that will execute with affinity
-  return std::thread([this, r, taskId]() {
-    ExecutePinned(r);
+  // Capture shared_from_this() to ensure AffinityThreadFactory lifetime
+  // extends beyond thread completion (thread accesses affinityReservations_)
+  auto self = shared_from_this();
+  return std::thread([self, r, taskId]() {
+    self->ExecutePinned(r);
     // Remove reservation after thread completes
-    std::lock_guard<std::mutex> lock(mutex_);
-    affinityReservations_.erase(taskId);
+    std::lock_guard<std::mutex> lock(self->mutex_);
+    self->affinityReservations_.erase(taskId);
   });
 }
 

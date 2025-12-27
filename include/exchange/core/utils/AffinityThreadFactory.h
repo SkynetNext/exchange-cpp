@@ -18,6 +18,7 @@
 
 #include <disruptor/dsl/ThreadFactory.h>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <set>
 #include <thread>
@@ -39,8 +40,13 @@ enum class ThreadAffinityMode {
  * AffinityThreadFactory - factory for creating threads with CPU affinity
  * Pins threads to specific CPU cores for better cache locality
  * Implements disruptor::dsl::ThreadFactory (matches Java version)
+ *
+ * Note: Must be managed via shared_ptr to ensure lifetime extends beyond
+ * threads it creates (which access affinityReservations_ in their cleanup).
  */
-class AffinityThreadFactory : public disruptor::dsl::ThreadFactory {
+class AffinityThreadFactory
+    : public disruptor::dsl::ThreadFactory,
+      public std::enable_shared_from_this<AffinityThreadFactory> {
 public:
   explicit AffinityThreadFactory(ThreadAffinityMode threadAffinityMode);
 
