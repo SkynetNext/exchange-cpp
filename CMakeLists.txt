@@ -133,6 +133,32 @@ else()
     message(FATAL_ERROR "TBB is required for lock-free promise map")
 endif()
 
+# moodycamel::concurrentqueue: High-performance lock-free queue
+# Header-only library, faster than TBB concurrent_queue for high-frequency trading
+# Replaces std::queue + std::mutex in SharedPool for better performance
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/concurrentqueue/concurrentqueue.h)
+    message(STATUS "Using moodycamel::concurrentqueue from submodule")
+    set(CONCURRENTQUEUE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/concurrentqueue)
+else()
+    include(FetchContent)
+    FetchContent_Declare(
+        concurrentqueue
+        GIT_REPOSITORY https://github.com/cameron314/concurrentqueue.git
+        GIT_TAG        v1.0.4
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_GetProperties(concurrentqueue)
+    if(NOT concurrentqueue_POPULATED)
+        FetchContent_Populate(concurrentqueue)
+        set(CONCURRENTQUEUE_INCLUDE_DIR ${concurrentqueue_SOURCE_DIR})
+        message(STATUS "Using moodycamel::concurrentqueue from FetchContent")
+    else()
+        # Already populated, get the source directory
+        FetchContent_GetProperties(concurrentqueue SOURCE_DIR concurrentqueue_SOURCE_DIR)
+        set(CONCURRENTQUEUE_INCLUDE_DIR ${concurrentqueue_SOURCE_DIR})
+    endif()
+endif()
+
 # spdlog: High-performance logging library (header-only, matches Java SLF4J+Logback)
 # Using FetchContent for easy integration
 include(FetchContent)
@@ -181,6 +207,12 @@ target_include_directories(exchange-cpp
     PRIVATE
         # Private includes if needed
 )
+
+# Add concurrentqueue include directory (header-only library)
+if(CONCURRENTQUEUE_INCLUDE_DIR)
+    target_include_directories(exchange-cpp PRIVATE ${CONCURRENTQUEUE_INCLUDE_DIR})
+    message(STATUS "Added concurrentqueue include directory: ${CONCURRENTQUEUE_INCLUDE_DIR}")
+endif()
 
 target_link_libraries(exchange-cpp
     PUBLIC

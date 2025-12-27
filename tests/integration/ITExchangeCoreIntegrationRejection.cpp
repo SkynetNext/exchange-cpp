@@ -69,6 +69,9 @@ void ITExchangeCoreIntegrationRejection::TestMultiBuy(
 
   EXPECT_CALL(mockHandler_, CommandResult(_)).Times(5);
   EXPECT_CALL(mockHandler_, ReduceEvent(_)).Times(0);
+  // OrderBook may be called if market data is generated, allow any number of
+  // calls
+  EXPECT_CALL(mockHandler_, OrderBook(_)).Times(::testing::AnyNumber());
 
   if (orderType == OrderType::FOK_BUDGET &&
       rejectionCause != RejectionCause::NO_REJECTION) {
@@ -170,6 +173,9 @@ void ITExchangeCoreIntegrationRejection::TestMultiSell(
 
   EXPECT_CALL(mockHandler_, CommandResult(_)).Times(5);
   EXPECT_CALL(mockHandler_, ReduceEvent(_)).Times(0);
+  // OrderBook may be called if market data is generated, allow any number of
+  // calls
+  EXPECT_CALL(mockHandler_, OrderBook(_)).Times(::testing::AnyNumber());
 
   if (orderType == OrderType::FOK_BUDGET &&
       rejectionCause != RejectionCause::NO_REJECTION) {

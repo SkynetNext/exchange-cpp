@@ -19,8 +19,10 @@
 #include "../common/MatcherTradeEvent.h"
 #include <cstdint>
 #include <memory>
-#include <mutex>
-#include <queue>
+
+// Use moodycamel::ConcurrentQueue for lock-free high-performance queue
+// Header-only library, faster than std::queue + mutex or TBB concurrent_queue
+#include <concurrentqueue.h>
 
 namespace exchange {
 namespace core {
@@ -70,9 +72,13 @@ public:
   int32_t GetChainLength() const { return chainLength_; }
 
 private:
-  std::queue<common::MatcherTradeEvent *> eventChainsBuffer_;
-  std::mutex mutex_; // Protects eventChainsBuffer_
-  int32_t poolMaxSize_;
+  // Lock-free concurrent queue for high-performance event chain management
+  // Replaces std::queue + std::mutex with lock-free implementation
+  // Note: moodycamel::ConcurrentQueue is unbounded, so poolMaxSize_ is kept
+  // for API compatibility but not enforced (object pool is for optimization,
+  // not strict memory limiting)
+  moodycamel::ConcurrentQueue<common::MatcherTradeEvent *> eventChainsBuffer_;
+  int32_t poolMaxSize_; // Kept for API compatibility, not enforced
   int32_t chainLength_;
 };
 
