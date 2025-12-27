@@ -1,0 +1,78 @@
+name: CI
+
+on:
+    push:
+        branches: [main, master, develop]
+    pull_request:
+        branches: [main, master, develop]
+
+jobs:
+    linux-gcc:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+
+            - name: Install dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y \
+                    build-essential \
+                    cmake \
+                    ninja-build \
+                    g++ \
+                    liblz4-dev
+
+            - name: Configure CMake (GCC)
+              run: |
+                  cmake -B build -G Ninja \
+                    -DCMAKE_BUILD_TYPE=Release \
+                    -DCMAKE_CXX_COMPILER=g++ \
+                    -DBUILD_TESTING=ON \
+                    -DBUILD_BENCHMARKS=OFF \
+                    -DBUILD_EXAMPLES=ON
+
+            - name: Build
+              run: cmake --build build --config Release
+
+            - name: Run tests (skip perf tests)
+              run: |
+                  cd build
+                  ctest --output-on-failure -E "Perf.*" --parallel $(nproc)
+
+    linux-clang:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  submodules: recursive
+
+            - name: Install dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y \
+                    build-essential \
+                    cmake \
+                    ninja-build \
+                    clang \
+                    liblz4-dev
+
+            - name: Configure CMake (Clang)
+              run: |
+                  cmake -B build -G Ninja \
+                    -DCMAKE_BUILD_TYPE=Release \
+                    -DCMAKE_CXX_COMPILER=clang++ \
+                    -DBUILD_TESTING=ON \
+                    -DBUILD_BENCHMARKS=OFF \
+                    -DBUILD_EXAMPLES=ON
+
+            - name: Build
+              run: cmake --build build --config Release
+
+            - name: Run tests (skip perf tests)
+              run: |
+                  cd build
+                  ctest --output-on-failure -E "Perf.*" --parallel $(nproc)
