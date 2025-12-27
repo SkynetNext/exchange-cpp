@@ -646,6 +646,8 @@ void RiskEngine::HandleMatcherEventsExchangeBuy(
     // TODO IOC_BUDGET - order can be partially rejected - need held taker fee
     // correction
 
+    // Return the difference between held amount and actual execution amount
+    // Match Java: (takerSizePriceHeldSum - takerSizePriceSum) *
     taker->accounts[quoteCurrency] +=
         (takerSizePriceHeldSum - takerSizePriceSum) * spec->quoteScaleK;
     taker->accounts[spec->baseCurrency] +=

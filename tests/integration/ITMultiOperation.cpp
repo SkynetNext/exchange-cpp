@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+#include "../util/TestConstants.h"
 #include "../util/TestDataParameters.h"
+#include "../util/TestOrdersGeneratorConfig.h"
 #include "../util/ThroughputTestsModule.h"
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
@@ -43,7 +45,24 @@ CreateThroughputPerfCfg(int matchingEnginesNum, int riskEnginesNum) {
 TEST(ITMultiOperation, ShouldPerformMarginOperations) {
   auto perfCfg = CreateThroughputPerfCfg(1, 1);
 
-  auto testParams = TestDataParameters::SinglePairMargin();
+  // Match Java: TestDataParameters.builder()
+  //   .totalTransactionsNumber(1_000_000)
+  //   .targetOrderBookOrdersTotal(1000)
+  //   .numAccounts(2000)
+  //   .currenciesAllowed(TestConstants.CURRENCIES_FUTURES)
+  //   .numSymbols(1)
+  //   .allowedSymbolTypes(ExchangeTestContainer.AllowedSymbolTypes.FUTURES_CONTRACT)
+  //   .preFillMode(TestOrdersGeneratorConfig.PreFillMode.ORDERS_NUMBER)
+  //   .build()
+  TestDataParameters testParams;
+  testParams.totalTransactionsNumber = 1'000'000;
+  testParams.targetOrderBookOrdersTotal = 1000;
+  testParams.numAccounts = 2000;
+  testParams.currenciesAllowed = TestConstants::GetCurrenciesFutures();
+  testParams.numSymbols = 1;
+  testParams.allowedSymbolTypes = AllowedSymbolTypes::FUTURES_CONTRACT;
+  testParams.preFillMode = PreFillMode::ORDERS_NUMBER;
+  testParams.avalancheIOC = false;
 
   ThroughputTestsModule::ThroughputTestImpl(
       perfCfg, testParams,
@@ -54,7 +73,24 @@ TEST(ITMultiOperation, ShouldPerformMarginOperations) {
 TEST(ITMultiOperation, ShouldPerformExchangeOperations) {
   auto perfCfg = CreateThroughputPerfCfg(1, 1);
 
-  auto testParams = TestDataParameters::SinglePairExchange();
+  // Match Java: TestDataParameters.builder()
+  //   .totalTransactionsNumber(1_000_000)
+  //   .targetOrderBookOrdersTotal(1000)
+  //   .numAccounts(2000)
+  //   .currenciesAllowed(TestConstants.CURRENCIES_EXCHANGE)
+  //   .numSymbols(1)
+  //   .allowedSymbolTypes(ExchangeTestContainer.AllowedSymbolTypes.CURRENCY_EXCHANGE_PAIR)
+  //   .preFillMode(TestOrdersGeneratorConfig.PreFillMode.ORDERS_NUMBER)
+  //   .build()
+  TestDataParameters testParams;
+  testParams.totalTransactionsNumber = 1'000'000;
+  testParams.targetOrderBookOrdersTotal = 1000;
+  testParams.numAccounts = 2000;
+  testParams.currenciesAllowed = TestConstants::GetCurrenciesExchange();
+  testParams.numSymbols = 1;
+  testParams.allowedSymbolTypes = AllowedSymbolTypes::CURRENCY_EXCHANGE_PAIR;
+  testParams.preFillMode = PreFillMode::ORDERS_NUMBER;
+  testParams.avalancheIOC = false;
 
   ThroughputTestsModule::ThroughputTestImpl(
       perfCfg, testParams,
@@ -65,9 +101,24 @@ TEST(ITMultiOperation, ShouldPerformExchangeOperations) {
 TEST(ITMultiOperation, ShouldPerformSharded) {
   auto perfCfg = CreateThroughputPerfCfg(2, 2);
 
-  auto testParams = TestDataParameters::SinglePairExchange();
+  // Match Java: TestDataParameters.builder()
+  //   .totalTransactionsNumber(1_000_000)
+  //   .targetOrderBookOrdersTotal(1000)
+  //   .numAccounts(2000)
+  //   .currenciesAllowed(TestConstants.CURRENCIES_EXCHANGE)
+  //   .numSymbols(32)
+  //   .allowedSymbolTypes(ExchangeTestContainer.AllowedSymbolTypes.BOTH)
+  //   .preFillMode(TestOrdersGeneratorConfig.PreFillMode.ORDERS_NUMBER)
+  //   .build()
+  TestDataParameters testParams;
+  testParams.totalTransactionsNumber = 1'000'000;
+  testParams.targetOrderBookOrdersTotal = 1000;
+  testParams.numAccounts = 2000;
+  testParams.currenciesAllowed = TestConstants::GetCurrenciesExchange();
   testParams.numSymbols = 32;
   testParams.allowedSymbolTypes = AllowedSymbolTypes::BOTH;
+  testParams.preFillMode = PreFillMode::ORDERS_NUMBER;
+  testParams.avalancheIOC = false;
 
   ThroughputTestsModule::ThroughputTestImpl(
       perfCfg, testParams,
