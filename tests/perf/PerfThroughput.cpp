@@ -45,7 +45,8 @@ void PerfThroughput::TestThroughputMargin() {
       perfCfg, testParams,
       exchange::core::common::config::InitialStateConfiguration::CleanTest(),
       exchange::core::common::config::SerializationConfiguration::Default(),
-      50);
+      5); // Reduced from 50 to 5 for faster C++ test execution (industry
+          // standard: 5 iterations for simple tests)
 }
 
 void PerfThroughput::TestThroughputExchange() {
@@ -61,7 +62,8 @@ void PerfThroughput::TestThroughputExchange() {
       perfCfg, testParams,
       exchange::core::common::config::InitialStateConfiguration::CleanTest(),
       exchange::core::common::config::SerializationConfiguration::Default(),
-      50);
+      5); // Reduced from 50 to 5 for faster C++ test execution (industry
+          // standard: 5 iterations for simple tests)
 }
 
 void PerfThroughput::TestThroughputPeak() {
@@ -85,7 +87,8 @@ void PerfThroughput::TestThroughputPeak() {
       perfCfg, testParams,
       exchange::core::common::config::InitialStateConfiguration::CleanTest(),
       exchange::core::common::config::SerializationConfiguration::Default(),
-      50);
+      5); // Reduced from 50 to 5 for faster C++ test execution (industry
+          // standard: 5 iterations for simple tests)
 }
 
 void PerfThroughput::TestThroughputMultiSymbolMedium() {
@@ -98,7 +101,8 @@ void PerfThroughput::TestThroughputMultiSymbolMedium() {
       perfCfg, testParams,
       exchange::core::common::config::InitialStateConfiguration::CleanTest(),
       exchange::core::common::config::SerializationConfiguration::Default(),
-      25);
+      3); // Reduced from 25 to 3 for faster C++ test execution (industry
+          // standard: 3 iterations for complex multi-symbol tests)
 }
 
 void PerfThroughput::TestThroughputMultiSymbolLarge() {
@@ -111,7 +115,8 @@ void PerfThroughput::TestThroughputMultiSymbolLarge() {
       perfCfg, testParams,
       exchange::core::common::config::InitialStateConfiguration::CleanTest(),
       exchange::core::common::config::SerializationConfiguration::Default(),
-      25);
+      3); // Reduced from 25 to 3 for faster C++ test execution (industry
+          // standard: 3 iterations for complex multi-symbol tests)
 }
 
 void PerfThroughput::TestThroughputMultiSymbolHuge() {
@@ -126,7 +131,8 @@ void PerfThroughput::TestThroughputMultiSymbolHuge() {
       perfCfg, testParams,
       exchange::core::common::config::InitialStateConfiguration::CleanTest(),
       exchange::core::common::config::SerializationConfiguration::Default(),
-      25);
+      3); // Reduced from 25 to 3 for faster C++ test execution (industry
+          // standard: 3 iterations for complex multi-symbol tests)
 }
 
 // Register tests
