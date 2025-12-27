@@ -22,7 +22,12 @@
 #include <exchange/core/collections/art/LongObjConsumer.h>
 #include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <map>
+// On Windows, mimalloc-static doesn't automatically override C++ new/delete,
+// so we need to include mimalloc-new-delete.h explicitly.
+// On Linux/Unix, mimalloc-static automatically overrides via linking.
+#ifdef _WIN32
 #include <mimalloc-new-delete.h>
+#endif
 #include <random>
 #include <vector>
 
