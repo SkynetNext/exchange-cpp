@@ -16,10 +16,14 @@
 
 #include "LatencyTestsModule.h"
 #include "ExchangeTestContainer.h"
+#include "LatencyTools.h"
 #include <algorithm>
 #include <chrono>
+#include <exchange/core/utils/Logger.h>
+#include <iomanip>
 #include <map>
 #include <mutex>
+#include <sstream>
 #include <thread>
 #include <vector>
 
@@ -132,17 +136,56 @@ void LatencyTestsModule::LatencyTestImpl(
 
     container->SetConsumer(nullptr);
 
-    // Calculate median latency
+    // Calculate latency statistics and output results
     std::lock_guard<std::mutex> lock(latenciesMutex);
     bool shouldContinue = true;
     if (!latencies.empty()) {
       std::sort(latencies.begin(), latencies.end());
-      int64_t medianLatency = latencies[latencies.size() / 2];
+
+      // Calculate percentiles (match Java HDR histogram percentiles)
+      auto getPercentile = [&latencies](double percentile) -> int64_t {
+        if (latencies.empty())
+          return 0;
+        size_t index = static_cast<size_t>(
+            std::round((percentile / 100.0) * (latencies.size() - 1)));
+        return latencies[std::min(index, latencies.size() - 1)];
+      };
+
+      int64_t p50 = getPercentile(50.0);
+      int64_t p90 = getPercentile(90.0);
+      int64_t p95 = getPercentile(95.0);
+      int64_t p99 = getPercentile(99.0);
+      int64_t p99_9 = getPercentile(99.9);
+      int64_t p99_99 = getPercentile(99.99);
+      int64_t maxLatency = latencies.back();
+
+      // Calculate throughput (MT/s)
+      auto endTime = std::chrono::steady_clock::now();
+      auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                           endTime - startTime)
+                           .count();
+      float perfMt = (elapsedMs > 0)
+                         ? (static_cast<float>(benchmarkCommands.size()) /
+                            static_cast<float>(elapsedMs) / 1000.0f)
+                         : 0.0f;
+
+      // Output latency report (match Java format)
+      std::ostringstream report;
+      report << std::fixed << std::setprecision(3) << perfMt << " MT/s ";
+      report << "50%:" << LatencyTools::FormatNanos(p50) << " ";
+      report << "90%:" << LatencyTools::FormatNanos(p90) << " ";
+      report << "95%:" << LatencyTools::FormatNanos(p95) << " ";
+      report << "99%:" << LatencyTools::FormatNanos(p99) << " ";
+      report << "99.9%:" << LatencyTools::FormatNanos(p99_9) << " ";
+      report << "99.99%:" << LatencyTools::FormatNanos(p99_99) << " ";
+      report << "W:" << LatencyTools::FormatNanos(maxLatency);
+
+      LOG_INFO("{}", report.str());
 
       // Stop if median latency > 1ms (10,000,000 nanoseconds)
       // Match Java: return warmup || histogram.getValueAtPercentile(50.0) <
       // 10_000_000;
-      if (medianLatency >= 10'000'000) {
+      if (p50 >= 10'000'000) {
         shouldContinue = false;
       }
     }
