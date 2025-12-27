@@ -47,7 +47,7 @@ PerformanceConfiguration PerformanceConfiguration::Default() {
       false,     // sendL2ForEveryCmd
       8,         // l2RefreshDepth
       CoreWaitStrategy::BLOCKING,
-      std::make_unique<SimpleThreadFactory>(),
+      std::make_shared<SimpleThreadFactory>(),
       [](const CoreSymbolSpecification *spec,
          ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
          orderbook::OrderBookEventsHelper *eventsHelper) {
@@ -69,7 +69,7 @@ PerformanceConfiguration PerformanceConfiguration::LatencyPerformanceBuilder() {
       false,    // sendL2ForEveryCmd
       8,        // l2RefreshDepth
       CoreWaitStrategy::BUSY_SPIN,
-      std::make_unique<utils::AffinityThreadFactory>(
+      std::make_shared<utils::AffinityThreadFactory>(
           utils::ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE),
       [](const CoreSymbolSpecification *spec,
          ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
@@ -92,7 +92,7 @@ PerformanceConfiguration::ThroughputPerformanceBuilder() {
       false,     // sendL2ForEveryCmd
       8,         // l2RefreshDepth
       CoreWaitStrategy::BUSY_SPIN,
-      std::make_unique<utils::AffinityThreadFactory>(
+      std::make_shared<utils::AffinityThreadFactory>(
           utils::ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE),
       [](const CoreSymbolSpecification *spec,
          ::exchange::core::collections::objpool::ObjectsPool *objectsPool,

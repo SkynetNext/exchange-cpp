@@ -91,48 +91,14 @@ ExchangeTestContainer::ExchangeTestContainer(
     : uniqueIdCounterLong_(0), uniqueIdCounterInt_(0) {
 
   // Create ExchangeConfiguration
-  // PerformanceConfiguration cannot be copied (contains unique_ptr), so we need
-  // to create a new one by manually copying all fields and creating a new
-  // threadFactory Since ThreadFactory is abstract, we create a
-  // SimpleThreadFactory as a fallback (In practice, the original threadFactory
-  // will be used by ExchangeCore, so this is just for the config)
-  class SimpleThreadFactory : public disruptor::dsl::ThreadFactory {
-  public:
-    std::thread newThread(std::function<void()> r) override {
-      return std::thread(r);
-    }
-  };
-
-  std::unique_ptr<disruptor::dsl::ThreadFactory> newThreadFactory;
-  if (perfCfg.threadFactory) {
-    // Try to preserve the original ThreadFactory type
-    // Since ThreadFactory is abstract, we can't easily check the type.
-    // However, we can infer from other config fields:
-    // - If waitStrategy is BUSY_SPIN, likely ThroughputPerformanceBuilder or
-    //   LatencyPerformanceBuilder (uses AffinityThreadFactory)
-    // - If waitStrategy is BLOCKING, likely Default() (uses
-    // SimpleThreadFactory) Match Java: ExchangeCore uses
-    // perfCfg.getThreadFactory(), so we need to preserve the same type. For
-    // ThroughputPerformanceBuilder and LatencyPerformanceBuilder, they use
-    // AffinityThreadFactory with THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE.
-    if (perfCfg.waitStrategy ==
-        exchange::core::common::CoreWaitStrategy::BUSY_SPIN) {
-      // Likely ThroughputPerformanceBuilder or LatencyPerformanceBuilder
-      newThreadFactory = std::make_unique<utils::AffinityThreadFactory>(
-          utils::ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE);
-    } else {
-      // Likely Default() - use SimpleThreadFactory
-      newThreadFactory = std::make_unique<SimpleThreadFactory>();
-    }
-  } else {
-    newThreadFactory = nullptr;
-  }
-
+  // Match Java: ExchangeCore uses perfCfg.getThreadFactory(), so we directly
+  // use the same threadFactory instance via shared_ptr (matching Java's
+  // reference semantics)
   exchange::core::common::config::PerformanceConfiguration perfCfgCopy(
       perfCfg.ringBufferSize, perfCfg.matchingEnginesNum,
       perfCfg.riskEnginesNum, perfCfg.msgsInGroupLimit,
       perfCfg.maxGroupDurationNs, perfCfg.sendL2ForEveryCmd,
-      perfCfg.l2RefreshDepth, perfCfg.waitStrategy, std::move(newThreadFactory),
+      perfCfg.l2RefreshDepth, perfCfg.waitStrategy, perfCfg.threadFactory,
       perfCfg.orderBookFactory);
 
   exchange::core::common::config::ExchangeConfiguration exchangeConfiguration(

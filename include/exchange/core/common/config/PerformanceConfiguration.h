@@ -18,8 +18,8 @@
 
 #include "../../orderbook/IOrderBook.h"
 #include "../CoreWaitStrategy.h"
-#include <disruptor/dsl/ThreadFactory.h>
 #include <cstdint>
+#include <disruptor/dsl/ThreadFactory.h>
 #include <functional>
 #include <memory>
 
@@ -69,9 +69,9 @@ public:
 
   // ThreadFactory (matches Java version)
   // Note: Disruptor only stores a reference to ThreadFactory, not ownership
-  // We use unique_ptr here to manage the lifetime of the concrete implementation
-  // (AffinityThreadFactory or SimpleThreadFactory), since ThreadFactory is abstract
-  std::unique_ptr<disruptor::dsl::ThreadFactory> threadFactory;
+  // We use shared_ptr here to allow multiple PerformanceConfiguration instances
+  // to share the same ThreadFactory, matching Java's reference semantics
+  std::shared_ptr<disruptor::dsl::ThreadFactory> threadFactory;
 
   // OrderBook factory (matches Java IOrderBook.OrderBookFactory signature)
   using OrderBookFactory = std::function<std::unique_ptr<orderbook::IOrderBook>(
@@ -80,19 +80,18 @@ public:
       orderbook::OrderBookEventsHelper *eventsHelper)>;
   OrderBookFactory orderBookFactory;
 
-  PerformanceConfiguration(int32_t ringBufferSize, int32_t matchingEnginesNum,
-                           int32_t riskEnginesNum, int32_t msgsInGroupLimit,
-                           int64_t maxGroupDurationNs, bool sendL2ForEveryCmd,
-                           int32_t l2RefreshDepth,
-                           CoreWaitStrategy waitStrategy,
-                           std::unique_ptr<disruptor::dsl::ThreadFactory> threadFactory,
-                           OrderBookFactory orderBookFactory)
+  PerformanceConfiguration(
+      int32_t ringBufferSize, int32_t matchingEnginesNum,
+      int32_t riskEnginesNum, int32_t msgsInGroupLimit,
+      int64_t maxGroupDurationNs, bool sendL2ForEveryCmd,
+      int32_t l2RefreshDepth, CoreWaitStrategy waitStrategy,
+      std::shared_ptr<disruptor::dsl::ThreadFactory> threadFactory,
+      OrderBookFactory orderBookFactory)
       : ringBufferSize(ringBufferSize), matchingEnginesNum(matchingEnginesNum),
         riskEnginesNum(riskEnginesNum), msgsInGroupLimit(msgsInGroupLimit),
         maxGroupDurationNs(maxGroupDurationNs),
         sendL2ForEveryCmd(sendL2ForEveryCmd), l2RefreshDepth(l2RefreshDepth),
-        waitStrategy(waitStrategy),
-        threadFactory(std::move(threadFactory)),
+        waitStrategy(waitStrategy), threadFactory(threadFactory),
         orderBookFactory(std::move(orderBookFactory)) {}
 
   static PerformanceConfiguration Default();
