@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,14 +40,18 @@ public:
   Wire() : bytes_(), bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
 
   explicit Wire(std::vector<uint8_t> bytes)
-      : bytes_(std::move(bytes)), bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
+      : bytes_(std::move(bytes)),
+        bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
 
   // Copy constructor - ensure bytesIn_ references the new bytes_
-  Wire(const Wire &other) : bytes_(other.bytes_), bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
+  Wire(const Wire &other)
+      : bytes_(other.bytes_),
+        bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
 
   // Move constructor
   Wire(Wire &&other) noexcept
-      : bytes_(std::move(other.bytes_)), bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
+      : bytes_(std::move(other.bytes_)),
+        bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
 
   // Copy assignment operator
   Wire &operator=(const Wire &other) {
@@ -70,7 +74,8 @@ public:
   /**
    * Get BytesIn from Wire
    * Match Java: Wire::bytes
-   * Reset position to 0 before returning (each call should start from beginning)
+   * Reset position to 0 before returning (each call should start from
+   * beginning)
    */
   BytesIn &bytes() {
     bytesIn_->SetPosition(0);
@@ -92,4 +97,3 @@ public:
 } // namespace common
 } // namespace core
 } // namespace exchange
-

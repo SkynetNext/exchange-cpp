@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
+#include "../util/TestConstants.h"
 #include "OrderBookBaseTest.h"
 #include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
-#include "../util/TestConstants.h"
+
 
 using namespace exchange::core::common;
 using namespace exchange::core::orderbook;
@@ -73,23 +74,28 @@ TEST_F(OrderBookNaiveImplMarginTest, ShouldRemoveOrderAndEmptyBucket) {
   TestShouldRemoveOrderAndEmptyBucket();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest, ShouldReturnErrorWhenDeletingUnknownOrder) {
+TEST_F(OrderBookNaiveImplMarginTest,
+       ShouldReturnErrorWhenDeletingUnknownOrder) {
   TestShouldReturnErrorWhenDeletingUnknownOrder();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest, ShouldReturnErrorWhenDeletingOtherUserOrder) {
+TEST_F(OrderBookNaiveImplMarginTest,
+       ShouldReturnErrorWhenDeletingOtherUserOrder) {
   TestShouldReturnErrorWhenDeletingOtherUserOrder();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest, ShouldReturnErrorWhenUpdatingOtherUserOrder) {
+TEST_F(OrderBookNaiveImplMarginTest,
+       ShouldReturnErrorWhenUpdatingOtherUserOrder) {
   TestShouldReturnErrorWhenUpdatingOtherUserOrder();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest, ShouldReturnErrorWhenUpdatingUnknownOrder) {
+TEST_F(OrderBookNaiveImplMarginTest,
+       ShouldReturnErrorWhenUpdatingUnknownOrder) {
   TestShouldReturnErrorWhenUpdatingUnknownOrder();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest, ShouldReturnErrorWhenReducingUnknownOrder) {
+TEST_F(OrderBookNaiveImplMarginTest,
+       ShouldReturnErrorWhenReducingUnknownOrder) {
   TestShouldReturnErrorWhenReducingUnknownOrder();
 }
 
@@ -98,7 +104,8 @@ TEST_F(OrderBookNaiveImplMarginTest,
   TestShouldReturnErrorWhenReducingByZeroOrNegativeSize();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest, ShouldReturnErrorWhenReducingOtherUserOrder) {
+TEST_F(OrderBookNaiveImplMarginTest,
+       ShouldReturnErrorWhenReducingOtherUserOrder) {
   TestShouldReturnErrorWhenReducingOtherUserOrder();
 }
 
@@ -174,8 +181,7 @@ TEST_F(OrderBookNaiveImplMarginTest,
   TestShouldFullyMatchMarketableGtcOrderWithAllLiquidity();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest,
-       ShouldMoveOrderFullyMatchAsMarketable) {
+TEST_F(OrderBookNaiveImplMarginTest, ShouldMoveOrderFullyMatchAsMarketable) {
   TestShouldMoveOrderFullyMatchAsMarketable();
 }
 
@@ -192,4 +198,3 @@ TEST_F(OrderBookNaiveImplMarginTest, ShouldMoveOrderMatchesAllLiquidity) {
 } // namespace tests
 } // namespace core
 } // namespace exchange
-

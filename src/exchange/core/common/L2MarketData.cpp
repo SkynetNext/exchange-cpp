@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -96,7 +96,7 @@ bool L2MarketData::operator==(const L2MarketData &other) const {
         static_cast<size_t>(askSize) > other.askOrders.size()) {
       return false;
     }
-    
+
     for (int32_t i = 0; i < askSize; i++) {
       if (askPrices[i] != other.askPrices[i] ||
           askVolumes[i] != other.askVolumes[i] ||
@@ -116,7 +116,7 @@ bool L2MarketData::operator==(const L2MarketData &other) const {
         static_cast<size_t>(bidSize) > other.bidOrders.size()) {
       return false;
     }
-    
+
     for (int32_t i = 0; i < bidSize; i++) {
       if (bidPrices[i] != other.bidPrices[i] ||
           bidVolumes[i] != other.bidVolumes[i] ||

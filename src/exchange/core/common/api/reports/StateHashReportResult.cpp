@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,7 +90,7 @@ int32_t StateHashReportResult::GetStateHash() const {
   // final int[] hashes = hashCodes.entrySet().stream()
   //         .mapToInt(e -> Objects.hash(e.getKey(), e.getValue())).toArray();
   // return Arrays.hashCode(hashes);
-  
+
   // Step 1: Calculate hash for each entry (key, value) pair
   std::vector<int32_t> hashes;
   hashes.reserve(hashCodes.size());
@@ -98,12 +98,14 @@ int32_t StateHashReportResult::GetStateHash() const {
     // Objects.hash(key, value) equivalent:
     // hash = 31 * (31 + key.hashCode()) + value.hashCode()
     // For SubmoduleKey, we use its operator< for hashing
-    std::size_t keyHash = std::hash<int32_t>{}(pair.first.moduleId) ^
-                         (std::hash<int32_t>{}(static_cast<int32_t>(pair.first.submodule)) << 1);
-    int32_t entryHash = static_cast<int32_t>(31 * (31 + static_cast<int32_t>(keyHash)) + pair.second);
+    std::size_t keyHash =
+        std::hash<int32_t>{}(pair.first.moduleId) ^
+        (std::hash<int32_t>{}(static_cast<int32_t>(pair.first.submodule)) << 1);
+    int32_t entryHash = static_cast<int32_t>(
+        31 * (31 + static_cast<int32_t>(keyHash)) + pair.second);
     hashes.push_back(entryHash);
   }
-  
+
   // Step 2: Arrays.hashCode(hashes) equivalent
   // Arrays.hashCode uses: result = 1; for (int e : a) result = 31 * result + e;
   int32_t result = 1;

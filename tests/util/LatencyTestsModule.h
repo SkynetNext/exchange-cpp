@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,17 +56,16 @@ public:
    * @param initialStateCfg - initial state configuration
    * @param warmupCycles - number of warmup cycles
    */
-  static void HiccupTestImpl(
-      const exchange::core::common::config::PerformanceConfiguration
-          &performanceCfg,
-      const TestDataParameters &testDataParameters,
-      const exchange::core::common::config::InitialStateConfiguration
-          &initialStateCfg,
-      int warmupCycles);
+  static void
+  HiccupTestImpl(const exchange::core::common::config::PerformanceConfiguration
+                     &performanceCfg,
+                 const TestDataParameters &testDataParameters,
+                 const exchange::core::common::config::InitialStateConfiguration
+                     &initialStateCfg,
+                 int warmupCycles);
 };
 
 } // namespace util
 } // namespace tests
 } // namespace core
 } // namespace exchange
-

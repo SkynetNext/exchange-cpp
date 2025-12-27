@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,7 +51,8 @@ public:
   }
 
   std::optional<std::unique_ptr<TotalCurrencyBalanceReportResult>>
-  Process(::exchange::core::processors::MatchingEngineRouter *matchingEngine) override;
+  Process(::exchange::core::processors::MatchingEngineRouter *matchingEngine)
+      override;
 
   std::optional<std::unique_ptr<TotalCurrencyBalanceReportResult>>
   Process(::exchange::core::processors::RiskEngine *riskEngine) override;

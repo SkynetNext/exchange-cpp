@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,8 @@ namespace api {
 namespace reports {
 
 // Use fully qualified names to avoid namespace ambiguity
-using MatchingEngineRouterType = ::exchange::core::processors::MatchingEngineRouter;
+using MatchingEngineRouterType =
+    ::exchange::core::processors::MatchingEngineRouter;
 using RiskEngineType = ::exchange::core::processors::RiskEngine;
 
 REGISTER_REPORT_QUERY_TYPE(StateHashReportQuery, ReportType::STATE_HASH);
@@ -54,7 +55,8 @@ StateHashReportQuery::Process(MatchingEngineRouterType *matchingEngine) {
   const int32_t moduleId = matchingEngine->GetShardId();
 
   hashCodes[StateHashReportResult::CreateKey(
-      moduleId, StateHashReportResult::SubmoduleType::MATCHING_BINARY_CMD_PROCESSOR)] =
+      moduleId,
+      StateHashReportResult::SubmoduleType::MATCHING_BINARY_CMD_PROCESSOR)] =
       matchingEngine->GetBinaryCommandsProcessor()->GetStateHash();
 
   // For OrderBooks - use StateHashStream (vector of pointers)
@@ -68,8 +70,7 @@ StateHashReportQuery::Process(MatchingEngineRouterType *matchingEngine) {
       static_cast<int32_t>(
           std::hash<int64_t>{}(matchingEngine->GetShardMask()));
 
-  return std::make_optional(
-      std::make_unique<StateHashReportResult>(hashCodes));
+  return std::make_optional(std::make_unique<StateHashReportResult>(hashCodes));
 }
 
 std::optional<std::unique_ptr<StateHashReportResult>>
@@ -80,15 +81,18 @@ StateHashReportQuery::Process(RiskEngineType *riskEngine) {
   const int32_t moduleId = riskEngine->GetShardId();
 
   hashCodes[StateHashReportResult::CreateKey(
-      moduleId, StateHashReportResult::SubmoduleType::RISK_SYMBOL_SPEC_PROVIDER)] =
+      moduleId,
+      StateHashReportResult::SubmoduleType::RISK_SYMBOL_SPEC_PROVIDER)] =
       riskEngine->GetSymbolSpecificationProvider()->GetStateHash();
 
   hashCodes[StateHashReportResult::CreateKey(
-      moduleId, StateHashReportResult::SubmoduleType::RISK_USER_PROFILE_SERVICE)] =
+      moduleId,
+      StateHashReportResult::SubmoduleType::RISK_USER_PROFILE_SERVICE)] =
       riskEngine->GetUserProfileService()->GetStateHash();
 
   hashCodes[StateHashReportResult::CreateKey(
-      moduleId, StateHashReportResult::SubmoduleType::RISK_BINARY_CMD_PROCESSOR)] =
+      moduleId,
+      StateHashReportResult::SubmoduleType::RISK_BINARY_CMD_PROCESSOR)] =
       riskEngine->GetBinaryCommandsProcessor()->GetStateHash();
 
   // For LastPriceCache, Fees, Adjustments, Suspends - calculate hash manually
@@ -118,7 +122,7 @@ StateHashReportQuery::Process(RiskEngineType *riskEngine) {
   std::size_t adjustmentsHash = 0;
   for (const auto &pair : adjustments) {
     adjustmentsHash ^= (std::hash<int32_t>{}(pair.first) << 6) ^
-                        (std::hash<int64_t>{}(pair.second) << 7);
+                       (std::hash<int64_t>{}(pair.second) << 7);
   }
   hashCodes[StateHashReportResult::CreateKey(
       moduleId, StateHashReportResult::SubmoduleType::RISK_ADJUSTMENTS)] =
@@ -136,11 +140,9 @@ StateHashReportQuery::Process(RiskEngineType *riskEngine) {
 
   hashCodes[StateHashReportResult::CreateKey(
       moduleId, StateHashReportResult::SubmoduleType::RISK_SHARD_MASK)] =
-      static_cast<int32_t>(
-          std::hash<int64_t>{}(riskEngine->GetShardMask()));
+      static_cast<int32_t>(std::hash<int64_t>{}(riskEngine->GetShardMask()));
 
-  return std::make_optional(
-      std::make_unique<StateHashReportResult>(hashCodes));
+  return std::make_optional(std::make_unique<StateHashReportResult>(hashCodes));
 }
 
 } // namespace reports

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,12 @@
 
 #include "PersistenceTestsModule.h"
 #include "ExchangeTestContainer.h"
+#include <chrono>
 #include <exchange/core/common/api/ApiPersistState.h>
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
-#include <chrono>
 #include <thread>
+
 
 namespace exchange {
 namespace core {
@@ -30,18 +31,18 @@ namespace util {
 void PersistenceTestsModule::PersistenceTestImpl(
     const exchange::core::common::config::PerformanceConfiguration
         &performanceCfg,
-    const TestDataParameters &testDataParameters,
-    int iterations) {
+    const TestDataParameters &testDataParameters, int iterations) {
 
   for (int iteration = 0; iteration < iterations; iteration++) {
-    auto testDataFutures =
-        ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, iteration);
+    auto testDataFutures = ExchangeTestContainer::PrepareTestDataAsync(
+        testDataParameters, iteration);
 
-    const long stateId = std::chrono::duration_cast<std::chrono::milliseconds>(
-                             std::chrono::system_clock::now().time_since_epoch())
-                             .count() *
-                         1000 +
-                         iteration;
+    const long stateId =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch())
+                .count() *
+            1000 +
+        iteration;
 
     char exchangeIdBuffer[32];
     snprintf(exchangeIdBuffer, sizeof(exchangeIdBuffer), "%012llX",
@@ -61,15 +62,18 @@ void PersistenceTestsModule::PersistenceTestImpl(
     {
       auto container = ExchangeTestContainer::Create(
           performanceCfg, firstStartConfig,
-          exchange::core::common::config::SerializationConfiguration::DiskSnapshotOnly());
+          exchange::core::common::config::SerializationConfiguration::
+              DiskSnapshotOnly());
 
       // Load symbols, users and prefill orders
       container->LoadSymbolsUsersAndPrefillOrders(testDataFutures);
 
       // Create snapshot
-      auto persistState = std::make_unique<exchange::core::common::api::ApiPersistState>(
-          stateId, false);
-      auto future = container->GetApi()->SubmitCommandAsync(persistState.release());
+      auto persistState =
+          std::make_unique<exchange::core::common::api::ApiPersistState>(
+              stateId, false);
+      auto future =
+          container->GetApi()->SubmitCommandAsync(persistState.release());
       auto result = future.get();
       if (result != exchange::core::common::cmd::CommandResultCode::SUCCESS) {
         throw std::runtime_error("Failed to create snapshot");
@@ -82,14 +86,16 @@ void PersistenceTestsModule::PersistenceTestImpl(
       auto genResult = testDataFutures.genResult.get();
       auto benchmarkCommandsFuture = genResult->GetApiCommandsBenchmark();
       auto benchmarkCommands = benchmarkCommandsFuture.get();
-      
+
       auto tStart = std::chrono::steady_clock::now();
       if (!benchmarkCommands.empty()) {
         container->GetApi()->SubmitCommandsSync(benchmarkCommands);
       }
       auto tDuration = std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::steady_clock::now() - tStart).count();
-      originalPerfMt = benchmarkCommands.size() / static_cast<float>(tDuration) / 1000.0f;
+                           std::chrono::steady_clock::now() - tStart)
+                           .count();
+      originalPerfMt =
+          benchmarkCommands.size() / static_cast<float>(tDuration) / 1000.0f;
 
       // Verify total balance report is zero
       auto balanceReport = container->TotalBalanceReport();
@@ -129,14 +135,14 @@ void PersistenceTestsModule::PersistenceTestImpl(
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     // Recreate from snapshot
-    auto fromSnapshotConfig =
-        exchange::core::common::config::InitialStateConfiguration::FromSnapshotOnly(
-            exchangeId, stateId, 0);
+    auto fromSnapshotConfig = exchange::core::common::config::
+        InitialStateConfiguration::FromSnapshotOnly(exchangeId, stateId, 0);
 
     {
       auto recreatedContainer = ExchangeTestContainer::Create(
           performanceCfg, fromSnapshotConfig,
-          exchange::core::common::config::SerializationConfiguration::DiskSnapshotOnly());
+          exchange::core::common::config::SerializationConfiguration::
+              DiskSnapshotOnly());
 
       // Wait for core to be ready
       recreatedContainer->TotalBalanceReport();
@@ -185,16 +191,18 @@ void PersistenceTestsModule::PersistenceTestImpl(
       auto genResult2 = testDataFutures.genResult.get();
       auto benchmarkCommandsFuture2 = genResult2->GetApiCommandsBenchmark();
       auto benchmarkCommands2 = benchmarkCommandsFuture2.get();
-      
+
       auto tStart2 = std::chrono::steady_clock::now();
       if (!benchmarkCommands2.empty()) {
         recreatedContainer->GetApi()->SubmitCommandsSync(benchmarkCommands2);
       }
       auto tDuration2 = std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::steady_clock::now() - tStart2).count();
-      float perfMt = benchmarkCommands2.size() / static_cast<float>(tDuration2) / 1000.0f;
+                            std::chrono::steady_clock::now() - tStart2)
+                            .count();
+      float perfMt =
+          benchmarkCommands2.size() / static_cast<float>(tDuration2) / 1000.0f;
       float perfRatioPerc = perfMt / originalPerfMt * 100.0f;
-      
+
       // Log performance comparison (can be used for reporting)
       (void)perfRatioPerc; // Suppress unused variable warning for now
     }
@@ -207,4 +215,3 @@ void PersistenceTestsModule::PersistenceTestImpl(
 } // namespace tests
 } // namespace core
 } // namespace exchange
-

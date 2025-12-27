@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -81,7 +81,8 @@ int32_t SymbolSpecificationProvider::GetStateHash() const {
   return utils::HashingUtils::StateHash(nonConstMap);
 }
 
-void SymbolSpecificationProvider::WriteMarshallable(common::BytesOut &bytes) const {
+void SymbolSpecificationProvider::WriteMarshallable(
+    common::BytesOut &bytes) const {
   // Write symbolSpecs (int -> CoreSymbolSpecification*)
   // Convert const map to non-const for serialization (safe cast)
   ankerl::unordered_dense::map<int32_t, common::CoreSymbolSpecification *>

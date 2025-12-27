@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,8 +37,8 @@ protected:
     // Use member variable symbolSpec_ from base class
     auto pool = ObjectsPool::CreateDefaultTestPool();
     auto eventsHelper = OrderBookEventsHelper::NonPooledEventsHelper();
-    return std::make_unique<OrderBookDirectImpl>(&symbolSpec_, pool, eventsHelper,
-                                                 nullptr);
+    return std::make_unique<OrderBookDirectImpl>(&symbolSpec_, pool,
+                                                 eventsHelper, nullptr);
   }
 
   CoreSymbolSpecification GetCoreSymbolSpec() override {

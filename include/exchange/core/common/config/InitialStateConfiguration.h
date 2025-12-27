@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,30 +61,40 @@ public:
    * @param exchangeId Exchange ID
    * @return clean start configuration with journaling on.
    */
-  static InitialStateConfiguration CleanStartJournaling(const std::string &exchangeId) {
+  static InitialStateConfiguration
+  CleanStartJournaling(const std::string &exchangeId) {
     return InitialStateConfiguration(exchangeId, 0, 0, 0, true);
   }
 
   /**
-   * Configuration that loads from snapshot, without journal replay with journaling off.
+   * Configuration that loads from snapshot, without journal replay with
+   * journaling off.
    * @param exchangeId Exchange ID
    * @param snapshotId snapshot ID
    * @param baseSeq base seq
-   * @return configuration that loads from snapshot, without journal replay with journaling off.
+   * @return configuration that loads from snapshot, without journal replay with
+   * journaling off.
    */
-  static InitialStateConfiguration FromSnapshotOnly(const std::string &exchangeId, int64_t snapshotId, int64_t baseSeq) {
+  static InitialStateConfiguration
+  FromSnapshotOnly(const std::string &exchangeId, int64_t snapshotId,
+                   int64_t baseSeq) {
     return InitialStateConfiguration(exchangeId, snapshotId, baseSeq, 0, true);
   }
 
   /**
-   * Configuration that load exchange from last known state including journal replay till last known start. Journal is enabled.
+   * Configuration that load exchange from last known state including journal
+   * replay till last known start. Journal is enabled.
    * @param exchangeId Exchange ID
    * @param snapshotId snapshot ID
    * @param baseSeq base seq
-   * @return configuration that load exchange from last known state including journal replay till last known start. Journal is enabled.
+   * @return configuration that load exchange from last known state including
+   * journal replay till last known start. Journal is enabled.
    */
-  static InitialStateConfiguration LastKnownStateFromJournal(const std::string &exchangeId, int64_t snapshotId, int64_t baseSeq) {
-    return InitialStateConfiguration(exchangeId, snapshotId, baseSeq, std::numeric_limits<int64_t>::max(), true);
+  static InitialStateConfiguration
+  LastKnownStateFromJournal(const std::string &exchangeId, int64_t snapshotId,
+                            int64_t baseSeq) {
+    return InitialStateConfiguration(exchangeId, snapshotId, baseSeq,
+                                     std::numeric_limits<int64_t>::max(), true);
   }
 };
 

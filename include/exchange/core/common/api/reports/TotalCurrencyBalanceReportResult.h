@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,7 +82,8 @@ public:
   ankerl::unordered_dense::map<int32_t, int64_t> GetGlobalBalancesSum() const;
 
   /**
-   * Check if all global balances are zero (matches Java isGlobalBalancesAllZero)
+   * Check if all global balances are zero (matches Java
+   * isGlobalBalancesAllZero)
    */
   bool IsGlobalBalancesAllZero() const;
 

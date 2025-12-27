@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,12 +35,11 @@ struct SnapshotDescriptor {
 
   SnapshotDescriptor(int64_t snapshotId, int64_t seq, int64_t timestampNs,
                      const std::string &path)
-      : snapshotId(snapshotId), seq(seq), timestampNs(timestampNs),
-        path(path) {}
+      : snapshotId(snapshotId), seq(seq), timestampNs(timestampNs), path(path) {
+  }
 };
 
 } // namespace journaling
 } // namespace processors
 } // namespace core
 } // namespace exchange
-

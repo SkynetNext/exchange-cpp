@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,12 +45,14 @@ public:
 protected:
   // Override HandleReportImpl to use type erasure
   std::optional<std::unique_ptr<common::api::reports::ReportResult>>
-  HandleReportImpl(common::api::reports::ReportQueryBase *reportQuery) override {
+  HandleReportImpl(
+      common::api::reports::ReportQueryBase *reportQuery) override {
     if (matchingEngine_ == nullptr || reportQuery == nullptr) {
-      LOG_WARN("[MatchingEngineReportQueriesHandler] HandleReportImpl: matchingEngine_ or reportQuery is nullptr");
+      LOG_WARN("[MatchingEngineReportQueriesHandler] HandleReportImpl: "
+               "matchingEngine_ or reportQuery is nullptr");
       return std::nullopt;
     }
-    
+
     return reportQuery->ProcessTypeErased(matchingEngine_);
   }
 

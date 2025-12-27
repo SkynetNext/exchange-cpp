@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ private:
 public:
   ReportQueryFactory(ReportQueryFactory const &) = delete;
   ReportQueryFactory &operator=(ReportQueryFactory const &) = delete;
-  
+
   // Use Meyers Singleton
   static ReportQueryFactory &getInstance();
 
@@ -64,7 +64,7 @@ struct ReportQueryTypeRegistrar {
 
 // Register report query type macro
 #define REGISTER_REPORT_QUERY_TYPE(QueryType, EnumType)                        \
-  static detail::ReportQueryTypeRegistrar QueryType##_registrar(              \
+  static detail::ReportQueryTypeRegistrar QueryType##_registrar(               \
       EnumType, [](BytesIn &bytes) -> void * { return new QueryType(bytes); })
 
 } // namespace reports

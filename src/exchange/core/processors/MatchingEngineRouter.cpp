@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -327,24 +327,28 @@ void MatchingEngineRouter::ProcessMatchingCommand(
   // Match Java: processMatchingCommand implementation
   orderbook::IOrderBook *orderBook = GetOrderBook(cmd->symbol);
   if (orderBook == nullptr) {
-    // Match Java: if (orderBook == null) { cmd.resultCode = MATCHING_INVALID_ORDER_BOOK_ID; }
+    // Match Java: if (orderBook == null) { cmd.resultCode =
+    // MATCHING_INVALID_ORDER_BOOK_ID; }
     cmd->resultCode =
         common::cmd::CommandResultCode::MATCHING_INVALID_ORDER_BOOK_ID;
-    // For ORDER_BOOK_REQUEST, ensure marketData is set (even if null) so ProcessResult can fulfill the promise
-    // This is needed because ProcessResult expects marketData to be set for ORDER_BOOK_REQUEST
-    // If orderBook is null, we can't get market data, so leave it as nullptr
+    // For ORDER_BOOK_REQUEST, ensure marketData is set (even if null) so
+    // ProcessResult can fulfill the promise This is needed because
+    // ProcessResult expects marketData to be set for ORDER_BOOK_REQUEST If
+    // orderBook is null, we can't get market data, so leave it as nullptr
     // ProcessResult will handle nullptr marketData correctly
   } else {
     // Match Java: cmd.resultCode = IOrderBook.processCommand(orderBook, cmd);
     cmd->resultCode = orderbook::IOrderBook::ProcessCommand(orderBook, cmd);
 
-    // Match Java: posting market data for risk processor makes sense only if command execution is successful
+    // Match Java: posting market data for risk processor makes sense only if
+    // command execution is successful
     // TODO don't need for EXCHANGE mode order books?
     // TODO doing this for many order books simultaneously can introduce hiccups
     if ((cfgSendL2ForEveryCmd_ || (cmd->serviceFlags & 1) != 0) &&
         cmd->command != common::cmd::OrderCommandType::ORDER_BOOK_REQUEST &&
         cmd->resultCode == common::cmd::CommandResultCode::SUCCESS) {
-      // Match Java: cmd.marketData = orderBook.getL2MarketDataSnapshot(cfgL2RefreshDepth);
+      // Match Java: cmd.marketData =
+      // orderBook.getL2MarketDataSnapshot(cfgL2RefreshDepth);
       cmd->marketData = orderBook->GetL2MarketDataSnapshot(cfgL2RefreshDepth_);
     }
   }

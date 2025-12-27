@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,21 +60,21 @@ protected:
   void SetUp() override;
 
   // Test helper methods
-  void TestMultiBuy(const exchange::core::common::CoreSymbolSpecification
-                        &symbolSpec,
-                    exchange::core::common::OrderType orderType,
-                    RejectionCause rejectionCause);
+  void TestMultiBuy(
+      const exchange::core::common::CoreSymbolSpecification &symbolSpec,
+      exchange::core::common::OrderType orderType,
+      RejectionCause rejectionCause);
 
-  void TestMultiSell(const exchange::core::common::CoreSymbolSpecification
-                         &symbolSpec,
-                     exchange::core::common::OrderType orderType,
-                     RejectionCause rejectionCause);
+  void TestMultiSell(
+      const exchange::core::common::CoreSymbolSpecification &symbolSpec,
+      exchange::core::common::OrderType orderType,
+      RejectionCause rejectionCause);
 
   // Mock event handler
   class MockEventsHandler : public exchange::core::IEventsHandler {
   public:
-    MOCK_METHOD(void, CommandResult,
-                (const exchange::core::ApiCommandResult &), (override));
+    MOCK_METHOD(void, CommandResult, (const exchange::core::ApiCommandResult &),
+                (override));
     MOCK_METHOD(void, TradeEvent, (const exchange::core::TradeEvent &),
                 (override));
     MOCK_METHOD(void, RejectEvent, (const exchange::core::RejectEvent &),
@@ -99,4 +99,3 @@ private:
 } // namespace tests
 } // namespace core
 } // namespace exchange
-

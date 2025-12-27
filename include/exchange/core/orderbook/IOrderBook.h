@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -118,7 +118,8 @@ public:
 
   /**
    * Get L2 Market Data snapshot
-   * Returns shared_ptr to allow sharing between OrderCommands (matching Java behavior)
+   * Returns shared_ptr to allow sharing between OrderCommands (matching Java
+   * behavior)
    */
   virtual std::shared_ptr<common::L2MarketData>
   GetL2MarketDataSnapshot(int32_t size) = 0;

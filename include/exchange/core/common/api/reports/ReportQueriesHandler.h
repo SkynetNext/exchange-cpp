@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,8 @@ public:
   std::optional<std::unique_ptr<R>> HandleReport(ReportQuery<R> *reportQuery) {
     // Call virtual method with type erasure
     // Subclasses override HandleReportImpl to provide actual implementation
-    // ReportQuery<R>* can be safely cast to ReportQueryBase* since ReportQuery<R> inherits from ReportQueryBase
+    // ReportQuery<R>* can be safely cast to ReportQueryBase* since
+    // ReportQuery<R> inherits from ReportQueryBase
     auto result = HandleReportImpl(static_cast<ReportQueryBase *>(reportQuery));
     if (result.has_value()) {
       // Cast from ReportResult* to R*

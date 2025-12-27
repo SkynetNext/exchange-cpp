@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,11 @@
  */
 
 #include <cstring>
-#include <exchange/core/utils/SerializationUtils.h>
 #include <exchange/core/common/Wire.h>
+#include <exchange/core/utils/SerializationUtils.h>
 #include <lz4.h>
 #include <stdexcept>
+
 
 namespace exchange {
 namespace core {
@@ -265,7 +266,7 @@ SerializationUtils::LongsToWire(const std::vector<int64_t> &dataArray) {
   // Match Java: SerializationUtils.longsToWire()
   // 1:1 translation
   const int sizeInBytes = static_cast<int>(dataArray.size() * sizeof(int64_t));
-  
+
   // Convert long array to bytes (little-endian)
   std::vector<uint8_t> bytesArray;
   bytesArray.resize(sizeInBytes);

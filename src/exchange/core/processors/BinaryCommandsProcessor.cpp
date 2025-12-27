@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -189,7 +189,8 @@ BinaryCommandsProcessor::AcceptBinaryFrame(common::cmd::OrderCommand *cmd) {
       // Match Java:
       // deserializeQuery(bytesIn).flatMap(reportQueriesHandler::handleReport).ifPresent(...)
       if (!reportQueriesHandler_) {
-        LOG_WARN("[BinaryCommandsProcessor] BINARY_DATA_QUERY received but reportQueriesHandler_ is nullptr!");
+        LOG_WARN("[BinaryCommandsProcessor] BINARY_DATA_QUERY received but "
+                 "reportQueriesHandler_ is nullptr!");
       } else {
         // Read class code and deserialize query
         int32_t classCode = bytesIn.ReadInt();

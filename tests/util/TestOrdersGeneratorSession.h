@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,13 @@
 
 #pragma once
 
+#include "JavaRandom.h"
 #include <exchange/core/common/OrderAction.h>
 #include <exchange/core/orderbook/IOrderBook.h>
-#include "JavaRandom.h"
 #include <functional>
 #include <unordered_map>
 #include <vector>
+
 
 namespace exchange {
 namespace core {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,8 @@ exchange::core::common::config::PerformanceConfiguration
 ITFeesMarginLatency::GetPerformanceConfiguration() {
   // Note: latencyPerformanceBuilder() equivalent - use Default() with
   // latency-optimized settings
-  auto cfg = exchange::core::common::config::PerformanceConfiguration::Default();
+  auto cfg =
+      exchange::core::common::config::PerformanceConfiguration::Default();
   // Latency-optimized settings would be applied here if needed
   return cfg;
 }
@@ -37,4 +38,3 @@ ITFeesMarginLatency::GetPerformanceConfiguration() {
 } // namespace tests
 } // namespace core
 } // namespace exchange
-

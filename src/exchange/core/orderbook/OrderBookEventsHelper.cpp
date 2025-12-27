@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -161,15 +161,17 @@ OrderBookEventsHelper::DeserializeEvents(const common::cmd::OrderCommand *cmd) {
     }
   });
 
-  // Convert each section's events to Wire (matches Java NavigableMap<Integer, Wire>)
+  // Convert each section's events to Wire (matches Java NavigableMap<Integer,
+  // Wire>)
   std::map<int32_t, common::Wire> result;
 
   for (const auto &[section, events] : sections) {
-    // Skip empty events lists (matches Java behavior where empty sections are not added)
+    // Skip empty events lists (matches Java behavior where empty sections are
+    // not added)
     if (events.empty()) {
       continue;
     }
-    
+
     // Build long array from events (5 longs per event)
     std::vector<int64_t> dataArray;
     dataArray.reserve(events.size() * 5);

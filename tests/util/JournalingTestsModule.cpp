@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,12 @@
 
 #include "JournalingTestsModule.h"
 #include "ExchangeTestContainer.h"
+#include <chrono>
 #include <exchange/core/common/api/ApiPersistState.h>
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
-#include <chrono>
 #include <thread>
+
 
 namespace exchange {
 namespace core {
@@ -30,39 +31,41 @@ namespace util {
 void JournalingTestsModule::JournalingTestImpl(
     const exchange::core::common::config::PerformanceConfiguration
         &performanceCfg,
-    const TestDataParameters &testDataParameters,
-    int iterations) {
+    const TestDataParameters &testDataParameters, int iterations) {
 
   for (int iteration = 0; iteration < iterations; iteration++) {
-    auto testDataFutures =
-        ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, iteration);
+    auto testDataFutures = ExchangeTestContainer::PrepareTestDataAsync(
+        testDataParameters, iteration);
 
-    const long stateId = std::chrono::duration_cast<std::chrono::milliseconds>(
-                             std::chrono::system_clock::now().time_since_epoch())
-                             .count() *
-                         1000 +
-                         iteration;
+    const long stateId =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch())
+                .count() *
+            1000 +
+        iteration;
 
     const std::string exchangeId = ExchangeTestContainer::TimeBasedExchangeId();
     long originalFinalStateHash = 0;
 
     // First start: clean start with journaling
-    auto firstStartConfig =
-        exchange::core::common::config::InitialStateConfiguration::CleanStartJournaling(
-            exchangeId);
+    auto firstStartConfig = exchange::core::common::config::
+        InitialStateConfiguration::CleanStartJournaling(exchangeId);
 
     {
       auto container = ExchangeTestContainer::Create(
           performanceCfg, firstStartConfig,
-          exchange::core::common::config::SerializationConfiguration::DiskJournaling());
+          exchange::core::common::config::SerializationConfiguration::
+              DiskJournaling());
 
       // Load symbols, users and prefill orders
       container->LoadSymbolsUsersAndPrefillOrders(testDataFutures);
 
       // Create snapshot
-      auto persistState = std::make_unique<exchange::core::common::api::ApiPersistState>(
-          stateId, false);
-      auto future = container->GetApi()->SubmitCommandAsync(persistState.release());
+      auto persistState =
+          std::make_unique<exchange::core::common::api::ApiPersistState>(
+              stateId, false);
+      auto future =
+          container->GetApi()->SubmitCommandAsync(persistState.release());
       auto result = future.get();
       if (result != exchange::core::common::cmd::CommandResultCode::SUCCESS) {
         throw std::runtime_error("Failed to create snapshot");
@@ -117,13 +120,14 @@ void JournalingTestsModule::JournalingTestImpl(
     // Recreate from snapshot + journal
     const long snapshotBaseSeq = 0L;
     auto fromSnapshotConfig =
-        exchange::core::common::config::InitialStateConfiguration::LastKnownStateFromJournal(
-            exchangeId, stateId, snapshotBaseSeq);
+        exchange::core::common::config::InitialStateConfiguration::
+            LastKnownStateFromJournal(exchangeId, stateId, snapshotBaseSeq);
 
     {
       auto recreatedContainer = ExchangeTestContainer::Create(
           performanceCfg, fromSnapshotConfig,
-          exchange::core::common::config::SerializationConfiguration::DiskJournaling());
+          exchange::core::common::config::SerializationConfiguration::
+              DiskJournaling());
 
       // Wait for core to be ready
       recreatedContainer->TotalBalanceReport();
@@ -177,4 +181,3 @@ void JournalingTestsModule::JournalingTestImpl(
 } // namespace tests
 } // namespace core
 } // namespace exchange
-

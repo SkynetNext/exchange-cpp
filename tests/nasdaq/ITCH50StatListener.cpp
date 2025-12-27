@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,11 @@
  */
 
 #include "ITCH50StatListener.h"
-#include <exchange/core/utils/Logger.h>
 #include <algorithm>
 #include <cmath>
+#include <exchange/core/utils/Logger.h>
 #include <sstream>
+
 
 namespace exchange {
 namespace core {

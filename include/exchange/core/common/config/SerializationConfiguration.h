@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,8 +25,8 @@ namespace config {
 class ExchangeConfiguration;
 
 /**
- * SerializationConfiguration - serialization (snapshots and journaling) configuration
- * Simplified version for now
+ * SerializationConfiguration - serialization (snapshots and journaling)
+ * configuration Simplified version for now
  */
 class SerializationConfiguration {
 public:
@@ -52,4 +52,3 @@ public:
 } // namespace common
 } // namespace core
 } // namespace exchange
-

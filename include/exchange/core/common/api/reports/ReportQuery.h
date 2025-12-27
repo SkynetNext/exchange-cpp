@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,8 @@ namespace reports {
 
 /**
  * ReportQueryBase - non-template base class for type erasure
- * Provides virtual methods that work with ReportResult* instead of template types
+ * Provides virtual methods that work with ReportResult* instead of template
+ * types
  */
 class ReportQueryBase : public WriteBytesMarshallable {
 public:
@@ -52,8 +53,8 @@ public:
    * Type-erased Process method for MatchingEngineRouter
    * Returns ReportResult* instead of template type
    */
-  virtual std::optional<std::unique_ptr<ReportResult>>
-  ProcessTypeErased(::exchange::core::processors::MatchingEngineRouter *matchingEngine) = 0;
+  virtual std::optional<std::unique_ptr<ReportResult>> ProcessTypeErased(
+      ::exchange::core::processors::MatchingEngineRouter *matchingEngine) = 0;
 
   /**
    * Type-erased Process method for RiskEngine
@@ -110,8 +111,9 @@ public:
   CreateResult(const std::vector<BytesIn *> &sections) = 0;
 
   // Implementation of type-erased methods from ReportQueryBase
-  std::optional<std::unique_ptr<ReportResult>>
-  ProcessTypeErased(::exchange::core::processors::MatchingEngineRouter *matchingEngine) override {
+  std::optional<std::unique_ptr<ReportResult>> ProcessTypeErased(
+      ::exchange::core::processors::MatchingEngineRouter *matchingEngine)
+      override {
     auto result = Process(matchingEngine);
     if (result.has_value()) {
       return std::optional<std::unique_ptr<ReportResult>>(
@@ -120,8 +122,8 @@ public:
     return std::nullopt;
   }
 
-  std::optional<std::unique_ptr<ReportResult>>
-  ProcessTypeErased(::exchange::core::processors::RiskEngine *riskEngine) override {
+  std::optional<std::unique_ptr<ReportResult>> ProcessTypeErased(
+      ::exchange::core::processors::RiskEngine *riskEngine) override {
     auto result = Process(riskEngine);
     if (result.has_value()) {
       return std::optional<std::unique_ptr<ReportResult>>(

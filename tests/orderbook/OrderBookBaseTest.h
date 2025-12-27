@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -124,11 +124,11 @@ protected:
   // Debug helper methods for comparing implementations
   void PrintOrderBookState(const std::string &label,
                            exchange::core::orderbook::IOrderBook *orderBook);
-  void PrintOrderBookComparison(
-      exchange::core::orderbook::IOrderBook *orderBook1,
-      exchange::core::orderbook::IOrderBook *orderBook2,
-      const std::string &label1 = "OrderBook1",
-      const std::string &label2 = "OrderBook2");
+  void
+  PrintOrderBookComparison(exchange::core::orderbook::IOrderBook *orderBook1,
+                           exchange::core::orderbook::IOrderBook *orderBook2,
+                           const std::string &label1 = "OrderBook1",
+                           const std::string &label2 = "OrderBook2");
 };
 
 } // namespace orderbook

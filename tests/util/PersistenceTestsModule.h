@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,12 +38,10 @@ public:
   static void PersistenceTestImpl(
       const exchange::core::common::config::PerformanceConfiguration
           &performanceCfg,
-      const TestDataParameters &testDataParameters,
-      int iterations);
+      const TestDataParameters &testDataParameters, int iterations);
 };
 
 } // namespace util
 } // namespace tests
 } // namespace core
 } // namespace exchange
-

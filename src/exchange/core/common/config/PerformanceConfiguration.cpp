@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,8 +46,7 @@ PerformanceConfiguration PerformanceConfiguration::Default() {
       10'000,    // maxGroupDurationNs (10 microseconds)
       false,     // sendL2ForEveryCmd
       8,         // l2RefreshDepth
-      CoreWaitStrategy::BLOCKING,
-      std::make_shared<SimpleThreadFactory>(),
+      CoreWaitStrategy::BLOCKING, std::make_shared<SimpleThreadFactory>(),
       [](const CoreSymbolSpecification *spec,
          ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
          orderbook::OrderBookEventsHelper *eventsHelper) {
@@ -59,7 +58,8 @@ PerformanceConfiguration PerformanceConfiguration::Default() {
 }
 
 PerformanceConfiguration PerformanceConfiguration::LatencyPerformanceBuilder() {
-  // Java: .threadFactory(new AffinityThreadFactory(THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE))
+  // Java: .threadFactory(new
+  // AffinityThreadFactory(THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE))
   return PerformanceConfiguration(
       2 * 1024, // ringBufferSize
       1,        // matchingEnginesNum
@@ -82,7 +82,8 @@ PerformanceConfiguration PerformanceConfiguration::LatencyPerformanceBuilder() {
 
 PerformanceConfiguration
 PerformanceConfiguration::ThroughputPerformanceBuilder() {
-  // Java: .threadFactory(new AffinityThreadFactory(THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE))
+  // Java: .threadFactory(new
+  // AffinityThreadFactory(THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE))
   return PerformanceConfiguration(
       64 * 1024, // ringBufferSize
       4,         // matchingEnginesNum

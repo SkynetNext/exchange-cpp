@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,9 +47,7 @@ TEST_F(ITExchangeCoreIntegrationBasic, ShouldInitSymbols) {
   ShouldInitSymbols();
 }
 
-TEST_F(ITExchangeCoreIntegrationBasic, ShouldInitUsers) {
-  ShouldInitUsers();
-}
+TEST_F(ITExchangeCoreIntegrationBasic, ShouldInitUsers) { ShouldInitUsers(); }
 
 TEST_F(ITExchangeCoreIntegrationBasic, ExchangeRiskBasicTest) {
   ExchangeRiskBasicTest();

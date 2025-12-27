@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Maksim Zheravin
+ * Copyright 2025 Justin Zhu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,8 +57,9 @@ public:
                                              int64_t reduceSize,
                                              bool completed);
 
-  // Create a reduce event (overload with price parameters to avoid use-after-free)
-  // Use this version when the order will be released/deleted after the call
+  // Create a reduce event (overload with price parameters to avoid
+  // use-after-free) Use this version when the order will be released/deleted
+  // after the call
   common::MatcherTradeEvent *SendReduceEvent(int64_t price,
                                              int64_t reserveBidPrice,
                                              int64_t reduceSize,
