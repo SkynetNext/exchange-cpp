@@ -19,6 +19,7 @@
 #include "LatencyTools.h"
 #include <algorithm>
 #include <chrono>
+#include <condition_variable>
 #include <exchange/core/utils/Logger.h>
 #include <iomanip>
 #include <map>
@@ -85,6 +86,9 @@ void LatencyTestsModule::LatencyTestImpl(
   }
 
   // Main test iterations - match Java: max 10000 iterations
+  // Baseline for steady_clock (match Java System.nanoTime() - relative time)
+  auto testBaseline = std::chrono::steady_clock::now();
+
   for (int i = 0; i < 10000; i++) {
     int tps = targetTps + targetTpsStep * i;
     container->LoadSymbolsUsersAndPrefillOrdersNoLog(testDataFutures);
@@ -98,47 +102,102 @@ void LatencyTestsModule::LatencyTestImpl(
     latencies.reserve(benchmarkCommands.size());
 
     std::mutex latenciesMutex;
-    container->SetConsumer([&latencies, &latenciesMutex](
-                               exchange::core::common::cmd::OrderCommand *cmd,
-                               int64_t seq) {
-      if (cmd && cmd->timestamp > 0) {
-        auto now = std::chrono::system_clock::now();
-        auto cmdTime = std::chrono::time_point<std::chrono::system_clock>(
-            std::chrono::milliseconds(cmd->timestamp));
-        auto latency =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(now - cmdTime)
-                .count();
-        std::lock_guard<std::mutex> lock(latenciesMutex);
-        latencies.push_back(latency);
+
+    // CountDownLatch implementation (match Java: CountDownLatch)
+    class CountDownLatch {
+    public:
+      explicit CountDownLatch(int64_t count) : count_(count) {}
+
+      void countDown() {
+        std::lock_guard<std::mutex> lock(mu_);
+        if (count_ > 0) {
+          --count_;
+        }
+        if (count_ == 0) {
+          cv_.notify_all();
+        }
       }
-    });
+
+      void await() {
+        std::unique_lock<std::mutex> lock(mu_);
+        cv_.wait(lock, [this] { return count_ == 0; });
+      }
+
+    private:
+      mutable std::mutex mu_;
+      std::condition_variable cv_;
+      int64_t count_;
+    };
+
+    // Match Java: CountDownLatch latchBenchmark = new
+    // CountDownLatch(genResult.getBenchmarkCommandsSize());
+    CountDownLatch latchBenchmark(
+        static_cast<int64_t>(benchmarkCommands.size()));
+
+    // Match Java: container.setConsumer((cmd, seq) -> { ...
+    // latchBenchmark.countDown(); });
+    container->SetConsumer(
+        [&latencies, &latenciesMutex, &latchBenchmark, testBaseline](
+            exchange::core::common::cmd::OrderCommand *cmd, int64_t seq) {
+          if (cmd && cmd->timestamp > 0) {
+            // Match Java: final long latency = System.nanoTime() -
+            // cmd.timestamp; cmd->timestamp stores nanoseconds since
+            // testBaseline (matching Java System.nanoTime())
+            auto now = std::chrono::steady_clock::now();
+            auto nowNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                             now - testBaseline)
+                             .count();
+            // Latency = current time (ns) - command timestamp (ns)
+            auto latency = nowNs - cmd->timestamp;
+            std::lock_guard<std::mutex> lock(latenciesMutex);
+            latencies.push_back(latency);
+          }
+          // Match Java: latchBenchmark.countDown();
+          latchBenchmark.countDown();
+        });
 
     const int nanosPerCmd = 1'000'000'000 / tps;
     auto startTime = std::chrono::steady_clock::now();
-    auto plannedTime = startTime;
 
+    // Match Java: long plannedTimestamp = System.nanoTime();
+    // Use testBaseline for consistency (matching Java System.nanoTime() -
+    // relative time)
+    auto plannedTimestamp = testBaseline;
+
+    // Match Java: for (ApiCommand cmd :
+    // genResult.getApiCommandsBenchmark().join())
     for (auto *cmd : benchmarkCommands) {
-      while (std::chrono::steady_clock::now() < plannedTime) {
+      // Match Java: while (System.nanoTime() < plannedTimestamp) { }
+      while (std::chrono::steady_clock::now() < plannedTimestamp) {
         std::this_thread::yield();
       }
-      auto now = std::chrono::system_clock::now();
-      cmd->timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-                           now.time_since_epoch())
-                           .count();
+      // Match Java: cmd.timestamp = plannedTimestamp;
+      // Store nanoseconds since testBaseline (matching Java System.nanoTime()
+      // behavior) OrderCommand.timestamp is int64_t, can store nanoseconds
+      auto timestampNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                             plannedTimestamp - testBaseline)
+                             .count();
+      cmd->timestamp = timestampNs;
       container->GetApi()->SubmitCommand(cmd);
-      plannedTime += std::chrono::nanoseconds(nanosPerCmd);
+      plannedTimestamp += std::chrono::nanoseconds(nanosPerCmd);
     }
 
-    // Wait for completion
-    container->GetApi()->SubmitCommand(
-        new exchange::core::common::api::ApiNop());
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // Match Java: latchBenchmark.await();
+    latchBenchmark.await();
 
+    // Match Java: container.setConsumer((cmd, seq) -> { });
     container->SetConsumer(nullptr);
 
     // Calculate latency statistics and output results
     std::lock_guard<std::mutex> lock(latenciesMutex);
     bool shouldContinue = true;
+
+    // Debug: log if latencies are empty
+    if (latencies.empty()) {
+      LOG_INFO("Warning: No latency data collected (expected: {} commands)",
+               benchmarkCommands.size());
+    }
+
     if (!latencies.empty()) {
       std::sort(latencies.begin(), latencies.end());
 
