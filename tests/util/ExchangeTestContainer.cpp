@@ -44,7 +44,6 @@
 #include <exchange/core/common/config/ReportsQueriesConfiguration.h>
 #include <exchange/core/utils/AffinityThreadFactory.h>
 #include <random>
-#include <thread>
 #include <unordered_map>
 
 namespace exchange {
