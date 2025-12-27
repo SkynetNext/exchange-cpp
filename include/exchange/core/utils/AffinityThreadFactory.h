@@ -18,7 +18,6 @@
 
 #include <disruptor/dsl/ThreadFactory.h>
 #include <functional>
-#include <memory>
 #include <mutex>
 #include <set>
 #include <thread>
