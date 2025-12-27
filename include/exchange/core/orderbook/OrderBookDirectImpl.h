@@ -60,11 +60,14 @@ public:
         common::OrderAction::ASK; // Order side (ASK/BID)
     int64_t timestamp = 0;        // Order timestamp
 
-    DirectOrder *next = nullptr; // Next order (towards matching direction,
-                                 // price grows for asks)
+    DirectOrder *next = nullptr; // Next order in global price-sorted linked
+                                 // list (towards better price for matching, or
+                                 // older order within same price)
     DirectOrder *prev =
-        nullptr; // Previous order (towards tail, lower priority, worse price)
-    Bucket *bucket = nullptr; // Parent price bucket this order belongs to
+        nullptr; // Previous order in global price-sorted linked list
+                 // (towards worse price, or newer order within same price)
+    Bucket *bucket =
+        nullptr; // Price bucket index entry (ART tree maps price -> bucket)
 
     DirectOrder() = default;
 
