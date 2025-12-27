@@ -139,16 +139,23 @@ void LatencyTestsModule::LatencyTestImpl(
     auto startTime = std::chrono::steady_clock::now();
 
     // Match Java: long plannedTimestamp = System.nanoTime();
-    // Use absolute time from iterationBaseline (matching Java
-    // System.nanoTime()) Java stores absolute nanoseconds, not relative
-    auto plannedTimestamp = iterationBaseline;
+    // Use absolute nanoseconds since iterationBaseline (matching Java
+    // System.nanoTime() - absolute time)
+    // Start from current time, not 0, to match Java behavior where
+    // System.nanoTime() returns current absolute timestamp
+    auto nowTimePoint = std::chrono::steady_clock::now();
     int64_t plannedTimestampNs =
-        0; // Absolute nanoseconds since iterationBaseline
+        std::chrono::duration_cast<std::chrono::nanoseconds>(nowTimePoint -
+                                                             iterationBaseline)
+            .count();
 
     // Match Java: for (ApiCommand cmd :
     // genResult.getApiCommandsBenchmark().join())
     for (auto *cmd : benchmarkCommands) {
       // Match Java: while (System.nanoTime() < plannedTimestamp) { }
+      // Convert plannedTimestampNs back to time_point for comparison
+      auto plannedTimestamp =
+          iterationBaseline + std::chrono::nanoseconds(plannedTimestampNs);
       while (std::chrono::steady_clock::now() < plannedTimestamp) {
         std::this_thread::yield();
       }
@@ -158,7 +165,6 @@ void LatencyTestsModule::LatencyTestImpl(
       // OrderCommand.timestamp is int64_t, can store nanoseconds
       cmd->timestamp = plannedTimestampNs;
       container->GetApi()->SubmitCommand(cmd);
-      plannedTimestamp += std::chrono::nanoseconds(nanosPerCmd);
       plannedTimestampNs += nanosPerCmd; // Increment absolute timestamp
     }
 
@@ -305,16 +311,23 @@ void LatencyTestsModule::LatencyTestImpl(
     auto startTime = std::chrono::steady_clock::now();
 
     // Match Java: long plannedTimestamp = System.nanoTime();
-    // Use absolute time from iterationBaseline (matching Java
-    // System.nanoTime()) Java stores absolute nanoseconds, not relative
-    auto plannedTimestamp = iterationBaseline;
+    // Use absolute nanoseconds since iterationBaseline (matching Java
+    // System.nanoTime() - absolute time)
+    // Start from current time, not 0, to match Java behavior where
+    // System.nanoTime() returns current absolute timestamp
+    auto nowTimePoint = std::chrono::steady_clock::now();
     int64_t plannedTimestampNs =
-        0; // Absolute nanoseconds since iterationBaseline
+        std::chrono::duration_cast<std::chrono::nanoseconds>(nowTimePoint -
+                                                             iterationBaseline)
+            .count();
 
     // Match Java: for (ApiCommand cmd :
     // genResult.getApiCommandsBenchmark().join())
     for (auto *cmd : benchmarkCommands) {
       // Match Java: while (System.nanoTime() < plannedTimestamp) { }
+      // Convert plannedTimestampNs back to time_point for comparison
+      auto plannedTimestamp =
+          iterationBaseline + std::chrono::nanoseconds(plannedTimestampNs);
       while (std::chrono::steady_clock::now() < plannedTimestamp) {
         std::this_thread::yield();
       }
@@ -324,7 +337,6 @@ void LatencyTestsModule::LatencyTestImpl(
       // OrderCommand.timestamp is int64_t, can store nanoseconds
       cmd->timestamp = plannedTimestampNs;
       container->GetApi()->SubmitCommand(cmd);
-      plannedTimestamp += std::chrono::nanoseconds(nanosPerCmd);
       plannedTimestampNs += nanosPerCmd; // Increment absolute timestamp
     }
 
