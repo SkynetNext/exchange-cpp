@@ -2,9 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -18,10 +20,11 @@ jobs:
 
       - name: Update disruptor-cpp to latest main
         run: |
-          cd third_party/disruptor-cpp
-          git fetch origin main
-          git checkout main
-          git pull origin main
+          cd third_party/disruptor-cpp || exit 1
+          git fetch origin main || echo "Warning: Failed to fetch disruptor-cpp"
+          git checkout main || echo "Warning: Failed to checkout main"
+          git pull origin main || echo "Warning: Failed to pull latest changes"
+          git log -1 --oneline
 
       - name: Install dependencies
         run: |
@@ -60,10 +63,11 @@ jobs:
 
       - name: Update disruptor-cpp to latest main
         run: |
-          cd third_party/disruptor-cpp
-          git fetch origin main
-          git checkout main
-          git pull origin main
+          cd third_party/disruptor-cpp || exit 1
+          git fetch origin main || echo "Warning: Failed to fetch disruptor-cpp"
+          git checkout main || echo "Warning: Failed to checkout main"
+          git pull origin main || echo "Warning: Failed to pull latest changes"
+          git log -1 --oneline
 
       - name: Install dependencies
         run: |
