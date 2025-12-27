@@ -39,28 +39,32 @@ public:
   struct DirectOrder;
 
   struct Bucket {
-    int64_t price = 0;
+    int64_t price = 0; // Price level for this bucket
     OrderBookDirectImpl::DirectOrder *lastOrder =
-        nullptr; // tail order (worst priority in this price level)
-    int64_t totalVolume = 0;
-    int32_t numOrders = 0;
+        nullptr;             // Tail order (worst priority in this price level)
+    int64_t totalVolume = 0; // Total volume of all orders at this price level
+    int32_t numOrders = 0;   // Number of orders at this price level
   };
 
   struct DirectOrder : public common::IOrder,
                        public common::WriteBytesMarshallable,
                        public common::StateHash {
-    int64_t orderId = 0;
-    int64_t price = 0;
-    int64_t size = 0;
-    int64_t filled = 0;
-    int64_t reserveBidPrice = 0; // Reserved price for fast moves
-    int64_t uid = 0;
-    common::OrderAction action = common::OrderAction::ASK;
-    int64_t timestamp = 0;
+    int64_t orderId = 0; // Unique order identifier
+    int64_t price = 0;   // Order price
+    int64_t size = 0;    // Original order size
+    int64_t filled = 0;  // Filled quantity
+    int64_t reserveBidPrice =
+        0; // Reserved price for fast moves of GTC bid orders in exchange mode
+    int64_t uid = 0; // User ID who placed this order
+    common::OrderAction action =
+        common::OrderAction::ASK; // Order side (ASK/BID)
+    int64_t timestamp = 0;        // Order timestamp
 
-    DirectOrder *next = nullptr;
-    DirectOrder *prev = nullptr;
-    Bucket *bucket = nullptr;
+    DirectOrder *next = nullptr; // Next order (towards matching direction,
+                                 // price grows for asks)
+    DirectOrder *prev =
+        nullptr; // Previous order (towards tail, lower priority, worse price)
+    Bucket *bucket = nullptr; // Parent price bucket this order belongs to
 
     DirectOrder() = default;
 
