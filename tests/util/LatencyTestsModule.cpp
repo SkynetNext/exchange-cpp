@@ -56,34 +56,174 @@ void LatencyTestsModule::LatencyTestImpl(
   // Simple latency measurement (without HDR histogram for now)
   // Can be enhanced with HDR histogram library later
 
-  // Warmup cycles
+  // Match Java: log.debug("Warming up {} cycles...", warmupCycles);
+  LOG_DEBUG("Warming up {} cycles...", warmupCycles);
+
+  // Warmup cycles - match Java: warmup also outputs latency results
   for (int i = 0; i < warmupCycles; i++) {
+    // Use same test iteration logic as main loop, but with warmupTps and
+    // warmup=true
+    int tps = warmupTps;
     container->LoadSymbolsUsersAndPrefillOrdersNoLog(testDataFutures);
 
     auto genResult = testDataFutures.genResult.get();
     auto benchmarkCommandsFuture = genResult->GetApiCommandsBenchmark();
     auto benchmarkCommands = benchmarkCommandsFuture.get();
 
-    // Run warmup at high TPS
-    const int nanosPerCmd = 1'000'000'000 / warmupTps;
-    auto plannedTime = std::chrono::steady_clock::now();
+    // Simple latency tracking
+    std::vector<int64_t> latencies;
+    latencies.reserve(benchmarkCommands.size());
 
+    std::mutex latenciesMutex;
+
+    // CountDownLatch implementation (match Java: CountDownLatch)
+    class CountDownLatch {
+    public:
+      explicit CountDownLatch(int64_t count) : count_(count) {}
+
+      void countDown() {
+        std::lock_guard<std::mutex> lock(mu_);
+        if (count_ > 0) {
+          --count_;
+        }
+        if (count_ == 0) {
+          cv_.notify_all();
+        }
+      }
+
+      void await() {
+        std::unique_lock<std::mutex> lock(mu_);
+        cv_.wait(lock, [this] { return count_ == 0; });
+      }
+
+    private:
+      mutable std::mutex mu_;
+      std::condition_variable cv_;
+      int64_t count_;
+    };
+
+    // Match Java: CountDownLatch latchBenchmark = new
+    // CountDownLatch(genResult.getBenchmarkCommandsSize());
+    CountDownLatch latchBenchmark(
+        static_cast<int64_t>(benchmarkCommands.size()));
+
+    // Baseline for this iteration (match Java System.nanoTime() - each
+    // iteration has its own baseline)
+    auto iterationBaseline = std::chrono::steady_clock::now();
+
+    // Match Java: container.setConsumer((cmd, seq) -> { ...
+    // latchBenchmark.countDown(); });
+    container->SetConsumer(
+        [&latencies, &latenciesMutex, &latchBenchmark, iterationBaseline](
+            exchange::core::common::cmd::OrderCommand *cmd, int64_t seq) {
+          if (cmd && cmd->timestamp > 0) {
+            // Match Java: final long latency = System.nanoTime() -
+            // cmd.timestamp; cmd->timestamp stores nanoseconds since
+            // iterationBaseline (matching Java System.nanoTime())
+            auto now = std::chrono::steady_clock::now();
+            auto nowNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                             now - iterationBaseline)
+                             .count();
+            // Latency = current time (ns) - command timestamp (ns)
+            auto latency = nowNs - cmd->timestamp;
+            std::lock_guard<std::mutex> lock(latenciesMutex);
+            latencies.push_back(latency);
+          }
+          // Match Java: latchBenchmark.countDown();
+          latchBenchmark.countDown();
+        });
+
+    const int nanosPerCmd = 1'000'000'000 / tps;
+    auto startTime = std::chrono::steady_clock::now();
+
+    // Match Java: long plannedTimestamp = System.nanoTime();
+    // Use iterationBaseline for this iteration (matching Java System.nanoTime()
+    // - each iteration is independent)
+    auto plannedTimestamp = iterationBaseline;
+
+    // Match Java: for (ApiCommand cmd :
+    // genResult.getApiCommandsBenchmark().join())
     for (auto *cmd : benchmarkCommands) {
-      while (std::chrono::steady_clock::now() < plannedTime) {
+      // Match Java: while (System.nanoTime() < plannedTimestamp) { }
+      while (std::chrono::steady_clock::now() < plannedTimestamp) {
         std::this_thread::yield();
       }
+      // Match Java: cmd.timestamp = plannedTimestamp;
+      // Store nanoseconds since iterationBaseline (matching Java
+      // System.nanoTime() behavior) OrderCommand.timestamp is int64_t, can
+      // store nanoseconds
+      auto timestampNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                             plannedTimestamp - iterationBaseline)
+                             .count();
+      cmd->timestamp = timestampNs;
       container->GetApi()->SubmitCommand(cmd);
-      plannedTime += std::chrono::nanoseconds(nanosPerCmd);
+      plannedTimestamp += std::chrono::nanoseconds(nanosPerCmd);
     }
 
-    // Wait for completion
-    container->GetApi()->SubmitCommand(
-        new exchange::core::common::api::ApiNop());
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // Match Java: latchBenchmark.await();
+    latchBenchmark.await();
+
+    // Match Java: container.setConsumer((cmd, seq) -> { });
+    container->SetConsumer(nullptr);
+
+    // Calculate latency statistics and output results (warmup also outputs)
+    std::lock_guard<std::mutex> lock(latenciesMutex);
+    bool shouldContinue = true;
+
+    if (!latencies.empty()) {
+      std::sort(latencies.begin(), latencies.end());
+
+      // Calculate percentiles (match Java HDR histogram percentiles)
+      auto getPercentile = [&latencies](double percentile) -> int64_t {
+        if (latencies.empty())
+          return 0;
+        size_t index = static_cast<size_t>(
+            std::round((percentile / 100.0) * (latencies.size() - 1)));
+        return latencies[std::min(index, latencies.size() - 1)];
+      };
+
+      int64_t p50 = getPercentile(50.0);
+      int64_t p90 = getPercentile(90.0);
+      int64_t p95 = getPercentile(95.0);
+      int64_t p99 = getPercentile(99.0);
+      int64_t p99_9 = getPercentile(99.9);
+      int64_t p99_99 = getPercentile(99.99);
+      int64_t maxLatency = latencies.back();
+
+      // Calculate throughput (MT/s)
+      auto endTime = std::chrono::steady_clock::now();
+      auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                           endTime - startTime)
+                           .count();
+      float perfMt = (elapsedMs > 0)
+                         ? (static_cast<float>(benchmarkCommands.size()) /
+                            static_cast<float>(elapsedMs) / 1000.0f)
+                         : 0.0f;
+
+      // Output latency report (match Java format) - warmup also outputs
+      std::ostringstream report;
+      report << std::fixed << std::setprecision(3) << perfMt << " MT/s ";
+      report << "50%:" << LatencyTools::FormatNanos(p50) << " ";
+      report << "90%:" << LatencyTools::FormatNanos(p90) << " ";
+      report << "95%:" << LatencyTools::FormatNanos(p95) << " ";
+      report << "99%:" << LatencyTools::FormatNanos(p99) << " ";
+      report << "99.9%:" << LatencyTools::FormatNanos(p99_9) << " ";
+      report << "99.99%:" << LatencyTools::FormatNanos(p99_99) << " ";
+      report << "W:" << LatencyTools::FormatNanos(maxLatency);
+
+      LOG_INFO("{}", report.str());
+
+      // Match Java: warmup doesn't stop on high latency
+      // return warmup || histogram.getValueAtPercentile(50.0) < 10_000_000;
+      // Warmup always continues
+    }
 
     container->ResetExchangeCore();
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
+
+  // Match Java: log.debug("Warmup done, starting tests");
+  LOG_DEBUG("Warmup done, starting tests");
 
   // Main test iterations - match Java: max 10000 iterations
   for (int i = 0; i < 10000; i++) {
