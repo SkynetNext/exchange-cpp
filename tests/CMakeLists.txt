@@ -22,6 +22,7 @@ if(BUILD_TESTING AND GTest_FOUND)
         util/TestOrdersGeneratorConfig.cpp
         util/ThroughputTestsModule.cpp
         util/UserCurrencyAccountsGenerator.cpp
+        steps/OrderStepdefs.cpp
     )
     
     target_link_libraries(test_utils
@@ -191,6 +192,207 @@ if(BUILD_TESTING AND GTest_FOUND)
     )
     add_test(NAME ITExchangeCoreIntegrationBasic COMMAND test_integration_basic)
     list(APPEND ALL_TEST_TARGETS test_integration_basic)
+
+    # ITExchangeCoreIntegrationLatency
+    add_executable(test_integration_latency
+        integration/ITExchangeCoreIntegration.cpp
+        integration/ITExchangeCoreIntegrationLatency.cpp
+    )
+    target_link_libraries(test_integration_latency
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME ITExchangeCoreIntegrationLatency COMMAND test_integration_latency)
+    list(APPEND ALL_TEST_TARGETS test_integration_latency)
+
+    # ITFeesExchangeBasic
+    add_executable(test_integration_fees_exchange_basic
+        integration/ITFeesExchange.cpp
+        integration/ITFeesExchangeBasic.cpp
+    )
+    target_link_libraries(test_integration_fees_exchange_basic
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME ITFeesExchangeBasic COMMAND test_integration_fees_exchange_basic)
+    list(APPEND ALL_TEST_TARGETS test_integration_fees_exchange_basic)
+
+    # ITFeesExchangeLatency
+    add_executable(test_integration_fees_exchange_latency
+        integration/ITFeesExchange.cpp
+        integration/ITFeesExchangeLatency.cpp
+        integration/ITFeesExchangeBasic.cpp
+    )
+    target_link_libraries(test_integration_fees_exchange_latency
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME ITFeesExchangeLatency COMMAND test_integration_fees_exchange_latency)
+    list(APPEND ALL_TEST_TARGETS test_integration_fees_exchange_latency)
+
+    # ITFeesMarginBasic
+    add_executable(test_integration_fees_margin_basic
+        integration/ITFeesMargin.cpp
+        integration/ITFeesMarginBasic.cpp
+    )
+    target_link_libraries(test_integration_fees_margin_basic
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME ITFeesMarginBasic COMMAND test_integration_fees_margin_basic)
+    list(APPEND ALL_TEST_TARGETS test_integration_fees_margin_basic)
+
+    # ITFeesMarginLatency
+    add_executable(test_integration_fees_margin_latency
+        integration/ITFeesMargin.cpp
+        integration/ITFeesMarginLatency.cpp
+        integration/ITFeesMarginBasic.cpp
+    )
+    target_link_libraries(test_integration_fees_margin_latency
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME ITFeesMarginLatency COMMAND test_integration_fees_margin_latency)
+    list(APPEND ALL_TEST_TARGETS test_integration_fees_margin_latency)
+
+    # ITExchangeCoreIntegrationRejectionBasic
+    add_executable(test_integration_rejection_basic
+        integration/ITExchangeCoreIntegrationRejection.cpp
+        integration/ITExchangeCoreIntegrationRejectionBasic.cpp
+    )
+    target_link_libraries(test_integration_rejection_basic
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+            GTest::gmock
+    )
+    add_test(NAME ITExchangeCoreIntegrationRejectionBasic COMMAND test_integration_rejection_basic)
+    list(APPEND ALL_TEST_TARGETS test_integration_rejection_basic)
+
+    # ITExchangeCoreIntegrationRejectionLatency
+    add_executable(test_integration_rejection_latency
+        integration/ITExchangeCoreIntegrationRejection.cpp
+        integration/ITExchangeCoreIntegrationRejectionLatency.cpp
+        integration/ITExchangeCoreIntegrationRejectionBasic.cpp
+    )
+    target_link_libraries(test_integration_rejection_latency
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+            GTest::gmock
+    )
+    add_test(NAME ITExchangeCoreIntegrationRejectionLatency COMMAND test_integration_rejection_latency)
+    list(APPEND ALL_TEST_TARGETS test_integration_rejection_latency)
+
+    # ITExchangeCoreIntegrationStressBasic
+    add_executable(test_integration_stress_basic
+        integration/ITExchangeCoreIntegrationStress.cpp
+        integration/ITExchangeCoreIntegrationStressBasic.cpp
+    )
+    target_link_libraries(test_integration_stress_basic
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME ITExchangeCoreIntegrationStressBasic COMMAND test_integration_stress_basic)
+    list(APPEND ALL_TEST_TARGETS test_integration_stress_basic)
+
+    # ITExchangeCoreIntegrationStressLatency
+    add_executable(test_integration_stress_latency
+        integration/ITExchangeCoreIntegrationStress.cpp
+        integration/ITExchangeCoreIntegrationStressLatency.cpp
+        integration/ITExchangeCoreIntegrationStressBasic.cpp
+    )
+    target_link_libraries(test_integration_stress_latency
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME ITExchangeCoreIntegrationStressLatency COMMAND test_integration_stress_latency)
+    list(APPEND ALL_TEST_TARGETS test_integration_stress_latency)
+
+    # ITMultiOperation
+    add_executable(test_integration_multi_operation
+        integration/ITMultiOperation.cpp
+    )
+    target_link_libraries(test_integration_multi_operation
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME ITMultiOperation COMMAND test_integration_multi_operation)
+    list(APPEND ALL_TEST_TARGETS test_integration_multi_operation)
+
+    # ============================================================================
+    # Cucumber-style BDD Tests (using GTest, matching Java Cucumber tests)
+    # ============================================================================
+
+    # RunCukesDirectThroughputTests
+    add_executable(test_run_cukes_direct_throughput
+        steps/RunCukesDirectThroughputTests.cpp
+    )
+    target_link_libraries(test_run_cukes_direct_throughput
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME RunCukesDirectThroughputTests COMMAND test_run_cukes_direct_throughput)
+    list(APPEND ALL_TEST_TARGETS test_run_cukes_direct_throughput)
+
+    # RunCukesDirectLatencyTests
+    add_executable(test_run_cukes_direct_latency
+        steps/RunCukesDirectLatencyTests.cpp
+    )
+    target_link_libraries(test_run_cukes_direct_latency
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME RunCukesDirectLatencyTests COMMAND test_run_cukes_direct_latency)
+    list(APPEND ALL_TEST_TARGETS test_run_cukes_direct_latency)
+
+    # RunCukeNaiveTests
+    add_executable(test_run_cuke_naive
+        steps/RunCukeNaiveTests.cpp
+    )
+    target_link_libraries(test_run_cuke_naive
+        PRIVATE
+            exchange-cpp
+            test_utils
+            GTest::gtest
+            GTest::gtest_main
+    )
+    add_test(NAME RunCukeNaiveTests COMMAND test_run_cuke_naive)
+    list(APPEND ALL_TEST_TARGETS test_run_cuke_naive)
     
     # ITMultiOperation
     # add_executable(test_integration_multi_operation

@@ -71,7 +71,21 @@ protected:
                      RejectionCause rejectionCause);
 
   // Mock event handler
-  ::testing::StrictMock<exchange::core::IEventsHandler> mockHandler_;
+  class MockEventsHandler : public exchange::core::IEventsHandler {
+  public:
+    MOCK_METHOD(void, CommandResult,
+                (const exchange::core::ApiCommandResult &), (override));
+    MOCK_METHOD(void, TradeEvent, (const exchange::core::TradeEvent &),
+                (override));
+    MOCK_METHOD(void, RejectEvent, (const exchange::core::RejectEvent &),
+                (override));
+    MOCK_METHOD(void, ReduceEvent, (const exchange::core::ReduceEvent &),
+                (override));
+    MOCK_METHOD(void, OrderBook, (const exchange::core::OrderBook &),
+                (override));
+  };
+
+  ::testing::StrictMock<MockEventsHandler> mockHandler_;
   std::unique_ptr<exchange::core::SimpleEventsProcessor> processor_;
 
 private:

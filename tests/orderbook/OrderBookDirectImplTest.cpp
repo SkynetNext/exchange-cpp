@@ -26,7 +26,6 @@
 #include <exchange/core/orderbook/OrderBookDirectImpl.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
 #include <exchange/core/utils/Logger.h>
-#include <iostream>
 #include <unordered_map>
 
 using namespace exchange::core::common;

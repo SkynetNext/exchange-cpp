@@ -18,7 +18,6 @@
 #include "../util/TestOrdersGenerator.h"
 #include <exchange/core/utils/Logger.h>
 #include <numeric>
-#include <sstream>
 
 using namespace exchange::core::common;
 using namespace exchange::core::common::cmd;
@@ -798,20 +797,22 @@ void OrderBookBaseTest::TestMultipleCommandsKeepInternalState() {
 }
 
 void OrderBookBaseTest::PrintOrderBookState(
-    const std::string &label, exchange::core::orderbook::IOrderBook *orderBook) {
+    const std::string &label,
+    exchange::core::orderbook::IOrderBook *orderBook) {
   if (orderBook == nullptr) {
     LOG_INFO("{}: (nullptr)", label);
     return;
   }
 
-  LOG_INFO("\n=== {} ===\nState Hash: {}\nAsk orders: {}\nBid orders: {}\nImplementation: {}",
-           label, orderBook->GetStateHash(), 
+  LOG_INFO("\n=== {} ===\nState Hash: {}\nAsk orders: {}\nBid orders: "
+           "{}\nImplementation: {}",
+           label, orderBook->GetStateHash(),
            orderBook->GetOrdersNum(OrderAction::ASK),
            orderBook->GetOrdersNum(OrderAction::BID),
            (orderBook->GetImplementationType() ==
-                        exchange::core::orderbook::OrderBookImplType::DIRECT
-                    ? "DirectImpl"
-                    : "NaiveImpl"));
+                    exchange::core::orderbook::OrderBookImplType::DIRECT
+                ? "DirectImpl"
+                : "NaiveImpl"));
 
   // Print diagrams using base class interface
   LOG_INFO("\n--- Ask Buckets ---\n{}", orderBook->PrintAskBucketsDiagram());
@@ -822,7 +823,8 @@ void OrderBookBaseTest::PrintOrderBookComparison(
     exchange::core::orderbook::IOrderBook *orderBook1,
     exchange::core::orderbook::IOrderBook *orderBook2,
     const std::string &label1, const std::string &label2) {
-  LOG_INFO("\n========================================\nORDER BOOK COMPARISON\n========================================\n");
+  LOG_INFO("\n========================================\nORDER BOOK "
+           "COMPARISON\n========================================\n");
 
   PrintOrderBookState(label1, orderBook1);
   PrintOrderBookState(label2, orderBook2);

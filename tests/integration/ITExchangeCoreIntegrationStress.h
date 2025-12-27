@@ -39,12 +39,14 @@ public:
   virtual exchange::core::common::config::PerformanceConfiguration
   GetPerformanceConfiguration() = 0;
 
-  // Note: Test methods will be implemented in .cpp file
-  // They require ExchangeTestContainer which needs to be implemented first
+  /**
+   * Many operations test (matches Java manyOperations method)
+   */
+  void ManyOperations(
+      const exchange::core::common::CoreSymbolSpecification &symbolSpec);
 };
 
 } // namespace integration
 } // namespace tests
 } // namespace core
 } // namespace exchange
-

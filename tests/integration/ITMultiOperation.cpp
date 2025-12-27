@@ -31,10 +31,10 @@ namespace integration {
 // Helper function to create throughput performance configuration
 static exchange::core::common::config::PerformanceConfiguration
 CreateThroughputPerfCfg(int matchingEnginesNum, int riskEnginesNum) {
-  // Note: C++ version doesn't have builder pattern, so we use Default() and
-  // modify fields
-  auto cfg =
-      exchange::core::common::config::PerformanceConfiguration::Default();
+  // Use ThroughputPerformanceBuilder() to get AffinityThreadFactory (matches
+  // Java version)
+  auto cfg = exchange::core::common::config::PerformanceConfiguration::
+      ThroughputPerformanceBuilder();
   cfg.matchingEnginesNum = matchingEnginesNum;
   cfg.riskEnginesNum = riskEnginesNum;
   return cfg;

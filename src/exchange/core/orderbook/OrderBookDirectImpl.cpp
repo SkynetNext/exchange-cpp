@@ -565,9 +565,10 @@ std::vector<common::Order *> OrderBookDirectImpl::FindUserOrders(int64_t uid) {
   orderIdIndex_.ForEach(
       [&list, uid](int64_t orderId, DirectOrder *order) {
         if (order->uid == uid) {
-          list.push_back(new common::Order(orderId, order->price, order->size,
-                                           order->filled, 0, order->action,
-                                           order->uid, order->timestamp));
+          list.push_back(
+              new common::Order(orderId, order->price, order->size,
+                                order->filled, order->reserveBidPrice,
+                                order->action, order->uid, order->timestamp));
         }
       },
       INT32_MAX);

@@ -32,6 +32,7 @@
 #include <exchange/core/common/api/ApiCommand.h>
 #include <exchange/core/common/api/ApiMoveOrder.h>
 #include <exchange/core/common/api/ApiPlaceOrder.h>
+#include <exchange/core/common/api/ApiReduceOrder.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/orderbook/IOrderBook.h>
@@ -39,7 +40,6 @@
 #include <exchange/core/utils/Logger.h>
 #include <future>
 #include <memory>
-#include <random>
 #include <unordered_map>
 
 using namespace exchange::core::common;
@@ -222,18 +222,18 @@ static void UpdateOrderBookSizeStat(TestOrdersGeneratorSession *session) {
 
 static OrderCommand
 GenerateRandomGtcOrder(TestOrdersGeneratorSession *session) {
-  std::uniform_int_distribution<int> dist(0, 3);
-  OrderAction action = (dist(session->rand) + session->priceDirection >= 2)
+  // Match Java: rand.nextInt(4)
+  OrderAction action = (session->rand.nextInt(4) + session->priceDirection >= 2)
                            ? OrderAction::BID
                            : OrderAction::ASK;
 
-  std::uniform_int_distribution<int> userDist(0, session->numUsers - 1);
-  int32_t uid = session->uidMapper(userDist(session->rand));
+  // Match Java: rand.nextInt(session.numUsers)
+  int32_t uid = session->uidMapper(session->rand.nextInt(session->numUsers));
   int32_t newOrderId = session->seq;
 
-  std::uniform_real_distribution<double> doubleDist(0.0, 1.0);
+  // Match Java: Math.pow(rand.nextDouble(), 2)
   int32_t dev =
-      1 + static_cast<int32_t>(std::pow(doubleDist(session->rand), 2) *
+      1 + static_cast<int32_t>(std::pow(session->rand.nextDouble(), 2) *
                                session->priceDeviation);
   if (dev <= 0) {
     dev = 1; // Ensure dev is at least 1
@@ -241,9 +241,9 @@ GenerateRandomGtcOrder(TestOrdersGeneratorSession *session) {
 
   int64_t p = 0;
   const int x = 4;
-  std::uniform_int_distribution<int> devDist(0, dev - 1);
+  // Match Java: rand.nextInt(dev)
   for (int i = 0; i < x; i++) {
-    p += devDist(session->rand);
+    p += session->rand.nextInt(dev);
   }
   p = p / x * 2 - dev;
   if ((p > 0) ^ (action == OrderAction::ASK)) {
@@ -252,11 +252,9 @@ GenerateRandomGtcOrder(TestOrdersGeneratorSession *session) {
 
   int64_t price = session->lastTradePrice + p;
 
-  std::uniform_int_distribution<int> sizeDist1(0, 5);
-  std::uniform_int_distribution<int> sizeDist2(0, 5);
-  std::uniform_int_distribution<int> sizeDist3(0, 5);
-  int32_t size = 1 + sizeDist1(session->rand) * sizeDist2(session->rand) *
-                         sizeDist3(session->rand);
+  // Match Java: rand.nextInt(6) * rand.nextInt(6) * rand.nextInt(6)
+  int32_t size = 1 + session->rand.nextInt(6) * session->rand.nextInt(6) *
+                         session->rand.nextInt(6);
 
   session->orderPrices[newOrderId] = price;
   session->orderSizes[newOrderId] = size;
@@ -271,13 +269,13 @@ GenerateRandomGtcOrder(TestOrdersGeneratorSession *session) {
 
 static OrderCommand
 GenerateRandomInstantOrder(TestOrdersGeneratorSession *session) {
-  std::uniform_int_distribution<int> dist(0, 3);
-  OrderAction action = (dist(session->rand) + session->priceDirection >= 2)
+  // Match Java: rand.nextInt(4)
+  OrderAction action = (session->rand.nextInt(4) + session->priceDirection >= 2)
                            ? OrderAction::BID
                            : OrderAction::ASK;
 
-  std::uniform_int_distribution<int> userDist(0, session->numUsers - 1);
-  int32_t uid = session->uidMapper(userDist(session->rand));
+  // Match Java: rand.nextInt(session.numUsers)
+  int32_t uid = session->uidMapper(session->rand.nextInt(session->numUsers));
 
   int32_t newOrderId = session->seq;
 
@@ -302,38 +300,39 @@ GenerateRandomInstantOrder(TestOrdersGeneratorSession *session) {
     if (availableVolume < 0) {
       availableVolume = 0;
     }
-    std::uniform_int_distribution<int64_t> bigRandDist(0, availableVolume);
-    size = 1 + bigRandDist(session->rand);
+    // Match Java: bigRand = rand.nextLong(); bigRand = bigRand < 0 ? -1 -
+    // bigRand : bigRand;
+    int64_t bigRand = session->rand.nextLong();
+    bigRand = bigRand < 0 ? -1 - bigRand : bigRand;
+    size = 1 + static_cast<int64_t>(bigRand % (availableVolume + 1));
 
     if (action == OrderAction::ASK) {
       session->lastTotalVolumeAsk =
           std::max(session->lastTotalVolumeAsk - size, static_cast<int64_t>(0));
     } else {
+      // Match Java bug: should be lastTotalVolumeBid but Java uses
+      // lastTotalVolumeAsk
       session->lastTotalVolumeBid =
-          std::max(session->lastTotalVolumeBid - size, static_cast<int64_t>(0));
+          std::max(session->lastTotalVolumeAsk - size, static_cast<int64_t>(0));
     }
 
   } else {
-    std::uniform_int_distribution<int> fokDist(0, 31);
-    if (fokDist(session->rand) == 0) {
+    // Match Java: rand.nextInt(32) == 0
+    if (session->rand.nextInt(32) == 0) {
       // IOC:FOKB = 31:1
       orderType = OrderType::FOK_BUDGET;
-      std::uniform_int_distribution<int> sizeDist1(0, 7);
-      std::uniform_int_distribution<int> sizeDist2(0, 7);
-      std::uniform_int_distribution<int> sizeDist3(0, 7);
-      size = 1 + sizeDist1(session->rand) * sizeDist2(session->rand) *
-                     sizeDist3(session->rand);
+      // Match Java: rand.nextInt(8) * rand.nextInt(8) * rand.nextInt(8)
+      size = 1 + session->rand.nextInt(8) * session->rand.nextInt(8) *
+                     session->rand.nextInt(8);
       priceOrBudget = size * priceLimit;
       reserveBidPrice = priceOrBudget;
     } else {
       orderType = OrderType::IOC;
       priceOrBudget = priceLimit;
       reserveBidPrice = action == OrderAction::BID ? session->maxPrice : 0;
-      std::uniform_int_distribution<int> sizeDist1(0, 5);
-      std::uniform_int_distribution<int> sizeDist2(0, 5);
-      std::uniform_int_distribution<int> sizeDist3(0, 5);
-      size = 1 + sizeDist1(session->rand) * sizeDist2(session->rand) *
-                     sizeDist3(session->rand);
+      // Match Java: rand.nextInt(6) * rand.nextInt(6) * rand.nextInt(6)
+      size = 1 + session->rand.nextInt(6) * session->rand.nextInt(6) *
+                     session->rand.nextInt(6);
     }
   }
 
@@ -363,11 +362,10 @@ static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession *session) {
     session->counterReduce = 0;
   }
 
-  std::uniform_int_distribution<int> actionDist(0, 3);
-  OrderAction action =
-      (actionDist(session->rand) + session->priceDirection >= 2)
-          ? OrderAction::BID
-          : OrderAction::ASK;
+  // Match Java: rand.nextInt(4)
+  OrderAction action = (session->rand.nextInt(4) + session->priceDirection >= 2)
+                           ? OrderAction::BID
+                           : OrderAction::ASK;
 
   int32_t lackOfOrders =
       (action == OrderAction::ASK) ? lackOfOrdersAsk : lackOfOrdersBid;
@@ -383,11 +381,11 @@ static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession *session) {
 
   int32_t q;
   if (growOrders) {
-    std::uniform_int_distribution<int> qDist(0, requireFastFill ? 1 : 9);
-    q = qDist(session->rand);
+    // Match Java: rand.nextInt(requireFastFill ? 2 : 10)
+    q = session->rand.nextInt(requireFastFill ? 2 : 10);
   } else {
-    std::uniform_int_distribution<int> qDist(0, 39);
-    q = qDist(session->rand);
+    // Match Java: rand.nextInt(40)
+    q = session->rand.nextInt(40);
   }
 
   if (q < 2 || session->orderUids.empty()) {
@@ -409,8 +407,8 @@ static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession *session) {
     }
   }
 
-  std::uniform_int_distribution<int32_t> randPosDist(0, size - 1);
-  int32_t randPos = randPosDist(session->rand);
+  // Match Java: rand.nextInt(size)
+  int32_t randPos = session->rand.nextInt(size);
 
   // Safely advance iterator
   auto it = session->orderUids.begin();
@@ -447,8 +445,8 @@ static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession *session) {
       throw std::runtime_error("Order size not found");
     }
     int32_t prevSize = sizeIt->second;
-    std::uniform_int_distribution<int32_t> reduceDist(1, prevSize);
-    int32_t reduceBy = reduceDist(session->rand);
+    // Match Java: rand.nextInt(prevSize) + 1
+    int32_t reduceBy = session->rand.nextInt(prevSize) + 1;
     return OrderCommand::Reduce(orderId, uid, reduceBy);
 
   } else {
@@ -466,8 +464,8 @@ static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession *session) {
     } else if (prevPrice < session->lastTradePrice) {
       priceMoveRounded = static_cast<int64_t>(std::ceil(priceMove));
     } else {
-      std::uniform_int_distribution<int> dirDist(0, 1);
-      priceMoveRounded = dirDist(session->rand) * 2 - 1;
+      // Match Java: rand.nextInt(2) * 2 - 1
+      priceMoveRounded = session->rand.nextInt(2) * 2 - 1;
     }
 
     int64_t newPrice =
@@ -492,7 +490,19 @@ TestOrdersGenerator::GenResult TestOrdersGenerator::GenerateCommands(
   result.commandsBenchmark.reserve(benchmarkTransactionsNumber);
 
   // Create a reference orderbook to simulate order generation
-  auto symbolSpec = TestConstants::CreateSymbolSpecEurUsd();
+  // Select symbol specification based on symbol ID to ensure order book
+  // snapshot matches actual execution (fixes Java TODO comment)
+  exchange::core::common::CoreSymbolSpecification symbolSpec;
+  if (symbol == TestConstants::SYMBOL_MARGIN) {
+    symbolSpec = TestConstants::CreateSymbolSpecEurUsd();
+  } else if (symbol == TestConstants::SYMBOL_EXCHANGE) {
+    symbolSpec = TestConstants::CreateSymbolSpecEthXbt();
+  } else if (symbol == TestConstants::SYMBOL_EXCHANGE_FEE) {
+    symbolSpec = TestConstants::CreateSymbolSpecFeeXbtLtc();
+  } else {
+    // Fallback to EUR_USD for unknown symbols
+    symbolSpec = TestConstants::CreateSymbolSpecEurUsd();
+  }
   std::unique_ptr<IOrderBook> orderBook =
       std::make_unique<OrderBookNaiveImpl>(&symbolSpec, nullptr, nullptr);
 
@@ -676,19 +686,27 @@ TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsFill() const {
   apiCommands.reserve(commandsFill.size());
 
   for (const auto &cmd : commandsFill) {
+    exchange::core::common::api::ApiCommand *apiCmd = nullptr;
     if (cmd.command ==
         exchange::core::common::cmd::OrderCommandType::PLACE_ORDER) {
-      apiCommands.push_back(new exchange::core::common::api::ApiPlaceOrder(
+      apiCmd = new exchange::core::common::api::ApiPlaceOrder(
           cmd.price, cmd.size, cmd.orderId, cmd.action, cmd.orderType, cmd.uid,
-          cmd.symbol, cmd.userCookie, cmd.reserveBidPrice));
+          cmd.symbol, cmd.userCookie, cmd.reserveBidPrice);
     } else if (cmd.command ==
                exchange::core::common::cmd::OrderCommandType::MOVE_ORDER) {
-      apiCommands.push_back(new exchange::core::common::api::ApiMoveOrder(
-          cmd.orderId, cmd.price, cmd.uid, cmd.symbol));
+      apiCmd = new exchange::core::common::api::ApiMoveOrder(
+          cmd.orderId, cmd.price, cmd.uid, cmd.symbol);
     } else if (cmd.command ==
                exchange::core::common::cmd::OrderCommandType::CANCEL_ORDER) {
-      apiCommands.push_back(new exchange::core::common::api::ApiCancelOrder(
-          cmd.orderId, cmd.uid, cmd.symbol));
+      apiCmd = new exchange::core::common::api::ApiCancelOrder(
+          cmd.orderId, cmd.uid, cmd.symbol);
+    } else if (cmd.command ==
+               exchange::core::common::cmd::OrderCommandType::REDUCE_ORDER) {
+      apiCmd = new exchange::core::common::api::ApiReduceOrder(
+          cmd.orderId, cmd.uid, cmd.symbol, cmd.size);
+    }
+    if (apiCmd) {
+      apiCommands.push_back(apiCmd);
     }
   }
 
@@ -743,8 +761,9 @@ TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsBenchmark() const {
       counterCancel++;
     } else if (cmd.command ==
                exchange::core::common::cmd::OrderCommandType::REDUCE_ORDER) {
+      apiCmd = new exchange::core::common::api::ApiReduceOrder(
+          cmd.orderId, cmd.uid, cmd.symbol, cmd.size);
       counterReduce++;
-      // REDUCE_ORDER not yet supported in API
     }
     if (apiCmd) {
       apiCommands.push_back(apiCmd);

@@ -90,6 +90,10 @@ int32_t TestConstants::GetCurrency(const std::string &currency) {
     return CURRENCY_XBT;
   } else if (currency == "ETH") {
     return CURRENCY_ETH;
+  } else if (currency == "JPY") {
+    return CURRENCY_JPY;
+  } else if (currency == "LTC") {
+    return CURRENCY_LTC;
   }
   throw std::runtime_error("Unknown currency [" + currency + "]");
 }

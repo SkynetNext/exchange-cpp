@@ -32,14 +32,18 @@ TestOrdersGeneratorSession::TestOrdersGeneratorSession(
       targetOrderBookOrdersHalf(targetOrderBookOrdersHalf),
       priceDeviation(0), // Will be set via const_cast below
       avalancheIOC(avalancheIOC), numUsers(numUsers), uidMapper(uidMapper),
-      symbol(symbol), rand(std::hash<int32_t>{}(symbol * -177277) ^
-                           std::hash<int>{}(seed * 10037 + 198267)),
+      // Match Java: Objects.hash(symbol * -177277, seed * 10037 + 198267)
+      // Objects.hash for 2 args: 31 * (31 * 1 + value1) + value2 = 961 + 31 *
+      // value1 + value2
+      symbol(symbol),
+      rand(961 + 31 * (symbol * -177277) + (seed * 10037 + 198267)),
       minPrice(0), maxPrice(0),          // Will be set via const_cast below
       lackOrOrdersFastFillThreshold(0) { // Will be set via const_cast below
   // Generate initial price: 10^(3.3 + rand*1.5 + rand*1.5)
-  std::uniform_real_distribution<double> dist(0.0, 1.0);
-  double rand1 = dist(rand);
-  double rand2 = dist(rand);
+  // Match Java: int price = (int) Math.pow(10, 3.3 + rand.nextDouble() * 1.5 +
+  // rand.nextDouble() * 1.5);
+  double rand1 = rand.nextDouble();
+  double rand2 = rand.nextDouble();
   int64_t price =
       static_cast<int64_t>(std::pow(10.0, 3.3 + rand1 * 1.5 + rand2 * 1.5));
 

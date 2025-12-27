@@ -60,7 +60,7 @@ private:
   static std::atomic<int32_t> threadsCounter_;
 
   void ExecutePinned(std::function<void()> runnable);
-  void AcquireAffinityLock();
+  int AcquireAffinityLock(int32_t threadId);
 };
 
 } // namespace utils

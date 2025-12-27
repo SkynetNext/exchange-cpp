@@ -17,15 +17,20 @@
 #include "ExchangeTestContainer.h"
 #include "TestConstants.h"
 #include "UserCurrencyAccountsGenerator.h"
+#include <chrono>
+#include <exchange/core/ExchangeApi.h>
 #include <exchange/core/ExchangeCore.h>
+#include <exchange/core/common/VectorBytesIn.h>
+#include <exchange/core/common/VectorBytesOut.h>
 #include <exchange/core/common/api/ApiAddUser.h>
 #include <exchange/core/common/api/ApiAdjustUserBalance.h>
-#include <exchange/core/common/api/ApiNop.h>
-#include <exchange/core/common/api/ApiReset.h>
 #include <exchange/core/common/api/ApiBinaryDataCommand.h>
 #include <exchange/core/common/api/ApiCancelOrder.h>
 #include <exchange/core/common/api/ApiMoveOrder.h>
+#include <exchange/core/common/api/ApiNop.h>
 #include <exchange/core/common/api/ApiPlaceOrder.h>
+#include <exchange/core/common/api/ApiReduceOrder.h>
+#include <exchange/core/common/api/ApiReset.h>
 #include <exchange/core/common/api/binary/BatchAddSymbolsCommand.h>
 #include <exchange/core/common/api/reports/SingleUserReportQuery.h>
 #include <exchange/core/common/api/reports/SingleUserReportResult.h>
@@ -33,14 +38,11 @@
 #include <exchange/core/common/api/reports/StateHashReportResult.h>
 #include <exchange/core/common/api/reports/TotalCurrencyBalanceReportQuery.h>
 #include <exchange/core/common/api/reports/TotalCurrencyBalanceReportResult.h>
-#include <exchange/core/ExchangeApi.h>
-#include <exchange/core/common/VectorBytesIn.h>
-#include <exchange/core/common/VectorBytesOut.h>
 #include <exchange/core/common/config/ExchangeConfiguration.h>
 #include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/common/config/OrdersProcessingConfiguration.h>
 #include <exchange/core/common/config/ReportsQueriesConfiguration.h>
-#include <chrono>
+#include <exchange/core/utils/AffinityThreadFactory.h>
 #include <random>
 #include <thread>
 #include <unordered_map>
@@ -53,23 +55,26 @@ namespace util {
 // Static helper for CHECK_SUCCESS callback
 void ExchangeTestContainer::CheckSuccess(
     const exchange::core::common::cmd::OrderCommand &cmd) {
-  if (cmd.resultCode != exchange::core::common::cmd::CommandResultCode::SUCCESS) {
+  if (cmd.resultCode !=
+      exchange::core::common::cmd::CommandResultCode::SUCCESS) {
     throw std::runtime_error("Command failed with code: " +
-                            std::to_string(static_cast<int>(cmd.resultCode)));
+                             std::to_string(static_cast<int>(cmd.resultCode)));
   }
 }
 
 // Static factory methods
 std::unique_ptr<ExchangeTestContainer> ExchangeTestContainer::Create(
     const exchange::core::common::config::PerformanceConfiguration &perfCfg) {
-  return Create(perfCfg,
-                exchange::core::common::config::InitialStateConfiguration::Default(),
-                exchange::core::common::config::SerializationConfiguration::Default());
+  return Create(
+      perfCfg,
+      exchange::core::common::config::InitialStateConfiguration::Default(),
+      exchange::core::common::config::SerializationConfiguration::Default());
 }
 
 std::unique_ptr<ExchangeTestContainer> ExchangeTestContainer::Create(
     const exchange::core::common::config::PerformanceConfiguration &perfCfg,
-    const exchange::core::common::config::InitialStateConfiguration &initStateCfg,
+    const exchange::core::common::config::InitialStateConfiguration
+        &initStateCfg,
     const exchange::core::common::config::SerializationConfiguration
         &serializationCfg) {
   return std::unique_ptr<ExchangeTestContainer>(
@@ -79,45 +84,57 @@ std::unique_ptr<ExchangeTestContainer> ExchangeTestContainer::Create(
 // Constructor
 ExchangeTestContainer::ExchangeTestContainer(
     const exchange::core::common::config::PerformanceConfiguration &perfCfg,
-    const exchange::core::common::config::InitialStateConfiguration &initStateCfg,
+    const exchange::core::common::config::InitialStateConfiguration
+        &initStateCfg,
     const exchange::core::common::config::SerializationConfiguration
         &serializationCfg)
     : uniqueIdCounterLong_(0), uniqueIdCounterInt_(0) {
 
   // Create ExchangeConfiguration
-  // PerformanceConfiguration cannot be copied (contains unique_ptr), so we need to create a new one
-  // by manually copying all fields and creating a new threadFactory
-  // Since ThreadFactory is abstract, we create a SimpleThreadFactory as a fallback
-  // (In practice, the original threadFactory will be used by ExchangeCore, so this is just for the config)
+  // PerformanceConfiguration cannot be copied (contains unique_ptr), so we need
+  // to create a new one by manually copying all fields and creating a new
+  // threadFactory Since ThreadFactory is abstract, we create a
+  // SimpleThreadFactory as a fallback (In practice, the original threadFactory
+  // will be used by ExchangeCore, so this is just for the config)
   class SimpleThreadFactory : public disruptor::dsl::ThreadFactory {
   public:
     std::thread newThread(std::function<void()> r) override {
       return std::thread(r);
     }
   };
-  
+
   std::unique_ptr<disruptor::dsl::ThreadFactory> newThreadFactory;
   if (perfCfg.threadFactory) {
-    // Try to create a new AffinityThreadFactory if the original was one
-    // Otherwise use SimpleThreadFactory
-    // Note: This is a simplified approach - in practice, we might need to check the actual type
-    newThreadFactory = std::make_unique<SimpleThreadFactory>();
+    // Try to preserve the original ThreadFactory type
+    // Since ThreadFactory is abstract, we can't easily check the type.
+    // However, we can infer from other config fields:
+    // - If waitStrategy is BUSY_SPIN, likely ThroughputPerformanceBuilder or
+    //   LatencyPerformanceBuilder (uses AffinityThreadFactory)
+    // - If waitStrategy is BLOCKING, likely Default() (uses
+    // SimpleThreadFactory) Match Java: ExchangeCore uses
+    // perfCfg.getThreadFactory(), so we need to preserve the same type. For
+    // ThroughputPerformanceBuilder and LatencyPerformanceBuilder, they use
+    // AffinityThreadFactory with THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE.
+    if (perfCfg.waitStrategy ==
+        exchange::core::common::CoreWaitStrategy::BUSY_SPIN) {
+      // Likely ThroughputPerformanceBuilder or LatencyPerformanceBuilder
+      newThreadFactory = std::make_unique<utils::AffinityThreadFactory>(
+          utils::ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE);
+    } else {
+      // Likely Default() - use SimpleThreadFactory
+      newThreadFactory = std::make_unique<SimpleThreadFactory>();
+    }
   } else {
     newThreadFactory = nullptr;
   }
-  
+
   exchange::core::common::config::PerformanceConfiguration perfCfgCopy(
-      perfCfg.ringBufferSize,
-      perfCfg.matchingEnginesNum,
-      perfCfg.riskEnginesNum,
-      perfCfg.msgsInGroupLimit,
-      perfCfg.maxGroupDurationNs,
-      perfCfg.sendL2ForEveryCmd,
-      perfCfg.l2RefreshDepth,
-      perfCfg.waitStrategy,
-      std::move(newThreadFactory),
+      perfCfg.ringBufferSize, perfCfg.matchingEnginesNum,
+      perfCfg.riskEnginesNum, perfCfg.msgsInGroupLimit,
+      perfCfg.maxGroupDurationNs, perfCfg.sendL2ForEveryCmd,
+      perfCfg.l2RefreshDepth, perfCfg.waitStrategy, std::move(newThreadFactory),
       perfCfg.orderBookFactory);
-  
+
   exchange::core::common::config::ExchangeConfiguration exchangeConfiguration(
       exchange::core::common::config::OrdersProcessingConfiguration::Default(),
       std::move(perfCfgCopy), initStateCfg,
@@ -208,31 +225,38 @@ void ExchangeTestContainer::InitFeeUsers() {
 
 // Initialize a single basic user
 void ExchangeTestContainer::InitBasicUser(int64_t uid) {
-  auto addUserCmd = std::make_unique<exchange::core::common::api::ApiAddUser>(uid);
+  auto addUserCmd =
+      std::make_unique<exchange::core::common::api::ApiAddUser>(uid);
   auto result1 = api_->SubmitCommandAsync(addUserCmd.release());
   if (result1.get() !=
       exchange::core::common::cmd::CommandResultCode::SUCCESS) {
     throw std::runtime_error("Failed to add user");
   }
 
-  auto adjust1 = std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
-      uid, TestConstants::CURRENCY_USD, 10'000'00L, GetRandomTransactionId());
+  auto adjust1 =
+      std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
+          uid, TestConstants::CURRENCY_USD, 10'000'00L,
+          GetRandomTransactionId());
   auto result2 = api_->SubmitCommandAsync(adjust1.release());
   if (result2.get() !=
       exchange::core::common::cmd::CommandResultCode::SUCCESS) {
     throw std::runtime_error("Failed to adjust balance USD");
   }
 
-  auto adjust2 = std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
-      uid, TestConstants::CURRENCY_XBT, 1'0000'0000L, GetRandomTransactionId());
+  auto adjust2 =
+      std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
+          uid, TestConstants::CURRENCY_XBT, 1'0000'0000L,
+          GetRandomTransactionId());
   auto result3 = api_->SubmitCommandAsync(adjust2.release());
   if (result3.get() !=
       exchange::core::common::cmd::CommandResultCode::SUCCESS) {
     throw std::runtime_error("Failed to adjust balance XBT");
   }
 
-  auto adjust3 = std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
-      uid, TestConstants::CURRENCY_ETH, 1'0000'0000L, GetRandomTransactionId());
+  auto adjust3 =
+      std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
+          uid, TestConstants::CURRENCY_ETH, 1'0000'0000L,
+          GetRandomTransactionId());
   auto result4 = api_->SubmitCommandAsync(adjust3.release());
   if (result4.get() !=
       exchange::core::common::cmd::CommandResultCode::SUCCESS) {
@@ -242,39 +266,48 @@ void ExchangeTestContainer::InitBasicUser(int64_t uid) {
 
 // Initialize a single fee user
 void ExchangeTestContainer::InitFeeUser(int64_t uid) {
-  auto addUserCmd = std::make_unique<exchange::core::common::api::ApiAddUser>(uid);
+  auto addUserCmd =
+      std::make_unique<exchange::core::common::api::ApiAddUser>(uid);
   auto result1 = api_->SubmitCommandAsync(addUserCmd.release());
   if (result1.get() !=
       exchange::core::common::cmd::CommandResultCode::SUCCESS) {
     throw std::runtime_error("Failed to add user");
   }
 
-  auto adjust1 = std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
-      uid, TestConstants::CURRENCY_USD, 10'000'00L, GetRandomTransactionId());
+  auto adjust1 =
+      std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
+          uid, TestConstants::CURRENCY_USD, 10'000'00L,
+          GetRandomTransactionId());
   auto result2 = api_->SubmitCommandAsync(adjust1.release());
   if (result2.get() !=
       exchange::core::common::cmd::CommandResultCode::SUCCESS) {
     throw std::runtime_error("Failed to adjust balance USD");
   }
 
-  auto adjust2 = std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
-      uid, TestConstants::CURRENCY_JPY, 10'000'000L, GetRandomTransactionId());
+  auto adjust2 =
+      std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
+          uid, TestConstants::CURRENCY_JPY, 10'000'000L,
+          GetRandomTransactionId());
   auto result3 = api_->SubmitCommandAsync(adjust2.release());
   if (result3.get() !=
       exchange::core::common::cmd::CommandResultCode::SUCCESS) {
     throw std::runtime_error("Failed to adjust balance JPY");
   }
 
-  auto adjust3 = std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
-      uid, TestConstants::CURRENCY_XBT, 1'0000'0000L, GetRandomTransactionId());
+  auto adjust3 =
+      std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
+          uid, TestConstants::CURRENCY_XBT, 1'0000'0000L,
+          GetRandomTransactionId());
   auto result4 = api_->SubmitCommandAsync(adjust3.release());
   if (result4.get() !=
       exchange::core::common::cmd::CommandResultCode::SUCCESS) {
     throw std::runtime_error("Failed to adjust balance XBT");
   }
 
-  auto adjust4 = std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
-      uid, TestConstants::CURRENCY_LTC, 1000'0000'0000L, GetRandomTransactionId());
+  auto adjust4 =
+      std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
+          uid, TestConstants::CURRENCY_LTC, 1000'0000'0000L,
+          GetRandomTransactionId());
   auto result5 = api_->SubmitCommandAsync(adjust4.release());
   if (result5.get() !=
       exchange::core::common::cmd::CommandResultCode::SUCCESS) {
@@ -305,20 +338,22 @@ void ExchangeTestContainer::AddMoneyToUser(int64_t uid, int32_t currency,
 // Add symbol
 void ExchangeTestContainer::AddSymbol(
     const exchange::core::common::CoreSymbolSpecification &symbol) {
-  auto batchCmd = std::make_unique<exchange::core::common::api::binary::BatchAddSymbolsCommand>(
-      &symbol);
+  auto batchCmd = std::make_unique<
+      exchange::core::common::api::binary::BatchAddSymbolsCommand>(&symbol);
   SendBinaryDataCommandSync(std::move(batchCmd), 5000);
 }
 
 // Add multiple symbols
 void ExchangeTestContainer::AddSymbols(
-    const std::vector<exchange::core::common::CoreSymbolSpecification> &symbols) {
+    const std::vector<exchange::core::common::CoreSymbolSpecification>
+        &symbols) {
   // Split into chunks of 10000 (matching Java version)
   const size_t chunkSize = 10000;
   for (size_t i = 0; i < symbols.size(); i += chunkSize) {
     size_t end = std::min(i + chunkSize, symbols.size());
     // Convert to vector of pointers
-    std::vector<const exchange::core::common::CoreSymbolSpecification *> chunkPtrs;
+    std::vector<const exchange::core::common::CoreSymbolSpecification *>
+        chunkPtrs;
     chunkPtrs.reserve(end - i);
     for (size_t j = i; j < end; j++) {
       chunkPtrs.push_back(&symbols[j]);
@@ -331,11 +366,12 @@ void ExchangeTestContainer::AddSymbols(
 
 // Send binary data command synchronously
 void ExchangeTestContainer::SendBinaryDataCommandSync(
-    std::unique_ptr<exchange::core::common::api::binary::BinaryDataCommand> data,
+    std::unique_ptr<exchange::core::common::api::binary::BinaryDataCommand>
+        data,
     int timeOutMs) {
-  auto binaryCmd = std::make_unique<
-      exchange::core::common::api::ApiBinaryDataCommand>(
-      GetRandomTransferId(), std::move(data));
+  auto binaryCmd =
+      std::make_unique<exchange::core::common::api::ApiBinaryDataCommand>(
+          GetRandomTransferId(), std::move(data));
   auto future = api_->SubmitCommandAsync(binaryCmd.release());
   auto status = future.wait_for(std::chrono::milliseconds(timeOutMs));
   if (status == std::future_status::timeout) {
@@ -344,7 +380,7 @@ void ExchangeTestContainer::SendBinaryDataCommandSync(
   auto result = future.get();
   if (result != exchange::core::common::cmd::CommandResultCode::SUCCESS) {
     throw std::runtime_error("Binary data command failed with code: " +
-                            std::to_string(static_cast<int>(result)));
+                             std::to_string(static_cast<int>(result)));
   }
 }
 
@@ -354,7 +390,8 @@ void ExchangeTestContainer::UserAccountsInit(
   // Calculate max amount per account to avoid overflow
   std::unordered_map<int32_t, int64_t> accountsNumPerCurrency;
   for (const auto &currencies : userCurrencies) {
-    for (size_t currencyIdx = 0; currencyIdx < currencies.size(); currencyIdx++) {
+    for (size_t currencyIdx = 0; currencyIdx < currencies.size();
+         currencyIdx++) {
       if (currencies[currencyIdx]) {
         int32_t currency = static_cast<int32_t>(currencyIdx);
         accountsNumPerCurrency[currency]++;
@@ -372,7 +409,7 @@ void ExchangeTestContainer::UserAccountsInit(
 
 // Initialize users with currencies
 void ExchangeTestContainer::UsersInit(int numUsers,
-                                     const std::set<int32_t> &currencies) {
+                                      const std::set<int32_t> &currencies) {
   std::vector<exchange::core::common::api::ApiCommand *> cmds;
   for (int64_t uid = 1; uid <= numUsers; uid++) {
     cmds.push_back(new exchange::core::common::api::ApiAddUser(uid));
@@ -393,7 +430,7 @@ void ExchangeTestContainer::ResetExchangeCore() {
   auto result = future.get();
   if (result != exchange::core::common::cmd::CommandResultCode::SUCCESS) {
     throw std::runtime_error("Reset failed with code: " +
-                            std::to_string(static_cast<int>(result)));
+                             std::to_string(static_cast<int>(result)));
   }
 }
 
@@ -416,7 +453,8 @@ void ExchangeTestContainer::SubmitCommandSync(
     std::unique_ptr<exchange::core::common::api::ApiCommand> apiCommand,
     std::function<void(const exchange::core::common::cmd::OrderCommand &)>
         validator) {
-  // Matches Java: validator.accept(api.submitCommandAsyncFullResponse(apiCommand).join())
+  // Matches Java:
+  // validator.accept(api.submitCommandAsyncFullResponse(apiCommand).join())
   validator(api_->SubmitCommandAsyncFullResponse(apiCommand.release()).get());
 }
 
@@ -441,14 +479,16 @@ void ExchangeTestContainer::ValidateUserState(
 }
 
 // Get user profile
-// Match Java: return api.processReport(new SingleUserReportQuery(clientId), getRandomTransferId()).get();
+// Match Java: return api.processReport(new SingleUserReportQuery(clientId),
+// getRandomTransferId()).get();
 std::unique_ptr<exchange::core::common::api::reports::SingleUserReportResult>
 ExchangeTestContainer::GetUserProfile(int64_t clientId) {
   auto query = std::make_unique<
       exchange::core::common::api::reports::SingleUserReportQuery>(clientId);
-  
+
   // Use ProcessReportHelper to match Java api.processReport behavior
-  // ProcessReportHelper handles serialization, ProcessReportAny, and CreateResult
+  // ProcessReportHelper handles serialization, ProcessReportAny, and
+  // CreateResult
   try {
     auto future = exchange::core::ProcessReportHelper<
         exchange::core::common::api::reports::SingleUserReportQuery,
@@ -457,9 +497,11 @@ ExchangeTestContainer::GetUserProfile(int64_t clientId) {
     return future.get();
   } catch (const std::future_error &e) {
     if (e.code() == std::future_errc::no_state) {
-      throw std::runtime_error("GetUserProfile failed for clientId " + std::to_string(clientId) + 
-                              ": " + std::string(e.what()) + 
-                              " - This usually means the promise was destroyed before set_value() was called");
+      throw std::runtime_error("GetUserProfile failed for clientId " +
+                               std::to_string(clientId) + ": " +
+                               std::string(e.what()) +
+                               " - This usually means the promise was "
+                               "destroyed before set_value() was called");
     }
     throw;
   }
@@ -467,7 +509,8 @@ ExchangeTestContainer::GetUserProfile(int64_t clientId) {
 
 // Helper function to check if all balances are zero
 static bool IsAllBalancesZero(
-    const exchange::core::common::api::reports::TotalCurrencyBalanceReportResult &result) {
+    const exchange::core::common::api::reports::TotalCurrencyBalanceReportResult
+        &result) {
   // Check account balances
   if (result.accountBalances) {
     for (const auto &pair : *result.accountBalances) {
@@ -476,7 +519,7 @@ static bool IsAllBalancesZero(
       }
     }
   }
-  
+
   // Check fees
   if (result.fees) {
     for (const auto &pair : *result.fees) {
@@ -485,7 +528,7 @@ static bool IsAllBalancesZero(
       }
     }
   }
-  
+
   // Check adjustments
   if (result.adjustments) {
     for (const auto &pair : *result.adjustments) {
@@ -494,7 +537,7 @@ static bool IsAllBalancesZero(
       }
     }
   }
-  
+
   // Check suspends
   if (result.suspends) {
     for (const auto &pair : *result.suspends) {
@@ -503,7 +546,7 @@ static bool IsAllBalancesZero(
       }
     }
   }
-  
+
   // Check orders balances
   if (result.ordersBalances) {
     for (const auto &pair : *result.ordersBalances) {
@@ -512,25 +555,27 @@ static bool IsAllBalancesZero(
       }
     }
   }
-  
+
   // Check open interest (long and short should balance)
   if (result.openInterestLong && result.openInterestShort) {
     for (const auto &pair : *result.openInterestLong) {
       auto it = result.openInterestShort->find(pair.first);
-      int64_t diff = pair.second - (it != result.openInterestShort->end() ? it->second : 0);
+      int64_t diff = pair.second -
+                     (it != result.openInterestShort->end() ? it->second : 0);
       if (diff != 0) {
         return false;
       }
     }
     for (const auto &pair : *result.openInterestShort) {
-      if (result.openInterestLong->find(pair.first) == result.openInterestLong->end()) {
+      if (result.openInterestLong->find(pair.first) ==
+          result.openInterestLong->end()) {
         if (pair.second != 0) {
           return false;
         }
       }
     }
   }
-  
+
   return true;
 }
 
@@ -540,64 +585,67 @@ std::unique_ptr<
 ExchangeTestContainer::TotalBalanceReport() {
   auto query = std::make_unique<
       exchange::core::common::api::reports::TotalCurrencyBalanceReportQuery>();
-  
-  // Use ProcessReportHelper to properly handle serialization and section merging
-  // This matches the Java api.processReport behavior
-  auto result = exchange::core::ProcessReportHelper<
-      exchange::core::common::api::reports::TotalCurrencyBalanceReportQuery,
-      exchange::core::common::api::reports::TotalCurrencyBalanceReportResult>(
-      api_, std::move(query), GetRandomTransferId())
-      .get();
-  
+
+  // Use ProcessReportHelper to properly handle serialization and section
+  // merging This matches the Java api.processReport behavior
+  auto result =
+      exchange::core::ProcessReportHelper<
+          exchange::core::common::api::reports::TotalCurrencyBalanceReportQuery,
+          exchange::core::common::api::reports::
+              TotalCurrencyBalanceReportResult>(api_, std::move(query),
+                                                GetRandomTransferId())
+          .get();
+
   // Verify open interest balance (matching Java version behavior)
   if (result && result->openInterestLong && result->openInterestShort) {
     for (const auto &pair : *result->openInterestLong) {
       auto it = result->openInterestShort->find(pair.first);
-      int64_t diff = pair.second - (it != result->openInterestShort->end() ? it->second : 0);
+      int64_t diff = pair.second -
+                     (it != result->openInterestShort->end() ? it->second : 0);
       if (diff != 0) {
         throw std::runtime_error("Open Interest balance check failed");
       }
     }
     for (const auto &pair : *result->openInterestShort) {
-      if (result->openInterestLong->find(pair.first) == result->openInterestLong->end()) {
+      if (result->openInterestLong->find(pair.first) ==
+          result->openInterestLong->end()) {
         if (pair.second != 0) {
           throw std::runtime_error("Open Interest balance check failed");
         }
       }
     }
   }
-  
+
   return result;
 }
 
 // Request state hash
 int32_t ExchangeTestContainer::RequestStateHash() {
-  auto query =
-      std::make_unique<exchange::core::common::api::reports::StateHashReportQuery>();
-  
+  auto query = std::make_unique<
+      exchange::core::common::api::reports::StateHashReportQuery>();
+
   // Serialize query using WriteMarshallable
   std::vector<uint8_t> queryBytesVec;
   exchange::core::common::VectorBytesOut queryBytesOut(queryBytesVec);
   query->WriteMarshallable(queryBytesOut);
   std::vector<uint8_t> queryBytes = queryBytesOut.GetData();
-  
+
   auto future = api_->ProcessReportAny(
-      query->GetReportTypeCode(),
-      std::move(queryBytes), GetRandomTransferId());
+      query->GetReportTypeCode(), std::move(queryBytes), GetRandomTransferId());
   auto resultBytes = future.get();
   if (resultBytes.empty() || resultBytes[0].empty()) {
     throw std::runtime_error("Failed to get state hash");
   }
-  
+
   // Deserialize result using constructor from BytesIn
   exchange::core::common::VectorBytesIn resultBytesIn(resultBytes[0]);
-  exchange::core::common::api::reports::StateHashReportResult result(resultBytesIn);
+  exchange::core::common::api::reports::StateHashReportResult result(
+      resultBytesIn);
   return result.GetStateHash();
 }
 
 // Helper function to convert OrderCommand to ApiCommand*
-static exchange::core::common::api::ApiCommand *
-ConvertOrderCommandToApiCommand(
+static exchange::core::common::api::ApiCommand *ConvertOrderCommandToApiCommand(
     const exchange::core::common::cmd::OrderCommand &cmd) {
   switch (cmd.command) {
   case exchange::core::common::cmd::OrderCommandType::PLACE_ORDER:
@@ -606,15 +654,13 @@ ConvertOrderCommandToApiCommand(
         cmd.symbol, cmd.userCookie, cmd.reserveBidPrice);
   case exchange::core::common::cmd::OrderCommandType::MOVE_ORDER:
     return new exchange::core::common::api::ApiMoveOrder(cmd.orderId, cmd.price,
-                                                          cmd.uid, cmd.symbol);
+                                                         cmd.uid, cmd.symbol);
   case exchange::core::common::cmd::OrderCommandType::CANCEL_ORDER:
     return new exchange::core::common::api::ApiCancelOrder(cmd.orderId, cmd.uid,
-                                                            cmd.symbol);
-  case exchange::core::common::cmd::OrderCommandType::REDUCE_ORDER: {
-    // TODO: Add ApiReduceOrder support when available
-    // ApiReduceOrder is not yet implemented in C++ version
-    return nullptr;
-  }
+                                                           cmd.symbol);
+  case exchange::core::common::cmd::OrderCommandType::REDUCE_ORDER:
+    return new exchange::core::common::api::ApiReduceOrder(
+        cmd.orderId, cmd.uid, cmd.symbol, cmd.size);
   default:
     return nullptr;
   }
@@ -624,18 +670,21 @@ ConvertOrderCommandToApiCommand(
 void ExchangeTestContainer::LoadSymbolsUsersAndPrefillOrders(
     const TestDataFutures &testDataFutures) {
   // Load symbols
-  auto coreSymbolSpecifications = const_cast<TestDataFutures&>(testDataFutures).coreSymbolSpecifications.get();
+  auto coreSymbolSpecifications = const_cast<TestDataFutures &>(testDataFutures)
+                                      .coreSymbolSpecifications.get();
   AddSymbols(coreSymbolSpecifications);
 
   // Create accounts and deposit initial funds
-  auto userAccounts = const_cast<TestDataFutures&>(testDataFutures).usersAccounts.get();
+  auto userAccounts =
+      const_cast<TestDataFutures &>(testDataFutures).usersAccounts.get();
   UserAccountsInit(userAccounts);
 
   // Prefill orders - get fill commands from genResult
-  auto genResult = const_cast<TestDataFutures&>(testDataFutures).genResult.get();
+  auto genResult =
+      const_cast<TestDataFutures &>(testDataFutures).genResult.get();
   auto fillCommandsFuture = genResult->GetApiCommandsFill();
   auto fillCommands = fillCommandsFuture.get();
-  
+
   if (!fillCommands.empty()) {
     api_->SubmitCommandsSync(fillCommands);
     // Note: ApiCommand pointers are owned by ExchangeApi, don't delete them
@@ -645,7 +694,8 @@ void ExchangeTestContainer::LoadSymbolsUsersAndPrefillOrders(
 // Load symbols, users and prefill orders (no logging)
 void ExchangeTestContainer::LoadSymbolsUsersAndPrefillOrdersNoLog(
     const TestDataFutures &testDataFutures) {
-  // Same implementation as LoadSymbolsUsersAndPrefillOrders, but without logging
+  // Same implementation as LoadSymbolsUsersAndPrefillOrders, but without
+  // logging
   this->LoadSymbolsUsersAndPrefillOrders(testDataFutures);
 }
 
@@ -691,52 +741,56 @@ void ExchangeTestContainer::CreateUserAccountsRegular(
 }
 
 // Static helper methods
-TestDataFutures
-ExchangeTestContainer::PrepareTestDataAsync(const util::TestDataParameters &parameters,
-                                             int seed) {
+TestDataFutures ExchangeTestContainer::PrepareTestDataAsync(
+    const util::TestDataParameters &parameters, int seed) {
   TestDataFutures futures;
 
   // Prepare symbols asynchronously
   // Convert std::future to std::shared_future to allow multiple get() calls
-  futures.coreSymbolSpecifications = std::async(
-      std::launch::async, [&parameters]() {
-        return ExchangeTestContainer::GenerateRandomSymbols(parameters.numSymbols,
-                                      parameters.currenciesAllowed,
-                                      parameters.allowedSymbolTypes);
-      }).share();  // Convert to shared_future
+  futures.coreSymbolSpecifications =
+      std::async(std::launch::async, [&parameters]() {
+        return ExchangeTestContainer::GenerateRandomSymbols(
+            parameters.numSymbols, parameters.currenciesAllowed,
+            parameters.allowedSymbolTypes);
+      }).share(); // Convert to shared_future
 
   // Prepare user accounts asynchronously
-  futures.usersAccounts = std::async(std::launch::async, [&parameters]() {
-    return UserCurrencyAccountsGenerator::GenerateUsers(
-        parameters.numAccounts, parameters.currenciesAllowed);
-  }).share();  // Convert to shared_future
+  futures.usersAccounts =
+      std::async(std::launch::async, [&parameters]() {
+        return UserCurrencyAccountsGenerator::GenerateUsers(
+            parameters.numAccounts, parameters.currenciesAllowed);
+      }).share(); // Convert to shared_future
 
   // Prepare test orders generator result
-  // Wrap in shared_ptr because MultiSymbolGenResult contains non-copyable OrderCommand
-  futures.genResult = std::async(std::launch::async, [&parameters, seed]() {
-    // Wait for symbols and users to be ready
-    // Note: In a real async implementation, we'd combine the futures
-    // For now, we'll generate symbols and users synchronously here
-    auto symbols = ExchangeTestContainer::GenerateRandomSymbols(parameters.numSymbols,
-                                          parameters.currenciesAllowed,
-                                          parameters.allowedSymbolTypes);
-    auto users = UserCurrencyAccountsGenerator::GenerateUsers(
-        parameters.numAccounts, parameters.currenciesAllowed);
-    
-    // Create TestOrdersGeneratorConfig
-    util::TestOrdersGeneratorConfig config;
-    config.coreSymbolSpecifications = symbols;
-    config.totalTransactionsNumber = parameters.totalTransactionsNumber;
-    config.usersAccounts = users;
-    config.targetOrderBookOrdersTotal = parameters.targetOrderBookOrdersTotal;
-    config.seed = seed;
-    config.avalancheIOC = parameters.avalancheIOC;
-    config.preFillMode = parameters.preFillMode;
-    
-    // Generate multiple symbols and wrap in shared_ptr
-    return std::make_shared<util::TestOrdersGenerator::MultiSymbolGenResult>(
-        util::TestOrdersGenerator::GenerateMultipleSymbols(config));
-  }).share();  // Convert to shared_future
+  // Wrap in shared_ptr because MultiSymbolGenResult contains non-copyable
+  // OrderCommand
+  futures.genResult =
+      std::async(std::launch::async, [&parameters, seed]() {
+        // Wait for symbols and users to be ready
+        // Note: In a real async implementation, we'd combine the futures
+        // For now, we'll generate symbols and users synchronously here
+        auto symbols = ExchangeTestContainer::GenerateRandomSymbols(
+            parameters.numSymbols, parameters.currenciesAllowed,
+            parameters.allowedSymbolTypes);
+        auto users = UserCurrencyAccountsGenerator::GenerateUsers(
+            parameters.numAccounts, parameters.currenciesAllowed);
+
+        // Create TestOrdersGeneratorConfig
+        util::TestOrdersGeneratorConfig config;
+        config.coreSymbolSpecifications = symbols;
+        config.totalTransactionsNumber = parameters.totalTransactionsNumber;
+        config.usersAccounts = users;
+        config.targetOrderBookOrdersTotal =
+            parameters.targetOrderBookOrdersTotal;
+        config.seed = seed;
+        config.avalancheIOC = parameters.avalancheIOC;
+        config.preFillMode = parameters.preFillMode;
+
+        // Generate multiple symbols and wrap in shared_ptr
+        return std::make_shared<
+            util::TestOrdersGenerator::MultiSymbolGenResult>(
+            util::TestOrdersGenerator::GenerateMultipleSymbols(config));
+      }).share(); // Convert to shared_future
 
   return futures;
 }
@@ -777,8 +831,7 @@ ExchangeTestContainer::GenerateRandomSymbols(
     int quoteCurrency = currencies[rng() % currencies.size()];
     if (baseCurrency != quoteCurrency) {
       exchange::core::common::CoreSymbolSpecification symbol;
-      symbol.symbolId =
-          TestConstants::SYMBOL_AUTOGENERATED_RANGE_START + i;
+      symbol.symbolId = TestConstants::SYMBOL_AUTOGENERATED_RANGE_START + i;
       symbol.type = symbolTypeSupplier();
       symbol.baseCurrency = baseCurrency;
       symbol.quoteCurrency = quoteCurrency;
@@ -800,7 +853,8 @@ std::string ExchangeTestContainer::TimeBasedExchangeId() {
                 now.time_since_epoch())
                 .count();
   char buffer[32];
-  snprintf(buffer, sizeof(buffer), "%012llX", static_cast<unsigned long long>(ms));
+  snprintf(buffer, sizeof(buffer), "%012llX",
+           static_cast<unsigned long long>(ms));
   return std::string(buffer);
 }
 
@@ -808,4 +862,3 @@ std::string ExchangeTestContainer::TimeBasedExchangeId() {
 } // namespace tests
 } // namespace core
 } // namespace exchange
-

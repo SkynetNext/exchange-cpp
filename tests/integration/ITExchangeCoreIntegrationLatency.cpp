@@ -15,7 +15,11 @@
  */
 
 #include "ITExchangeCoreIntegrationLatency.h"
+#include "../util/TestConstants.h"
 #include <exchange/core/common/config/PerformanceConfiguration.h>
+#include <gtest/gtest.h>
+
+using namespace exchange::core::tests::util;
 
 namespace exchange {
 namespace core {
@@ -27,15 +31,39 @@ ITExchangeCoreIntegrationLatency::ITExchangeCoreIntegrationLatency()
 
 exchange::core::common::config::PerformanceConfiguration
 ITExchangeCoreIntegrationLatency::GetPerformanceConfiguration() {
-  // Note: C++ version doesn't have LatencyPerformanceBuilder, use Default()
-  // with latency-optimized settings
-  auto cfg = exchange::core::common::config::PerformanceConfiguration::Default();
-  // Latency-optimized settings would be applied here if needed
-  return cfg;
+  // Match Java: PerformanceConfiguration.latencyPerformanceBuilder().build()
+  return exchange::core::common::config::PerformanceConfiguration::
+      LatencyPerformanceBuilder();
+}
+
+// Register tests (same as Basic version but with latency configuration)
+TEST_F(ITExchangeCoreIntegrationLatency, BasicFullCycleTestMargin) {
+  BasicFullCycleTest(TestConstants::SYMBOLSPEC_EUR_USD());
+}
+
+TEST_F(ITExchangeCoreIntegrationLatency, BasicFullCycleTestExchange) {
+  BasicFullCycleTest(TestConstants::SYMBOLSPEC_ETH_XBT());
+}
+
+TEST_F(ITExchangeCoreIntegrationLatency, ShouldInitSymbols) {
+  ShouldInitSymbols();
+}
+
+TEST_F(ITExchangeCoreIntegrationLatency, ShouldInitUsers) { ShouldInitUsers(); }
+
+TEST_F(ITExchangeCoreIntegrationLatency, ExchangeRiskBasicTest) {
+  ExchangeRiskBasicTest();
+}
+
+TEST_F(ITExchangeCoreIntegrationLatency, ExchangeCancelBid) {
+  ExchangeCancelBid();
+}
+
+TEST_F(ITExchangeCoreIntegrationLatency, ExchangeRiskMoveTest) {
+  ExchangeRiskMoveTest();
 }
 
 } // namespace integration
 } // namespace tests
 } // namespace core
 } // namespace exchange
-

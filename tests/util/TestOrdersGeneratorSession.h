@@ -18,8 +18,8 @@
 
 #include <exchange/core/common/OrderAction.h>
 #include <exchange/core/orderbook/IOrderBook.h>
+#include "JavaRandom.h"
 #include <functional>
-#include <random>
 #include <unordered_map>
 #include <vector>
 
@@ -48,7 +48,7 @@ public:
 
   const int32_t symbol;
 
-  std::mt19937 rand;
+  JavaRandom rand;
 
   std::unordered_map<int32_t, int64_t> orderPrices;
   std::unordered_map<int32_t, int32_t> orderSizes;

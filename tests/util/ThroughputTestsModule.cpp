@@ -186,66 +186,13 @@ void ThroughputTestsModule::ThroughputTestImpl(
                                    std::to_string(symbol.symbolId));
         }
 
-        // Both pointers should be valid at this point
         // Compare order book snapshots using operator==
         // Match Java assertEquals behavior: both must be equal
+        // Java version doesn't print anything if they match, only throws on
+        // mismatch
         if (*expectedPtr != *actual) {
-          // Log detailed comparison for debugging
-          std::string errorMsg = "Order book state mismatch for symbol " +
-                                 std::to_string(symbol.symbolId);
-          errorMsg +=
-              "\nExpected: askSize=" + std::to_string(expectedPtr->askSize) +
-              ", bidSize=" + std::to_string(expectedPtr->bidSize);
-          errorMsg += "\nActual: askSize=" + std::to_string(actual->askSize) +
-                      ", bidSize=" + std::to_string(actual->bidSize);
-
-          // Compare ask side
-          int32_t minAskSize = std::min(expectedPtr->askSize, actual->askSize);
-          for (int32_t i = 0; i < minAskSize; i++) {
-            if (expectedPtr->askPrices[i] != actual->askPrices[i] ||
-                expectedPtr->askVolumes[i] != actual->askVolumes[i] ||
-                expectedPtr->askOrders[i] != actual->askOrders[i]) {
-              errorMsg +=
-                  "\nAsk[" + std::to_string(i) + "]: expected price=" +
-                  std::to_string(expectedPtr->askPrices[i]) +
-                  " volume=" + std::to_string(expectedPtr->askVolumes[i]) +
-                  " orders=" + std::to_string(expectedPtr->askOrders[i]);
-              errorMsg +=
-                  ", actual price=" + std::to_string(actual->askPrices[i]) +
-                  " volume=" + std::to_string(actual->askVolumes[i]) +
-                  " orders=" + std::to_string(actual->askOrders[i]);
-            }
-          }
-          if (expectedPtr->askSize != actual->askSize) {
-            errorMsg += "\nAsk size mismatch: expected " +
-                        std::to_string(expectedPtr->askSize) + ", actual " +
-                        std::to_string(actual->askSize);
-          }
-
-          // Compare bid side
-          int32_t minBidSize = std::min(expectedPtr->bidSize, actual->bidSize);
-          for (int32_t i = 0; i < minBidSize; i++) {
-            if (expectedPtr->bidPrices[i] != actual->bidPrices[i] ||
-                expectedPtr->bidVolumes[i] != actual->bidVolumes[i] ||
-                expectedPtr->bidOrders[i] != actual->bidOrders[i]) {
-              errorMsg +=
-                  "\nBid[" + std::to_string(i) + "]: expected price=" +
-                  std::to_string(expectedPtr->bidPrices[i]) +
-                  " volume=" + std::to_string(expectedPtr->bidVolumes[i]) +
-                  " orders=" + std::to_string(expectedPtr->bidOrders[i]);
-              errorMsg +=
-                  ", actual price=" + std::to_string(actual->bidPrices[i]) +
-                  " volume=" + std::to_string(actual->bidVolumes[i]) +
-                  " orders=" + std::to_string(actual->bidOrders[i]);
-            }
-          }
-          if (expectedPtr->bidSize != actual->bidSize) {
-            errorMsg += "\nBid size mismatch: expected " +
-                        std::to_string(expectedPtr->bidSize) + ", actual " +
-                        std::to_string(actual->bidSize);
-          }
-
-          throw std::runtime_error(errorMsg);
+          throw std::runtime_error("Order book state mismatch for symbol " +
+                                   std::to_string(symbol.symbolId));
         }
       }
     }

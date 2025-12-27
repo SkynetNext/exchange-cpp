@@ -49,12 +49,26 @@ std::thread AffinityThreadFactory::newThread(std::function<void()> r) {
   // and skips pinning. In C++, we can't easily do type checking on
   // std::function, so we proceed with affinity for all threads.
 
-  // Note: Java version also tracks affinityReservations to avoid duplicate
-  // reservations. In C++, std::function doesn't provide a reliable way to
-  // get a unique identifier, so we skip this check for now.
+  // Check for duplicate reservations (match Java behavior)
+  // Note: We use function object address as identifier (not perfect, but
+  // works for detecting most duplicates)
+  void *taskId = static_cast<void *>(const_cast<std::function<void()> *>(&r));
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (affinityReservations_.find(taskId) != affinityReservations_.end()) {
+      // Match Java: log.warn("Task {} was already pinned", runnable);
+      LOG_WARN("Task {} was already pinned", taskId);
+    }
+    affinityReservations_.insert(taskId);
+  }
 
   // Create thread that will execute with affinity
-  return std::thread([this, r]() { ExecutePinned(r); });
+  return std::thread([this, r, taskId]() {
+    ExecutePinned(r);
+    // Remove reservation after thread completes
+    std::lock_guard<std::mutex> lock(mutex_);
+    affinityReservations_.erase(taskId);
+  });
 }
 
 bool AffinityThreadFactory::IsTaskPinned(void *task) const {
@@ -67,31 +81,8 @@ void AffinityThreadFactory::ExecutePinned(std::function<void()> runnable) {
   int32_t threadId = threadsCounter_.fetch_add(1) + 1;
 
   // Acquire affinity lock (if enabled) - this sets CPU affinity
-  int cpuId = -1;
-#ifdef _WIN32
-  // Get CPU ID from Windows affinity mask (simplified)
-  DWORD_PTR processAffinityMask = 0;
-  DWORD_PTR systemAffinityMask = 0;
-  if (GetProcessAffinityMask(GetCurrentProcess(), &processAffinityMask,
-                             &systemAffinityMask)) {
-    cpuId = threadId % (sizeof(DWORD_PTR) * 8);
-    if (threadAffinityMode_ ==
-        ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_PHYSICAL_CORE) {
-      cpuId = (cpuId / 2) * 2;
-    }
-  }
-#elif defined(__linux__)
-  int numCpus = sysconf(_SC_NPROCESSORS_ONLN);
-  if (numCpus > 0) {
-    cpuId = threadId % numCpus;
-    if (threadAffinityMode_ ==
-        ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_PHYSICAL_CORE) {
-      cpuId = (cpuId / 2) * 2;
-    }
-  }
-#endif
-
-  AcquireAffinityLock();
+  // Returns the CPU ID that was actually set (or -1 if failed)
+  int cpuId = AcquireAffinityLock(threadId);
 
   try {
     // Format thread name similar to Java: "Thread-AF-{threadId}-cpu{cpuId}"
@@ -104,10 +95,11 @@ void AffinityThreadFactory::ExecutePinned(std::function<void()> runnable) {
     // On Windows: SetThreadDescription API (Windows 10+)
     // On Linux: pthread_setname_np
 
-    if (cpuId >= 0) {
-      LOG_DEBUG("{} will be running on thread={} pinned to cpu {}", "Task",
-                threadName, cpuId);
-    }
+    // Match Java: log.debug() is visible in tests, so use LOG_INFO for
+    // visibility
+    // Always log, even if cpuId is -1 (affinity failed)
+    LOG_INFO("{} will be running on thread={} pinned to cpu {}", "Task",
+             threadName, cpuId >= 0 ? cpuId : -1);
 
     // Execute the runnable
     runnable();
@@ -119,12 +111,13 @@ void AffinityThreadFactory::ExecutePinned(std::function<void()> runnable) {
   }
 
   // Cleanup: CPU affinity is automatically restored when thread exits
-  LOG_DEBUG("Removing cpu lock/reservation from {}", "Task");
+  // Match Java: log.debug() is visible in tests, so use LOG_INFO for visibility
+  LOG_INFO("Removing cpu lock/reservation from {}", "Task");
 }
 
-void AffinityThreadFactory::AcquireAffinityLock() {
+int AffinityThreadFactory::AcquireAffinityLock(int32_t threadId) {
   if (threadAffinityMode_ == ThreadAffinityMode::THREAD_AFFINITY_DISABLE) {
-    return;
+    return -1;
   }
 
 #ifdef _WIN32
@@ -137,8 +130,8 @@ void AffinityThreadFactory::AcquireAffinityLock() {
                              &systemAffinityMask)) {
     // Find an available CPU core
     DWORD_PTR affinityMask = 0;
-    int coreId = threadsCounter_.load() %
-                 (sizeof(DWORD_PTR) * 8); // Use modulo to cycle through cores
+    int coreId =
+        threadId % (sizeof(DWORD_PTR) * 8); // Use modulo to cycle through cores
 
     if (threadAffinityMode_ ==
         ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_PHYSICAL_CORE) {
@@ -162,15 +155,19 @@ void AffinityThreadFactory::AcquireAffinityLock() {
         LOG_WARN("[AffinityThreadFactory] Failed to set thread affinity mask "
                  "0x{:x}, thread will run without CPU pinning",
                  affinityMask);
+        return -1;
       }
+      return coreId;
     } else {
       // No available cores in affinity mask - thread will run without pinning
       LOG_WARN("[AffinityThreadFactory] No available CPU cores in affinity "
                "mask (processAffinityMask=0x{:x}), thread will run without "
                "CPU pinning",
                processAffinityMask);
+      return -1;
     }
   }
+  return -1;
 
 #elif defined(__linux__)
   // Linux implementation
@@ -182,11 +179,10 @@ void AffinityThreadFactory::AcquireAffinityLock() {
   if (numCpus <= 0) {
     LOG_WARN("[AffinityThreadFactory] Cannot determine CPU count, thread will "
              "run without CPU pinning");
-    return;
+    return -1;
   }
 
   // Calculate which CPU to use
-  int threadId = threadsCounter_.load();
   int cpuId = threadId % numCpus;
 
   if (threadAffinityMode_ ==
@@ -206,11 +202,14 @@ void AffinityThreadFactory::AcquireAffinityLock() {
     LOG_WARN("[AffinityThreadFactory] Failed to set thread affinity to CPU "
              "{}, error={}, thread will run without CPU pinning",
              cpuId, ret);
+    return -1;
   }
+  return cpuId;
 
 #else
   // Unsupported platform - no-op
   // macOS and other platforms would need different implementations
+  return -1;
 #endif
 }
 
