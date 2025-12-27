@@ -2,7 +2,7 @@
 
 ## Overview
 
-Performance comparison between C++ and Java implementations of the exchange core system, focusing on throughput for `CURRENCY_EXCHANGE_PAIR` (Exchange) operations.
+Performance comparison between C++ and Java implementations of the exchange core system, focusing on throughput for `CURRENCY_EXCHANGE_PAIR` (Exchange) operations and peak load scenarios.
 
 ## Test Environment
 
@@ -79,4 +79,76 @@ Performance comparison between C++ and Java implementations of the exchange core
 
 ---
 
-**Version**: 1.0 | **Date**: 2025-12-28 | **Test**: `TestThroughputExchange`
+## TestThroughputPeak Results
+
+Peak load test with multi-symbol, high-volume configuration to test system scalability under stress.
+
+### Test Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Symbol Type | `BOTH` (FUTURES_CONTRACT + CURRENCY_EXCHANGE_PAIR) |
+| Symbols | 100 |
+| Benchmark Commands | 3,000,000 |
+| PreFill Commands | 10,000 |
+| Users | 10,000 accounts (4,810 unique) |
+| Currencies | 40 |
+| Iterations | 5 |
+| Ring Buffer | 32,768 |
+| Matching Engines | 4 |
+| Risk Engines | 2 |
+| Messages in Group Limit | 1,536 |
+
+**Command Distribution**: GTC ~14%, IOC ~3%, Cancel ~10%, Move ~67%, Reduce ~6%
+
+### C++ Implementation
+
+| Iteration | Throughput (MT/s) | Time (ms) |
+|-----------|-------------------|-----------|
+| 0 | 5.671 | 529 |
+| 1 | 4.754 | 631 |
+| 2 | 2.976 | 1,008 |
+| 3 | 3.006 | 998 |
+| 4 | 3.927 | 764 |
+| **Average** | **4.067 MT/s** | **786.0 ms** |
+
+**Total Time**: 7.3 seconds  
+**Variance**: ±1.0 MT/s (higher variance due to multi-symbol load)  
+**Warm-up**: None
+
+### Java Implementation
+
+| Iteration | Throughput (MT/s) | Time (ms) |
+|-----------|-------------------|-----------|
+| 0 | 1.121 | ~2,676 |
+| 1 | 0.604 | ~4,970 |
+| 2 | 1.904 | ~1,575 |
+| 3 | 0.878 | ~3,415 |
+| 4 | 1.302 | ~2,303 |
+| **Average** | **1.162 MT/s** | **~2,988 ms** |
+
+**Total Time**: ~23 seconds  
+**Variance**: ±0.5 MT/s (high variance, significant performance degradation)  
+**Warm-up**: Not clearly visible (all iterations slow)
+
+### Performance Comparison
+
+| Metric | C++ | Java | Ratio |
+|--------|-----|------|-------|
+| Average Throughput | 4.067 MT/s | 1.162 MT/s | **3.50x** |
+| Peak Throughput | 5.671 MT/s | 1.904 MT/s | **2.98x** |
+| Avg Execution Time | 786.0 ms | ~2,988 ms | **3.80x faster** |
+| Total Test Time | 7.3s | ~23s | **3.15x faster** |
+| Performance Variance | ±1.0 MT/s | ±0.5 MT/s | C++ more stable under load |
+
+### Observations
+
+- **C++ performance**: 4.067 MT/s average, handles 100 symbols with 4+2 configuration effectively
+- **Java performance**: 1.162 MT/s average, significant degradation under multi-symbol load
+- **C++ advantage**: 3.5x faster throughput, better scalability with multiple matching/risk engines
+- **Java limitations**: High variance, poor performance under peak load (100 symbols, 3M commands)
+- **Multi-threading**: C++ benefits from lock-free `moodycamel::ConcurrentQueue` in SharedPool (6 threads accessing pool)
+
+---
+
+**Version**: 1.1 | **Date**: 2025-12-28 | **Tests**: `TestThroughputExchange`, `TestThroughputPeak`
