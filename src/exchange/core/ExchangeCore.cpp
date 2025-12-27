@@ -674,6 +674,14 @@ public:
 
 private:
   const common::config::ExchangeConfiguration *exchangeConfiguration_;
+  // CRITICAL: Store barriers created by factories to ensure they outlive
+  // processors. Must be declared before disruptor_ so it's destroyed after
+  // disruptor_ (barriers are accessed during Disruptor::halt() in destructor).
+  // In Java, GC manages object lifetime. In C++, we must explicitly manage
+  // ownership. Barriers contain FixedSequenceGroup which holds Sequence*
+  // pointers that must remain valid.
+  using BarrierPtr = typename DisruptorT::BarrierPtr;
+  std::vector<BarrierPtr> ownedBarriers_;
   std::unique_ptr<DisruptorT> disruptor_;
   std::unique_ptr<ExchangeApi<WaitStrategyT>> api_;
   std::unique_ptr<processors::SharedPool> sharedPool_;
@@ -705,12 +713,6 @@ private:
   std::vector<
       std::unique_ptr<disruptor::EventHandler<common::cmd::OrderCommand>>>
       matchingEngineHandlers_;
-  // CRITICAL: Store barriers created by factories to ensure they outlive
-  // processors In Java, GC manages object lifetime. In C++, we must explicitly
-  // manage ownership. Barriers contain FixedSequenceGroup which holds Sequence*
-  // pointers that must remain valid.
-  using BarrierPtr = typename DisruptorT::BarrierPtr;
-  std::vector<BarrierPtr> ownedBarriers_;
 
   // Lifecycle flags - match Java behavior
   // core can be started and stopped only once
