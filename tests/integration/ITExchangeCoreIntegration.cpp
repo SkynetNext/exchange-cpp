@@ -89,23 +89,24 @@ void ITExchangeCoreIntegration::BasicFullCycleTest(
         EXPECT_EQ(cmd.matcherEvent, nullptr);
       });
 
-  // Reserve price calculation: for CURRENCY_EXCHANGE_PAIR, use 1561, otherwise 0
+  // Reserve price calculation: for CURRENCY_EXCHANGE_PAIR, use 1561, otherwise
+  // 0
   int64_t reserve102 =
       (symbolSpec.type == SymbolType::CURRENCY_EXCHANGE_PAIR) ? 1561 : 0;
   auto order102 = std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
       1550, 4, 102, OrderAction::BID, OrderType::GTC, TestConstants::UID_1,
       symbolSpec.symbolId, 0, reserve102);
 
-  container->SubmitCommandSync(std::move(order102),
-                               [](const OrderCommand &cmd) {
-                                 EXPECT_EQ(cmd.resultCode,
-                                           CommandResultCode::SUCCESS);
-                                 EXPECT_EQ(cmd.matcherEvent, nullptr);
-                               });
+  container->SubmitCommandSync(
+      std::move(order102), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+        EXPECT_EQ(cmd.matcherEvent, nullptr);
+      });
 
   L2MarketDataHelper l2helper;
   l2helper.AddAsk(1600, 7).AddBid(1550, 4);
   auto expected = l2helper.Build();
+  ASSERT_NE(expected, nullptr);
   auto actual = container->RequestCurrentOrderBook(symbolSpec.symbolId);
   ASSERT_NE(actual, nullptr);
   EXPECT_EQ(*expected, *actual);
@@ -117,37 +118,39 @@ void ITExchangeCoreIntegration::BasicFullCycleTest(
       1700, 2, 201, OrderAction::BID, OrderType::IOC, TestConstants::UID_2,
       symbolSpec.symbolId, 0, reserve201);
 
-  container->SubmitCommandSync(std::move(order201), [](const OrderCommand &cmd) {
-    EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+  container->SubmitCommandSync(
+      std::move(order201), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
 
-    // Extract events (simplified - in real implementation, need to traverse
-    // matcherEvent chain)
-    int eventCount = 0;
-    auto *evt = cmd.matcherEvent;
-    while (evt) {
-      eventCount++;
-      evt = evt->nextEvent;
-    }
-    EXPECT_EQ(eventCount, 1);
+        // Extract events (simplified - in real implementation, need to traverse
+        // matcherEvent chain)
+        int eventCount = 0;
+        auto *evt = cmd.matcherEvent;
+        while (evt) {
+          eventCount++;
+          evt = evt->nextEvent;
+        }
+        EXPECT_EQ(eventCount, 1);
 
-    EXPECT_EQ(cmd.action, OrderAction::BID);
-    EXPECT_EQ(cmd.orderId, 201);
-    EXPECT_EQ(cmd.uid, TestConstants::UID_2);
+        EXPECT_EQ(cmd.action, OrderAction::BID);
+        EXPECT_EQ(cmd.orderId, 201);
+        EXPECT_EQ(cmd.uid, TestConstants::UID_2);
 
-    if (cmd.matcherEvent) {
-      EXPECT_EQ(cmd.matcherEvent->activeOrderCompleted, true);
-      EXPECT_EQ(cmd.matcherEvent->matchedOrderId, 101);
-      EXPECT_EQ(cmd.matcherEvent->matchedOrderUid, TestConstants::UID_1);
-      EXPECT_EQ(cmd.matcherEvent->matchedOrderCompleted, false);
-      EXPECT_EQ(cmd.matcherEvent->eventType, MatcherEventType::TRADE);
-      EXPECT_EQ(cmd.matcherEvent->size, 2);
-      EXPECT_EQ(cmd.matcherEvent->price, 1600);
-    }
-  });
+        if (cmd.matcherEvent) {
+          EXPECT_EQ(cmd.matcherEvent->activeOrderCompleted, true);
+          EXPECT_EQ(cmd.matcherEvent->matchedOrderId, 101);
+          EXPECT_EQ(cmd.matcherEvent->matchedOrderUid, TestConstants::UID_1);
+          EXPECT_EQ(cmd.matcherEvent->matchedOrderCompleted, false);
+          EXPECT_EQ(cmd.matcherEvent->eventType, MatcherEventType::TRADE);
+          EXPECT_EQ(cmd.matcherEvent->size, 2);
+          EXPECT_EQ(cmd.matcherEvent->price, 1600);
+        }
+      });
 
   // volume is decreased to 5
   l2helper.SetAskVolume(0, 5);
   expected = l2helper.Build();
+  ASSERT_NE(expected, nullptr);
   actual = container->RequestCurrentOrderBook(symbolSpec.symbolId);
   ASSERT_NE(actual, nullptr);
   EXPECT_EQ(*expected, *actual);
@@ -159,13 +162,15 @@ void ITExchangeCoreIntegration::BasicFullCycleTest(
       1583, 4, 202, OrderAction::BID, OrderType::GTC, TestConstants::UID_2,
       symbolSpec.symbolId, 0, reserve202);
 
-  container->SubmitCommandSync(std::move(order202), [](const OrderCommand &cmd) {
-    EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
-    EXPECT_EQ(cmd.matcherEvent, nullptr);
-  });
+  container->SubmitCommandSync(
+      std::move(order202), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+        EXPECT_EQ(cmd.matcherEvent, nullptr);
+      });
 
   l2helper.InsertBid(0, 1583, 4);
   expected = l2helper.Build();
+  ASSERT_NE(expected, nullptr);
   actual = container->RequestCurrentOrderBook(symbolSpec.symbolId);
   ASSERT_NE(actual, nullptr);
   EXPECT_EQ(*expected, *actual);
@@ -175,39 +180,42 @@ void ITExchangeCoreIntegration::BasicFullCycleTest(
   auto moveOrder = std::make_unique<exchange::core::common::api::ApiMoveOrder>(
       101, 1580, TestConstants::UID_1, symbolSpec.symbolId);
 
-  container->SubmitCommandSync(std::move(moveOrder), [](const OrderCommand &cmd) {
-    EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+  container->SubmitCommandSync(
+      std::move(moveOrder), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
 
-    int eventCount = 0;
-    auto *evt = cmd.matcherEvent;
-    while (evt) {
-      eventCount++;
-      evt = evt->nextEvent;
-    }
-    EXPECT_EQ(eventCount, 1);
+        int eventCount = 0;
+        auto *evt = cmd.matcherEvent;
+        while (evt) {
+          eventCount++;
+          evt = evt->nextEvent;
+        }
+        EXPECT_EQ(eventCount, 1);
 
-    EXPECT_EQ(cmd.action, OrderAction::ASK);
-    EXPECT_EQ(cmd.orderId, 101);
-    EXPECT_EQ(cmd.uid, TestConstants::UID_1);
+        EXPECT_EQ(cmd.action, OrderAction::ASK);
+        EXPECT_EQ(cmd.orderId, 101);
+        EXPECT_EQ(cmd.uid, TestConstants::UID_1);
 
-    if (cmd.matcherEvent) {
-      EXPECT_EQ(cmd.matcherEvent->activeOrderCompleted, false);
-      EXPECT_EQ(cmd.matcherEvent->matchedOrderId, 202);
-      EXPECT_EQ(cmd.matcherEvent->matchedOrderUid, TestConstants::UID_2);
-      EXPECT_EQ(cmd.matcherEvent->matchedOrderCompleted, true);
-      EXPECT_EQ(cmd.matcherEvent->eventType, MatcherEventType::TRADE);
-      EXPECT_EQ(cmd.matcherEvent->size, 4);
-      EXPECT_EQ(cmd.matcherEvent->price, 1583);
-    }
-  });
+        if (cmd.matcherEvent) {
+          EXPECT_EQ(cmd.matcherEvent->activeOrderCompleted, false);
+          EXPECT_EQ(cmd.matcherEvent->matchedOrderId, 202);
+          EXPECT_EQ(cmd.matcherEvent->matchedOrderUid, TestConstants::UID_2);
+          EXPECT_EQ(cmd.matcherEvent->matchedOrderCompleted, true);
+          EXPECT_EQ(cmd.matcherEvent->eventType, MatcherEventType::TRADE);
+          EXPECT_EQ(cmd.matcherEvent->size, 4);
+          EXPECT_EQ(cmd.matcherEvent->price, 1583);
+        }
+      });
 
   l2helper.SetAskPriceVolume(0, 1580, 1).RemoveBid(0);
   expected = l2helper.Build();
+  ASSERT_NE(expected, nullptr);
   actual = container->RequestCurrentOrderBook(symbolSpec.symbolId);
   ASSERT_NE(actual, nullptr);
   EXPECT_EQ(*expected, *actual);
 
-  // Verify total balance is zero (matches Java: container.totalBalanceReport().isGlobalBalancesAllZero())
+  // Verify total balance is zero (matches Java:
+  // container.totalBalanceReport().isGlobalBalancesAllZero())
   auto balanceReport = container->TotalBalanceReport();
   if (balanceReport) {
     EXPECT_TRUE(balanceReport->IsGlobalBalancesAllZero());
@@ -230,8 +238,9 @@ void ITExchangeCoreIntegration::ShouldInitUsers() {
 void ITExchangeCoreIntegration::ExchangeRiskBasicTest() {
   auto container = ExchangeTestContainer::Create(GetPerformanceConfiguration());
   container->InitBasicSymbols();
-  container->CreateUserWithMoney(TestConstants::UID_1, TestConstants::CURRENCY_XBT,
-                                  2'000'000); // 2M satoshi (0.02 BTC)
+  container->CreateUserWithMoney(TestConstants::UID_1,
+                                 TestConstants::CURRENCY_XBT,
+                                 2'000'000); // 2M satoshi (0.02 BTC)
 
   // try submit an order - limit BUY 7 lots, price 300K satoshi (30K x10 step)
   // for each lot 100K szabo should be rejected
@@ -239,9 +248,10 @@ void ITExchangeCoreIntegration::ExchangeRiskBasicTest() {
       30'000, 7, 101, OrderAction::BID, OrderType::GTC, TestConstants::UID_1,
       TestConstants::SYMBOL_EXCHANGE, 0, 30'000);
 
-  container->SubmitCommandSync(std::move(order101), [](const OrderCommand &cmd) {
-    EXPECT_EQ(cmd.resultCode, CommandResultCode::RISK_NSF);
-  });
+  container->SubmitCommandSync(
+      std::move(order101), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::RISK_NSF);
+      });
 
   // verify
   container->ValidateUserState(
@@ -259,15 +269,15 @@ void ITExchangeCoreIntegration::ExchangeRiskBasicTest() {
   // add 100K more
   auto adjustBalance =
       std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
-      TestConstants::UID_1, TestConstants::CURRENCY_XBT, 100'000,
-      223948217349827L);
+          TestConstants::UID_1, TestConstants::CURRENCY_XBT, 100'000,
+          223948217349827L);
   container->SubmitCommandSync(std::move(adjustBalance), CHECK_SUCCESS);
 
   // submit order again - should be placed
   auto order101_retry =
       std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
-      30'000, 7, 101, OrderAction::BID, OrderType::GTC, TestConstants::UID_1,
-      TestConstants::SYMBOL_EXCHANGE, 0, 30'000);
+          30'000, 7, 101, OrderAction::BID, OrderType::GTC,
+          TestConstants::UID_1, TestConstants::SYMBOL_EXCHANGE, 0, 30'000);
 
   container->SubmitCommandSync(
       std::move(order101_retry), [](const OrderCommand &cmd) {
@@ -289,50 +299,52 @@ void ITExchangeCoreIntegration::ExchangeRiskBasicTest() {
       TestConstants::UID_1,
       [](const exchange::core::common::api::reports::SingleUserReportResult
              &profile) {
-    ASSERT_NE(profile.accounts, nullptr);
-    auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
-    if (it != profile.accounts->end()) {
-      EXPECT_EQ(it->second, 0);
-    } else {
-      // If account doesn't exist, balance should be 0 (implicit)
-      // This is acceptable
-    }
-  });
+        ASSERT_NE(profile.accounts, nullptr);
+        auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
+        if (it != profile.accounts->end()) {
+          EXPECT_EQ(it->second, 0);
+        } else {
+          // If account doesn't exist, balance should be 0 (implicit)
+          // This is acceptable
+        }
+      });
 
-  container->CreateUserWithMoney(TestConstants::UID_2, TestConstants::CURRENCY_ETH,
-                                  699'999); // 699'999 szabo (<~0.7 ETH)
+  container->CreateUserWithMoney(TestConstants::UID_2,
+                                 TestConstants::CURRENCY_ETH,
+                                 699'999); // 699'999 szabo (<~0.7 ETH)
   // try submit an order - sell 7 lots, price 300K satoshi (30K x10 step) for
   // each lot 100K szabo should be rejected
   auto order102 = std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
       30'000, 7, 102, OrderAction::ASK, OrderType::IOC, TestConstants::UID_2,
       TestConstants::SYMBOL_EXCHANGE, 0, 0);
 
-  container->SubmitCommandSync(std::move(order102), [](const OrderCommand &cmd) {
-    EXPECT_EQ(cmd.resultCode, CommandResultCode::RISK_NSF);
-  });
+  container->SubmitCommandSync(
+      std::move(order102), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::RISK_NSF);
+      });
 
   // verify order is rejected and account balance is not changed
   container->ValidateUserState(
       TestConstants::UID_2,
       [](const exchange::core::common::api::reports::SingleUserReportResult
              &profile) {
-    ASSERT_NE(profile.accounts, nullptr);
-    auto it = profile.accounts->find(TestConstants::CURRENCY_ETH);
-    ASSERT_NE(it, profile.accounts->end());
-    EXPECT_EQ(it->second, 699'999);
-  });
+        ASSERT_NE(profile.accounts, nullptr);
+        auto it = profile.accounts->find(TestConstants::CURRENCY_ETH);
+        ASSERT_NE(it, profile.accounts->end());
+        EXPECT_EQ(it->second, 699'999);
+      });
 
   // add 1 szabo more
   auto adjustBalance2 =
       std::make_unique<exchange::core::common::api::ApiAdjustUserBalance>(
-      TestConstants::UID_2, TestConstants::CURRENCY_ETH, 1, 2193842938742L);
+          TestConstants::UID_2, TestConstants::CURRENCY_ETH, 1, 2193842938742L);
   container->SubmitCommandSync(std::move(adjustBalance2), CHECK_SUCCESS);
 
   // submit order again - should be matched
   auto order102_retry =
       std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
-      30'000, 7, 102, OrderAction::ASK, OrderType::IOC, TestConstants::UID_2,
-      TestConstants::SYMBOL_EXCHANGE, 0, 0);
+          30'000, 7, 102, OrderAction::ASK, OrderType::IOC,
+          TestConstants::UID_2, TestConstants::SYMBOL_EXCHANGE, 0, 0);
 
   container->SubmitCommandSync(
       std::move(order102_retry), [](const OrderCommand &cmd) {
@@ -351,16 +363,16 @@ void ITExchangeCoreIntegration::ExchangeRiskBasicTest() {
       TestConstants::UID_2,
       [](const exchange::core::common::api::reports::SingleUserReportResult
              &profile) {
-    ASSERT_NE(profile.accounts, nullptr);
-    auto xbtIt = profile.accounts->find(TestConstants::CURRENCY_XBT);
-    auto ethIt = profile.accounts->find(TestConstants::CURRENCY_ETH);
-    if (xbtIt != profile.accounts->end()) {
-      EXPECT_EQ(xbtIt->second, 2'100'000);
-    }
-    if (ethIt != profile.accounts->end()) {
-      EXPECT_EQ(ethIt->second, 0);
-    }
-  });
+        ASSERT_NE(profile.accounts, nullptr);
+        auto xbtIt = profile.accounts->find(TestConstants::CURRENCY_XBT);
+        auto ethIt = profile.accounts->find(TestConstants::CURRENCY_ETH);
+        if (xbtIt != profile.accounts->end()) {
+          EXPECT_EQ(xbtIt->second, 2'100'000);
+        }
+        if (ethIt != profile.accounts->end()) {
+          EXPECT_EQ(ethIt->second, 0);
+        }
+      });
 
   container->ValidateUserState(
       TestConstants::UID_1,
@@ -377,7 +389,8 @@ void ITExchangeCoreIntegration::ExchangeRiskBasicTest() {
         }
       });
 
-  // Verify total balance is zero (matches Java: container.totalBalanceReport().isGlobalBalancesAllZero())
+  // Verify total balance is zero (matches Java:
+  // container.totalBalanceReport().isGlobalBalancesAllZero())
   auto balanceReport = container->TotalBalanceReport();
   if (balanceReport) {
     EXPECT_TRUE(balanceReport->IsGlobalBalancesAllZero());
@@ -390,27 +403,31 @@ void ITExchangeCoreIntegration::ExchangeCancelBid() {
   container->InitBasicSymbols();
 
   // create user
-  container->CreateUserWithMoney(TestConstants::UID_2, TestConstants::CURRENCY_XBT,
-                                  94'000'000); // 94M satoshi (0.94 BTC)
+  container->CreateUserWithMoney(TestConstants::UID_2,
+                                 TestConstants::CURRENCY_XBT,
+                                 94'000'000); // 94M satoshi (0.94 BTC)
 
   // submit order with reservePrice below funds limit - should be placed
   auto order203 = std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
       18'000, 500, 203, OrderAction::BID, OrderType::GTC, TestConstants::UID_2,
       TestConstants::SYMBOL_EXCHANGE, 0, 18'500);
 
-  container->SubmitCommandSync(std::move(order203), [](const OrderCommand &cmd) {
-    EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
-  });
+  container->SubmitCommandSync(
+      std::move(order203), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+      });
 
-  // verify order placed with correct reserve price and account balance is updated accordingly
+  // verify order placed with correct reserve price and account balance is
+  // updated accordingly
   const auto symbolSpec = TestConstants::SYMBOLSPEC_ETH_XBT();
   const int64_t expectedBalanceAfterPlace =
       94'000'000L - 18'500 * 500 * symbolSpec.quoteScaleK;
 
   container->ValidateUserState(
       TestConstants::UID_2,
-      [&expectedBalanceAfterPlace](const exchange::core::common::api::reports::SingleUserReportResult
-             &profile) {
+      [&expectedBalanceAfterPlace](
+          const exchange::core::common::api::reports::SingleUserReportResult
+              &profile) {
         ASSERT_NE(profile.accounts, nullptr);
         auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
         ASSERT_NE(it, profile.accounts->end());
@@ -425,25 +442,26 @@ void ITExchangeCoreIntegration::ExchangeCancelBid() {
   // cancel remaining order
   auto cancelOrder =
       std::make_unique<exchange::core::common::api::ApiCancelOrder>(
-      203, TestConstants::UID_2, TestConstants::SYMBOL_EXCHANGE);
+          203, TestConstants::UID_2, TestConstants::SYMBOL_EXCHANGE);
 
-  container->SubmitCommandSync(std::move(cancelOrder), [](const OrderCommand &cmd) {
-    EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
-    EXPECT_EQ(cmd.command, OrderCommandType::CANCEL_ORDER);
-    EXPECT_EQ(cmd.orderId, 203);
-    EXPECT_EQ(cmd.uid, TestConstants::UID_2);
-    EXPECT_EQ(cmd.symbol, TestConstants::SYMBOL_EXCHANGE);
+  container->SubmitCommandSync(
+      std::move(cancelOrder), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::SUCCESS);
+        EXPECT_EQ(cmd.command, OrderCommandType::CANCEL_ORDER);
+        EXPECT_EQ(cmd.orderId, 203);
+        EXPECT_EQ(cmd.uid, TestConstants::UID_2);
+        EXPECT_EQ(cmd.symbol, TestConstants::SYMBOL_EXCHANGE);
 
-    EXPECT_EQ(cmd.action, OrderAction::BID);
+        EXPECT_EQ(cmd.action, OrderAction::BID);
 
-    const auto *evt = cmd.matcherEvent;
-    EXPECT_NE(evt, nullptr);
-    if (evt) {
-      EXPECT_EQ(evt->eventType, MatcherEventType::REDUCE);
-      EXPECT_EQ(evt->bidderHoldPrice, 18'500);
-      EXPECT_EQ(evt->size, 500);
-    }
-  });
+        const auto *evt = cmd.matcherEvent;
+        EXPECT_NE(evt, nullptr);
+        if (evt) {
+          EXPECT_EQ(evt->eventType, MatcherEventType::REDUCE);
+          EXPECT_EQ(evt->bidderHoldPrice, 18'500);
+          EXPECT_EQ(evt->size, 500);
+        }
+      });
 
   // verify that all 94M satoshi were returned back
   container->ValidateUserState(
@@ -478,8 +496,9 @@ void ITExchangeCoreIntegration::ExchangeCancelBid() {
 void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
   auto container = ExchangeTestContainer::Create(GetPerformanceConfiguration());
   container->InitBasicSymbols();
-  container->CreateUserWithMoney(TestConstants::UID_1, TestConstants::CURRENCY_ETH,
-                                  100'000'000); // 100M szabo (100 ETH)
+  container->CreateUserWithMoney(TestConstants::UID_1,
+                                 TestConstants::CURRENCY_ETH,
+                                 100'000'000); // 100M szabo (100 ETH)
 
   // try submit an order - sell 1001 lots, price 300K satoshi (30K x10 step) for
   // each lot 100K szabo should be rejected
@@ -487,9 +506,10 @@ void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
       30'000, 1001, 202, OrderAction::ASK, OrderType::GTC, TestConstants::UID_1,
       TestConstants::SYMBOL_EXCHANGE, 0, 0);
 
-  container->SubmitCommandSync(std::move(order202), [](const OrderCommand &cmd) {
-    EXPECT_EQ(cmd.resultCode, CommandResultCode::RISK_NSF);
-  });
+  container->SubmitCommandSync(
+      std::move(order202), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::RISK_NSF);
+      });
 
   container->ValidateUserState(
       TestConstants::UID_1,
@@ -515,8 +535,8 @@ void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
   // submit order again - should be placed (1000 lots)
   auto order202_retry =
       std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
-      30'000, 1000, 202, OrderAction::ASK, OrderType::GTC, TestConstants::UID_1,
-      TestConstants::SYMBOL_EXCHANGE, 0, 0);
+          30'000, 1000, 202, OrderAction::ASK, OrderType::GTC,
+          TestConstants::UID_1, TestConstants::SYMBOL_EXCHANGE, 0, 0);
 
   container->SubmitCommandSync(
       std::move(order202_retry), [](const OrderCommand &cmd) {
@@ -602,17 +622,19 @@ void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
       });
 
   // create user
-  container->CreateUserWithMoney(TestConstants::UID_2, TestConstants::CURRENCY_XBT,
-                                  94'000'000); // 94M satoshi (0.94 BTC)
+  container->CreateUserWithMoney(TestConstants::UID_2,
+                                 TestConstants::CURRENCY_XBT,
+                                 94'000'000); // 94M satoshi (0.94 BTC)
 
   // try submit order with reservePrice above funds limit - rejected
   auto order203 = std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
       18'000, 500, 203, OrderAction::BID, OrderType::GTC, TestConstants::UID_2,
       TestConstants::SYMBOL_EXCHANGE, 0, 19'000);
 
-  container->SubmitCommandSync(std::move(order203), [](const OrderCommand &cmd) {
-    EXPECT_EQ(cmd.resultCode, CommandResultCode::RISK_NSF);
-  });
+  container->SubmitCommandSync(
+      std::move(order203), [](const OrderCommand &cmd) {
+        EXPECT_EQ(cmd.resultCode, CommandResultCode::RISK_NSF);
+      });
 
   container->ValidateUserState(
       TestConstants::UID_2,
@@ -638,8 +660,8 @@ void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
   // submit order with reservePrice below funds limit - should be placed
   auto order203_retry =
       std::make_unique<exchange::core::common::api::ApiPlaceOrder>(
-      18'000, 500, 203, OrderAction::BID, OrderType::GTC, TestConstants::UID_2,
-      TestConstants::SYMBOL_EXCHANGE, 0, 18'500);
+          18'000, 500, 203, OrderAction::BID, OrderType::GTC,
+          TestConstants::UID_2, TestConstants::SYMBOL_EXCHANGE, 0, 18'500);
 
   container->SubmitCommandSync(
       std::move(order203_retry), [](const OrderCommand &cmd) {
@@ -663,8 +685,9 @@ void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
 
   container->ValidateUserState(
       TestConstants::UID_2,
-      [&ethUid2](const exchange::core::common::api::reports::SingleUserReportResult
-             &profile) {
+      [&ethUid2](
+          const exchange::core::common::api::reports::SingleUserReportResult
+              &profile) {
         ASSERT_NE(profile.accounts, nullptr);
         auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
         ASSERT_NE(it, profile.accounts->end());
@@ -694,8 +717,9 @@ void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
 
   container->ValidateUserState(
       TestConstants::UID_2,
-      [&ethUid2](const exchange::core::common::api::reports::SingleUserReportResult
-             &profile) {
+      [&ethUid2](
+          const exchange::core::common::api::reports::SingleUserReportResult
+              &profile) {
         ASSERT_NE(profile.accounts, nullptr);
         auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
         ASSERT_NE(it, profile.accounts->end());
@@ -711,15 +735,18 @@ void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
   auto moveOrder4 = std::make_unique<exchange::core::common::api::ApiMoveOrder>(
       203, 18'501, TestConstants::UID_2, TestConstants::SYMBOL_EXCHANGE);
 
-  container->SubmitCommandSync(std::move(moveOrder4), [](const OrderCommand &cmd) {
-    EXPECT_EQ(cmd.resultCode,
-              CommandResultCode::MATCHING_MOVE_FAILED_PRICE_OVER_RISK_LIMIT);
-  });
+  container->SubmitCommandSync(
+      std::move(moveOrder4), [](const OrderCommand &cmd) {
+        EXPECT_EQ(
+            cmd.resultCode,
+            CommandResultCode::MATCHING_MOVE_FAILED_PRICE_OVER_RISK_LIMIT);
+      });
 
   container->ValidateUserState(
       TestConstants::UID_2,
-      [&ethUid2](const exchange::core::common::api::reports::SingleUserReportResult
-             &profile) {
+      [&ethUid2](
+          const exchange::core::common::api::reports::SingleUserReportResult
+              &profile) {
         ASSERT_NE(profile.accounts, nullptr);
         auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
         ASSERT_NE(it, profile.accounts->end());
@@ -748,8 +775,9 @@ void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
 
   container->ValidateUserState(
       TestConstants::UID_2,
-      [&ethUid2](const exchange::core::common::api::reports::SingleUserReportResult
-             &profile) {
+      [&ethUid2](
+          const exchange::core::common::api::reports::SingleUserReportResult
+              &profile) {
         ASSERT_NE(profile.accounts, nullptr);
         auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
         ASSERT_NE(it, profile.accounts->end());
@@ -769,8 +797,9 @@ void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
 
   container->ValidateUserState(
       TestConstants::UID_2,
-      [&ethUid2](const exchange::core::common::api::reports::SingleUserReportResult
-             &profile) {
+      [&ethUid2](
+          const exchange::core::common::api::reports::SingleUserReportResult
+              &profile) {
         ASSERT_NE(profile.accounts, nullptr);
         auto it = profile.accounts->find(TestConstants::CURRENCY_XBT);
         ASSERT_NE(it, profile.accounts->end());
@@ -807,12 +836,15 @@ void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
           EXPECT_EQ(evt->matchedOrderUid, TestConstants::UID_2);
           EXPECT_EQ(evt->matchedOrderCompleted, true);
           EXPECT_EQ(evt->price, 17'500); // user price from maker order
-          EXPECT_EQ(evt->bidderHoldPrice, 18'500); // user original reserve price from bidder order (203)
+          EXPECT_EQ(
+              evt->bidderHoldPrice,
+              18'500); // user original reserve price from bidder order (203)
           EXPECT_EQ(evt->size, 500);
         }
       });
 
-  // check UID_1 has 87.5M satoshi (17_500 * 10 * 500) and half-filled SELL order
+  // check UID_1 has 87.5M satoshi (17_500 * 10 * 500) and half-filled SELL
+  // order
   container->ValidateUserState(
       TestConstants::UID_1,
       [](const exchange::core::common::api::reports::SingleUserReportResult
@@ -863,7 +895,7 @@ void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
   // cancel remaining order
   auto cancelOrder =
       std::make_unique<exchange::core::common::api::ApiCancelOrder>(
-      202, TestConstants::UID_1, TestConstants::SYMBOL_EXCHANGE);
+          202, TestConstants::UID_1, TestConstants::SYMBOL_EXCHANGE);
 
   container->SubmitCommandSync(
       std::move(cancelOrder), [](const OrderCommand &cmd) {
@@ -883,7 +915,8 @@ void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
         }
       });
 
-  // check UID_1 has 87.5M satoshi (17_500 * 10 * 500) and 50M szabo (after 100M)
+  // check UID_1 has 87.5M satoshi (17_500 * 10 * 500) and 50M szabo (after
+  // 100M)
   container->ValidateUserState(
       TestConstants::UID_1,
       [](const exchange::core::common::api::reports::SingleUserReportResult
@@ -921,4 +954,3 @@ void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
 } // namespace tests
 } // namespace core
 } // namespace exchange
-
