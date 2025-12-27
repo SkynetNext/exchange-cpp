@@ -66,7 +66,7 @@ std::unique_ptr<ExchangeTestContainer> ExchangeTestContainer::Create(
     const exchange::core::common::config::PerformanceConfiguration &perfCfg) {
   return Create(
       perfCfg,
-      exchange::core::common::config::InitialStateConfiguration::Default(),
+      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
       exchange::core::common::config::SerializationConfiguration::Default());
 }
 
@@ -424,7 +424,7 @@ void ExchangeTestContainer::SubmitCommandSync(
 }
 
 // Request current order book
-std::unique_ptr<exchange::core::common::L2MarketData>
+std::shared_ptr<exchange::core::common::L2MarketData>
 ExchangeTestContainer::RequestCurrentOrderBook(int32_t symbol) {
   return api_->RequestOrderBookAsync(symbol, -1).get();
 }

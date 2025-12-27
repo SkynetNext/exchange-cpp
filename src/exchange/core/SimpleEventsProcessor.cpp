@@ -177,49 +177,15 @@ void SimpleEventsProcessor::SendTradeEvent(common::cmd::OrderCommand *cmd) {
 }
 
 void SimpleEventsProcessor::SendMarketData(common::cmd::OrderCommand *cmd) {
-  // For ORDER_BOOK_REQUEST, we need to preserve marketData for ProcessResult
-  // which is called after this Accept method. So we copy it instead of moving.
-  // Note: ProcessResult is called after SimpleEventsProcessor::Accept,
-  // so if we move marketData here, ProcessResult won't be able to access it.
-  // However, since ProcessResult is called after, we still need to move it
-  // for the event handler. The solution is to copy it in ProcessResult before
-  // it gets moved here. But actually, we can't do that...
-  // 
-  // Actually, the correct solution is: ProcessResult should be called BEFORE
-  // SimpleEventsProcessor::Accept, but that's not the current architecture.
-  // 
-  // Workaround: For ORDER_BOOK_REQUEST, we copy marketData for event handler
-  // and leave the original for ProcessResult. But this is inefficient.
-  // 
-  // Better solution: In ProcessResult, we check if marketData is nullptr
-  // (meaning it was already moved), and if so, we can't fulfill the promise.
-  // But this means RequestOrderBookAsync won't work correctly.
-  //
-  // Actually, looking at the Java code, ProcessResult is called AFTER
-  // SimpleEventsProcessor::Accept, and it still works because Java doesn't
-  // have move semantics - the reference is still there.
-  //
-  // For C++, we need to either:
-  // 1. Change the call order (not ideal)
-  // 2. Copy marketData instead of moving (inefficient but works)
-  // 3. Store a copy in ProcessResult before moving (complex)
-  //
-  // Let's go with option 2 for ORDER_BOOK_REQUEST: copy instead of move.
-  std::unique_ptr<common::L2MarketData> marketData;
-  if (cmd->command == common::cmd::OrderCommandType::ORDER_BOOK_REQUEST) {
-    // For ORDER_BOOK_REQUEST, copy marketData instead of moving,
-    // so ProcessResult can still access it
-    if (cmd->marketData) {
-      marketData = cmd->marketData->Copy();
-    }
-  } else {
-    // For other commands, move marketData as usual
-    marketData = std::move(cmd->marketData);
-  }
-  
-  if (marketData == nullptr) {
+  // With shared_ptr, we can simply copy the shared_ptr (matching Java behavior)
+  // No need for special handling for ORDER_BOOK_REQUEST since shared_ptr can be
+  // copied
+  if (cmd->marketData == nullptr) {
     return;
   }
+
+  // Copy shared_ptr (cheap operation, just increments reference count)
+  std::shared_ptr<common::L2MarketData> marketData = cmd->marketData;
 
   std::vector<OrderBookRecord> asks;
   asks.reserve(marketData->askSize);

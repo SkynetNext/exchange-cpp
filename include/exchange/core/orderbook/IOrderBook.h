@@ -118,11 +118,12 @@ public:
 
   /**
    * Get L2 Market Data snapshot
+   * Returns shared_ptr to allow sharing between OrderCommands (matching Java behavior)
    */
-  virtual std::unique_ptr<common::L2MarketData>
+  virtual std::shared_ptr<common::L2MarketData>
   GetL2MarketDataSnapshot(int32_t size) = 0;
 
-  virtual std::unique_ptr<common::L2MarketData> GetL2MarketDataSnapshot() {
+  virtual std::shared_ptr<common::L2MarketData> GetL2MarketDataSnapshot() {
     return GetL2MarketDataSnapshot(INT32_MAX);
   }
 

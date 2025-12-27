@@ -88,7 +88,10 @@ struct alignas(64) OrderCommand : public IOrder, public StateHash {
   MatcherTradeEvent *matcherEvent = nullptr;
 
   // optional market data
-  std::unique_ptr<L2MarketData> marketData = nullptr;
+  // Use shared_ptr to allow OrderCommand to be copyable (matching Java
+  // behavior) In Java, L2MarketData is a reference that can be shared between
+  // OrderCommands
+  std::shared_ptr<L2MarketData> marketData = nullptr;
 
   // ---- potential false sharing section ------
 

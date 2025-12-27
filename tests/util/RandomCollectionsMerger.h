@@ -33,13 +33,13 @@ public:
   /**
    * Merge multiple collections into one using weighted random distribution
    * @tparam T - element type
-   * @param chunks - vector of collections to merge
+   * @param chunks - vector of collections to merge (will be consumed/moved)
    * @param seed - random seed
    * @return merged collection
    */
   template <typename T>
-  static std::vector<T>
-  MergeCollections(const std::vector<std::vector<T>> &chunks, int64_t seed);
+  static std::vector<T> MergeCollections(std::vector<std::vector<T>> &chunks,
+                                         int64_t seed);
 };
 
 } // namespace util
@@ -57,25 +57,27 @@ namespace tests {
 namespace util {
 
 template <typename T>
-std::vector<T> RandomCollectionsMerger::MergeCollections(
-    const std::vector<std::vector<T>> &chunks, int64_t seed) {
+std::vector<T>
+RandomCollectionsMerger::MergeCollections(std::vector<std::vector<T>> &chunks,
+                                          int64_t seed) {
   std::mt19937 rng(static_cast<uint32_t>(std::hash<int64_t>{}(seed)));
 
   std::vector<T> mergedResult;
 
   // Create working copies with indices
+  // Use reference to avoid copying non-copyable types
   struct ChunkInfo {
-    std::vector<T> data;
+    std::vector<T> *data; // Pointer to allow moving
     size_t currentIndex;
     size_t size;
 
-    ChunkInfo(const std::vector<T> &chunk)
-        : data(chunk), currentIndex(0), size(chunk.size()) {}
+    ChunkInfo(std::vector<T> &chunk)
+        : data(&chunk), currentIndex(0), size(chunk.size()) {}
   };
 
   std::vector<ChunkInfo> activeChunks;
   activeChunks.reserve(chunks.size());
-  for (const auto &chunk : chunks) {
+  for (auto &chunk : chunks) {
     if (!chunk.empty()) {
       activeChunks.emplace_back(chunk);
     }
@@ -96,6 +98,9 @@ std::vector<T> RandomCollectionsMerger::MergeCollections(
     int missCounter = 0;
     while (missCounter < 3 && !activeChunks.empty()) {
       // Generate random number in [0, totalWeight)
+      if (totalWeight == 0) {
+        break;
+      }
       std::uniform_int_distribution<size_t> dist(0, totalWeight - 1);
       size_t randomValue = dist(rng);
 
@@ -115,7 +120,9 @@ std::vector<T> RandomCollectionsMerger::MergeCollections(
       // Try to take element from selected chunk
       auto &selectedChunk = activeChunks[selectedIndex];
       if (selectedChunk.currentIndex < selectedChunk.size) {
-        mergedResult.push_back(selectedChunk.data[selectedChunk.currentIndex]);
+        // Use move semantics for non-copyable types
+        mergedResult.push_back(
+            std::move((*selectedChunk.data)[selectedChunk.currentIndex]));
         selectedChunk.currentIndex++;
         missCounter = 0;
         totalWeight--;

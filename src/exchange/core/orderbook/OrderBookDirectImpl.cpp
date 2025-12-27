@@ -541,7 +541,7 @@ int32_t OrderBookDirectImpl::GetTotalBidBuckets(int32_t limit) {
   return bidPriceBuckets_.Size(limit);
 }
 
-std::unique_ptr<common::L2MarketData>
+std::shared_ptr<common::L2MarketData>
 OrderBookDirectImpl::GetL2MarketDataSnapshot(int32_t size) {
   // Match Java default implementation in IOrderBook interface:
   // default L2MarketData getL2MarketDataSnapshot(final int size) {
@@ -554,7 +554,7 @@ OrderBookDirectImpl::GetL2MarketDataSnapshot(int32_t size) {
   // }
   int32_t asksSize = GetTotalAskBuckets(size);
   int32_t bidsSize = GetTotalBidBuckets(size);
-  auto data = std::make_unique<common::L2MarketData>(asksSize, bidsSize);
+  auto data = std::make_shared<common::L2MarketData>(asksSize, bidsSize);
   FillAsks(asksSize, data.get());
   FillBids(bidsSize, data.get());
   return data;

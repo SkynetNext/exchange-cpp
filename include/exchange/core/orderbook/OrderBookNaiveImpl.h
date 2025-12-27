@@ -76,7 +76,7 @@ public:
    */
   void WriteMarshallable(common::BytesOut &bytes) const override;
 
-  std::unique_ptr<common::L2MarketData>
+  std::shared_ptr<common::L2MarketData>
   GetL2MarketDataSnapshot(int32_t size) override;
   void FillAsks(int32_t size, common::L2MarketData *data) override;
   void FillBids(int32_t size, common::L2MarketData *data) override;

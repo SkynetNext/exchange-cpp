@@ -16,6 +16,7 @@
 
 #include "TestOrdersGenerator.h"
 #include "ExecutionTime.h"
+#include "RandomCollectionsMerger.h"
 #include "TestConstants.h"
 #include "TestOrdersGeneratorConfig.h"
 #include "TestOrdersGeneratorSession.h"
@@ -586,6 +587,47 @@ TestOrdersGenerator::GenResult TestOrdersGenerator::GenerateCommands(
   return result;
 }
 
+// Create weighted distribution for multiple symbols (Pareto distribution)
+// Match Java: createWeightedDistribution(int size, int seed)
+// Java: ParetoDistribution(new JDKRandomGenerator(seed), scale=0.001,
+// shape=1.5) Pareto distribution: f(x) = (shape * scale^shape) / x^(shape+1)
+// for x >= scale To generate: X = scale / U^(1/shape) where U ~ Uniform(0,1)
+std::vector<double> TestOrdersGenerator::CreateWeightedDistribution(int size,
+                                                                    int seed) {
+  constexpr double scale = 0.001;
+  constexpr double shape = 1.5;
+
+  std::mt19937 rng(seed);
+  std::uniform_real_distribution<double> uniform(0.0, 1.0);
+
+  std::vector<double> paretoRaw;
+  paretoRaw.reserve(size);
+  for (int i = 0; i < size; i++) {
+    double u = uniform(rng);
+    // Avoid division by zero: ensure u > 0
+    if (u <= 0.0) {
+      u = std::numeric_limits<double>::min();
+    }
+    // Generate Pareto: X = scale / U^(1/shape)
+    double sample = scale / std::pow(u, 1.0 / shape);
+    paretoRaw.push_back(sample);
+  }
+
+  // Normalize: sum all values and divide each by sum
+  double sum = 0.0;
+  for (double val : paretoRaw) {
+    sum += val;
+  }
+
+  std::vector<double> result;
+  result.reserve(size);
+  for (double val : paretoRaw) {
+    result.push_back(val / sum);
+  }
+
+  return result;
+}
+
 // Generate multiple symbols test commands
 TestOrdersGenerator::MultiSymbolGenResult
 TestOrdersGenerator::GenerateMultipleSymbols(
@@ -598,38 +640,44 @@ TestOrdersGenerator::GenerateMultipleSymbols(
 
   MultiSymbolGenResult multiResult;
 
-  // Calculate transactions per symbol
-  int transactionsPerSymbol =
-      config.totalTransactionsNumber /
-      static_cast<int>(config.coreSymbolSpecifications.size());
-  if (transactionsPerSymbol == 0) {
-    transactionsPerSymbol = 1;
-  }
+  // Match Java: create weighted distribution
+  std::vector<double> distribution = CreateWeightedDistribution(
+      config.coreSymbolSpecifications.size(), config.seed);
 
-  // Calculate target orders per symbol
-  int targetOrdersPerSymbol =
-      config.targetOrderBookOrdersTotal /
-      static_cast<int>(config.coreSymbolSpecifications.size());
-  if (targetOrdersPerSymbol == 0) {
-    targetOrdersPerSymbol = 1;
-  }
+  int quotaLeft = config.totalTransactionsNumber;
+  std::unordered_map<int32_t, GenResult> genResults;
 
-  // Generate commands for each symbol
-  for (const auto &symbolSpec : config.coreSymbolSpecifications) {
+  // Match Java: shared progress logger
+  auto sharedProgressLogger = CreateAsyncProgressLogger(
+      config.totalTransactionsNumber + config.targetOrderBookOrdersTotal);
+
+  // Match Java: iterate from last to first (reverse order)
+  for (int i = static_cast<int>(config.coreSymbolSpecifications.size()) - 1;
+       i >= 0; i--) {
+    const auto &symbolSpec = config.coreSymbolSpecifications[i];
+
+    // Match Java: orderBookSizeTarget = (int) (targetOrderBookOrdersTotal *
+    // distribution[i] + 0.5)
+    int orderBookSizeTarget = static_cast<int>(
+        config.targetOrderBookOrdersTotal * distribution[i] + 0.5);
+
+    // Match Java: commandsNum = (i != 0) ? (int) (totalTransactionsNumber *
+    // distribution[i] + 0.5) : Math.max(quotaLeft, 1)
+    int commandsNum =
+        (i != 0) ? static_cast<int>(
+                       config.totalTransactionsNumber * distribution[i] + 0.5)
+                 : std::max(quotaLeft, 1);
+    quotaLeft -= commandsNum;
+
     // Get users that can trade this symbol
     auto userList = UserCurrencyAccountsGenerator::CreateUserListForSymbol(
-        config.usersAccounts, symbolSpec, transactionsPerSymbol);
+        config.usersAccounts, symbolSpec, commandsNum);
 
     if (userList.empty()) {
       continue; // Skip symbols with no eligible users
     }
 
     // Create UID mapper for this symbol
-    std::unordered_map<int32_t, int32_t> userIndexMap;
-    for (size_t i = 0; i < userList.size(); i++) {
-      userIndexMap[userList[i]] = static_cast<int32_t>(i);
-    }
-
     auto uidMapper = [&userList](int32_t index) -> int32_t {
       if (index >= 0 && index < static_cast<int32_t>(userList.size())) {
         return userList[index];
@@ -638,30 +686,58 @@ TestOrdersGenerator::GenerateMultipleSymbols(
     };
 
     // Generate commands for this symbol
-    int readySeq = config.CalculateReadySeq();
     int targetOrders =
         (config.preFillMode == util::PreFillMode::ORDERS_NUMBER_PLUS_QUARTER)
-            ? targetOrdersPerSymbol * 5 / 4
-            : targetOrdersPerSymbol;
+            ? orderBookSizeTarget * 5 / 4
+            : orderBookSizeTarget;
 
     auto genResult = GenerateCommands(
-        transactionsPerSymbol, targetOrders, static_cast<int>(userList.size()),
+        commandsNum, orderBookSizeTarget, static_cast<int>(userList.size()),
         uidMapper, symbolSpec.symbolId, false, config.avalancheIOC,
-        CreateAsyncProgressLogger(transactionsPerSymbol + targetOrders),
-        config.seed);
+        sharedProgressLogger, config.seed);
 
-    // Combine commands (use Copy() method for OrderCommand) before moving
-    for (const auto &cmd : genResult.commandsFill) {
-      multiResult.commandsFill.push_back(cmd.Copy());
-    }
-    for (const auto &cmd : genResult.commandsBenchmark) {
-      multiResult.commandsBenchmark.push_back(cmd.Copy());
-    }
-
-    // Store per-symbol result (use try_emplace to avoid copy assignment)
-    multiResult.genResults.try_emplace(symbolSpec.symbolId,
-                                       std::move(genResult));
+    // Store per-symbol result
+    genResults.emplace(symbolSpec.symbolId, std::move(genResult));
   }
+
+  // Match Java: merge commands using RandomCollectionsMerger
+  // Collect fill commands from all symbols
+  // Note: Java version directly uses OrderCommand objects (which are copyable
+  // in Java) C++ version needs to use Copy() because OrderCommand contains
+  // unique_ptr
+  std::vector<std::vector<exchange::core::common::cmd::OrderCommand>>
+      fillCommandsLists;
+  std::vector<std::vector<exchange::core::common::cmd::OrderCommand>>
+      benchmarkCommandsLists;
+
+  for (const auto &pair : genResults) {
+    // For fill commands, we need to copy them since they'll be moved during
+    // merge
+    std::vector<exchange::core::common::cmd::OrderCommand> fillCmds;
+    fillCmds.reserve(pair.second.commandsFill.size());
+    for (const auto &cmd : pair.second.commandsFill) {
+      fillCmds.push_back(cmd.Copy());
+    }
+    fillCommandsLists.push_back(std::move(fillCmds));
+
+    // For benchmark commands, same approach
+    std::vector<exchange::core::common::cmd::OrderCommand> benchmarkCmds;
+    benchmarkCmds.reserve(pair.second.commandsBenchmark.size());
+    for (const auto &cmd : pair.second.commandsBenchmark) {
+      benchmarkCmds.push_back(cmd.Copy());
+    }
+    benchmarkCommandsLists.push_back(std::move(benchmarkCmds));
+  }
+
+  // Merge using RandomCollectionsMerger (matching Java)
+  // The merge will move elements from the input vectors, so they'll be consumed
+  multiResult.commandsFill =
+      RandomCollectionsMerger::MergeCollections(fillCommandsLists, config.seed);
+  multiResult.commandsBenchmark = RandomCollectionsMerger::MergeCollections(
+      benchmarkCommandsLists, config.seed);
+
+  // Store genResults
+  multiResult.genResults = std::move(genResults);
 
   // Log merging commands
   LOG_DEBUG("Merging {} commands for {} symbols (preFill)...",

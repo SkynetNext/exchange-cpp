@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <chrono>
 #include <disruptor/EventTranslatorOneArg.h>
 #include <disruptor/RingBuffer.h>
 #include <exchange/core/ExchangeApi.h>
@@ -47,7 +48,6 @@
 #include <exchange/core/processors/BinaryCommandsProcessor.h>
 #include <exchange/core/utils/Logger.h>
 #include <exchange/core/utils/SerializationUtils.h>
-#include <chrono>
 #include <functional>
 #include <stdexcept>
 #include <vector>
@@ -268,21 +268,14 @@ void ExchangeApi<WaitStrategyT>::ProcessResult(int64_t seq,
 
   // Check if this is an order book request result
   // Match Java: promises.put(seq, cmd1 -> future.complete(cmd1.marketData))
-  // Note: For ORDER_BOOK_REQUEST, SimpleEventsProcessor::SendMarketData
-  // copies marketData instead of moving it, so cmd->marketData is still available here.
-  // We can directly move it to avoid an extra copy.
+  // With shared_ptr, we can simply copy the shared_ptr (cheap operation)
   typename OrderBookPromiseMap::accessor orderBookAccessor;
   if (orderBookPromises_.find(orderBookAccessor, seq)) {
     // Extract marketData from OrderCommand and fulfill promise
-    if (cmd->marketData) {
-      // Move marketData directly (SimpleEventsProcessor already copied it for event handler)
-      // This avoids an extra copy compared to Copy()
-      orderBookAccessor->second.set_value(std::move(cmd->marketData));
-    } else {
-      // Market data was already moved - this shouldn't happen for ORDER_BOOK_REQUEST
-      // since SendMarketData copies instead of moving for this command type
-      orderBookAccessor->second.set_value(nullptr);
-    }
+    // Copy shared_ptr (just increments reference count, very cheap)
+    // marketData can be nullptr if orderBook was not found, which is valid
+    // shared_ptr can be directly assigned, even if it's nullptr
+    orderBookAccessor->second.set_value(cmd->marketData);
     orderBookPromises_.erase(orderBookAccessor);
     return;
   }
@@ -467,7 +460,8 @@ std::future<common::cmd::OrderCommand>
 ExchangeApi<WaitStrategyT>::SubmitCommandAsyncFullResponse(
     common::api::ApiCommand *cmd) {
   if (!cmd) {
-    throw std::invalid_argument("SubmitCommandAsyncFullResponse: cmd is nullptr");
+    throw std::invalid_argument(
+        "SubmitCommandAsyncFullResponse: cmd is nullptr");
   }
   if (!ringBuffer_) {
     throw std::runtime_error(
@@ -481,8 +475,8 @@ ExchangeApi<WaitStrategyT>::SubmitCommandAsyncFullResponse(
   // sequences
   if (auto *binaryData =
           dynamic_cast<common::api::ApiBinaryDataCommand *>(cmd)) {
-    // For binary data commands, we can't use full response (they don't return OrderCommand)
-    // Fall back to regular async
+    // For binary data commands, we can't use full response (they don't return
+    // OrderCommand) Fall back to regular async
     throw std::invalid_argument(
         "SubmitCommandAsyncFullResponse: BinaryDataCommand not supported");
   } else if (auto *persistState =
@@ -548,14 +542,14 @@ ExchangeApi<WaitStrategyT>::SubmitCommandAsyncFullResponse(
 }
 
 template <typename WaitStrategyT>
-std::future<std::unique_ptr<common::L2MarketData>>
+std::future<std::shared_ptr<common::L2MarketData>>
 ExchangeApi<WaitStrategyT>::RequestOrderBookAsync(int32_t symbolId,
                                                   int32_t depth) {
   if (!ringBuffer_) {
     throw std::runtime_error("RequestOrderBookAsync: ringBuffer is nullptr");
   }
 
-  std::promise<std::unique_ptr<common::L2MarketData>> promise;
+  std::promise<std::shared_ptr<common::L2MarketData>> promise;
   auto future = promise.get_future();
 
   // Get sequence before publishing (match Java: ringBuffer.publishEvent)
@@ -569,7 +563,8 @@ ExchangeApi<WaitStrategyT>::RequestOrderBookAsync(int32_t symbolId,
   }
 
   // Get event slot and set up order book request
-  // Match Java: ringBuffer.publishEvent(((cmd, seq) -> { ... promises.put(seq, cmd1 -> future.complete(cmd1.marketData)); }))
+  // Match Java: ringBuffer.publishEvent(((cmd, seq) -> { ... promises.put(seq,
+  // cmd1 -> future.complete(cmd1.marketData)); }))
   auto &event = ringBuffer_->get(seq);
   event.command = common::cmd::OrderCommandType::ORDER_BOOK_REQUEST;
   event.orderId = -1;
@@ -923,7 +918,8 @@ ExchangeApi<WaitStrategyT>::ProcessReport(std::unique_ptr<Q> query,
 
       // Convert map values to vector of BytesIn pointers
       // Match Java: .map(Wire::bytes)
-      // Skip empty wires (matches Java behavior where empty sections are filtered)
+      // Skip empty wires (matches Java behavior where empty sections are
+      // filtered)
       std::vector<common::BytesIn *> sections;
       sections.reserve(sectionsMap.size());
       std::vector<common::Wire> wireOwners;

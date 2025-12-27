@@ -17,13 +17,13 @@
 #pragma once
 
 #include <exchange/core/common/L2MarketData.h>
-#include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/common/api/ApiCommand.h>
+#include <exchange/core/common/cmd/OrderCommand.h>
 #include <functional>
+#include <future>
 #include <memory>
 #include <unordered_map>
 #include <vector>
-#include <future>
 
 namespace exchange {
 namespace core {
@@ -53,7 +53,7 @@ public:
   struct GenResult {
     std::vector<exchange::core::common::cmd::OrderCommand> commandsFill;
     std::vector<exchange::core::common::cmd::OrderCommand> commandsBenchmark;
-    std::unique_ptr<exchange::core::common::L2MarketData>
+    std::shared_ptr<exchange::core::common::L2MarketData>
         finalOrderBookSnapshot;
     int64_t finalOrderbookHash;
 
@@ -107,29 +107,30 @@ public:
   struct MultiSymbolGenResult {
     // Map from symbolId to GenResult
     std::unordered_map<int32_t, GenResult> genResults;
-    
+
     // Combined benchmark commands (all symbols)
     std::vector<exchange::core::common::cmd::OrderCommand> commandsBenchmark;
-    
+
     // Combined fill commands (all symbols)
     std::vector<exchange::core::common::cmd::OrderCommand> commandsFill;
-    
+
     /**
      * Get benchmark commands size
      */
-    size_t GetBenchmarkCommandsSize() const {
-      return commandsBenchmark.size();
-    }
-    
+    size_t GetBenchmarkCommandsSize() const { return commandsBenchmark.size(); }
+
     /**
      * Get fill commands (as future for async compatibility with Java version)
      */
-    std::future<std::vector<exchange::core::common::api::ApiCommand*>> GetApiCommandsFill() const;
-    
+    std::future<std::vector<exchange::core::common::api::ApiCommand *>>
+    GetApiCommandsFill() const;
+
     /**
-     * Get benchmark commands (as future for async compatibility with Java version)
+     * Get benchmark commands (as future for async compatibility with Java
+     * version)
      */
-    std::future<std::vector<exchange::core::common::api::ApiCommand*>> GetApiCommandsBenchmark() const;
+    std::future<std::vector<exchange::core::common::api::ApiCommand *>>
+    GetApiCommandsBenchmark() const;
   };
 
   /**
@@ -137,8 +138,16 @@ public:
    * @param config - test orders generator configuration
    * @return multi-symbol generation result
    */
-  static MultiSymbolGenResult GenerateMultipleSymbols(
-      const TestOrdersGeneratorConfig &config);
+  static MultiSymbolGenResult
+  GenerateMultipleSymbols(const TestOrdersGeneratorConfig &config);
+
+  /**
+   * Create weighted distribution for multiple symbols (Pareto distribution)
+   * @param size - number of symbols
+   * @param seed - random seed
+   * @return normalized distribution array
+   */
+  static std::vector<double> CreateWeightedDistribution(int size, int seed);
 };
 
 } // namespace util

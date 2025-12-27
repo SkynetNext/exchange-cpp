@@ -103,7 +103,11 @@ OrderCommand OrderCommand::Copy() const {
   }
 
   if (marketData != nullptr) {
-    newCmd.marketData = marketData->Copy();
+    // Match Java: marketData.copy() - create a new copy
+    // Since we're using shared_ptr, we need to create a new L2MarketData
+    // instance
+    auto copy = marketData->Copy();
+    newCmd.marketData = std::shared_ptr<L2MarketData>(copy.release());
   }
 
   return newCmd;

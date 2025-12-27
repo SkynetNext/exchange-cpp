@@ -340,7 +340,7 @@ OrderBookNaiveImpl::ReduceOrder(common::cmd::OrderCommand *cmd) {
     // Save order data before deleting it to avoid use-after-free
     int64_t orderReserveBidPrice = order->reserveBidPrice;
     common::OrderAction orderAction = order->action;
-    
+
     idMap_.erase(orderId);
     ordersBucket->Remove(orderId, cmd->uid);
     if (ordersBucket->GetTotalVolume() == 0) {
@@ -350,10 +350,10 @@ OrderBookNaiveImpl::ReduceOrder(common::cmd::OrderCommand *cmd) {
         bidBuckets_.erase(orderPrice);
       }
     }
-    
+
     // Delete order before creating event
     delete order;
-    
+
     // Use saved data to create event
     cmd->matcherEvent = eventsHelper_->SendReduceEvent(
         orderPrice, orderReserveBidPrice, reduceBy, true);
@@ -496,11 +496,11 @@ void OrderBookNaiveImpl::ValidateInternalState() {
   }
 }
 
-std::unique_ptr<common::L2MarketData>
+std::shared_ptr<common::L2MarketData>
 OrderBookNaiveImpl::GetL2MarketDataSnapshot(int32_t size) {
   int32_t asksSize = GetTotalAskBuckets(size);
   int32_t bidsSize = GetTotalBidBuckets(size);
-  auto data = std::make_unique<common::L2MarketData>(asksSize, bidsSize);
+  auto data = std::make_shared<common::L2MarketData>(asksSize, bidsSize);
   FillAsks(asksSize, data.get());
   FillBids(bidsSize, data.get());
   return data;

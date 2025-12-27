@@ -110,7 +110,7 @@ public:
   MoveOrder(common::cmd::OrderCommand *cmd) override;
   common::cmd::CommandResultCode
   ReduceOrder(common::cmd::OrderCommand *cmd) override;
-  std::unique_ptr<common::L2MarketData>
+  std::shared_ptr<common::L2MarketData>
   GetL2MarketDataSnapshot(int32_t size) override;
   int32_t GetOrdersNum(common::OrderAction action) override;
   int64_t GetTotalOrdersVolume(common::OrderAction action) override;

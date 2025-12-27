@@ -111,9 +111,10 @@ public:
    * Request order book snapshot async (matches Java requestOrderBookAsync)
    * @param symbolId Symbol ID
    * @param depth Maximum depth of order book
-   * @return Future with L2MarketData
+   * @return Future with L2MarketData (shared_ptr to match
+   * OrderCommand::marketData)
    */
-  virtual std::future<std::unique_ptr<common::L2MarketData>>
+  virtual std::future<std::shared_ptr<common::L2MarketData>>
   RequestOrderBookAsync(int32_t symbolId, int32_t depth) = 0;
 };
 
@@ -182,9 +183,10 @@ public:
    * Request order book snapshot async (matches Java requestOrderBookAsync)
    * @param symbolId Symbol ID
    * @param depth Maximum depth of order book
-   * @return Future with L2MarketData
+   * @return Future with L2MarketData (shared_ptr to match
+   * OrderCommand::marketData)
    */
-  std::future<std::unique_ptr<common::L2MarketData>>
+  std::future<std::shared_ptr<common::L2MarketData>>
   RequestOrderBookAsync(int32_t symbolId, int32_t depth) override;
 
 private:
@@ -210,16 +212,15 @@ private:
 
   // Order book request promises cache (seq -> promise for L2MarketData)
   // Used for RequestOrderBookAsync to extract market data from OrderCommand
-  using OrderBookPromiseMap =
-      tbb::concurrent_hash_map<int64_t,
-                                std::promise<std::unique_ptr<common::L2MarketData>>>;
+  using OrderBookPromiseMap = tbb::concurrent_hash_map<
+      int64_t, std::promise<std::shared_ptr<common::L2MarketData>>>;
   OrderBookPromiseMap orderBookPromises_;
 
   // Full response promises cache (seq -> promise for OrderCommand)
   // Used for SubmitCommandAsyncFullResponse to return complete OrderCommand
   using FullResponsePromiseMap =
       tbb::concurrent_hash_map<int64_t,
-                                std::promise<common::cmd::OrderCommand>>;
+                               std::promise<common::cmd::OrderCommand>>;
   FullResponsePromiseMap fullResponsePromises_;
 
   void PublishCommand(common::api::ApiCommand *cmd, int64_t seq);
@@ -266,7 +267,8 @@ std::future<std::unique_ptr<R>> ProcessReportHelper(IExchangeApi *api,
   auto sections = sectionsFuture.get();
 
   // Convert sections to BytesIn pointers for CreateResult
-  // Skip empty sections (matches Java behavior where empty sections are filtered)
+  // Skip empty sections (matches Java behavior where empty sections are
+  // filtered)
   std::vector<common::BytesIn *> sectionBytes;
   sectionBytes.reserve(sections.size());
   std::vector<std::unique_ptr<common::VectorBytesIn>> sectionBytesOwners;

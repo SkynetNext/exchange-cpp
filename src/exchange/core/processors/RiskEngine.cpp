@@ -265,7 +265,7 @@ bool RiskEngine::PreProcessCommand(int64_t seq,
 void RiskEngine::PostProcessCommand(int64_t seq,
                                     common::cmd::OrderCommand *cmd) {
   const int32_t symbol = cmd->symbol;
-  const auto *marketData = cmd->marketData.get();
+  const auto *marketData = cmd->marketData ? cmd->marketData.get() : nullptr;
   common::MatcherTradeEvent *mte = cmd->matcherEvent;
 
   // skip events processing if no events (or if contains BINARY EVENT)
