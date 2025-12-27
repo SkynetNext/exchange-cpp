@@ -107,24 +107,25 @@ void LatencyTestsModule::LatencyTestImpl(
     CountDownLatch latchBenchmark(
         static_cast<int64_t>(benchmarkCommands.size()));
 
-    // Baseline for this iteration (match Java System.nanoTime() - each
-    // iteration has its own baseline)
-    auto iterationBaseline = std::chrono::steady_clock::now();
+    // Helper function to get absolute nanoseconds (matching Java
+    // System.nanoTime())
+    auto getNanoTime = []() -> int64_t {
+      return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                 std::chrono::steady_clock::now().time_since_epoch())
+          .count();
+    };
 
     // Match Java: container.setConsumer((cmd, seq) -> { ...
     // latchBenchmark.countDown(); });
     container->SetConsumer(
-        [&latencies, &latenciesMutex, &latchBenchmark, iterationBaseline](
+        [&latencies, &latenciesMutex, &latchBenchmark, getNanoTime](
             exchange::core::common::cmd::OrderCommand *cmd, int64_t seq) {
           if (cmd && cmd->timestamp > 0) {
             // Match Java: final long latency = System.nanoTime() -
-            // cmd.timestamp; cmd->timestamp stores absolute nanoseconds since
-            // iterationBaseline (matching Java System.nanoTime() - absolute
-            // time)
-            auto now = std::chrono::steady_clock::now();
-            auto nowNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                             now - iterationBaseline)
-                             .count();
+            // cmd.timestamp;
+            // cmd->timestamp stores absolute nanoseconds (matching Java
+            // System.nanoTime() - absolute time)
+            auto nowNs = getNanoTime();
             // Latency = current absolute time (ns) - command absolute timestamp
             // (ns)
             auto latency = nowNs - cmd->timestamp;
@@ -139,30 +140,22 @@ void LatencyTestsModule::LatencyTestImpl(
     auto startTime = std::chrono::steady_clock::now();
 
     // Match Java: long plannedTimestamp = System.nanoTime();
-    // Use absolute nanoseconds since iterationBaseline (matching Java
-    // System.nanoTime() - absolute time)
-    // Start from current time, not 0, to match Java behavior where
-    // System.nanoTime() returns current absolute timestamp
-    auto nowTimePoint = std::chrono::steady_clock::now();
-    int64_t plannedTimestampNs =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(nowTimePoint -
-                                                             iterationBaseline)
-            .count();
+    // Use absolute nanoseconds (matching Java System.nanoTime() - absolute
+    // time)
+    int64_t plannedTimestampNs = getNanoTime();
 
     // Match Java: for (ApiCommand cmd :
     // genResult.getApiCommandsBenchmark().join())
     for (auto *cmd : benchmarkCommands) {
       // Match Java: while (System.nanoTime() < plannedTimestamp) { }
-      // Convert plannedTimestampNs back to time_point for comparison
-      auto plannedTimestamp =
-          iterationBaseline + std::chrono::nanoseconds(plannedTimestampNs);
-      while (std::chrono::steady_clock::now() < plannedTimestamp) {
+      // Directly compare nanoseconds (matching Java behavior)
+      while (getNanoTime() < plannedTimestampNs) {
         std::this_thread::yield();
       }
       // Match Java: cmd.timestamp = plannedTimestamp;
-      // Store absolute nanoseconds since iterationBaseline (matching Java
-      // System.nanoTime() - absolute time, not relative)
-      // OrderCommand.timestamp is int64_t, can store nanoseconds
+      // Store absolute nanoseconds (matching Java System.nanoTime() - absolute
+      // time, not relative)
+      // OrderCommand.timestamp is int64_t, can store nanosecondsp
       cmd->timestamp = plannedTimestampNs;
       container->GetApi()->SubmitCommand(cmd);
       plannedTimestampNs += nanosPerCmd; // Increment absolute timestamp
@@ -279,24 +272,25 @@ void LatencyTestsModule::LatencyTestImpl(
     CountDownLatch latchBenchmark(
         static_cast<int64_t>(benchmarkCommands.size()));
 
-    // Baseline for this iteration (match Java System.nanoTime() - each
-    // iteration has its own baseline)
-    auto iterationBaseline = std::chrono::steady_clock::now();
+    // Helper function to get absolute nanoseconds (matching Java
+    // System.nanoTime())
+    auto getNanoTime = []() -> int64_t {
+      return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                 std::chrono::steady_clock::now().time_since_epoch())
+          .count();
+    };
 
     // Match Java: container.setConsumer((cmd, seq) -> { ...
     // latchBenchmark.countDown(); });
     container->SetConsumer(
-        [&latencies, &latenciesMutex, &latchBenchmark, iterationBaseline](
+        [&latencies, &latenciesMutex, &latchBenchmark, getNanoTime](
             exchange::core::common::cmd::OrderCommand *cmd, int64_t seq) {
           if (cmd && cmd->timestamp > 0) {
             // Match Java: final long latency = System.nanoTime() -
-            // cmd.timestamp; cmd->timestamp stores absolute nanoseconds since
-            // iterationBaseline (matching Java System.nanoTime() - absolute
-            // time)
-            auto now = std::chrono::steady_clock::now();
-            auto nowNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                             now - iterationBaseline)
-                             .count();
+            // cmd.timestamp;
+            // cmd->timestamp stores absolute nanoseconds (matching Java
+            // System.nanoTime() - absolute time)
+            auto nowNs = getNanoTime();
             // Latency = current absolute time (ns) - command absolute timestamp
             // (ns)
             auto latency = nowNs - cmd->timestamp;
@@ -311,29 +305,21 @@ void LatencyTestsModule::LatencyTestImpl(
     auto startTime = std::chrono::steady_clock::now();
 
     // Match Java: long plannedTimestamp = System.nanoTime();
-    // Use absolute nanoseconds since iterationBaseline (matching Java
-    // System.nanoTime() - absolute time)
-    // Start from current time, not 0, to match Java behavior where
-    // System.nanoTime() returns current absolute timestamp
-    auto nowTimePoint = std::chrono::steady_clock::now();
-    int64_t plannedTimestampNs =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(nowTimePoint -
-                                                             iterationBaseline)
-            .count();
+    // Use absolute nanoseconds (matching Java System.nanoTime() - absolute
+    // time)
+    int64_t plannedTimestampNs = getNanoTime();
 
     // Match Java: for (ApiCommand cmd :
     // genResult.getApiCommandsBenchmark().join())
     for (auto *cmd : benchmarkCommands) {
       // Match Java: while (System.nanoTime() < plannedTimestamp) { }
-      // Convert plannedTimestampNs back to time_point for comparison
-      auto plannedTimestamp =
-          iterationBaseline + std::chrono::nanoseconds(plannedTimestampNs);
-      while (std::chrono::steady_clock::now() < plannedTimestamp) {
+      // Directly compare nanoseconds (matching Java behavior)
+      while (getNanoTime() < plannedTimestampNs) {
         std::this_thread::yield();
       }
       // Match Java: cmd.timestamp = plannedTimestamp;
-      // Store absolute nanoseconds since iterationBaseline (matching Java
-      // System.nanoTime() - absolute time, not relative)
+      // Store absolute nanoseconds (matching Java System.nanoTime() - absolute
+      // time, not relative)
       // OrderCommand.timestamp is int64_t, can store nanoseconds
       cmd->timestamp = plannedTimestampNs;
       container->GetApi()->SubmitCommand(cmd);
