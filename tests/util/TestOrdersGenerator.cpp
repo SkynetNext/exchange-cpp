@@ -704,6 +704,11 @@ TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsFill() const {
                exchange::core::common::cmd::OrderCommandType::REDUCE_ORDER) {
       apiCmd = new exchange::core::common::api::ApiReduceOrder(
           cmd.orderId, cmd.uid, cmd.symbol, cmd.size);
+    } else {
+      // Match Java: throw exception for unsupported command type
+      throw std::runtime_error(
+          "Unsupported command type in GetApiCommandsFill: " +
+          std::to_string(static_cast<int>(cmd.command)));
     }
     if (apiCmd) {
       apiCommands.push_back(apiCmd);
@@ -764,6 +769,11 @@ TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsBenchmark() const {
       apiCmd = new exchange::core::common::api::ApiReduceOrder(
           cmd.orderId, cmd.uid, cmd.symbol, cmd.size);
       counterReduce++;
+    } else {
+      // Match Java: throw exception for unsupported command type
+      throw std::runtime_error(
+          "Unsupported command type in GetApiCommandsBenchmark: " +
+          std::to_string(static_cast<int>(cmd.command)));
     }
     if (apiCmd) {
       apiCommands.push_back(apiCmd);

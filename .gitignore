@@ -33,6 +33,7 @@ cmake_install.cmake
 *.log
 test_results/
 benchmark_results/
+Testing/
 
 # Documentation
 docs/_build/
