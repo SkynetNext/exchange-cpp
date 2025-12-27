@@ -36,13 +36,16 @@ option(BUILD_EXAMPLES "Build examples" ON)
 # disruptor-cpp: High-performance inter-thread communication
 # Note: disruptor-cpp may add googletest and benchmark as submodules if BUILD_BENCHMARKS is ON
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/disruptor-cpp/CMakeLists.txt)
-    # Temporarily disable disruptor-cpp's own tests to avoid build errors
-    # We only need the library, not its tests
+    # Temporarily disable disruptor-cpp's own tests and benchmarks to avoid build errors
+    # We only need the library, not its tests or benchmarks
     set(BUILD_TESTING_OLD ${BUILD_TESTING})
+    set(BUILD_BENCHMARKS_OLD ${BUILD_BENCHMARKS})
     set(BUILD_TESTING OFF)
+    set(BUILD_BENCHMARKS OFF)
     add_subdirectory(third_party/disruptor-cpp)
     set(BUILD_TESTING ${BUILD_TESTING_OLD})
-    message(STATUS "Using disruptor-cpp from submodule (tests disabled)")
+    set(BUILD_BENCHMARKS ${BUILD_BENCHMARKS_OLD})
+    message(STATUS "Using disruptor-cpp from submodule (tests and benchmarks disabled)")
 else()
     message(FATAL_ERROR "disruptor-cpp submodule not found. Please run: git submodule update --init --recursive")
 endif()

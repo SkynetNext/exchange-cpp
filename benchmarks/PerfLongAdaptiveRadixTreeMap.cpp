@@ -62,7 +62,8 @@ public:
   int StepFunction(int i) {
     int64_t highestBit = i == 0 ? 0 : (1LL << (63 - __builtin_clzll(i)));
     int maxStep = static_cast<int>(
-        std::min(static_cast<int64_t>(INT_MAX), 1LL + (highestBit >> 8)));
+        std::min(static_cast<int64_t>(INT_MAX),
+                 static_cast<int64_t>(1LL + (highestBit >> 8))));
     std::uniform_int_distribution<int> dist(0, maxStep);
     return 1 + dist(rng);
   }
