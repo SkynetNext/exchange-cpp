@@ -5,6 +5,7 @@
 [submodule "third_party/disruptor-cpp"]
 	path = third_party/disruptor-cpp
 	url = https://github.com/SkynetNext/disruptor-cpp.git
+	branch = main
 
 [submodule "third_party/unordered_dense"]
 	path = third_party/unordered_dense
