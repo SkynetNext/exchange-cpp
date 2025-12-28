@@ -33,18 +33,23 @@ SharedPool::SharedPool(int32_t poolMaxSize, int32_t poolInitialSize,
     throw std::invalid_argument("too big poolInitialSize");
   }
 
+  // Set capacity to match Java LinkedBlockingQueue behavior
+  eventChainsBuffer_.set_capacity(poolMaxSize);
+
   // Pre-generate initial chains
   for (int32_t i = 0; i < poolInitialSize; i++) {
     common::MatcherTradeEvent *chain =
         common::MatcherTradeEvent::CreateEventChain(chainLength);
-    eventChainsBuffer_.enqueue(chain);
+    // push() will block if queue is full, but we know poolInitialSize <=
+    // poolMaxSize
+    eventChainsBuffer_.push(chain);
   }
 }
 
 common::MatcherTradeEvent *SharedPool::GetChain() {
   common::MatcherTradeEvent *head = nullptr;
-  // Lock-free try_dequeue - much faster than mutex-based approach
-  if (eventChainsBuffer_.try_dequeue(head)) {
+  // Lock-free try_pop - matches Java poll() behavior
+  if (eventChainsBuffer_.try_pop(head)) {
     return head;
   }
   // Pool is empty, create new chain
@@ -56,12 +61,9 @@ void SharedPool::PutChain(common::MatcherTradeEvent *head) {
     return;
   }
 
-  // Lock-free enqueue - always succeeds (unbounded queue)
-  // Note: Unlike Java LinkedBlockingQueue which is bounded,
-  // moodycamel::ConcurrentQueue is unbounded. This is acceptable since object
-  // pool is for optimization, not strict memory limiting. If memory becomes an
-  // issue, the pool will naturally stabilize.
-  eventChainsBuffer_.enqueue(head);
+  // Lock-free try_push - matches Java offer() behavior
+  // Returns false if queue is full, chain is discarded (matches Java behavior)
+  eventChainsBuffer_.try_push(head);
 }
 
 } // namespace processors

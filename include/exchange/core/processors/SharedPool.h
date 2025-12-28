@@ -20,9 +20,10 @@
 #include <cstdint>
 #include <memory>
 
-// Use moodycamel::ConcurrentQueue for lock-free high-performance queue
-// Header-only library, faster than std::queue + mutex or TBB concurrent_queue
-#include <concurrentqueue.h>
+// Use TBB concurrent_bounded_queue for bounded lock-free queue
+// Matches Java LinkedBlockingQueue behavior (bounded, try_push returns false
+// when full)
+#include <tbb/concurrent_queue.h>
 
 namespace exchange {
 namespace core {
@@ -72,13 +73,11 @@ public:
   int32_t GetChainLength() const { return chainLength_; }
 
 private:
-  // Lock-free concurrent queue for high-performance event chain management
-  // Replaces std::queue + std::mutex with lock-free implementation
-  // Note: moodycamel::ConcurrentQueue is unbounded, so poolMaxSize_ is kept
-  // for API compatibility but not enforced (object pool is for optimization,
-  // not strict memory limiting)
-  moodycamel::ConcurrentQueue<common::MatcherTradeEvent *> eventChainsBuffer_;
-  int32_t poolMaxSize_; // Kept for API compatibility, not enforced
+  // Bounded lock-free concurrent queue for high-performance event chain
+  // management Matches Java LinkedBlockingQueue behavior: try_push returns
+  // false when queue is full
+  tbb::concurrent_bounded_queue<common::MatcherTradeEvent *> eventChainsBuffer_;
+  int32_t poolMaxSize_; // Enforced by concurrent_bounded_queue capacity
   int32_t chainLength_;
 };
 

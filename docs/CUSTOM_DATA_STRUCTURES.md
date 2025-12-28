@@ -8,7 +8,7 @@
 | **Object Pool** | ObjectsPool (custom) | **Custom ObjectsPool** | **Direct translation from Java** | Thread-local object pool, zero-allocation design, supports multiple object types |
 | **Order Chain** | Intrusive Linked List (`DirectOrder.next/prev`, custom) | **Custom Intrusive Linked List** | **Direct translation from Java** | Same-price order queue (FIFO), zero additional memory allocation |
 | **Lock-Free Ring Buffer** | LMAX Disruptor | `disruptor-cpp` | Third-party library (submodule) | Lock-free ring buffer for inter-thread communication |
-| **Concurrent Queue** | `LinkedBlockingQueue` | `moodycamel::ConcurrentQueue` | Third-party library (submodule, header-only) | Lock-free concurrent queue, replaces `std::queue + std::mutex` in `SharedPool`. Unbounded queue, significantly faster in high-contention scenarios (6+ threads). Used for `MatcherTradeEvent` chain pooling |
+| **Concurrent Queue** | `LinkedBlockingQueue` | `tbb::concurrent_bounded_queue` | Third-party library (submodule, static linking) | Bounded lock-free concurrent queue, replaces `std::queue + std::mutex` in `SharedPool`. Matches Java `LinkedBlockingQueue` behavior: `try_push()` returns `false` when queue is full (chain is discarded), `set_capacity()` enforces `poolMaxSize` limit. Used for `MatcherTradeEvent` chain pooling |
 | **Global Allocator** | - | `mimalloc` | Third-party library (submodule) | High-performance memory allocator, reduces memory allocation overhead by 50%+ |
 | **Compression** | LZ4 Java (`lz4-java`) | `lz4` (C library) | Third-party library (submodule) | Fast compression/decompression, required dependency (1:1 with Java version) |
 
