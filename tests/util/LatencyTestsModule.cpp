@@ -191,45 +191,44 @@ void LatencyTestsModule::LatencyTestImpl(
 
     // Calculate latency statistics (match Java HDR histogram)
     std::lock_guard<std::mutex> lock(latenciesMutex);
+
+    // Match Java: HDR histogram always has values (returns 0 if no records)
+    // Calculate percentiles (match Java HDR histogram percentiles)
+    auto getPercentile = [&latencies](double percentile) -> int64_t {
+      if (latencies.empty())
+        return 0; // Match Java: histogram.getValueAtPercentile returns 0 if no
+                  // records
+      size_t index = static_cast<size_t>(
+          std::round((percentile / 100.0) * (latencies.size() - 1)));
+      return latencies[std::min(index, latencies.size() - 1)];
+    };
+
+    // Always calculate percentiles (match Java: histogram always has values)
     if (!latencies.empty()) {
       std::sort(latencies.begin(), latencies.end());
-
-      // Calculate percentiles (match Java HDR histogram percentiles)
-      auto getPercentile = [&latencies](double percentile) -> int64_t {
-        if (latencies.empty())
-          return 0;
-        size_t index = static_cast<size_t>(
-            std::round((percentile / 100.0) * (latencies.size() - 1)));
-        return latencies[std::min(index, latencies.size() - 1)];
-      };
-
-      int64_t p50 = getPercentile(50.0);
-      int64_t p90 = getPercentile(90.0);
-      int64_t p95 = getPercentile(95.0);
-      int64_t p99 = getPercentile(99.0);
-      int64_t p99_9 = getPercentile(99.9);
-      int64_t p99_99 = getPercentile(99.99);
-      int64_t maxLatency = latencies.back();
-
-      // Match Java: log.info("{} {}", tag,
-      // LatencyTools.createLatencyReportFast(histogram));
-      std::ostringstream report;
-      report << tagStream.str() << " ";
-      report << "50%:" << LatencyTools::FormatNanos(p50) << " ";
-      report << "90%:" << LatencyTools::FormatNanos(p90) << " ";
-      report << "95%:" << LatencyTools::FormatNanos(p95) << " ";
-      report << "99%:" << LatencyTools::FormatNanos(p99) << " ";
-      report << "99.9%:" << LatencyTools::FormatNanos(p99_9) << " ";
-      report << "99.99%:" << LatencyTools::FormatNanos(p99_99) << " ";
-      report << "W:" << LatencyTools::FormatNanos(maxLatency);
-
-      LOG_INFO("{}", report.str());
-
-      // Match Java: return warmup || histogram.getValueAtPercentile(50.0) <
-      // 10_000_000;
-      // stop testing if median latency above 1 millisecond
-      return warmup || p50 < 10'000'000;
     }
+
+    int64_t p50 = getPercentile(50.0);
+    int64_t p90 = getPercentile(90.0);
+    int64_t p95 = getPercentile(95.0);
+    int64_t p99 = getPercentile(99.0);
+    int64_t p99_9 = getPercentile(99.9);
+    int64_t p99_99 = getPercentile(99.99);
+    int64_t maxLatency = latencies.empty() ? 0 : latencies.back();
+
+    // Match Java: log.info("{} {}", tag,
+    // LatencyTools.createLatencyReportFast(histogram));
+    std::ostringstream report;
+    report << tagStream.str() << " ";
+    report << "50%:" << LatencyTools::FormatNanos(p50) << " ";
+    report << "90%:" << LatencyTools::FormatNanos(p90) << " ";
+    report << "95%:" << LatencyTools::FormatNanos(p95) << " ";
+    report << "99%:" << LatencyTools::FormatNanos(p99) << " ";
+    report << "99.9%:" << LatencyTools::FormatNanos(p99_9) << " ";
+    report << "99.99%:" << LatencyTools::FormatNanos(p99_99) << " ";
+    report << "W:" << LatencyTools::FormatNanos(maxLatency);
+
+    LOG_INFO("{}", report.str());
 
     // Match Java: container.resetExchangeCore();
     container->ResetExchangeCore();
@@ -241,7 +240,9 @@ void LatencyTestsModule::LatencyTestImpl(
 
     // Match Java: return warmup || histogram.getValueAtPercentile(50.0) <
     // 10_000_000;
-    return warmup;
+    // stop testing if median latency above 10 milliseconds (10,000,000
+    // nanoseconds)
+    return warmup || p50 < 10'000'000;
   };
 
   // Match Java: container.executeTestingThread(() -> {
