@@ -301,4 +301,92 @@ Latency test for single symbol (Exchange mode) with progressive TPS increase to 
 
 ---
 
-**Version**: 1.3 | **Date**: 2025-12-28 | **Tests**: `TestThroughputExchange`, `TestThroughputPeak`, `TestLatencyExchange`
+## SharedPool Queue Implementation Comparison
+
+Performance comparison between `moodycamel::ConcurrentQueue` (unbounded) and `tbb::concurrent_bounded_queue` (bounded) in `SharedPool` for `TestLatencyExchange`.
+
+### Test Configuration
+
+Same as `TestLatencyExchange` above:
+- Symbol Type: `CURRENCY_EXCHANGE_PAIR`
+- Symbols: 1
+- Benchmark Commands: 3,000,000
+- PreFill Commands: 1,000
+- Users: 2,000 accounts (1,325 unique)
+- Currencies: 2
+- Warmup Cycles: 16
+- Ring Buffer: 2,048
+- Matching Engines: 1
+- Risk Engines: 1
+- Messages in Group Limit: 256
+
+**Pool Configuration**: `poolMaxSize = poolInitialSize * 4` (where `poolInitialSize = (matchingEnginesNum + riskEnginesNum) * 8 = 16`), so `poolMaxSize = 64`
+
+### moodycamel::ConcurrentQueue (Unbounded) - Baseline
+
+**Data**: See [C++ Implementation](#c-implementation) section above (lines 192-247) for complete performance data.
+
+**Performance Characteristics**:
+- Consistent sub-microsecond median latency (0.61-0.71µs) across 200K-1.9M TPS range
+- Stable performance up to ~4.8M TPS with median latency < 10ms (most iterations < 1ms)
+- No performance cliff or sudden degradation
+- Unbounded queue allows all chains to be recycled, minimizing allocations
+- Test stopped at ~5.0M TPS (4.724 MT/s) when median latency exceeded 10ms threshold (64ms)
+
+### tbb::concurrent_bounded_queue (Bounded, poolMaxSize=64)
+
+| TPS | Throughput (MT/s) | 50% | 90% | 95% | 99% | 99.9% | 99.99% | Max |
+|-----|-------------------|-----|-----|-----|-----|-------|--------|-----|
+| 200K | 0.200 | 0.55µs | 0.68µs | 0.77µs | 1.58µs | 16.7µs | 87µs | 207µs |
+| 300K | 0.300 | 0.55µs | 0.67µs | 0.75µs | 3.2µs | 50µs | 1.6ms | 2.13ms |
+| 400K | 0.400 | 0.55µs | 0.66µs | 0.74µs | 3.6µs | 30µs | 107µs | 216µs |
+| 500K | 0.500 | 0.53µs | 0.64µs | 0.71µs | 3.8µs | 36µs | 108µs | 254µs |
+| 600K | 0.600 | 0.53µs | 0.64µs | 0.71µs | 4.1µs | 39µs | 114µs | 238µs |
+| 700K | 0.700 | 0.53µs | 0.64µs | 0.71µs | 4.5µs | 51µs | 120µs | 274µs |
+| 800K | 0.800 | 0.53µs | 0.63µs | 0.71µs | 4.8µs | 90µs | 1.08ms | 1.42ms |
+| 900K | 0.900 | 0.54µs | 0.63µs | 0.71µs | 5µs | 124µs | 1.58ms | 1.87ms |
+| 1.0M | 1.000 | 0.53µs | 0.62µs | 0.7µs | 4.8µs | 64µs | 155µs | 274µs |
+| 1.1M | 1.100 | 0.54µs | 0.64µs | 0.73µs | 5µs | 104µs | 1.28ms | 1.51ms |
+| 1.2M | 1.200 | 0.54µs | 0.63µs | 0.75µs | 5.3µs | 167µs | 1.23ms | 1.45ms |
+| 1.3M | 1.300 | 0.54µs | 0.63µs | 0.77µs | 5.3µs | 101µs | 313µs | 493µs |
+| 1.4M | 1.401 | 0.53µs | 0.64µs | 1.4µs | 13.7µs | 1.22ms | 1.78ms | 1.96ms |
+| 1.5M | 1.502 | 0.54µs | 0.64µs | 0.87µs | 6µs | 1.11ms | 2.44ms | 2.55ms |
+| 1.6M | 1.600 | 0.54µs | 0.64µs | 0.88µs | 5.6µs | 89µs | 157µs | 290µs |
+| 1.7M | 1.701 | 0.55µs | 0.65µs | 1.16µs | 6.2µs | 169µs | 576µs | 713µs |
+| **1.8M** | **1.790** | **0.66µs** | **6ms** | **7.6ms** | **12.4ms** | **16ms** | **16.5ms** | **16.6ms** |
+| **1.9M** | **0.409** | **2.15s** | **2.15s** | **2.15s** | **2.15s** | **2.15s** | **2.15s** | **2.15s** |
+
+**Performance Characteristics**:
+- **Low Load (<1.7M TPS)**: TBB p90 latency significantly better (0.63-0.65µs vs 1.5-1.93ms)
+- **High Load (≥1.8M TPS)**: Performance cliff at 1.790 MT/s → queue full → latency spikes (0.66µs → 2.15s)
+- **Throughput Collapse**: 1.790 MT/s → 0.409 MT/s (4.4x reduction)
+
+### Performance Comparison
+
+| Metric | moodycamel::ConcurrentQueue | tbb::concurrent_bounded_queue | Impact |
+|--------|----------------------------|-------------------------------|--------|
+| **90% Latency at 1.6M TPS** | 1.93ms | 0.64µs | **TBB 3,016x better** |
+| **90% Latency at 1.7M TPS** | 1.86ms | 0.65µs | **TBB 2,862x better** |
+| **90% Latency at 1.8M TPS** | 2.08ms | 6ms → 2.15s | **TBB worse after cliff** |
+| **Stable TPS Range** | Up to ~4.8M TPS | Up to 1.7M TPS | **moodycamel 2.8x higher** |
+| **Performance Cliff** | None | At 1.790 MT/s | TBB fails at peak load |
+| **Test Completion** | 4.724 MT/s (p50=64ms) | 0.409 MT/s (p50=2.15s) | **moodycamel 11.6x higher** |
+
+### Summary
+
+**Key Finding**: TBB bounded queue excels at low load (p90 latency 3,000x better), but fails at peak load due to queue capacity limit.
+
+**Root Cause**: Bounded queue (`poolMaxSize=64`) full → `try_push()` fails → chains discarded → frequent allocations → severe degradation.
+
+**Memory Safety Note**: 
+- **Java**: `offer()` returns false → GC automatically reclaims discarded chains (no leak)
+- **C++ with TBB**: `try_push()` returns false → chains must be explicitly deleted to avoid memory leak
+- **C++ with moodycamel**: `enqueue()` always succeeds (unbounded) → no leak risk
+
+**Recommendation**: Choose based on load profile:
+- **Low/Moderate Load (<1.7M TPS)**: TBB bounded queue for better p90 latency (requires explicit chain deletion on `try_push()` failure)
+- **High/Variable Load (≥1.8M TPS)**: moodycamel unbounded queue for stability and peak performance (no memory leak risk)
+
+---
+
+**Version**: 1.4 | **Date**: 2025-12-28 | **Tests**: `TestThroughputExchange`, `TestThroughputPeak`, `TestLatencyExchange`, `SharedPool Queue Comparison`

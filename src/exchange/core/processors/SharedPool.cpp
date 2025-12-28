@@ -33,23 +33,18 @@ SharedPool::SharedPool(int32_t poolMaxSize, int32_t poolInitialSize,
     throw std::invalid_argument("too big poolInitialSize");
   }
 
-  // Set capacity to match Java LinkedBlockingQueue behavior
-  eventChainsBuffer_.set_capacity(poolMaxSize);
-
   // Pre-generate initial chains
   for (int32_t i = 0; i < poolInitialSize; i++) {
     common::MatcherTradeEvent *chain =
         common::MatcherTradeEvent::CreateEventChain(chainLength);
-    // push() will block if queue is full, but we know poolInitialSize <=
-    // poolMaxSize
-    eventChainsBuffer_.push(chain);
+    eventChainsBuffer_.enqueue(chain);
   }
 }
 
 common::MatcherTradeEvent *SharedPool::GetChain() {
   common::MatcherTradeEvent *head = nullptr;
-  // Lock-free try_pop - matches Java poll() behavior
-  if (eventChainsBuffer_.try_pop(head)) {
+  // Lock-free try_dequeue - much faster than mutex-based approach
+  if (eventChainsBuffer_.try_dequeue(head)) {
     return head;
   }
   // Pool is empty, create new chain
@@ -61,9 +56,13 @@ void SharedPool::PutChain(common::MatcherTradeEvent *head) {
     return;
   }
 
-  // Lock-free try_push - matches Java offer() behavior
-  // Returns false if queue is full, chain is discarded (matches Java behavior)
-  eventChainsBuffer_.try_push(head);
+  // Lock-free enqueue - always succeeds (unbounded queue)
+  // Note: Unlike Java LinkedBlockingQueue which is bounded,
+  // moodycamel::ConcurrentQueue is unbounded. This is acceptable since object
+  // pool is for optimization, not strict memory limiting. Performance is
+  // critical for HFT systems - moodycamel::ConcurrentQueue is significantly
+  // faster than TBB concurrent_bounded_queue.
+  eventChainsBuffer_.enqueue(head);
 }
 
 } // namespace processors
