@@ -102,6 +102,10 @@ void JournalingTestsModule::JournalingTestImpl(
       if (!benchmarkCommands.empty()) {
         container->GetApi()->SubmitCommandsSync(benchmarkCommands);
       }
+      // Clean up ApiCommand objects to prevent memory leak
+      for (auto *cmd : benchmarkCommands) {
+        delete cmd;
+      }
       // Match Java:
       // assertTrue(container.totalBalanceReport().isGlobalBalancesAllZero());
       // Verify total balance report is zero

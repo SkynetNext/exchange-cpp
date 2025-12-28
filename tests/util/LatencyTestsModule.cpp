@@ -233,6 +233,11 @@ void LatencyTestsModule::LatencyTestImpl(
     // Match Java: container.resetExchangeCore();
     container->ResetExchangeCore();
 
+    // Clean up ApiCommand objects to prevent memory leak
+    for (auto *cmd : benchmarkCommands) {
+      delete cmd;
+    }
+
     // Match Java: System.gc();
     // Note: C++ doesn't have direct equivalent, but we can hint the compiler
     // Match Java: Thread.sleep(500);
@@ -453,6 +458,11 @@ void LatencyTestsModule::HiccupTestImpl(
 
     // Match Java: container.setConsumer((cmd, seq) -> { });
     container->SetConsumer(nullptr);
+
+    // Clean up ApiCommand objects to prevent memory leak
+    for (auto *cmd : benchmarkCommands) {
+      delete cmd;
+    }
 
     // Match Java: final TreeMap<ZonedDateTime, Long> sorted = new TreeMap<>();
     // Match Java: // convert nanosecond timestamp into Instant

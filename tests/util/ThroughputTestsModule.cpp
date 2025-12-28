@@ -87,6 +87,11 @@ void ThroughputTestsModule::ThroughputTestImpl(
              benchmarkCommands.size(), tDurationS,
              static_cast<long long>(tDurationMs));
 
+    // Clean up ApiCommand objects to prevent memory leak
+    for (auto *cmd : benchmarkCommands) {
+      delete cmd;
+    }
+
     // Verify balances - match Java:
     // container.totalBalanceReport().isGlobalBalancesAllZero()
     auto balanceReport = container->TotalBalanceReport();

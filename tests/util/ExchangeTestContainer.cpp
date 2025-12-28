@@ -654,7 +654,10 @@ void ExchangeTestContainer::LoadSymbolsUsersAndPrefillOrders(
 
   if (!fillCommands.empty()) {
     api_->SubmitCommandsSync(fillCommands);
-    // Note: ApiCommand pointers are owned by ExchangeApi, don't delete them
+    // Clean up ApiCommand objects to prevent memory leak
+    for (auto *cmd : fillCommands) {
+      delete cmd;
+    }
   }
 }
 

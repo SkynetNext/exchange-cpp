@@ -22,7 +22,6 @@
 #include <exchange/core/common/config/SerializationConfiguration.h>
 #include <thread>
 
-
 namespace exchange {
 namespace core {
 namespace tests {
@@ -96,6 +95,11 @@ void PersistenceTestsModule::PersistenceTestImpl(
                            .count();
       originalPerfMt =
           benchmarkCommands.size() / static_cast<float>(tDuration) / 1000.0f;
+
+      // Clean up ApiCommand objects to prevent memory leak
+      for (auto *cmd : benchmarkCommands) {
+        delete cmd;
+      }
 
       // Verify total balance report is zero
       auto balanceReport = container->TotalBalanceReport();
@@ -202,6 +206,11 @@ void PersistenceTestsModule::PersistenceTestImpl(
       float perfMt =
           benchmarkCommands2.size() / static_cast<float>(tDuration2) / 1000.0f;
       float perfRatioPerc = perfMt / originalPerfMt * 100.0f;
+
+      // Clean up ApiCommand objects to prevent memory leak
+      for (auto *cmd : benchmarkCommands2) {
+        delete cmd;
+      }
 
       // Log performance comparison (can be used for reporting)
       (void)perfRatioPerc; // Suppress unused variable warning for now
