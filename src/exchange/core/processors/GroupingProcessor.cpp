@@ -23,7 +23,9 @@
 #include <exchange/core/common/cmd/CommandResultCode.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/common/cmd/OrderCommandType.h>
+#include <exchange/core/orderbook/OrderBookEventsHelper.h>
 #include <exchange/core/processors/GroupingProcessor.h>
+#include <exchange/core/processors/SharedPool.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
 #include <exchange/core/utils/Logger.h>
 
@@ -110,8 +112,9 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
 
   bool groupingEnabled = true;
 
-  // Match Java: EVENTS_POOLING constant (currently false in C++ version)
-  constexpr bool EVENTS_POOLING = false;
+  // Use OrderBookEventsHelper::EVENTS_POOLING to match Java behavior
+  constexpr bool EVENTS_POOLING =
+      orderbook::OrderBookEventsHelper::EVENTS_POOLING;
 
   // Performance optimization: Use thread_local epoch to reduce time conversion
   // overhead This avoids calling time_since_epoch() repeatedly, using relative
@@ -174,29 +177,37 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
 
           // cleaning attached events
           // Match Java: if (EVENTS_POOLING && cmd.matcherEvent != null)
-          if (EVENTS_POOLING && cmd->matcherEvent != nullptr) {
-            // update tail
-            if (tradeEventTail == nullptr) {
-              tradeEventHead = cmd->matcherEvent;
-            } else {
-              tradeEventTail->nextEvent = cmd->matcherEvent;
-            }
+          if constexpr (EVENTS_POOLING) {
+            if (cmd->matcherEvent != nullptr) {
+              // update tail
+              if (tradeEventTail == nullptr) {
+                tradeEventHead = cmd->matcherEvent;
+              } else {
+                tradeEventTail->nextEvent = cmd->matcherEvent;
+              }
 
-            tradeEventTail = cmd->matcherEvent;
-            tradeEventCounter++;
-
-            // find last element in the chain and update tail accordingly
-            while (tradeEventTail->nextEvent != nullptr) {
-              tradeEventTail = tradeEventTail->nextEvent;
+              tradeEventTail = cmd->matcherEvent;
               tradeEventCounter++;
-            }
 
-            if (tradeEventCounter >= tradeEventChainLengthTarget) {
-              // chain is big enough -> send to the shared pool
-              tradeEventCounter = 0;
-              sharedPool_->PutChain(tradeEventHead);
-              tradeEventTail = nullptr;
-              tradeEventHead = nullptr;
+              // find last element in the chain and update tail accordingly
+              while (tradeEventTail->nextEvent != nullptr) {
+                tradeEventTail = tradeEventTail->nextEvent;
+                tradeEventCounter++;
+              }
+
+              if (tradeEventCounter >= tradeEventChainLengthTarget) {
+                // chain is big enough -> send to the shared pool
+                tradeEventCounter = 0;
+                sharedPool_->PutChain(tradeEventHead);
+                tradeEventTail = nullptr;
+                tradeEventHead = nullptr;
+              }
+            }
+          } else {
+            // When EVENTS_POOLING is false, delete event chains to prevent
+            // memory leak
+            if (cmd->matcherEvent != nullptr) {
+              SharedPool::DeleteChain(cmd->matcherEvent);
             }
           }
           cmd->matcherEvent = nullptr;

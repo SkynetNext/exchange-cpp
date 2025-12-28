@@ -75,15 +75,17 @@ public:
   int32_t GetChainLength() const { return chainLength_; }
 
   /**
+   * Delete an entire event chain (public for use when EVENTS_POOLING is false)
+   * @param head Head of the chain to delete
+   */
+  static void DeleteChain(common::MatcherTradeEvent *head);
+
+  /**
    * Destructor - cleans up all chains in the pool
    */
   ~SharedPool();
 
 private:
-  /**
-   * Helper function to delete an entire chain
-   */
-  static void DeleteChain(common::MatcherTradeEvent *head);
   // Lock-free concurrent queue for high-performance event chain management
   // Replaces std::queue + std::mutex with lock-free implementation
   // Note: moodycamel::ConcurrentQueue is unbounded, but we enforce poolMaxSize_
