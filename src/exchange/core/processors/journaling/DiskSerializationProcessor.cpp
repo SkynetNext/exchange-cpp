@@ -330,9 +330,12 @@ std::string DiskSerializationProcessor::GetSnapshotPath(
 
 std::string DiskSerializationProcessor::GetJournalPath(int64_t snapshotId,
                                                        int32_t fileIndex) {
+  // Match Java: String.format("%s_journal_%d_%04X.ecj", exchangeId, snapshotId,
+  // partitionId)
   std::ostringstream oss;
   oss << folder_ << "/" << exchangeId_ << "_journal_" << snapshotId << "_"
-      << std::hex << std::setfill('0') << std::setw(4) << fileIndex << ".ecj";
+      << std::hex << std::uppercase << std::setfill('0') << std::setw(4)
+      << fileIndex << ".ecj";
   return oss.str();
 }
 
