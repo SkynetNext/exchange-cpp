@@ -17,13 +17,14 @@
 #pragma once
 
 #include "../common/MatcherTradeEvent.h"
+#include <atomic>
 #include <cstdint>
 #include <memory>
 
 // Use moodycamel::ConcurrentQueue for lock-free high-performance queue
-// Header-only library, faster than TBB concurrent_queue for high-frequency trading
-// Note: moodycamel::ConcurrentQueue is unbounded, but performance is critical
-// for HFT systems. poolMaxSize_ is kept for API compatibility.
+// Header-only library, faster than TBB concurrent_queue for high-frequency
+// trading Note: moodycamel::ConcurrentQueue is unbounded, but performance is
+// critical for HFT systems. poolMaxSize_ is kept for API compatibility.
 #include <concurrentqueue.h>
 
 namespace exchange {
@@ -73,14 +74,23 @@ public:
    */
   int32_t GetChainLength() const { return chainLength_; }
 
+  /**
+   * Destructor - cleans up all chains in the pool
+   */
+  ~SharedPool();
+
 private:
+  /**
+   * Helper function to delete an entire chain
+   */
+  static void DeleteChain(common::MatcherTradeEvent *head);
   // Lock-free concurrent queue for high-performance event chain management
   // Replaces std::queue + std::mutex with lock-free implementation
-  // Note: moodycamel::ConcurrentQueue is unbounded, so poolMaxSize_ is kept
-  // for API compatibility but not enforced (object pool is for optimization,
-  // not strict memory limiting). Performance is critical for HFT systems.
+  // Note: moodycamel::ConcurrentQueue is unbounded, but we enforce poolMaxSize_
+  // by tracking queue size with atomic counter and deleting chains when full.
   moodycamel::ConcurrentQueue<common::MatcherTradeEvent *> eventChainsBuffer_;
-  int32_t poolMaxSize_; // Kept for API compatibility, not enforced
+  std::atomic<int32_t> queueSize_; // Track queue size to enforce poolMaxSize_
+  int32_t poolMaxSize_;
   int32_t chainLength_;
 };
 
