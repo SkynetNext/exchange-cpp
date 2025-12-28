@@ -19,7 +19,6 @@
 #include <disruptor/BlockingWaitStrategy.h>
 #include <disruptor/BusySpinWaitStrategy.h>
 #include <disruptor/YieldingWaitStrategy.h>
-#include <exchange/core/common/EventChainCollector.h>
 #include <exchange/core/common/MatcherTradeEvent.h>
 #include <exchange/core/common/cmd/CommandResultCode.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
@@ -112,21 +111,18 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
   constexpr bool EVENTS_POOLING =
       orderbook::OrderBookEventsHelper::EVENTS_POOLING;
 
-  // Event chain collector (RAII-based, exception-safe)
-  // When EVENTS_POOLING is true, collects chains and returns to pool
-  // When EVENTS_POOLING is false, deletes chains immediately
-  common::EventChainCollector::PoolCallback poolCallback = nullptr;
-  int32_t targetLength = 0;
+  // Thread-local event chain accumulation (matches Java implementation)
+  // Best practice: Use counter-based batching instead of traversing chains
+  // This avoids O(n) traversal in hot path and reduces overhead
+  common::MatcherTradeEvent *tradeEventHead = nullptr;
+  common::MatcherTradeEvent *tradeEventTail = nullptr;
+  int32_t tradeEventCounter = 0;
+  int32_t tradeEventChainLengthTarget = 0;
   if constexpr (EVENTS_POOLING) {
     if (sharedPool_ != nullptr) {
-      poolCallback = [this](common::MatcherTradeEvent *chain) {
-        sharedPool_->PutChain(chain);
-      };
-      targetLength = sharedPool_->GetChainLength();
+      tradeEventChainLengthTarget = sharedPool_->GetChainLength();
     }
   }
-  common::EventChainCollector eventCollector(std::move(poolCallback),
-                                             targetLength);
 
   // Performance optimization: Use thread_local epoch to reduce time conversion
   // overhead This avoids calling time_since_epoch() repeatedly, using relative
@@ -165,7 +161,14 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
                   common::cmd::OrderCommandType::PERSIST_STATE_MATCHING ||
               cmd->command == common::cmd::OrderCommandType::GROUPING_CONTROL) {
             // Flush any remaining event chains before switching group
-            eventCollector.Flush();
+            if constexpr (EVENTS_POOLING) {
+              if (tradeEventHead != nullptr) {
+                sharedPool_->PutChain(tradeEventHead);
+                tradeEventCounter = 0;
+                tradeEventTail = nullptr;
+                tradeEventHead = nullptr;
+              }
+            }
             groupCounter++;
             msgsInGroup = 0;
           }
@@ -177,7 +180,14 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
                    common::cmd::OrderCommandType::BINARY_DATA_QUERY) &&
               cmd->symbol == -1) {
             // Flush any remaining event chains before switching group
-            eventCollector.Flush();
+            if constexpr (EVENTS_POOLING) {
+              if (tradeEventHead != nullptr) {
+                sharedPool_->PutChain(tradeEventHead);
+                tradeEventCounter = 0;
+                tradeEventTail = nullptr;
+                tradeEventHead = nullptr;
+              }
+            }
             groupCounter++;
             msgsInGroup = 0;
           }
@@ -191,16 +201,39 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
             cmd->serviceFlags = 0;
           }
 
-          // cleaning attached events - use EventChainCollector for safe,
-          // exception-safe management
+          // cleaning attached events (matches Java implementation)
+          // Best practice: Counter-based batching avoids O(n) chain traversal
           if (cmd->matcherEvent != nullptr) {
-            eventCollector.Collect(cmd->matcherEvent);
-            cmd->matcherEvent = nullptr;
+            if constexpr (EVENTS_POOLING) {
+              // Thread-local accumulation: append to local chain
+              if (tradeEventTail == nullptr) {
+                tradeEventHead = cmd->matcherEvent;
+              } else {
+                tradeEventTail->nextEvent = cmd->matcherEvent;
+              }
+              tradeEventTail = cmd->matcherEvent;
+              tradeEventCounter++;
 
-            // Check if should return to pool (only when EVENTS_POOLING is true)
-            if (eventCollector.ShouldReturn()) {
-              eventCollector.ReturnToPool();
+              // Find tail and update counter (single traversal)
+              while (tradeEventTail->nextEvent != nullptr) {
+                tradeEventTail = tradeEventTail->nextEvent;
+                tradeEventCounter++;
+              }
+
+              // Batch return when target length reached (avoids frequent
+              // PutChain calls)
+              if (tradeEventCounter >= tradeEventChainLengthTarget &&
+                  tradeEventChainLengthTarget > 0) {
+                sharedPool_->PutChain(tradeEventHead);
+                tradeEventCounter = 0;
+                tradeEventTail = nullptr;
+                tradeEventHead = nullptr;
+              }
+            } else {
+              // Fast path: direct deletion when pooling is disabled
+              common::MatcherTradeEvent::DeleteChain(cmd->matcherEvent);
             }
+            cmd->matcherEvent = nullptr;
           }
           cmd->marketData = nullptr;
 
@@ -211,7 +244,14 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
               cmd->command !=
                   common::cmd::OrderCommandType::PERSIST_STATE_RISK) {
             // Flush any remaining event chains before switching group
-            eventCollector.Flush();
+            if constexpr (EVENTS_POOLING) {
+              if (tradeEventHead != nullptr) {
+                sharedPool_->PutChain(tradeEventHead);
+                tradeEventCounter = 0;
+                tradeEventTail = nullptr;
+                tradeEventHead = nullptr;
+              }
+            }
             groupCounter++;
             msgsInGroup = 0;
           }
@@ -240,7 +280,14 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
         if (msgsInGroup > 0 && t > groupLastNs) {
           // switch group after T microseconds elapsed
           // Flush any remaining event chains before switching group
-          eventCollector.Flush();
+          if constexpr (EVENTS_POOLING) {
+            if (tradeEventHead != nullptr) {
+              sharedPool_->PutChain(tradeEventHead);
+              tradeEventCounter = 0;
+              tradeEventTail = nullptr;
+              tradeEventHead = nullptr;
+            }
+          }
           groupCounter++;
           msgsInGroup = 0;
         }
@@ -255,7 +302,14 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
     } catch (const disruptor::AlertException &ex) {
       if (running_.load() != RUNNING) {
         // Flush any remaining event chains before halting
-        eventCollector.Flush();
+        if constexpr (EVENTS_POOLING) {
+          if (tradeEventHead != nullptr) {
+            sharedPool_->PutChain(tradeEventHead);
+            tradeEventCounter = 0;
+            tradeEventTail = nullptr;
+            tradeEventHead = nullptr;
+          }
+        }
         break;
       }
     } catch (...) {

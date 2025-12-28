@@ -66,6 +66,10 @@ struct MatcherTradeEvent {
 
   static MatcherTradeEvent *CreateEventChain(int32_t chainLength);
 
+  // Delete an entire event chain
+  // @param head Head of chain to delete, or nullptr
+  static void DeleteChain(MatcherTradeEvent *head);
+
   // testing only
   static std::vector<MatcherTradeEvent *> AsList(MatcherTradeEvent *head);
 };

@@ -68,6 +68,14 @@ MatcherTradeEvent *MatcherTradeEvent::CreateEventChain(int32_t chainLength) {
   return head;
 }
 
+void MatcherTradeEvent::DeleteChain(MatcherTradeEvent *head) {
+  while (head != nullptr) {
+    MatcherTradeEvent *next = head->nextEvent;
+    delete head;
+    head = next;
+  }
+}
+
 std::vector<MatcherTradeEvent *>
 MatcherTradeEvent::AsList(MatcherTradeEvent *head) {
   std::vector<MatcherTradeEvent *> list;

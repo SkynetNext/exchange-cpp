@@ -26,7 +26,6 @@
 #include <chrono>
 #include <climits>
 #include <cmath>
-#include <exchange/core/common/EventChain.h>
 #include <exchange/core/common/MatcherEventType.h>
 #include <exchange/core/common/OrderAction.h>
 #include <exchange/core/common/OrderType.h>
@@ -560,8 +559,8 @@ TestOrdersGenerator::GenResult TestOrdersGenerator::GenerateCommands(
         }
       });
       // Delete event chain to prevent memory leak
-      // Use EventChain::Delete for safe cleanup
-      common::EventChain::Delete(cmd.matcherEvent);
+      // Use MatcherTradeEvent::DeleteChain for safe cleanup
+      common::MatcherTradeEvent::DeleteChain(cmd.matcherEvent);
       cmd.matcherEvent = nullptr;
     }
 
