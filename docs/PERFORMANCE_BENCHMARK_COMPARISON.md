@@ -177,7 +177,7 @@ Latency test for single symbol (Exchange mode) with progressive TPS increase to 
 |-----------|-------|
 | Symbol Type | `CURRENCY_EXCHANGE_PAIR` |
 | Symbols | 1 |
-| Benchmark Commands | 1,000,000 |
+| Benchmark Commands | 3,000,000 |
 | PreFill Commands | 1,000 |
 | Users | 2,000 accounts (1,325 unique) |
 | Currencies | 2 |
