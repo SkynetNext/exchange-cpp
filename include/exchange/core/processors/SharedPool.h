@@ -77,6 +77,8 @@ public:
   /**
    * Delete an entire event chain (public for use when EVENTS_POOLING is false)
    * @param head Head of the chain to delete
+   *
+   * @deprecated Use common::EventChain::Delete() instead for better type safety
    */
   static void DeleteChain(common::MatcherTradeEvent *head);
 

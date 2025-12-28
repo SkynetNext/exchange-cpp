@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <exchange/core/common/EventChain.h>
 #include <exchange/core/common/MatcherTradeEvent.h>
 #include <exchange/core/processors/SharedPool.h>
 #include <stdexcept>
@@ -74,11 +75,8 @@ void SharedPool::PutChain(common::MatcherTradeEvent *head) {
 }
 
 void SharedPool::DeleteChain(common::MatcherTradeEvent *head) {
-  while (head != nullptr) {
-    common::MatcherTradeEvent *next = head->nextEvent;
-    delete head;
-    head = next;
-  }
+  // Use EventChain::Delete for consistency
+  common::EventChain::Delete(head);
 }
 
 SharedPool::~SharedPool() {
