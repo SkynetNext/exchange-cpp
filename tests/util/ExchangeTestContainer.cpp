@@ -590,8 +590,10 @@ int32_t ExchangeTestContainer::RequestStateHash() {
       exchange::core::common::api::reports::StateHashReportQuery>();
 
   // Serialize query using WriteMarshallable
+  // Match ProcessReportHelper: write type code first, then query data
   std::vector<uint8_t> queryBytesVec;
   exchange::core::common::VectorBytesOut queryBytesOut(queryBytesVec);
+  queryBytesOut.WriteInt(query->GetReportTypeCode());
   query->WriteMarshallable(queryBytesOut);
   std::vector<uint8_t> queryBytes = queryBytesOut.GetData();
 
