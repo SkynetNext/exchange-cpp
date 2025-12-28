@@ -37,7 +37,7 @@ TestDataParameters TestDataParameters::SinglePairMargin() {
 
 TestDataParameters TestDataParameters::SinglePairExchange() {
   TestDataParameters params;
-  params.totalTransactionsNumber = 1'000'000; // Match Java: 1_000_000
+  params.totalTransactionsNumber = 3'000'000; // Match Java: 3_000_000
   params.targetOrderBookOrdersTotal = 1000;
   params.numAccounts = 2000;
   params.currenciesAllowed = TestConstants::GetCurrenciesExchange();
