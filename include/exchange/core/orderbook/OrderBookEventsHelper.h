@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../common/IOrder.h"
+#include "../common/MatcherEventType.h"
 #include "../common/MatcherTradeEvent.h"
 #include "../common/Wire.h"
 #include "../common/cmd/OrderCommand.h"
@@ -46,16 +47,42 @@ public:
     return new common::MatcherTradeEvent();
   });
 
-  // Create a trade event
-  common::MatcherTradeEvent *SendTradeEvent(const common::IOrder *matchingOrder,
-                                            bool makerCompleted,
-                                            bool takerCompleted, int64_t size,
-                                            int64_t bidderHoldPrice);
+  // Create a trade event - template function for compile-time polymorphism
+  template <typename OrderT>
+  common::MatcherTradeEvent *
+  SendTradeEvent(const OrderT *matchingOrder, bool makerCompleted,
+                 bool takerCompleted, int64_t size, int64_t bidderHoldPrice) {
+    common::MatcherTradeEvent *event = NewMatcherEvent();
 
-  // Create a reduce event
-  common::MatcherTradeEvent *SendReduceEvent(const common::IOrder *order,
-                                             int64_t reduceSize,
-                                             bool completed);
+    event->eventType = common::MatcherEventType::TRADE;
+    event->section = 0;
+    event->activeOrderCompleted = takerCompleted;
+    event->matchedOrderId = matchingOrder->GetOrderId();
+    event->matchedOrderUid = matchingOrder->GetUid();
+    event->matchedOrderCompleted = makerCompleted;
+    event->price = matchingOrder->GetPrice();
+    event->size = size;
+    event->bidderHoldPrice = bidderHoldPrice;
+
+    return event;
+  }
+
+  // Create a reduce event - template function for compile-time polymorphism
+  template <typename OrderT>
+  common::MatcherTradeEvent *
+  SendReduceEvent(const OrderT *order, int64_t reduceSize, bool completed) {
+    common::MatcherTradeEvent *event = NewMatcherEvent();
+    event->eventType = common::MatcherEventType::REDUCE;
+    event->section = 0;
+    event->activeOrderCompleted = completed;
+    event->matchedOrderId = 0;
+    event->matchedOrderCompleted = false;
+    event->price = order->GetPrice();
+    event->size = reduceSize;
+    event->bidderHoldPrice = order->GetReserveBidPrice();
+
+    return event;
+  }
 
   // Create a reduce event (overload with price parameters to avoid
   // use-after-free) Use this version when the order will be released/deleted

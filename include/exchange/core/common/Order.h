@@ -36,8 +36,7 @@ namespace common {
  * No external references allowed to such object - order objects only live
  * inside OrderBook.
  */
-class Order : public IOrderBase<Order>,
-              public IOrder,
+class Order : public IOrder<Order>,
               public StateHash,
               public WriteBytesMarshallable {
 public:
@@ -70,15 +69,15 @@ public:
    */
   Order(BytesIn &bytes);
 
-  // IOrder interface implementation
-  int64_t GetPrice() const override { return price; }
-  int64_t GetSize() const override { return size; }
-  int64_t GetFilled() const override { return filled; }
-  int64_t GetUid() const override { return uid; }
-  OrderAction GetAction() const override { return action; }
-  int64_t GetOrderId() const override { return orderId; }
-  int64_t GetTimestamp() const override { return timestamp; }
-  int64_t GetReserveBidPrice() const override { return reserveBidPrice; }
+  // IOrder<Order> CRTP interface implementation
+  int64_t GetPrice() const { return price; }
+  int64_t GetSize() const { return size; }
+  int64_t GetFilled() const { return filled; }
+  int64_t GetUid() const { return uid; }
+  OrderAction GetAction() const { return action; }
+  int64_t GetOrderId() const { return orderId; }
+  int64_t GetTimestamp() const { return timestamp; }
+  int64_t GetReserveBidPrice() const { return reserveBidPrice; }
 
   // StateHash interface implementation
   int32_t GetStateHash() const override;

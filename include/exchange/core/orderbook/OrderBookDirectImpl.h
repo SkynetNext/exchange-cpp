@@ -27,6 +27,7 @@
 #include "OrderBookEventsHelper.h"
 #include <algorithm>
 #include <cstdint>
+#include <type_traits>
 #include <vector>
 
 namespace exchange {
@@ -50,7 +51,7 @@ public:
     int32_t numOrders = 0;   // Number of orders at this price level
   };
 
-  struct DirectOrder : public common::IOrderBase<DirectOrder>,
+  struct DirectOrder : public common::IOrder<DirectOrder>,
                        public common::WriteBytesMarshallable,
                        public common::StateHash {
     int64_t orderId = 0; // Unique order identifier
@@ -127,7 +128,21 @@ public:
   GetL2MarketDataSnapshot(int32_t size) override;
   int32_t GetOrdersNum(common::OrderAction action) override;
   int64_t GetTotalOrdersVolume(common::OrderAction action) override;
-  common::IOrder *GetOrderById(int64_t orderId) override;
+
+  // Type-safe GetOrderById - specialization for DirectOrder
+  DirectOrder *GetOrderById(int64_t orderId);
+
+  // Generic template implementation (hides base class template)
+  template <typename OrderT> OrderT *GetOrderById(int64_t orderId) {
+    // Only DirectOrder is supported for OrderBookDirectImpl
+    if constexpr (std::is_same_v<OrderT, DirectOrder>) {
+      return GetOrderById(orderId); // Call non-template overload
+    } else {
+      // For other types, return nullptr (type mismatch)
+      return nullptr;
+    }
+  }
+
   void ValidateInternalState() override;
   OrderBookImplType GetImplementationType() const override;
   void FillAsks(int32_t size, common::L2MarketData *data) override;
@@ -143,11 +158,26 @@ public:
   std::string PrintAskBucketsDiagram() const override;
   std::string PrintBidBucketsDiagram() const override;
 
-  // Process orders methods (IOrderBook interface)
-  void ProcessAskOrders(
-      std::function<void(const common::IOrder *)> consumer) const override;
-  void ProcessBidOrders(
-      std::function<void(const common::IOrder *)> consumer) const override;
+  // Process orders methods - template functions for compile-time polymorphism
+  template <typename Consumer> void ProcessAskOrders(Consumer consumer) const {
+    // Match Java: askOrdersStream() uses OrdersSpliterator which starts from
+    // bestAskOrder and traverses via prev pointer
+    DirectOrder *current = bestAskOrder_;
+    while (current != nullptr) {
+      consumer(current);
+      current = current->prev;
+    }
+  }
+
+  template <typename Consumer> void ProcessBidOrders(Consumer consumer) const {
+    // Match Java: bidOrdersStream() uses OrdersSpliterator which starts from
+    // bestBidOrder and traverses via prev pointer
+    DirectOrder *current = bestBidOrder_;
+    while (current != nullptr) {
+      consumer(current);
+      current = current->prev;
+    }
+  }
 
   // Find user orders (IOrderBook interface)
   std::vector<common::Order *> FindUserOrders(int64_t uid) override;
@@ -182,15 +212,10 @@ private:
   Bucket *RemoveOrder(DirectOrder *order);
   void insertOrder(DirectOrder *order, Bucket *freeBucket);
   // Template function for hot path - uses CRTP, no virtual function overhead
-  // Accepts any type that implements IOrderBase<Self> or has direct field
+  // Accepts any type that implements IOrder<Self> or has direct field
   // access
   template <typename OrderT>
   int64_t tryMatchInstantly(OrderT *takerOrder,
-                            common::cmd::OrderCommand *triggerCmd);
-
-  // Legacy overload for backward compatibility (non-hot path)
-  // Delegates to template version
-  int64_t tryMatchInstantly(common::IOrder *takerOrder,
                             common::cmd::OrderCommand *triggerCmd);
   int64_t checkBudgetToFill(common::OrderAction action, int64_t size);
   bool isBudgetLimitSatisfied(common::OrderAction orderAction,
@@ -248,10 +273,9 @@ OrderBookDirectImpl::tryMatchInstantly(OrderT *takerOrder,
 
     const int64_t bidderHoldPrice =
         isBidAction ? takerReserveBidPrice : makerOrder->reserveBidPrice;
-    // Use adapter to convert DirectOrder* to IOrder* for non-hot path interface
-    common::IOrderAdapter<DirectOrder> adapter(makerOrder);
+    // Use template function for SendTradeEvent - compile-time polymorphism
     common::MatcherTradeEvent *tradeEvent = eventsHelper_->SendTradeEvent(
-        &adapter, makerCompleted, remainingSize == 0, tradeSize,
+        makerOrder, makerCompleted, remainingSize == 0, tradeSize,
         bidderHoldPrice);
 
     if (eventsTail == nullptr) {

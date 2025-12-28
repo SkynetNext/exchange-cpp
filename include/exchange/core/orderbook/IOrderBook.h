@@ -16,7 +16,8 @@
 
 #pragma once
 
-#include "../common/IOrder.h"
+// IOrder is now a template class, forward declaration in common namespace
+// Include IOrder.h only when needed in implementation files
 #include "../common/L2MarketData.h"
 #include "../common/OrderAction.h"
 #include "../common/StateHash.h"
@@ -24,7 +25,6 @@
 #include "../common/cmd/CommandResultCode.h"
 #include "../common/cmd/OrderCommand.h"
 #include <cstdint>
-#include <functional>
 #include <memory>
 
 namespace exchange {
@@ -98,8 +98,22 @@ public:
 
   /**
    * Get order by ID (testing only)
+   * Template function for type-safe access - caller specifies the expected
+   * order type. Returns nullptr if order not found or type mismatch.
+   *
+   * Usage:
+   *   auto* order = orderBook->GetOrderById<DirectOrder>(orderId);
+   *   auto* order = orderBook->GetOrderById<common::Order>(orderId);
    */
-  virtual common::IOrder *GetOrderById(int64_t orderId) = 0;
+  // Template function - derived classes provide their own implementation (hides
+  // this one)
+  template <typename OrderT> OrderT *GetOrderById(int64_t orderId) {
+    // Default implementation - derived classes should provide their own
+    // This definition is required for template instantiation, but derived
+    // classes will hide this with their own template implementation
+    (void)orderId;  // Suppress unused parameter warning
+    return nullptr; // Default: not found
+  }
 
   /**
    * Validate internal state (testing only)
@@ -158,18 +172,37 @@ public:
   /**
    * Process all ask orders with a callback function
    * Matches Java askOrdersStream() - iterates over all ask orders
-   * @param consumer Callback function that receives each order
+   * Note: Template function for compile-time polymorphism.
+   * Consumer should accept the order type specific to the implementation.
    */
-  virtual void ProcessAskOrders(
-      std::function<void(const common::IOrder *)> consumer) const = 0;
+  // Template function - derived classes provide their own implementation (hides
+  // this one)
+  template <typename Consumer> void ProcessAskOrders(Consumer consumer) const {
+    // Default implementation - derived classes should provide their own
+    // This definition is required for template instantiation, but derived
+    // classes will hide this with their own template implementation
+    (void)consumer; // Suppress unused parameter warning
+    // In practice, this should never be called as derived classes provide
+    // implementation
+  }
 
   /**
    * Process all bid orders with a callback function
    * Matches Java bidOrdersStream() - iterates over all bid orders
-   * @param consumer Callback function that receives each order
+   * Note: Template function for compile-time polymorphism.
+   * Consumer should accept the order type specific to the implementation.
+   * Derived classes must provide implementation.
    */
-  virtual void ProcessBidOrders(
-      std::function<void(const common::IOrder *)> consumer) const = 0;
+  // Template function - derived classes provide their own implementation (hides
+  // this one)
+  template <typename Consumer> void ProcessBidOrders(Consumer consumer) const {
+    // Default implementation - derived classes should provide their own
+    // This definition is required for template instantiation, but derived
+    // classes will hide this with their own template implementation
+    (void)consumer; // Suppress unused parameter warning
+    // In practice, this should never be called as derived classes provide
+    // implementation
+  }
 
   /**
    * Search for all orders for specified user

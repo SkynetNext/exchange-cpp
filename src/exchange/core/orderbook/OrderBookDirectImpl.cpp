@@ -296,117 +296,11 @@ CommandResultCode OrderBookDirectImpl::ReduceOrder(OrderCommand *cmd) {
   } else {
     order->size -= reduceBy;
     order->bucket->totalVolume -= reduceBy;
-    // Use adapter to convert DirectOrder* to IOrder* for non-hot path interface
-    common::IOrderAdapter<DirectOrder> adapter(order);
-    cmd->matcherEvent =
-        eventsHelper_->SendReduceEvent(&adapter, reduceBy, false);
+    // Use template function for SendReduceEvent - compile-time polymorphism
+    cmd->matcherEvent = eventsHelper_->SendReduceEvent(order, reduceBy, false);
     cmd->action = order->action;
   }
   return CommandResultCode::SUCCESS;
-}
-
-// Legacy overload for backward compatibility - delegates to template version
-// This is for non-hot paths that use IOrder* (e.g., from other OrderBook
-// implementations)
-int64_t OrderBookDirectImpl::tryMatchInstantly(common::IOrder *takerOrder,
-                                               OrderCommand *triggerCmd) {
-  // For IOrder*, we need to use virtual functions (non-hot path)
-  // In hot paths, use template version directly with DirectOrder*
-  const bool isBidAction = takerOrder->GetAction() == common::OrderAction::BID;
-  // For FOK_BUDGET ASK orders, use 0 as limitPrice to match all available bids
-  const int64_t limitPrice =
-      (triggerCmd->command == common::cmd::OrderCommandType::PLACE_ORDER &&
-       triggerCmd->orderType == common::OrderType::FOK_BUDGET && !isBidAction)
-          ? 0L
-          : takerOrder->GetPrice();
-
-  DirectOrder *makerOrder;
-  if (isBidAction) {
-    makerOrder = bestAskOrder_;
-    if (makerOrder == nullptr || makerOrder->price > limitPrice) {
-      return takerOrder->GetFilled();
-    }
-  } else {
-    makerOrder = bestBidOrder_;
-    if (makerOrder == nullptr || makerOrder->price < limitPrice) {
-      return takerOrder->GetFilled();
-    }
-  }
-
-  int64_t remainingSize = takerOrder->GetSize() - takerOrder->GetFilled();
-  if (remainingSize == 0)
-    return takerOrder->GetFilled();
-
-  DirectOrder *priceBucketTail = makerOrder->bucket->lastOrder;
-  MatcherTradeEvent *eventsTail = nullptr;
-
-  const int64_t takerReserveBidPrice = takerOrder->GetReserveBidPrice();
-
-  do {
-    const int64_t tradeSize =
-        std::min(remainingSize, makerOrder->size - makerOrder->filled);
-    makerOrder->filled += tradeSize;
-    makerOrder->bucket->totalVolume -= tradeSize;
-    remainingSize -= tradeSize;
-
-    const bool makerCompleted = (makerOrder->size == makerOrder->filled);
-    if (makerCompleted) {
-      makerOrder->bucket->numOrders--;
-    }
-
-    const int64_t bidderHoldPrice =
-        isBidAction ? takerReserveBidPrice : makerOrder->reserveBidPrice;
-    // Use adapter to convert DirectOrder* to IOrder* for non-hot path interface
-    common::IOrderAdapter<DirectOrder> adapter(makerOrder);
-    MatcherTradeEvent *tradeEvent = eventsHelper_->SendTradeEvent(
-        &adapter, makerCompleted, remainingSize == 0, tradeSize,
-        bidderHoldPrice);
-
-    if (eventsTail == nullptr) {
-      triggerCmd->matcherEvent = tradeEvent;
-    } else {
-      eventsTail->nextEvent = tradeEvent;
-    }
-    eventsTail = tradeEvent;
-
-    if (!makerCompleted)
-      break;
-
-    orderIdIndex_.Remove(makerOrder->orderId);
-    DirectOrder *toRecycle = makerOrder;
-
-    if (makerOrder == priceBucketTail) {
-      auto &buckets = isBidAction ? askPriceBuckets_ : bidPriceBuckets_;
-      buckets.Remove(makerOrder->price);
-      objectsPool_->Put(
-          ::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
-          makerOrder->bucket);
-
-      if (makerOrder->prev != nullptr) {
-        priceBucketTail = makerOrder->prev->bucket->lastOrder;
-      }
-    }
-
-    makerOrder = makerOrder->prev;
-    objectsPool_->Put(
-        ::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER,
-        toRecycle);
-
-  } while (makerOrder != nullptr && remainingSize > 0 &&
-           (isBidAction ? makerOrder->price <= limitPrice
-                        : makerOrder->price >= limitPrice));
-
-  if (makerOrder != nullptr) {
-    makerOrder->next = nullptr;
-  }
-
-  if (isBidAction) {
-    bestAskOrder_ = makerOrder;
-  } else {
-    bestBidOrder_ = makerOrder;
-  }
-
-  return takerOrder->GetSize() - remainingSize;
 }
 
 OrderBookDirectImpl::Bucket *
@@ -590,22 +484,9 @@ std::vector<common::Order *> OrderBookDirectImpl::FindUserOrders(int64_t uid) {
   return list;
 }
 
-common::IOrder *OrderBookDirectImpl::GetOrderById(int64_t orderId) {
-  DirectOrder *order = orderIdIndex_.Get(orderId);
-  if (order == nullptr) {
-    return nullptr;
-  }
-  // WARNING: This returns a pointer to a thread-local adapter.
-  // The adapter is valid only for the current thread and only during the
-  // current call. Callers must not store this pointer or use it across threads.
-  // For proper memory management, consider changing IOrderBook interface to
-  // return DirectOrder* or use std::variant, or allocate adapter on heap (but
-  // then caller must delete).
-  static thread_local common::IOrderAdapter<DirectOrder> adapter(nullptr);
-  // Re-initialize adapter with current order
-  adapter = common::IOrderAdapter<DirectOrder>(order);
-  return const_cast<common::IOrder *>(
-      static_cast<const common::IOrder *>(&adapter));
+OrderBookDirectImpl::DirectOrder *
+OrderBookDirectImpl::GetOrderById(int64_t orderId) {
+  return orderIdIndex_.Get(orderId);
 }
 
 void OrderBookDirectImpl::ValidateInternalState() {
@@ -812,32 +693,6 @@ std::string OrderBookDirectImpl::PrintAskBucketsDiagram() const {
   oss << "\nART Tree Structure:\n";
   oss << askPriceBuckets_.PrintDiagram();
   return oss.str();
-}
-
-void OrderBookDirectImpl::ProcessAskOrders(
-    std::function<void(const common::IOrder *)> consumer) const {
-  // Match Java: askOrdersStream() uses OrdersSpliterator which starts from
-  // bestAskOrder and traverses via prev pointer
-  DirectOrder *current = bestAskOrder_;
-  while (current != nullptr) {
-    // Use adapter to convert DirectOrder* to IOrder* for callback
-    common::IOrderAdapter<DirectOrder> adapter(current);
-    consumer(&adapter);
-    current = current->prev;
-  }
-}
-
-void OrderBookDirectImpl::ProcessBidOrders(
-    std::function<void(const common::IOrder *)> consumer) const {
-  // Match Java: bidOrdersStream() uses OrdersSpliterator which starts from
-  // bestBidOrder and traverses via prev pointer
-  DirectOrder *current = bestBidOrder_;
-  while (current != nullptr) {
-    // Use adapter to convert DirectOrder* to IOrder* for callback
-    common::IOrderAdapter<DirectOrder> adapter(current);
-    consumer(&adapter);
-    current = current->prev;
-  }
 }
 
 std::string OrderBookDirectImpl::PrintBidBucketsDiagram() const {
