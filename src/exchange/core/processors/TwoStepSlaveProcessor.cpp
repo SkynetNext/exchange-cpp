@@ -55,10 +55,7 @@ disruptor::Sequence &TwoStepSlaveProcessor<WaitStrategyT>::getSequence() {
 template <typename WaitStrategyT>
 void TwoStepSlaveProcessor<WaitStrategyT>::halt() {
   running_.store(HALTED);
-  auto *barrier = static_cast<disruptor::ProcessingSequenceBarrier<
-      disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT> *>(
-      sequenceBarrier_);
-  barrier->alert();
+  sequenceBarrier_->alert();
 }
 
 template <typename WaitStrategyT>
@@ -69,10 +66,7 @@ bool TwoStepSlaveProcessor<WaitStrategyT>::isRunning() {
 template <typename WaitStrategyT>
 void TwoStepSlaveProcessor<WaitStrategyT>::run() {
   if (running_.compare_exchange_strong(const_cast<int32_t &>(IDLE), RUNNING)) {
-    auto *barrier = static_cast<disruptor::ProcessingSequenceBarrier<
-        disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT> *>(
-        sequenceBarrier_);
-    barrier->clearAlert();
+    sequenceBarrier_->clearAlert();
   } else if (running_.load() == RUNNING) {
     throw std::runtime_error("Thread is already running (S)");
   }
@@ -86,16 +80,13 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
   while (true) {
     common::cmd::OrderCommand *event = nullptr;
     try {
-      auto *ringBuffer = static_cast<disruptor::MultiProducerRingBuffer<
-          common::cmd::OrderCommand, WaitStrategyT> *>(ringBuffer_);
-
       int64_t availableSequence =
           waitSpinningHelper_->TryWaitFor(nextSequence_);
 
       // process batch
       while (nextSequence_ <= availableSequence &&
              nextSequence_ < processUpToSequence) {
-        event = &ringBuffer->get(nextSequence_);
+        event = &ringBuffer_->get(nextSequence_);
         eventHandler_->OnEvent(nextSequence_, event);
         nextSequence_++;
       }

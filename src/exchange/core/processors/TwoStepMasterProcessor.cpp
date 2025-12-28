@@ -58,11 +58,7 @@ disruptor::Sequence &TwoStepMasterProcessor<WaitStrategyT>::getSequence() {
 template <typename WaitStrategyT>
 void TwoStepMasterProcessor<WaitStrategyT>::halt() {
   running_.store(HALTED);
-  // Cast sequenceBarrier_ to call alert()
-  auto *barrier = static_cast<disruptor::ProcessingSequenceBarrier<
-      disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT> *>(
-      sequenceBarrier_);
-  barrier->alert();
+  sequenceBarrier_->alert();
 }
 
 template <typename WaitStrategyT>
@@ -73,10 +69,7 @@ bool TwoStepMasterProcessor<WaitStrategyT>::isRunning() {
 template <typename WaitStrategyT>
 void TwoStepMasterProcessor<WaitStrategyT>::run() {
   if (running_.compare_exchange_strong(const_cast<int32_t &>(IDLE), RUNNING)) {
-    auto *barrier = static_cast<disruptor::ProcessingSequenceBarrier<
-        disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT> *>(
-        sequenceBarrier_);
-    barrier->clearAlert();
+    sequenceBarrier_->clearAlert();
 
     try {
       if (running_.load() == RUNNING) {
@@ -108,15 +101,12 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
   while (true) {
     common::cmd::OrderCommand *cmd = nullptr;
     try {
-      auto *ringBuffer = static_cast<disruptor::MultiProducerRingBuffer<
-          common::cmd::OrderCommand, WaitStrategyT> *>(ringBuffer_);
-
       // should spin and also check another barrier
       int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
 
       if (nextSequence <= availableSequence) {
         while (nextSequence <= availableSequence) {
-          cmd = &ringBuffer->get(nextSequence);
+          cmd = &ringBuffer_->get(nextSequence);
 
           // switch to next group - let slave processor start doing its handling
           // cycle

@@ -68,8 +68,11 @@ private:
   static constexpr int32_t RUNNING = 2;
 
   std::atomic<int32_t> running_;
-  void *ringBuffer_;      // Type-erased RingBuffer pointer
-  void *sequenceBarrier_; // Type-erased SequenceBarrier pointer
+  disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>
+      *ringBuffer_;
+  disruptor::ProcessingSequenceBarrier<
+      disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT>
+      *sequenceBarrier_;
   WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>
       *waitSpinningHelper_;
   SimpleEventHandler *eventHandler_;
