@@ -194,7 +194,55 @@ bool OrderBookNaiveImpl::CheckBudgetToFill(int64_t size,
   return found;
 }
 
-// Template implementation moved to header file for compile-time polymorphism
+int64_t OrderBookNaiveImpl::TryMatchInstantly(
+    const common::IOrder *activeOrder, MatchingRange &matchingRange,
+    int64_t filled, common::cmd::OrderCommand *triggerCmd) {
+
+  if (matchingRange.empty) {
+    return filled;
+  }
+
+  int64_t orderSize = activeOrder->GetSize();
+  ::exchange::core::common::MatcherTradeEvent *eventsTail = nullptr;
+
+  std::vector<int64_t> emptyBuckets;
+
+  matchingRange.forEach([&](int64_t bucketPrice, OrdersBucket *bucket) {
+    int64_t sizeLeft = orderSize - filled;
+
+    OrdersBucket::MatcherResult bucketMatchings =
+        bucket->Match(sizeLeft, activeOrder, eventsHelper_);
+
+    // Remove fully matched orders from idMap
+    for (int64_t orderId : bucketMatchings.ordersToRemove) {
+      idMap_.erase(orderId);
+    }
+
+    filled += bucketMatchings.volume;
+
+    // Attach event chain
+    if (bucketMatchings.eventsChainHead != nullptr) {
+      if (eventsTail == nullptr) {
+        triggerCmd->matcherEvent = bucketMatchings.eventsChainHead;
+      } else {
+        eventsTail->nextEvent = bucketMatchings.eventsChainHead;
+      }
+      eventsTail = bucketMatchings.eventsChainTail;
+    }
+
+    // Mark empty buckets for removal
+    if (bucket->GetTotalVolume() == 0) {
+      emptyBuckets.push_back(bucketPrice);
+    }
+  });
+
+  // Remove empty buckets
+  for (int64_t price : emptyBuckets) {
+    matchingRange.erasePrice(price);
+  }
+
+  return filled;
+}
 
 common::cmd::CommandResultCode
 OrderBookNaiveImpl::CancelOrder(common::cmd::OrderCommand *cmd) {
@@ -433,7 +481,7 @@ int64_t OrderBookNaiveImpl::GetTotalOrdersVolume(common::OrderAction action) {
   }
 }
 
-common::Order *OrderBookNaiveImpl::GetOrderById(int64_t orderId) {
+common::IOrder *OrderBookNaiveImpl::GetOrderById(int64_t orderId) {
   auto it = idMap_.find(orderId);
   return (it != idMap_.end()) ? it->second : nullptr;
 }
@@ -722,7 +770,31 @@ std::string OrderBookNaiveImpl::PrintBidBucketsDiagram() const {
   return oss.str();
 }
 
-// Template implementation moved to header file for compile-time polymorphism
+void OrderBookNaiveImpl::ProcessAskOrders(
+    std::function<void(const common::IOrder *)> consumer) const {
+  // Match Java: askBuckets.values().stream().flatMap(bucket ->
+  // bucket.getAllOrders().stream())
+  for (const auto &pair : askBuckets_) {
+    pair.second->ForEachOrder([&consumer](common::Order *order) {
+      if (order != nullptr) {
+        consumer(order);
+      }
+    });
+  }
+}
+
+void OrderBookNaiveImpl::ProcessBidOrders(
+    std::function<void(const common::IOrder *)> consumer) const {
+  // Match Java: bidBuckets.values().stream().flatMap(bucket ->
+  // bucket.getAllOrders().stream())
+  for (const auto &pair : bidBuckets_) {
+    pair.second->ForEachOrder([&consumer](common::Order *order) {
+      if (order != nullptr) {
+        consumer(order);
+      }
+    });
+  }
+}
 
 std::vector<common::Order *> OrderBookNaiveImpl::FindUserOrders(int64_t uid) {
   // Match Java: findUserOrders(final long uid)

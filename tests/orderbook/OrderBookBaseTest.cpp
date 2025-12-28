@@ -16,7 +16,6 @@
 
 #include "OrderBookBaseTest.h"
 #include "../util/TestOrdersGenerator.h"
-#include <exchange/core/orderbook/OrderBookDirectImpl.h>
 #include <exchange/core/utils/Logger.h>
 #include <numeric>
 
@@ -466,17 +465,8 @@ void OrderBookBaseTest::TestShouldMatchIocOrderWithTwoLimitOrdersPartial() {
   CheckEventTrade(events[0], 4L, 81593, 40L);
   CheckEventTrade(events[1], 5L, 81590, 1L);
 
-  // GetOrderById is now a template function - need to specify type based on
-  // implementation Use a helper lambda to work with both implementations
-  auto getOrderById = [this](int64_t id) -> void * {
-    if (orderBook_->GetImplementationType() == OrderBookImplType::DIRECT) {
-      return orderBook_->GetOrderById<OrderBookDirectImpl::DirectOrder>(id);
-    } else {
-      return orderBook_->GetOrderById<common::Order>(id);
-    }
-  };
-  ASSERT_EQ(getOrderById(4L), nullptr);
-  ASSERT_NE(getOrderById(5L), nullptr);
+  ASSERT_EQ(orderBook_->GetOrderById(4L), nullptr);
+  ASSERT_NE(orderBook_->GetOrderById(5L), nullptr);
 }
 
 void OrderBookBaseTest::TestShouldMatchIocOrderFullLiquidity() {
@@ -494,17 +484,9 @@ void OrderBookBaseTest::TestShouldMatchIocOrderFullLiquidity() {
   CheckEventTrade(events[1], 3L, 81599L, 25L);
   CheckEventTrade(events[2], 1L, 81600L, 100L);
 
-  // Use helper lambda for type-safe GetOrderById
-  auto getOrderById = [this](int64_t id) -> void * {
-    if (orderBook_->GetImplementationType() == OrderBookImplType::DIRECT) {
-      return orderBook_->GetOrderById<OrderBookDirectImpl::DirectOrder>(id);
-    } else {
-      return orderBook_->GetOrderById<common::Order>(id);
-    }
-  };
-  ASSERT_EQ(getOrderById(1L), nullptr);
-  ASSERT_EQ(getOrderById(2L), nullptr);
-  ASSERT_EQ(getOrderById(3L), nullptr);
+  ASSERT_EQ(orderBook_->GetOrderById(1L), nullptr);
+  ASSERT_EQ(orderBook_->GetOrderById(2L), nullptr);
+  ASSERT_EQ(orderBook_->GetOrderById(3L), nullptr);
 }
 
 void OrderBookBaseTest::TestShouldMatchIocOrderWithRejection() {

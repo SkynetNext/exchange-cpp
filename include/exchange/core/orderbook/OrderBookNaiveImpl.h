@@ -26,8 +26,6 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <type_traits>
-#include <vector>
 
 namespace exchange {
 namespace core {
@@ -62,22 +60,7 @@ public:
 
   int32_t GetOrdersNum(common::OrderAction action) override;
   int64_t GetTotalOrdersVolume(common::OrderAction action) override;
-
-  // Template specialization for type-safe GetOrderById
-  // Specialization for common::Order (the actual type stored)
-  common::Order *GetOrderById(int64_t orderId);
-
-  // Generic template implementation
-  template <typename OrderT> OrderT *GetOrderById(int64_t orderId) {
-    // Only common::Order is supported for OrderBookNaiveImpl
-    if constexpr (std::is_same_v<OrderT, common::Order>) {
-      return GetOrderById(orderId); // Call non-template overload
-    } else {
-      // For other types, return nullptr (type mismatch)
-      return nullptr;
-    }
-  }
-
+  common::IOrder *GetOrderById(int64_t orderId) override;
   void ValidateInternalState() override;
 
   OrderBookImplType GetImplementationType() const override {
@@ -107,30 +90,11 @@ public:
   std::string PrintAskBucketsDiagram() const override;
   std::string PrintBidBucketsDiagram() const override;
 
-  // Process orders methods - template functions for compile-time polymorphism
-  template <typename Consumer> void ProcessAskOrders(Consumer consumer) const {
-    // Match Java: askBuckets.values().stream().flatMap(bucket ->
-    // bucket.getAllOrders().stream())
-    for (const auto &pair : askBuckets_) {
-      pair.second->ForEachOrder([&consumer](common::Order *order) {
-        if (order != nullptr) {
-          consumer(order);
-        }
-      });
-    }
-  }
-
-  template <typename Consumer> void ProcessBidOrders(Consumer consumer) const {
-    // Match Java: bidBuckets.values().stream().flatMap(bucket ->
-    // bucket.getAllOrders().stream())
-    for (const auto &pair : bidBuckets_) {
-      pair.second->ForEachOrder([&consumer](common::Order *order) {
-        if (order != nullptr) {
-          consumer(order);
-        }
-      });
-    }
-  }
+  // Process orders methods (IOrderBook interface)
+  void ProcessAskOrders(
+      std::function<void(const common::IOrder *)> consumer) const override;
+  void ProcessBidOrders(
+      std::function<void(const common::IOrder *)> consumer) const override;
 
   // Find user orders (IOrderBook interface)
   std::vector<common::Order *> FindUserOrders(int64_t uid) override;
@@ -212,56 +176,9 @@ private:
   MatchingRange GetMatchingRange(common::OrderAction action, int64_t price);
 
   // Try to match order instantly against matching buckets range
-  // Template function for compile-time polymorphism
-  template <typename OrderT>
-  int64_t TryMatchInstantly(const OrderT *activeOrder,
+  int64_t TryMatchInstantly(const common::IOrder *activeOrder,
                             MatchingRange &matchingRange, int64_t filled,
-                            common::cmd::OrderCommand *triggerCmd) {
-    if (matchingRange.empty) {
-      return filled;
-    }
-
-    int64_t orderSize = activeOrder->GetSize();
-    ::exchange::core::common::MatcherTradeEvent *eventsTail = nullptr;
-
-    std::vector<int64_t> emptyBuckets;
-
-    matchingRange.forEach([&](int64_t bucketPrice, OrdersBucket *bucket) {
-      int64_t sizeLeft = orderSize - filled;
-
-      OrdersBucket::MatcherResult bucketMatchings =
-          bucket->Match(sizeLeft, activeOrder, eventsHelper_);
-
-      // Remove fully matched orders from idMap
-      for (int64_t orderId : bucketMatchings.ordersToRemove) {
-        idMap_.erase(orderId);
-      }
-
-      filled += bucketMatchings.volume;
-
-      // Attach event chain
-      if (bucketMatchings.eventsChainHead != nullptr) {
-        if (eventsTail == nullptr) {
-          triggerCmd->matcherEvent = bucketMatchings.eventsChainHead;
-        } else {
-          eventsTail->nextEvent = bucketMatchings.eventsChainHead;
-        }
-        eventsTail = bucketMatchings.eventsChainTail;
-      }
-
-      // Mark empty buckets for removal
-      if (bucket->GetTotalVolume() == 0) {
-        emptyBuckets.push_back(bucketPrice);
-      }
-    });
-
-    // Remove empty buckets
-    for (int64_t price : emptyBuckets) {
-      matchingRange.erasePrice(price);
-    }
-
-    return filled;
-  }
+                            common::cmd::OrderCommand *triggerCmd);
 
   // Order type specific handlers
   void NewOrderPlaceGtc(common::cmd::OrderCommand *cmd);

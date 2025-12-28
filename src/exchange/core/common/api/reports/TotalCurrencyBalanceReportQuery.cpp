@@ -71,8 +71,8 @@ TotalCurrencyBalanceReportQuery::Process(
       continue;
     }
 
-    // Process ask orders - template function accepts any order type
-    orderBook->ProcessAskOrders([&](auto *order) {
+    // Process ask orders
+    orderBook->ProcessAskOrders([&](const common::IOrder *order) {
       if (!order) {
         return;
       }
@@ -84,8 +84,8 @@ TotalCurrencyBalanceReportQuery::Process(
       }
     });
 
-    // Process bid orders - template function accepts any order type
-    orderBook->ProcessBidOrders([&](auto *order) {
+    // Process bid orders
+    orderBook->ProcessBidOrders([&](const common::IOrder *order) {
       if (!order) {
         return;
       }

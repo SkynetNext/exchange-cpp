@@ -25,7 +25,7 @@
 namespace exchange {
 namespace core {
 namespace common {
-template <typename Derived> class IOrder;
+class IOrder;
 class StateHash;
 class L2MarketData;
 struct MatcherTradeEvent;
@@ -55,7 +55,7 @@ namespace cmd {
  * Memory layout optimized for cache-line alignment (64 bytes)
  * to avoid false sharing in multi-threaded environment
  */
-struct alignas(64) OrderCommand : public IOrder<OrderCommand>, public StateHash {
+struct alignas(64) OrderCommand : public IOrder, public StateHash {
   OrderCommandType command = OrderCommandType::NOP;
 
   int64_t orderId = 0;
@@ -132,15 +132,15 @@ struct alignas(64) OrderCommand : public IOrder<OrderCommand>, public StateHash 
   // slow - testing only
   OrderCommand Copy() const;
 
-  // IOrder<OrderCommand> CRTP interface implementation
-  int64_t GetPrice() const { return price; }
-  int64_t GetSize() const { return size; }
-  int64_t GetFilled() const { return 0; }
-  int64_t GetUid() const { return uid; }
-  OrderAction GetAction() const { return action; }
-  int64_t GetOrderId() const { return orderId; }
-  int64_t GetTimestamp() const { return timestamp; }
-  int64_t GetReserveBidPrice() const { return reserveBidPrice; }
+  // IOrder interface implementation
+  int64_t GetPrice() const override { return price; }
+  int64_t GetSize() const override { return size; }
+  int64_t GetFilled() const override { return 0; }
+  int64_t GetUid() const override { return uid; }
+  OrderAction GetAction() const override { return action; }
+  int64_t GetOrderId() const override { return orderId; }
+  int64_t GetTimestamp() const override { return timestamp; }
+  int64_t GetReserveBidPrice() const override { return reserveBidPrice; }
 
   // StateHash interface implementation
   int32_t GetStateHash() const override {

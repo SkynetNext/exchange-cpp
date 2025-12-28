@@ -29,7 +29,42 @@ namespace orderbook {
 OrderBookEventsHelper::OrderBookEventsHelper(EventFactory factory)
     : eventFactory_(std::move(factory)) {}
 
-// Template implementation moved to header file for compile-time polymorphism
+common::MatcherTradeEvent *
+OrderBookEventsHelper::SendTradeEvent(const common::IOrder *matchingOrder,
+                                      bool makerCompleted, bool takerCompleted,
+                                      int64_t size, int64_t bidderHoldPrice) {
+
+  common::MatcherTradeEvent *event = NewMatcherEvent();
+
+  event->eventType = common::MatcherEventType::TRADE;
+  event->section = 0;
+  event->activeOrderCompleted = takerCompleted;
+  event->matchedOrderId = matchingOrder->GetOrderId();
+  event->matchedOrderUid = matchingOrder->GetUid();
+  event->matchedOrderCompleted = makerCompleted;
+  event->price = matchingOrder->GetPrice();
+  event->size = size;
+  event->bidderHoldPrice = bidderHoldPrice;
+
+  return event;
+}
+
+common::MatcherTradeEvent *
+OrderBookEventsHelper::SendReduceEvent(const common::IOrder *order,
+                                       int64_t reduceSize, bool completed) {
+
+  common::MatcherTradeEvent *event = NewMatcherEvent();
+  event->eventType = common::MatcherEventType::REDUCE;
+  event->section = 0;
+  event->activeOrderCompleted = completed;
+  event->matchedOrderId = 0;
+  event->matchedOrderCompleted = false;
+  event->price = order->GetPrice();
+  event->size = reduceSize;
+  event->bidderHoldPrice = order->GetReserveBidPrice();
+
+  return event;
+}
 
 common::MatcherTradeEvent *
 OrderBookEventsHelper::SendReduceEvent(int64_t price, int64_t reserveBidPrice,
