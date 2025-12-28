@@ -488,11 +488,12 @@ void DiskSerializationProcessor::WriteToJournal(common::cmd::OrderCommand *cmd,
   }
 }
 
-void DiskSerializationProcessor::EnableJournaling(int64_t afterSeq, void *api) {
+void DiskSerializationProcessor::EnableJournaling(int64_t afterSeq,
+                                                  IExchangeApi *api) {
   enableJournalAfterSeq_ = afterSeq;
   // Match Java: api.groupingControl(0, 1);
   if (api) {
-    static_cast<IExchangeApi *>(api)->GroupingControl(0, 1);
+    api->GroupingControl(0, 1);
   }
 }
 
@@ -503,13 +504,14 @@ DiskSerializationProcessor::FindAllSnapshotPoints() {
 
 void DiskSerializationProcessor::ReplayJournalStep(int64_t snapshotId,
                                                    int64_t seqFrom,
-                                                   int64_t seqTo, void *api) {
+                                                   int64_t seqTo,
+                                                   IExchangeApi *api) {
   throw std::runtime_error("ReplayJournalStep not implemented");
 }
 
 int64_t DiskSerializationProcessor::ReplayJournalFull(
     const common::config::InitialStateConfiguration *initialStateConfiguration,
-    void *api) {
+    IExchangeApi *api) {
   if (initialStateConfiguration->journalTimestampNs == 0) {
     LOG_DEBUG("No need to replay journal, returning baseSeq={}", baseSeq_);
     return baseSeq_;
@@ -519,7 +521,7 @@ int64_t DiskSerializationProcessor::ReplayJournalFull(
 
   // Match Java: api.groupingControl(0, 0);
   if (api) {
-    static_cast<IExchangeApi *>(api)->GroupingControl(0, 0);
+    api->GroupingControl(0, 0);
   }
 
   int64_t lastSeq = baseSeq_;
@@ -556,7 +558,8 @@ int64_t DiskSerializationProcessor::ReplayJournalFull(
   }
 }
 
-void DiskSerializationProcessor::ReadCommands(std::istream &is, void *api,
+void DiskSerializationProcessor::ReadCommands(std::istream &is,
+                                              IExchangeApi *api,
                                               int64_t &lastSeq,
                                               bool insideCompressedBlock) {
   while (is.peek() != EOF && is.good()) {
@@ -624,9 +627,6 @@ void DiskSerializationProcessor::ReadCommands(std::istream &is, void *api,
       const auto cmdType =
           common::cmd::OrderCommandTypeFromCode(static_cast<int8_t>(cmdByte));
 
-      // Convert void* to IExchangeApi*
-      auto *exchangeApi = static_cast<IExchangeApi *>(api);
-
       // Handle different command types
       // Match Java: all replay methods use serviceFlags and eventsGroup
       if (cmdType == common::cmd::OrderCommandType::MOVE_ORDER) {
@@ -641,8 +641,8 @@ void DiskSerializationProcessor::ReadCommands(std::istream &is, void *api,
           break;
         }
 
-        exchangeApi->MoveOrderReplay(serviceFlags, eventsGroup, timestampNs,
-                                     price, orderId, symbol, uid);
+        api->MoveOrderReplay(serviceFlags, eventsGroup, timestampNs, price,
+                             orderId, symbol, uid);
 
       } else if (cmdType == common::cmd::OrderCommandType::CANCEL_ORDER) {
         // Match Java: api.cancelOrder(serviceFlags, eventsGroup, timestampNs,
@@ -655,8 +655,8 @@ void DiskSerializationProcessor::ReadCommands(std::istream &is, void *api,
           break;
         }
 
-        exchangeApi->CancelOrderReplay(serviceFlags, eventsGroup, timestampNs,
-                                       orderId, symbol, uid);
+        api->CancelOrderReplay(serviceFlags, eventsGroup, timestampNs, orderId,
+                               symbol, uid);
 
       } else if (cmdType == common::cmd::OrderCommandType::REDUCE_ORDER) {
         // Match Java: api.reduceOrder(serviceFlags, eventsGroup, timestampNs,
@@ -670,8 +670,8 @@ void DiskSerializationProcessor::ReadCommands(std::istream &is, void *api,
           break;
         }
 
-        exchangeApi->ReduceOrderReplay(serviceFlags, eventsGroup, timestampNs,
-                                       reduceSize, orderId, symbol, uid);
+        api->ReduceOrderReplay(serviceFlags, eventsGroup, timestampNs,
+                               reduceSize, orderId, symbol, uid);
 
       } else if (cmdType == common::cmd::OrderCommandType::PLACE_ORDER) {
         // Match Java: api.placeNewOrder(serviceFlags, eventsGroup, timestampNs,
@@ -697,9 +697,9 @@ void DiskSerializationProcessor::ReadCommands(std::istream &is, void *api,
         const auto orderType = common::OrderTypeFromCode(
             static_cast<uint8_t>((actionAndType >> 1) & 0b1111));
 
-        exchangeApi->PlaceOrderReplay(
-            serviceFlags, eventsGroup, timestampNs, orderId, userCookie, price,
-            reservedBidPrice, size, orderAction, orderType, symbol, uid);
+        api->PlaceOrderReplay(serviceFlags, eventsGroup, timestampNs, orderId,
+                              userCookie, price, reservedBidPrice, size,
+                              orderAction, orderType, symbol, uid);
 
       } else if (cmdType == common::cmd::OrderCommandType::BALANCE_ADJUSTMENT) {
         // Match Java: api.balanceAdjustment(serviceFlags, eventsGroup,
@@ -719,9 +719,9 @@ void DiskSerializationProcessor::ReadCommands(std::istream &is, void *api,
         const auto adjustmentType =
             common::BalanceAdjustmentTypeFromCode(adjustmentTypeCode);
 
-        exchangeApi->BalanceAdjustmentReplay(serviceFlags, eventsGroup,
-                                             timestampNs, uid, transactionId,
-                                             currency, amount, adjustmentType);
+        api->BalanceAdjustmentReplay(serviceFlags, eventsGroup, timestampNs,
+                                     uid, transactionId, currency, amount,
+                                     adjustmentType);
 
       } else if (cmdType == common::cmd::OrderCommandType::ADD_USER) {
         // Match Java: api.createUser(serviceFlags, eventsGroup, timestampNs,
@@ -731,8 +731,7 @@ void DiskSerializationProcessor::ReadCommands(std::istream &is, void *api,
           break;
         }
 
-        exchangeApi->CreateUserReplay(serviceFlags, eventsGroup, timestampNs,
-                                      uid);
+        api->CreateUserReplay(serviceFlags, eventsGroup, timestampNs, uid);
 
       } else if (cmdType == common::cmd::OrderCommandType::SUSPEND_USER) {
         // Match Java: api.suspendUser(serviceFlags, eventsGroup, timestampNs,
@@ -742,8 +741,7 @@ void DiskSerializationProcessor::ReadCommands(std::istream &is, void *api,
           break;
         }
 
-        exchangeApi->SuspendUserReplay(serviceFlags, eventsGroup, timestampNs,
-                                       uid);
+        api->SuspendUserReplay(serviceFlags, eventsGroup, timestampNs, uid);
 
       } else if (cmdType == common::cmd::OrderCommandType::RESUME_USER) {
         // Match Java: api.resumeUser(serviceFlags, eventsGroup, timestampNs,
@@ -753,8 +751,7 @@ void DiskSerializationProcessor::ReadCommands(std::istream &is, void *api,
           break;
         }
 
-        exchangeApi->ResumeUserReplay(serviceFlags, eventsGroup, timestampNs,
-                                      uid);
+        api->ResumeUserReplay(serviceFlags, eventsGroup, timestampNs, uid);
 
       } else if (cmdType ==
                  common::cmd::OrderCommandType::BINARY_DATA_COMMAND) {
@@ -771,12 +768,12 @@ void DiskSerializationProcessor::ReadCommands(std::istream &is, void *api,
           break;
         }
 
-        exchangeApi->BinaryData(serviceFlags, eventsGroup, timestampNs,
-                                lastFlag, word0, word1, word2, word3, word4);
+        api->BinaryData(serviceFlags, eventsGroup, timestampNs, lastFlag, word0,
+                        word1, word2, word3, word4);
 
       } else if (cmdType == common::cmd::OrderCommandType::RESET) {
         // Match Java: api.reset(timestampNs);
-        exchangeApi->ResetReplay(timestampNs);
+        api->ResetReplay(timestampNs);
 
       } else {
         LOG_WARN("Unexpected command type in journal replay: {}",
@@ -789,7 +786,7 @@ void DiskSerializationProcessor::ReadCommands(std::istream &is, void *api,
 
 void DiskSerializationProcessor::ReplayJournalFullAndThenEnableJouraling(
     const common::config::InitialStateConfiguration *initialStateConfiguration,
-    void *api) {
+    IExchangeApi *api) {
   int64_t seq = ReplayJournalFull(initialStateConfiguration, api);
   EnableJournaling(seq, api);
 }

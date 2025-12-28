@@ -21,6 +21,7 @@
 
 // Forward declarations
 class ExchangeApi;
+class IExchangeApi;
 
 namespace exchange {
 namespace core {
@@ -45,21 +46,21 @@ public:
   void WriteToJournal(common::cmd::OrderCommand *cmd, int64_t dSeq,
                       bool eob) override;
 
-  void EnableJournaling(int64_t afterSeq, void *api) override;
+  void EnableJournaling(int64_t afterSeq, IExchangeApi *api) override;
 
   std::map<int64_t, SnapshotDescriptor *> FindAllSnapshotPoints() override;
 
   void ReplayJournalStep(int64_t snapshotId, int64_t seqFrom, int64_t seqTo,
-                         void *api) override;
+                         IExchangeApi *api) override;
 
   int64_t ReplayJournalFull(const common::config::InitialStateConfiguration
                                 *initialStateConfiguration,
-                            void *api) override;
+                            IExchangeApi *api) override;
 
   void ReplayJournalFullAndThenEnableJouraling(
       const common::config::InitialStateConfiguration
           *initialStateConfiguration,
-      void *api) override;
+      IExchangeApi *api) override;
 
   bool CheckSnapshotExists(int64_t snapshotId, SerializedModuleType type,
                            int32_t instanceId) override;

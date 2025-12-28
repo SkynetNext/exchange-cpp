@@ -16,6 +16,7 @@
 
 #include <exchange/core/common/BytesIn.h>
 #include <exchange/core/common/api/reports/ReportQueryFactory.h>
+#include <exchange/core/common/api/reports/ReportQuery.h>
 #include <stdexcept>
 
 namespace exchange {
@@ -60,8 +61,8 @@ ReportQueryConstructor ReportQueryFactory::getConstructor(ReportType type) {
   return constructors_[index];
 }
 
-// Create report query from bytes (returns type-erased pointer)
-void *ReportQueryFactory::createQuery(ReportType type, BytesIn &bytes) {
+// Create report query from bytes (returns ReportQueryBase pointer)
+ReportQueryBase *ReportQueryFactory::createQuery(ReportType type, BytesIn &bytes) {
   auto constructor = getConstructor(type);
   if (!constructor) {
     throw std::runtime_error("No constructor registered for ReportType: " +

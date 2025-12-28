@@ -26,6 +26,7 @@
 
 // Forward declarations
 class ExchangeApi;
+class IExchangeApi;
 
 namespace exchange {
 namespace core {
@@ -69,7 +70,7 @@ public:
   /**
    * Activate journal
    */
-  virtual void EnableJournaling(int64_t afterSeq, void *api) = 0;
+  virtual void EnableJournaling(int64_t afterSeq, IExchangeApi *api) = 0;
 
   /**
    * Get all available snapshots
@@ -80,7 +81,7 @@ public:
    * Replay journal step
    */
   virtual void ReplayJournalStep(int64_t snapshotId, int64_t seqFrom,
-                                 int64_t seqTo, void *api) = 0;
+                                 int64_t seqTo, IExchangeApi *api) = 0;
 
   /**
    * Replay journal full
@@ -88,7 +89,7 @@ public:
   virtual int64_t
   ReplayJournalFull(const common::config::InitialStateConfiguration
                         *initialStateConfiguration,
-                    void *api) = 0;
+                    IExchangeApi *api) = 0;
 
   /**
    * Replay journal full and then enable journaling
@@ -96,7 +97,7 @@ public:
   virtual void ReplayJournalFullAndThenEnableJouraling(
       const common::config::InitialStateConfiguration
           *initialStateConfiguration,
-      void *api) = 0;
+      IExchangeApi *api) = 0;
 
   /**
    * Check if snapshot exists

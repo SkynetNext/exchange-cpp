@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "ReportQuery.h"
 #include "ReportType.h"
 #include <functional>
 #include <vector>
@@ -31,7 +32,7 @@ namespace reports {
 template <typename T> class ReportQuery;
 
 // Type-erased report query constructor
-using ReportQueryConstructor = std::function<void *(BytesIn &)>;
+using ReportQueryConstructor = std::function<ReportQueryBase *(BytesIn &)>;
 
 class ReportQueryFactory {
 private:
@@ -52,8 +53,8 @@ public:
   // Get constructor for specific type
   ReportQueryConstructor getConstructor(ReportType type);
 
-  // Create report query from bytes (returns type-erased pointer)
-  void *createQuery(ReportType type, BytesIn &bytes);
+  // Create report query from bytes (returns ReportQueryBase pointer)
+  ReportQueryBase *createQuery(ReportType type, BytesIn &bytes);
 };
 
 namespace detail {
@@ -65,7 +66,9 @@ struct ReportQueryTypeRegistrar {
 // Register report query type macro
 #define REGISTER_REPORT_QUERY_TYPE(QueryType, EnumType)                        \
   static detail::ReportQueryTypeRegistrar QueryType##_registrar(               \
-      EnumType, [](BytesIn &bytes) -> void * { return new QueryType(bytes); })
+      EnumType, [](BytesIn &bytes) -> ReportQueryBase * {                      \
+        return new QueryType(bytes);                                           \
+      })
 
 } // namespace reports
 } // namespace api

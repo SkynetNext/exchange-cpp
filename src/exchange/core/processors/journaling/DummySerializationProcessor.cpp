@@ -49,7 +49,7 @@ void DummySerializationProcessor::WriteToJournal(common::cmd::OrderCommand *cmd,
 }
 
 void DummySerializationProcessor::EnableJournaling(int64_t afterSeq,
-                                                   void *api) {
+                                                   IExchangeApi *api) {
   // Dummy implementation - do nothing
 }
 
@@ -61,20 +61,20 @@ DummySerializationProcessor::FindAllSnapshotPoints() {
 
 void DummySerializationProcessor::ReplayJournalStep(int64_t snapshotId,
                                                     int64_t seqFrom,
-                                                    int64_t seqTo, void *api) {
+                                                    int64_t seqTo, IExchangeApi *api) {
   // Dummy implementation - do nothing
 }
 
 int64_t DummySerializationProcessor::ReplayJournalFull(
     const common::config::InitialStateConfiguration *initialStateConfiguration,
-    void *api) {
+    IExchangeApi *api) {
   // Dummy implementation - return 0
   return 0;
 }
 
 void DummySerializationProcessor::ReplayJournalFullAndThenEnableJouraling(
     const common::config::InitialStateConfiguration *initialStateConfiguration,
-    void *api) {
+    IExchangeApi *api) {
   // Dummy implementation - do nothing
 }
 

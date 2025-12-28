@@ -1255,8 +1255,8 @@ ExchangeApi<WaitStrategyT>::ProcessReportAny(int32_t queryTypeId,
   common::api::reports::ReportType reportType =
       common::api::reports::ReportTypeFromCode(queryTypeId);
 
-  // Create query using factory (type-erased)
-  void *queryPtr =
+  // Create query using factory
+  auto *queryPtr =
       common::api::reports::ReportQueryFactory::getInstance().createQuery(
           reportType, bytesIn);
 

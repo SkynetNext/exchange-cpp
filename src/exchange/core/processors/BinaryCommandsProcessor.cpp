@@ -24,6 +24,7 @@
 #include <exchange/core/common/WriteBytesMarshallable.h>
 #include <exchange/core/common/api/binary/BinaryCommandType.h>
 #include <exchange/core/common/api/binary/BinaryDataCommandFactory.h>
+#include <exchange/core/common/api/reports/ReportQuery.h>
 #include <exchange/core/common/api/reports/ReportQueryFactory.h>
 #include <exchange/core/common/api/reports/ReportType.h>
 #include <exchange/core/common/api/reports/SingleUserReportQuery.h>
@@ -41,6 +42,7 @@
 #include <exchange/core/utils/UnsafeUtils.h>
 #include <stdexcept>
 #include <vector>
+
 
 namespace exchange {
 namespace core {
@@ -220,7 +222,7 @@ BinaryCommandsProcessor::AcceptBinaryFrame(common::cmd::OrderCommand *cmd) {
               common::api::reports::ReportTypeFromCode(classCode);
 
           // Use factory to create report query
-          void *queryPtr =
+          auto *queryPtr =
               common::api::reports::ReportQueryFactory::getInstance()
                   .createQuery(reportType, bytesIn);
 
