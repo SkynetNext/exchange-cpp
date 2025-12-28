@@ -54,7 +54,7 @@ public:
 
   bool StoreData(int64_t snapshotId, int64_t seq, int64_t timestampNs,
                  SerializedModuleType type, int32_t instanceId,
-                 void *obj) override;
+                 const common::WriteBytesMarshallable *obj) override;
 
   void WriteToJournal(common::cmd::OrderCommand *cmd, int64_t dSeq,
                       bool eob) override;
@@ -123,11 +123,10 @@ private:
   void ReadCommands(std::istream &is, void *api, int64_t &lastSeq,
                     bool insideCompressedBlock);
 
-  // Override LoadDataVoid from base class
-  void *
-  LoadDataVoid(int64_t snapshotId, SerializedModuleType type,
-               int32_t instanceId,
-               std::function<void *(common::BytesIn *)> initFunc) override;
+  // Override LoadData from base class
+  void LoadData(int64_t snapshotId, SerializedModuleType type,
+                int32_t instanceId,
+                std::function<void(common::BytesIn *)> initFunc) override;
 };
 
 } // namespace journaling

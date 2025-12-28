@@ -119,10 +119,10 @@ DiskSerializationProcessor::DiskSerializationProcessor(
   snapshotsIndex_[0] = lastSnapshotDescriptor_;
 }
 
-bool DiskSerializationProcessor::StoreData(int64_t snapshotId, int64_t seq,
-                                           int64_t timestampNs,
-                                           SerializedModuleType type,
-                                           int32_t instanceId, void *obj) {
+bool DiskSerializationProcessor::StoreData(
+    int64_t snapshotId, int64_t seq, int64_t timestampNs,
+    SerializedModuleType type, int32_t instanceId,
+    const common::WriteBytesMarshallable *obj) {
   const std::string path = GetSnapshotPath(snapshotId, type, instanceId);
 
   LOG_DEBUG("Writing state into file {} ...", path);
@@ -142,16 +142,14 @@ bool DiskSerializationProcessor::StoreData(int64_t snapshotId, int64_t seq,
     // Serialize to memory first
     std::vector<uint8_t> serializedData;
     common::VectorBytesOut vectorOut(serializedData);
-    const auto *marshallable =
-        static_cast<const common::WriteBytesMarshallable *>(obj);
-    if (marshallable == nullptr) {
+    if (obj == nullptr) {
       LOG_ERROR("Can not write snapshot file: {} - obj is nullptr", path);
       file.close();
       return false;
     }
 
     try {
-      marshallable->WriteMarshallable(vectorOut);
+      obj->WriteMarshallable(vectorOut);
     } catch (const std::exception &ex) {
       LOG_ERROR(
           "Can not write snapshot file: {} - WriteMarshallable failed: {}",
@@ -244,9 +242,9 @@ bool DiskSerializationProcessor::StoreData(int64_t snapshotId, int64_t seq,
   }
 }
 
-void *DiskSerializationProcessor::LoadDataVoid(
+void DiskSerializationProcessor::LoadData(
     int64_t snapshotId, SerializedModuleType type, int32_t instanceId,
-    std::function<void *(common::BytesIn *)> initFunc) {
+    std::function<void(common::BytesIn *)> initFunc) {
   const std::string path = GetSnapshotPath(snapshotId, type, instanceId);
 
   LOG_DEBUG("Loading state from {}", path);
@@ -312,7 +310,7 @@ void *DiskSerializationProcessor::LoadDataVoid(
     common::VectorBytesIn bytesIn(decompressedData);
 
     // Call initFunc with BytesIn
-    return initFunc(&bytesIn);
+    initFunc(&bytesIn);
   } catch (const std::exception &ex) {
     LOG_ERROR("Can not read snapshot file: {} - {}", path, ex.what());
     throw;

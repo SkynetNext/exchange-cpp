@@ -101,12 +101,11 @@ RiskEngine::RiskEngine(
           journaling::ISerializationProcessor::SerializedModuleType::
               RISK_ENGINE)) {
     // Load from snapshot
-    auto state = serializationProcessor->LoadData<void *>(
+    serializationProcessor->LoadData(
         initStateCfg->snapshotId,
         journaling::ISerializationProcessor::SerializedModuleType::RISK_ENGINE,
         shardId_,
-        [this, sharedPool,
-         reportsQueriesCfg](common::BytesIn *bytesIn) -> void * {
+        [this, sharedPool, reportsQueriesCfg](common::BytesIn *bytesIn) {
           if (bytesIn == nullptr) {
             throw std::invalid_argument("BytesIn cannot be nullptr");
           }
@@ -155,8 +154,6 @@ RiskEngine::RiskEngine(
 
           // Deserialize suspends (int -> long)
           suspends_ = utils::SerializationUtils::ReadIntLongHashMap(*bytesIn);
-
-          return nullptr; // Not used
         });
   } else {
     // Initialize services normally

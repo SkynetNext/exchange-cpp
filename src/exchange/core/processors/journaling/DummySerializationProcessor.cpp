@@ -29,12 +29,18 @@ DummySerializationProcessor *DummySerializationProcessor::Instance() {
   return &instance;
 }
 
-bool DummySerializationProcessor::StoreData(int64_t snapshotId, int64_t seq,
-                                            int64_t timestampNs,
-                                            SerializedModuleType type,
-                                            int32_t instanceId, void *obj) {
+bool DummySerializationProcessor::StoreData(
+    int64_t snapshotId, int64_t seq, int64_t timestampNs,
+    SerializedModuleType type, int32_t instanceId,
+    const common::WriteBytesMarshallable *obj) {
   // Dummy implementation - do nothing
   return false;
+}
+
+void DummySerializationProcessor::LoadData(
+    int64_t snapshotId, SerializedModuleType type, int32_t instanceId,
+    std::function<void(common::BytesIn *)> initFunc) {
+  // Dummy implementation - do nothing
 }
 
 void DummySerializationProcessor::WriteToJournal(common::cmd::OrderCommand *cmd,

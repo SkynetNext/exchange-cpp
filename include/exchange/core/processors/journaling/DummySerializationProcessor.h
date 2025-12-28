@@ -36,7 +36,11 @@ public:
 
   bool StoreData(int64_t snapshotId, int64_t seq, int64_t timestampNs,
                  SerializedModuleType type, int32_t instanceId,
-                 void *obj) override;
+                 const common::WriteBytesMarshallable *obj) override;
+
+  void LoadData(int64_t snapshotId, SerializedModuleType type,
+                int32_t instanceId,
+                std::function<void(common::BytesIn *)> initFunc) override;
 
   void WriteToJournal(common::cmd::OrderCommand *cmd, int64_t dSeq,
                       bool eob) override;

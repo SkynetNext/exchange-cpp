@@ -17,6 +17,7 @@
 #pragma once
 
 #include "../../common/BytesIn.h"
+#include "../../common/WriteBytesMarshallable.h"
 #include "../../common/cmd/OrderCommand.h"
 #include "../../common/config/InitialStateConfiguration.h"
 #include <cstdint>
@@ -45,31 +46,19 @@ public:
 
   /**
    * Serialize state into storage
+   * @param obj - object implementing WriteBytesMarshallable interface
    */
   virtual bool StoreData(int64_t snapshotId, int64_t seq, int64_t timestampNs,
                          SerializedModuleType type, int32_t instanceId,
-                         void *obj) = 0;
+                         const common::WriteBytesMarshallable *obj) = 0;
 
   /**
-   * Deserialize state from storage
+   * Deserialize state from storage using callback pattern
+   * @param initFunc - callback that receives BytesIn and initializes the object
    */
-  template <typename T>
-  T LoadData(int64_t snapshotId, SerializedModuleType type, int32_t instanceId,
-             std::function<T(common::BytesIn *)> initFunc) {
-    // Call virtual method LoadDataVoid (type-erased)
-    return LoadDataVoid(snapshotId, type, instanceId,
-                        [&initFunc](common::BytesIn *bytesIn) -> void * {
-                          if constexpr (std::is_same_v<T, void *>) {
-                            return initFunc(bytesIn);
-                          } else {
-                            // For non-void* types, we need to store the result
-                            // This is a limitation of type erasure
-                            static thread_local T result;
-                            result = initFunc(bytesIn);
-                            return &result;
-                          }
-                        });
-  }
+  virtual void LoadData(int64_t snapshotId, SerializedModuleType type,
+                        int32_t instanceId,
+                        std::function<void(common::BytesIn *)> initFunc) = 0;
 
   /**
    * Write command into journal
@@ -123,19 +112,6 @@ public:
       ISerializationProcessor *serializationProcessor,
       const common::config::InitialStateConfiguration *initStateCfg,
       int32_t shardId, SerializedModuleType module);
-
-protected:
-  /**
-   * Virtual method for loading data (type-erased to void*)
-   * Derived classes should override this
-   */
-  virtual void *
-  LoadDataVoid(int64_t snapshotId, SerializedModuleType type,
-               int32_t instanceId,
-               std::function<void *(common::BytesIn *)> initFunc) {
-    // Default implementation: return initFunc(nullptr)
-    return initFunc(nullptr);
-  }
 };
 
 } // namespace journaling

@@ -98,12 +98,11 @@ MatchingEngineRouter::MatchingEngineRouter(
             journaling::ISerializationProcessor::SerializedModuleType::
                 MATCHING_ENGINE_ROUTER)) {
       // Load from snapshot
-      auto deserialized = serializationProcessor_->LoadData<void *>(
+      serializationProcessor_->LoadData(
           initStateCfg.snapshotId,
           journaling::ISerializationProcessor::SerializedModuleType::
               MATCHING_ENGINE_ROUTER,
-          shardId_,
-          [this, sharedPool, exchangeCfg](common::BytesIn *bytesIn) -> void * {
+          shardId_, [this, sharedPool, exchangeCfg](common::BytesIn *bytesIn) {
             if (bytesIn == nullptr) {
               throw std::invalid_argument("BytesIn cannot be nullptr");
             }
@@ -138,8 +137,6 @@ MatchingEngineRouter::MatchingEngineRouter(
                   &exchangeCfg->loggingCfg);
               orderBooks_[symbolId] = std::move(orderBook);
             }
-
-            return nullptr; // Not used
           });
     } else {
       // Create ReportQueriesHandler adapter to forward queries to
