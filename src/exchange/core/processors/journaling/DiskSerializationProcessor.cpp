@@ -17,6 +17,7 @@
 #include <chrono>
 #include <ctime>
 #include <exchange/core/ExchangeApi.h>
+#include <exchange/core/common/VectorBytesIn.h>
 #include <exchange/core/common/VectorBytesOut.h>
 #include <exchange/core/common/WriteBytesMarshallable.h>
 #include <exchange/core/common/api/ApiAddUser.h>
@@ -143,12 +144,27 @@ bool DiskSerializationProcessor::StoreData(int64_t snapshotId, int64_t seq,
     common::VectorBytesOut vectorOut(serializedData);
     const auto *marshallable =
         static_cast<const common::WriteBytesMarshallable *>(obj);
-    if (marshallable != nullptr) {
-      marshallable->WriteMarshallable(vectorOut);
+    if (marshallable == nullptr) {
+      LOG_ERROR("Can not write snapshot file: {} - obj is nullptr", path);
+      file.close();
+      return false;
     }
+
+    marshallable->WriteMarshallable(vectorOut);
+
+    // Get actual written size (may be different from vector size)
+    const size_t writtenSize = vectorOut.GetPosition();
+    // Resize vector to actual written size
+    serializedData.resize(writtenSize);
 
     // Compress with LZ4
     const int originalSize = static_cast<int>(serializedData.size());
+    if (originalSize == 0) {
+      LOG_ERROR("Can not write snapshot file: {} - serialized data is empty",
+                path);
+      file.close();
+      return false;
+    }
     const int maxCompressedSize = LZ4_compressBound(originalSize);
     std::vector<char> compressedData(maxCompressedSize);
     const int compressedSize = LZ4_compress_default(
@@ -156,7 +172,9 @@ bool DiskSerializationProcessor::StoreData(int64_t snapshotId, int64_t seq,
         compressedData.data(), originalSize, maxCompressedSize);
 
     if (compressedSize <= 0) {
-      LOG_ERROR("LZ4 compression failed for snapshot file: {}", path);
+      LOG_ERROR("Can not write snapshot file: {} - LZ4 compression failed",
+                path);
+      file.close();
       return false;
     }
 
@@ -166,6 +184,14 @@ bool DiskSerializationProcessor::StoreData(int64_t snapshotId, int64_t seq,
     file.write(reinterpret_cast<const char *>(&compressedSize),
                sizeof(int32_t));
     file.write(compressedData.data(), compressedSize);
+
+    // Flush and verify write
+    file.flush();
+    if (!file.good()) {
+      LOG_ERROR("Can not write snapshot file: {} - write failed", path);
+      file.close();
+      return false;
+    }
 
     file.close();
 
@@ -207,6 +233,81 @@ bool DiskSerializationProcessor::StoreData(int64_t snapshotId, int64_t seq,
   } catch (const std::exception &ex) {
     LOG_ERROR("Can not write snapshot file: {} - {}", path, ex.what());
     return false;
+  }
+}
+
+void *DiskSerializationProcessor::LoadDataVoid(
+    int64_t snapshotId, SerializedModuleType type, int32_t instanceId,
+    std::function<void *(common::BytesIn *)> initFunc) {
+  const std::string path = GetSnapshotPath(snapshotId, type, instanceId);
+
+  LOG_DEBUG("Loading state from {}", path);
+
+  try {
+    std::ifstream file(path, std::ios::binary);
+    if (!file.is_open()) {
+      throw std::runtime_error("Can not open snapshot file: " + path);
+    }
+
+    // Read format: [originalSize (4 bytes)] [compressedSize (4 bytes)]
+    // [compressed data]
+    int32_t originalSize = 0, compressedSize = 0;
+
+    // Check file size first
+    file.seekg(0, std::ios::end);
+    const std::streampos fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    if (fileSize < static_cast<std::streampos>(sizeof(int32_t) * 2)) {
+      throw std::runtime_error("Snapshot file too small");
+    }
+
+    if (!file.read(reinterpret_cast<char *>(&originalSize), sizeof(int32_t)) ||
+        !file.read(reinterpret_cast<char *>(&compressedSize),
+                   sizeof(int32_t))) {
+      throw std::runtime_error("Can not read snapshot file header");
+    }
+
+    if (originalSize <= 0 || compressedSize <= 0 || originalSize > 100000000 ||
+        compressedSize > 100000000) {
+      throw std::runtime_error("Invalid snapshot file sizes");
+    }
+
+    if (fileSize <
+        static_cast<std::streampos>(sizeof(int32_t) * 2 + compressedSize)) {
+      throw std::runtime_error("Snapshot file too small for compressed data");
+    }
+
+    // Read compressed data
+    std::vector<char> compressedData(compressedSize);
+    if (!file.read(compressedData.data(), compressedSize) ||
+        file.gcount() < compressedSize) {
+      throw std::runtime_error("Can not read full compressed data");
+    }
+
+    file.close();
+
+    LOG_DEBUG("start de-serializing...");
+
+    // Decompress with LZ4
+    std::vector<uint8_t> decompressedData(originalSize);
+    const int decompressedSize =
+        LZ4_decompress_safe(compressedData.data(),
+                            reinterpret_cast<char *>(decompressedData.data()),
+                            compressedSize, originalSize);
+
+    if (decompressedSize != originalSize) {
+      throw std::runtime_error("LZ4 decompression failed");
+    }
+
+    // Create BytesIn from decompressed data
+    common::VectorBytesIn bytesIn(decompressedData);
+
+    // Call initFunc with BytesIn
+    return initFunc(&bytesIn);
+  } catch (const std::exception &ex) {
+    LOG_ERROR("Can not read snapshot file: {} - {}", path, ex.what());
+    throw;
   }
 }
 
@@ -517,16 +618,6 @@ void DiskSerializationProcessor::ReadCommands(std::istream &is, void *api,
       // Convert void* to IExchangeApi*
       auto *exchangeApi = static_cast<IExchangeApi *>(api);
 
-      // Log command for debugging (only log every 10000th command to avoid
-      // spam)
-      if (seq % 10000 == 0 ||
-          cmdType == common::cmd::OrderCommandType::BINARY_DATA_COMMAND) {
-        LOG_DEBUG("Replaying command seq={} type={} timestampNs={} "
-                  "serviceFlags={} eventsGroup={}",
-                  seq, static_cast<int>(cmdByte), timestampNs, serviceFlags,
-                  eventsGroup);
-      }
-
       // Handle different command types
       // Match Java: all replay methods use serviceFlags and eventsGroup
       if (cmdType == common::cmd::OrderCommandType::MOVE_ORDER) {
@@ -668,23 +759,11 @@ void DiskSerializationProcessor::ReadCommands(std::istream &is, void *api,
             !is.read(reinterpret_cast<char *>(&word2), sizeof(int64_t)) ||
             !is.read(reinterpret_cast<char *>(&word3), sizeof(int64_t)) ||
             !is.read(reinterpret_cast<char *>(&word4), sizeof(int64_t))) {
-          LOG_ERROR("Failed to read BINARY_DATA_COMMAND data at seq={}", seq);
           break;
         }
 
-        LOG_DEBUG("Replaying BINARY_DATA_COMMAND seq={} lastFlag={} word0={} "
-                  "word1={} word2={} word3={} word4={}",
-                  seq, static_cast<int>(lastFlag), word0, word1, word2, word3,
-                  word4);
-
-        try {
-          exchangeApi->BinaryData(serviceFlags, eventsGroup, timestampNs,
-                                  lastFlag, word0, word1, word2, word3, word4);
-        } catch (const std::exception &ex) {
-          LOG_ERROR("Exception while replaying BINARY_DATA_COMMAND seq={}: {}",
-                    seq, ex.what());
-          throw;
-        }
+        exchangeApi->BinaryData(serviceFlags, eventsGroup, timestampNs,
+                                lastFlag, word0, word1, word2, word3, word4);
 
       } else if (cmdType == common::cmd::OrderCommandType::RESET) {
         // Match Java: api.reset(timestampNs);

@@ -56,9 +56,19 @@ public:
   template <typename T>
   T LoadData(int64_t snapshotId, SerializedModuleType type, int32_t instanceId,
              std::function<T(common::BytesIn *)> initFunc) {
-    // This is a placeholder - actual implementation should be provided by
-    // concrete classes
-    return initFunc(nullptr);
+    // Call virtual method LoadDataVoid (type-erased)
+    return LoadDataVoid(snapshotId, type, instanceId,
+                        [&initFunc](common::BytesIn *bytesIn) -> void * {
+                          if constexpr (std::is_same_v<T, void *>) {
+                            return initFunc(bytesIn);
+                          } else {
+                            // For non-void* types, we need to store the result
+                            // This is a limitation of type erasure
+                            static thread_local T result;
+                            result = initFunc(bytesIn);
+                            return &result;
+                          }
+                        });
   }
 
   /**
@@ -113,6 +123,19 @@ public:
       ISerializationProcessor *serializationProcessor,
       const common::config::InitialStateConfiguration *initStateCfg,
       int32_t shardId, SerializedModuleType module);
+
+protected:
+  /**
+   * Virtual method for loading data (type-erased to void*)
+   * Derived classes should override this
+   */
+  virtual void *
+  LoadDataVoid(int64_t snapshotId, SerializedModuleType type,
+               int32_t instanceId,
+               std::function<void *(common::BytesIn *)> initFunc) {
+    // Default implementation: return initFunc(nullptr)
+    return initFunc(nullptr);
+  }
 };
 
 } // namespace journaling

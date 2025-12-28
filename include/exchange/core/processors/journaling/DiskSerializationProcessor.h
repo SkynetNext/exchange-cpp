@@ -122,6 +122,12 @@ private:
   // Journal replay helpers
   void ReadCommands(std::istream &is, void *api, int64_t &lastSeq,
                     bool insideCompressedBlock);
+
+  // Override LoadDataVoid from base class
+  void *
+  LoadDataVoid(int64_t snapshotId, SerializedModuleType type,
+               int32_t instanceId,
+               std::function<void *(common::BytesIn *)> initFunc) override;
 };
 
 } // namespace journaling
