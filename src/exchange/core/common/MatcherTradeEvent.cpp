@@ -17,7 +17,6 @@
 #include <exchange/core/common/MatcherEventType.h>
 #include <exchange/core/common/MatcherTradeEvent.h>
 
-
 namespace exchange::core::common {
 
 MatcherTradeEvent MatcherTradeEvent::Copy() const {
@@ -53,6 +52,9 @@ int32_t MatcherTradeEvent::GetChainSize() const {
 }
 
 MatcherTradeEvent *MatcherTradeEvent::CreateEventChain(int32_t chainLength) {
+  if (chainLength <= 0) {
+    return nullptr;
+  }
   MatcherTradeEvent *head = new MatcherTradeEvent();
   MatcherTradeEvent *prev = head;
   for (int32_t j = 1; j < chainLength; j++) {
@@ -60,6 +62,9 @@ MatcherTradeEvent *MatcherTradeEvent::CreateEventChain(int32_t chainLength) {
     prev->nextEvent = nextEvent;
     prev = nextEvent;
   }
+  // Ensure last node's nextEvent is nullptr (should be already, but be
+  // explicit)
+  prev->nextEvent = nullptr;
   return head;
 }
 

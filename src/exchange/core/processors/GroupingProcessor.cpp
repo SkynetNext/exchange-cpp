@@ -158,6 +158,15 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
               cmd->command ==
                   common::cmd::OrderCommandType::PERSIST_STATE_MATCHING ||
               cmd->command == common::cmd::OrderCommandType::GROUPING_CONTROL) {
+            // Put remaining event chain back to pool before switching group
+            if constexpr (EVENTS_POOLING) {
+              if (tradeEventHead != nullptr && sharedPool_ != nullptr) {
+                sharedPool_->PutChain(tradeEventHead);
+                tradeEventHead = nullptr;
+                tradeEventTail = nullptr;
+                tradeEventCounter = 0;
+              }
+            }
             groupCounter++;
             msgsInGroup = 0;
           }
@@ -168,6 +177,15 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
                cmd->command ==
                    common::cmd::OrderCommandType::BINARY_DATA_QUERY) &&
               cmd->symbol == -1) {
+            // Put remaining event chain back to pool before switching group
+            if constexpr (EVENTS_POOLING) {
+              if (tradeEventHead != nullptr && sharedPool_ != nullptr) {
+                sharedPool_->PutChain(tradeEventHead);
+                tradeEventHead = nullptr;
+                tradeEventTail = nullptr;
+                tradeEventCounter = 0;
+              }
+            }
             groupCounter++;
             msgsInGroup = 0;
           }
@@ -230,6 +248,15 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
           if (msgsInGroup >= msgsInGroupLimit_ &&
               cmd->command !=
                   common::cmd::OrderCommandType::PERSIST_STATE_RISK) {
+            // Put remaining event chain back to pool before switching group
+            if constexpr (EVENTS_POOLING) {
+              if (tradeEventHead != nullptr && sharedPool_ != nullptr) {
+                sharedPool_->PutChain(tradeEventHead);
+                tradeEventHead = nullptr;
+                tradeEventTail = nullptr;
+                tradeEventCounter = 0;
+              }
+            }
             groupCounter++;
             msgsInGroup = 0;
           }
@@ -257,6 +284,15 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
                 .count();
         if (msgsInGroup > 0 && t > groupLastNs) {
           // switch group after T microseconds elapsed
+          // Put remaining event chain back to pool before switching group
+          if constexpr (EVENTS_POOLING) {
+            if (tradeEventHead != nullptr && sharedPool_ != nullptr) {
+              sharedPool_->PutChain(tradeEventHead);
+              tradeEventHead = nullptr;
+              tradeEventTail = nullptr;
+              tradeEventCounter = 0;
+            }
+          }
           groupCounter++;
           msgsInGroup = 0;
         }

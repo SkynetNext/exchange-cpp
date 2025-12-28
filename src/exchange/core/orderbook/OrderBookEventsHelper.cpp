@@ -109,6 +109,10 @@ OrderBookEventsHelper::NewMatcherEvent() {
     if (eventsChainHead_ == nullptr) {
       // Chain exhausted, get new chain from SharedPool
       eventsChainHead_ = eventFactory_();
+      if (eventsChainHead_ == nullptr) {
+        // Fallback: create single event if factory returns nullptr
+        return new common::MatcherTradeEvent();
+      }
     }
     // Return current head and advance to next node
     common::MatcherTradeEvent *res = eventsChainHead_;
