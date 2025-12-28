@@ -30,7 +30,7 @@ namespace journaling {
  */
 class DiskSerializationProcessorConfiguration {
 public:
-  static constexpr const char *DEFAULT_FOLDER = "exchange-state";
+  static constexpr const char *DEFAULT_FOLDER = "./dumps";
 
   std::string storageFolder;
   int32_t journalBufferSize; // Buffer size for journal writing
