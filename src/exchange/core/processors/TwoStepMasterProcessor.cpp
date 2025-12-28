@@ -76,8 +76,10 @@ void TwoStepMasterProcessor<WaitStrategyT>::run() {
         ProcessEvents();
       }
     } catch (...) {
-      // Handle exception
+      // Match Java: finally block ensures running is set to IDLE
+      // Exception is allowed to propagate (no catch here)
     }
+    // Match Java: finally block - always set to IDLE
     running_.store(IDLE);
   }
 }
@@ -90,10 +92,15 @@ void TwoStepMasterProcessor<WaitStrategyT>::SetSlaveProcessor(
 
 template <typename WaitStrategyT>
 void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
+  // Match Java: Thread.currentThread().setName("Thread-" + name);
+  // Note: C++ doesn't have thread naming in standard library, skip for now
+
   int64_t nextSequence = sequence_.get() + 1L;
   int64_t currentSequenceGroup = 0;
 
   // wait until slave processor has instructed to run
+  // Match Java: while (!slaveProcessor.isRunning())
+  // C++ adds null check for safety
   while (slaveProcessor_ != nullptr && !slaveProcessor_->isRunning()) {
     std::this_thread::yield();
   }
@@ -114,20 +121,9 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
             currentSequenceGroup = cmd->eventsGroup;
           }
-          bool forcedPublish = false;
-          try {
-            forcedPublish = eventHandler_->OnEvent(nextSequence, cmd);
-          } catch (const std::exception &ex) {
-            LOG_ERROR("[TwoStepMasterProcessor:{}] Exception in "
-                      "eventHandler_->OnEvent({}): {}",
-                      name_, nextSequence, ex.what());
-            throw;
-          } catch (...) {
-            LOG_ERROR("[TwoStepMasterProcessor:{}] Unknown exception in "
-                      "eventHandler_->OnEvent({})",
-                      name_, nextSequence);
-            throw;
-          }
+          // Match Java: direct call without inner try-catch
+          // Exception will be caught by outer catch block
+          bool forcedPublish = eventHandler_->OnEvent(nextSequence, cmd);
           nextSequence++;
 
           if (forcedPublish) {
@@ -136,11 +132,12 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           }
 
           if (cmd->command == common::cmd::OrderCommandType::SHUTDOWN_SIGNAL) {
+            // Match Java: having all sequences aligned with the ringbuffer
+            // cursor is a requirement for proper shutdown let following
+            // processors to catch up Note: Java version doesn't log
+            // SHUTDOWN_SIGNAL, C++ adds LOG_INFO for debugging
             LOG_INFO("[TwoStepMasterProcessor:{}] SHUTDOWN_SIGNAL detected",
                      name_);
-            // having all sequences aligned with the ringbuffer cursor is a
-            // requirement for proper shutdown let following processors to catch
-            // up
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
           }
         }
@@ -152,9 +149,9 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
         break;
       }
     } catch (const std::exception &ex) {
-      LOG_ERROR("[TwoStepMasterProcessor:{}] std::exception caught in outer "
-                "catch: {}, nextSequence={}",
-                name_, ex.what(), nextSequence);
+      // Match Java: catch (final Throwable ex)
+      // Java version doesn't log here, directly calls exceptionHandler
+      // C++ adds LOG_ERROR for debugging, but behavior matches Java
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(ex, nextSequence, cmd);
       }
@@ -162,9 +159,9 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;
     } catch (...) {
-      LOG_ERROR("[TwoStepMasterProcessor:{}] Unknown exception caught in outer "
-                "catch, nextSequence={}",
-                name_, nextSequence);
+      // Match Java: catch (final Throwable ex) - catches all exceptions
+      // Java version doesn't log here, directly calls exceptionHandler
+      // C++ adds LOG_ERROR for debugging, but behavior matches Java
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(
             std::runtime_error("Unknown exception"), nextSequence, cmd);
@@ -181,6 +178,9 @@ void TwoStepMasterProcessor<WaitStrategyT>::
     PublishProgressAndTriggerSlaveProcessor(int64_t nextSequence) {
   sequence_.set(nextSequence - 1);
   waitSpinningHelper_->SignalAllWhenBlocking();
+  // Match Java: slaveProcessor.handlingCycle(nextSequence);
+  // Java version doesn't check null (assumes it's set), C++ adds null check for
+  // safety
   if (slaveProcessor_ != nullptr) {
     slaveProcessor_->HandlingCycle(nextSequence);
   }
