@@ -381,14 +381,13 @@ int32_t BinaryCommandsProcessor::GetStateHash() const {
 
 void BinaryCommandsProcessor::WriteMarshallable(common::BytesOut &bytes) const {
   // Write incomingData (transactionId -> TransferRecord)
-  bytes.WriteInt(static_cast<int32_t>(incomingData_.size()));
+  // Match Java: SerializationUtils.marshallLongHashMap(incomingData, bytes)
+  // Convert void* map to TransferRecord* map for serialization
+  ankerl::unordered_dense::map<int64_t, TransferRecord *> transferRecordMap;
   for (const auto &pair : incomingData_) {
-    bytes.WriteLong(pair.first);
-    TransferRecord *record = static_cast<TransferRecord *>(pair.second);
-    if (record != nullptr) {
-      record->WriteMarshallable(bytes);
-    }
+    transferRecordMap[pair.first] = static_cast<TransferRecord *>(pair.second);
   }
+  utils::SerializationUtils::MarshallLongHashMap(transferRecordMap, bytes);
 }
 
 } // namespace processors

@@ -86,8 +86,8 @@ struct LastPriceCacheRecord {
  * RiskEngine - stateful risk engine
  * Handles risk management (R1 - Pre-hold, R2 - Release)
  */
-class RiskEngine : public common::StateHash,
-                   public common::WriteBytesMarshallable {
+class RiskEngine : public common::WriteBytesMarshallable,
+                   public common::StateHash {
 public:
   RiskEngine(
       int32_t shardId, int64_t numShards,

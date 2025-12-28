@@ -150,7 +150,15 @@ bool DiskSerializationProcessor::StoreData(int64_t snapshotId, int64_t seq,
       return false;
     }
 
-    marshallable->WriteMarshallable(vectorOut);
+    try {
+      marshallable->WriteMarshallable(vectorOut);
+    } catch (const std::exception &ex) {
+      LOG_ERROR(
+          "Can not write snapshot file: {} - WriteMarshallable failed: {}",
+          path, ex.what());
+      file.close();
+      return false;
+    }
 
     // Get actual written size (may be different from vector size)
     const size_t writtenSize = vectorOut.GetPosition();

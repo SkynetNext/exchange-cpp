@@ -822,29 +822,22 @@ int32_t RiskEngine::GetStateHash() const {
 
 void RiskEngine::WriteMarshallable(common::BytesOut &bytes) const {
   // Write shardId and shardMask
-  bytes.WriteInt(shardId_).WriteLong(shardMask_);
+  bytes.WriteInt(shardId_);
+  bytes.WriteLong(shardMask_);
 
-  // Write symbolSpecificationProvider
-  if (symbolSpecificationProvider_ != nullptr) {
-    symbolSpecificationProvider_->WriteMarshallable(bytes);
-  }
+  // Write symbolSpecificationProvider (always non-null in Java)
+  symbolSpecificationProvider_->WriteMarshallable(bytes);
 
-  // Write userProfileService
-  if (userProfileService_ != nullptr) {
-    userProfileService_->WriteMarshallable(bytes);
-  }
+  // Write userProfileService (always non-null in Java)
+  userProfileService_->WriteMarshallable(bytes);
 
-  // Write binaryCommandsProcessor
-  if (binaryCommandsProcessor_ != nullptr) {
-    binaryCommandsProcessor_->WriteMarshallable(bytes);
-  }
+  // Write binaryCommandsProcessor (always non-null in Java)
+  binaryCommandsProcessor_->WriteMarshallable(bytes);
 
   // Write lastPriceCache (int -> LastPriceCacheRecord)
-  bytes.WriteInt(static_cast<int32_t>(lastPriceCache_.size()));
-  for (const auto &pair : lastPriceCache_) {
-    bytes.WriteInt(pair.first);
-    pair.second.WriteMarshallable(bytes);
-  }
+  // Match Java: SerializationUtils.marshallIntHashMap(lastPriceCache, bytes)
+  utils::SerializationUtils::MarshallIntHashMap<LastPriceCacheRecord>(
+      lastPriceCache_, bytes);
 
   // Write fees (int -> long)
   utils::SerializationUtils::MarshallIntLongHashMap(fees_, bytes);

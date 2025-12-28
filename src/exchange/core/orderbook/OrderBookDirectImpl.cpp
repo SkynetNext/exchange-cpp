@@ -615,18 +615,8 @@ void OrderBookDirectImpl::WriteMarshallable(common::BytesOut &bytes) const {
         ->WriteMarshallable(bytes);
   }
 
-  // Collect all orders from orderIdIndex
-  std::vector<DirectOrder *> allOrders;
-  orderIdIndex_.ForEach(
-      [&allOrders](int64_t, DirectOrder *order) {
-        if (order != nullptr) {
-          allOrders.push_back(order);
-        }
-      },
-      INT32_MAX);
-
-  // Write total number of orders
-  bytes.WriteInt(static_cast<int32_t>(allOrders.size()));
+  // Match Java: bytes.writeInt(orderIdIndex.size(Integer.MAX_VALUE));
+  bytes.WriteInt(orderIdIndex_.Size(INT32_MAX));
 
   // Write ask orders (sorted by price ascending)
   std::vector<DirectOrder *> askOrders;

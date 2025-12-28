@@ -29,6 +29,7 @@
 #include <exchange/core/processors/MatchingEngineRouter.h>
 #include <exchange/core/processors/SharedPool.h>
 #include <exchange/core/processors/journaling/DiskSerializationProcessorConfiguration.h>
+#include <exchange/core/utils/SerializationUtils.h>
 #include <exchange/core/utils/UnsafeUtils.h>
 #include <stdexcept>
 
@@ -356,22 +357,20 @@ void MatchingEngineRouter::ProcessMatchingCommand(
 
 void MatchingEngineRouter::WriteMarshallable(common::BytesOut &bytes) const {
   // Write shardId and shardMask
-  bytes.WriteInt(shardId_).WriteLong(shardMask_);
+  bytes.WriteInt(shardId_);
+  bytes.WriteLong(shardMask_);
 
-  // Write binaryCommandsProcessor
-  if (binaryCommandsProcessor_ != nullptr) {
-    binaryCommandsProcessor_->WriteMarshallable(bytes);
-  }
+  // Write binaryCommandsProcessor (always non-null in Java)
+  binaryCommandsProcessor_->WriteMarshallable(bytes);
 
   // Write orderBooks
+  // Match Java: SerializationUtils.marshallIntHashMap(orderBooks, bytes)
   // Convert unique_ptr map to raw pointer map for serialization
-  bytes.WriteInt(static_cast<int32_t>(orderBooks_.size()));
+  ankerl::unordered_dense::map<int32_t, orderbook::IOrderBook *> orderBookMap;
   for (const auto &pair : orderBooks_) {
-    bytes.WriteInt(pair.first);
-    if (pair.second != nullptr) {
-      pair.second->WriteMarshallable(bytes);
-    }
+    orderBookMap[pair.first] = pair.second.get();
   }
+  utils::SerializationUtils::MarshallIntHashMap(orderBookMap, bytes);
 }
 
 } // namespace processors

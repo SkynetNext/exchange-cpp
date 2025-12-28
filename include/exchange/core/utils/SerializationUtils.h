@@ -148,6 +148,25 @@ public:
   }
 
   /**
+   * Marshall int->Object hash map (with WriteBytesMarshallable value types)
+   * Overload for value types (not pointers)
+   */
+  template <typename T>
+  static void MarshallIntHashMap(
+      const ankerl::unordered_dense::map<int32_t, T> &hashMap,
+      common::BytesOut &bytes,
+      typename std::enable_if<
+          std::is_same_v<decltype(std::declval<const T>().WriteMarshallable(
+                             std::declval<common::BytesOut &>())),
+                         void>>::type * = nullptr) {
+    bytes.WriteInt(static_cast<int32_t>(hashMap.size()));
+    for (const auto &pair : hashMap) {
+      bytes.WriteInt(pair.first);
+      pair.second.WriteMarshallable(bytes);
+    }
+  }
+
+  /**
    * Marshall int->Object hash map (with custom marshaller)
    */
   template <typename T>
@@ -161,6 +180,22 @@ public:
       if (pair.second != nullptr) {
         elementMarshaller(pair.second, bytes);
       }
+    }
+  }
+
+  /**
+   * Marshall int->Object hash map (with custom marshaller for value types)
+   * Overload for value types (not pointers)
+   */
+  template <typename T>
+  static void MarshallIntHashMap(
+      const ankerl::unordered_dense::map<int32_t, T> &hashMap,
+      common::BytesOut &bytes,
+      std::function<void(const T &, common::BytesOut &)> elementMarshaller) {
+    bytes.WriteInt(static_cast<int32_t>(hashMap.size()));
+    for (const auto &pair : hashMap) {
+      bytes.WriteInt(pair.first);
+      elementMarshaller(pair.second, bytes);
     }
   }
 

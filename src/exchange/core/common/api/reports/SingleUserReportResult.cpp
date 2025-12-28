@@ -77,18 +77,21 @@ void SingleUserReportResult::WriteMarshallable(BytesOut &bytes) const {
   }
 
   // orders
+  // Match Java: SerializationUtils.marshallIntHashMap(orders, bytes,
+  // symbolOrders -> SerializationUtils.marshallList(symbolOrders, bytes))
   bytes.WriteBoolean(orders != nullptr);
   if (orders != nullptr) {
-    bytes.WriteInt(static_cast<int32_t>(orders->size()));
-    for (const auto &pair : *orders) {
-      bytes.WriteInt(pair.first);
-      bytes.WriteInt(static_cast<int32_t>(pair.second.size()));
-      for (Order *order : pair.second) {
-        if (order != nullptr) {
-          order->WriteMarshallable(bytes);
-        }
-      }
-    }
+    using OrderListType = std::vector<common::Order *>;
+    utils::SerializationUtils::MarshallIntHashMap<OrderListType>(
+        *orders, bytes,
+        [](const OrderListType &symbolOrders, common::BytesOut &b) {
+          // Match Java: SerializationUtils.marshallList(symbolOrders, bytes)
+          utils::SerializationUtils::MarshallList<common::Order>(
+              symbolOrders, b,
+              [](common::Order *order, common::BytesOut &bytesOut) {
+                order->WriteMarshallable(bytesOut);
+              });
+        });
   }
 
   // queryExecutionStatus
