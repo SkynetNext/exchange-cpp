@@ -11,6 +11,10 @@ Performance comparison between C++ and Java implementations of the exchange core
 **CPU**: AMD EPYC 9Y24 96-Core Processor (16 cores, 8 cores/socket, 2 threads/core)  
 **CPU Caches**: L1d: 256 KiB (8×), L1i: 256 KiB (8×), L2: 8 MiB (8×), L3: 32 MiB (1×)  
 **Memory**: 61 GiB total, 48 GiB available  
+**Storage**: 
+- /dev/vda: 40 GiB (Virtual Disk, virtio-blk) - Root filesystem
+- /dev/vdb: 500 GiB (Virtual Disk, virtio-blk) - Data/journaling storage (/data, ext4)
+- **Backend**: KVM virtualized storage (actual physical storage type unknown from guest)
 **Virtualization**: KVM  
 **Build**: C++ (optimized native), Java (JVM with JIT)  
 **CPU Affinity**: Enabled
@@ -301,6 +305,84 @@ Latency test for single symbol (Exchange mode) with progressive TPS increase to 
 
 ---
 
+## TestLatencyExchangeJournaling Results
+
+Latency test for single symbol (Exchange mode) **with Journaling enabled** to measure latency impact of disk I/O operations.
+
+### Test Configuration
+
+Same as `TestLatencyExchange` above, with **Journaling enabled**:
+- Symbol Type: `CURRENCY_EXCHANGE_PAIR`
+- Symbols: 1
+- Benchmark Commands: 3,000,000
+- PreFill Commands: 1,000
+- Users: 2,000 accounts (1,325 unique)
+- Currencies: 2
+- Warmup Cycles: 6
+- Ring Buffer: 32,768
+- Matching Engines: 1
+- Risk Engines: 1
+- Messages in Group Limit: 256
+- **Journaling**: Enabled (DiskJournaling)
+
+**Test Strategy**: Progressive TPS increase (200K → 300K → 400K → ...) until median latency exceeds 10ms (10,000,000 nanoseconds)
+
+### C++ Implementation (With Journaling)
+
+| TPS | Throughput (MT/s) | 50% | 90% | 95% | 99% | 99.9% | 99.99% | Max |
+|-----|-------------------|-----|-----|-----|-----|-------|--------|-----|
+| 200K | 0.200 | 1.31ms | 9ms | 11.5ms | 17.8ms | 68ms | 81ms | 83ms |
+| 300K | 0.300 | 1.42ms | 13.9ms | 20.9ms | 121ms | 198ms | 207ms | 208ms |
+| 400K | 0.400 | 779µs | 11.3ms | 15.9ms | 25.2ms | 59ms | 65ms | 66ms |
+| 500K | 0.500 | 257µs | 6.6ms | 9ms | 13.9ms | 19.7ms | 23ms | 23.6ms |
+| 600K | 0.599 | 5.3ms | 14.1ms | 16.7ms | 22.1ms | 31ms | 35ms | 35ms |
+| 700K | 0.700 | 316µs | 7.4ms | 9.9ms | 17.7ms | 44ms | 47ms | 48ms |
+| 800K | 0.800 | 2.66ms | 12.2ms | 14.7ms | 19.8ms | 27ms | 30ms | 30ms |
+| 900K | 0.897 | 3.1ms | 10.8ms | 13.9ms | 45ms | 72ms | 75ms | 76ms |
+| 1.0M | 0.999 | 6.7ms | 15.1ms | 19.8ms | 79ms | 99ms | 102ms | 102ms |
+| 1.1M | 1.099 | 1.26ms | 8.2ms | 10.9ms | 15.3ms | 18.3ms | 20ms | 20.3ms |
+| 1.2M | 1.197 | 5.2ms | 11.3ms | 13.2ms | 18ms | 27.9ms | 29.7ms | 29.9ms |
+| 1.3M | 1.298 | 8.7ms | 16.9ms | 19.5ms | 24.2ms | 32ms | 33ms | 34ms |
+| 1.4M | 1.397 | 3.1ms | 13.6ms | 16.8ms | 32ms | 41ms | 43ms | 43ms |
+| 1.5M | 1.502 | 923µs | 11ms | 14.1ms | 19.3ms | 25.6ms | 27.2ms | 27.4ms |
+| 1.6M | 1.598 | 6.2µs | 25ms | 37ms | 49ms | 57ms | 58ms | 58ms |
+| 1.65M | 1.652 | **68ms** | 141ms | 151ms | 158ms | 168ms | 169ms | 169ms |
+
+**Test Status**: Test stopped at ~1.65M TPS (1.652 MT/s) when median latency exceeded 10ms threshold (68ms)  
+**Best Performance**: Best median latency 257µs at 500K TPS, but high variance  
+**Stable Range**: Up to ~1.5M TPS with median latency < 10ms (most iterations 1-9ms)
+
+### Performance Comparison: With vs Without Journaling
+
+| Metric | Without Journaling | With Journaling | Impact |
+|--------|-------------------|-----------------|--------|
+| **Best Median Latency** | 0.61µs (400K TPS) | 257µs (500K TPS) | **421x slower** |
+| **Median Latency at 200K TPS** | 0.66µs | 1.31ms | **1,985x slower** |
+| **Median Latency at 500K TPS** | 0.61µs | 257µs | **421x slower** |
+| **Median Latency at 1.0M TPS** | 0.61µs | 6.7ms | **10,984x slower** |
+| **99% Latency at 200K TPS** | 4.2ms | 17.8ms | **4.2x slower** |
+| **99% Latency at 1.0M TPS** | 15.9ms | 79ms | **5.0x slower** |
+| **Max Latency at 200K TPS** | 48ms | 83ms | **1.7x slower** |
+| **Max Latency at 1.0M TPS** | 32ms | 102ms | **3.2x slower** |
+| **Stable TPS Range** | Up to ~4.8M TPS (median < 10ms) | Up to ~1.5M TPS | **3.2x lower capacity** |
+| **Maximum Stable TPS** | ~4.8M TPS (median < 10ms) | ~1.5M TPS | **3.2x lower** |
+| **Test Stop Condition** | Stopped at 4.724 MT/s (p50=64ms) | Stopped at 1.652 MT/s (p50=68ms) | **2.9x lower throughput** |
+
+### Observations
+
+- **Journaling overhead**: Significant latency impact, especially at low TPS (200K: 0.66µs → 1.31ms, 1,985x slower)
+- **Median latency degradation**: Best case 257µs (vs 0.61µs without journaling), typically 1-9ms in stable range
+- **Tail latency impact**: 99% latency increases 4-5x (17.8ms vs 4.2ms at 200K TPS)
+- **Throughput capacity**: Maximum stable TPS reduced from ~4.8M to ~1.5M (3.2x reduction)
+- **Latency variance**: Higher variance with journaling, especially at 300K TPS (1.42ms median, 121ms 99%)
+- **Optimal range**: Best performance at 500K TPS (257µs median), but overall much higher latency than without journaling
+- **Disk I/O impact**: Journaling writes to disk (/data on /dev/vdb) add significant overhead to hot path
+- **Test completion**: Stopped at 1.652 MT/s (p50=68ms > 10ms threshold), vs 4.724 MT/s without journaling
+
+**Conclusion**: Journaling adds substantial latency overhead (421-10,984x for median latency) and reduces maximum stable throughput by 3.2x. For low-latency trading systems, journaling should be disabled in production or use faster storage (NVMe SSD) to minimize impact.
+
+---
+
 ## SharedPool Queue Implementation Comparison
 
 Performance comparison between `moodycamel::ConcurrentQueue` (unbounded) and `tbb::concurrent_bounded_queue` (bounded) in `SharedPool` for `TestLatencyExchange`.
@@ -389,4 +471,4 @@ Same as `TestLatencyExchange` above:
 
 ---
 
-**Version**: 1.4 | **Date**: 2025-12-28 | **Tests**: `TestThroughputExchange`, `TestThroughputPeak`, `TestLatencyExchange`, `SharedPool Queue Comparison`
+**Version**: 1.5 | **Date**: 2025-12-28 | **Tests**: `TestThroughputExchange`, `TestThroughputPeak`, `TestLatencyExchange`, `TestLatencyExchangeJournaling`, `SharedPool Queue Comparison`
