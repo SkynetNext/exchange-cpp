@@ -16,12 +16,14 @@
 
 #include "JournalingTestsModule.h"
 #include "ExchangeTestContainer.h"
+#include "LatencyTools.h"
 #include <chrono>
 #include <exchange/core/common/api/ApiPersistState.h>
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
-#include <thread>
-
+#include <exchange/core/utils/Logger.h>
+#include <iomanip>
+#include <sstream>
 
 namespace exchange {
 namespace core {
@@ -34,17 +36,17 @@ void JournalingTestsModule::JournalingTestImpl(
     const TestDataParameters &testDataParameters, int iterations) {
 
   for (int iteration = 0; iteration < iterations; iteration++) {
+    // Match Java: log.debug(" ----------- journaling test --- iteration {} of
+    // {}
+    // ----", iteration, iterations);
+    LOG_DEBUG(" ----------- journaling test --- iteration {} of {} ----",
+              iteration, iterations);
+
     auto testDataFutures = ExchangeTestContainer::PrepareTestDataAsync(
         testDataParameters, iteration);
 
-    const long stateId =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch())
-                .count() *
-            1000 +
-        iteration;
-
     const std::string exchangeId = ExchangeTestContainer::TimeBasedExchangeId();
+    long stateId;
     long originalFinalStateHash = 0;
 
     // First start: clean start with journaling
@@ -60,17 +62,39 @@ void JournalingTestsModule::JournalingTestImpl(
       // Load symbols, users and prefill orders
       container->LoadSymbolsUsersAndPrefillOrders(testDataFutures);
 
-      // Create snapshot
+      // Match Java: log.info("Creating snapshot...");
+      LOG_INFO("Creating snapshot...");
+      // Match Java: stateId = System.currentTimeMillis() * 1000 + iteration;
+      stateId = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch())
+                        .count() *
+                    1000 +
+                iteration;
+      // Match Java: try (ExecutionTime ignore = new ExecutionTime(t ->
+      // log.debug("Snapshot {} created in {}", stateId, t))) {
+      auto snapshotStart = std::chrono::steady_clock::now();
       auto persistState =
           std::make_unique<exchange::core::common::api::ApiPersistState>(
               stateId, false);
       auto future =
           container->GetApi()->SubmitCommandAsync(persistState.release());
       auto result = future.get();
+      auto snapshotEnd = std::chrono::steady_clock::now();
+      auto snapshotDurationNs =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(snapshotEnd -
+                                                               snapshotStart)
+              .count();
+      // Match Java: log.debug("Snapshot {} created in {}", stateId, t);
+      LOG_DEBUG("Snapshot {} created in {}", stateId,
+                LatencyTools::FormatNanos(snapshotDurationNs));
+      // Match Java: assertThat(resultCode, Is.is(CommandResultCode.SUCCESS));
+      LOG_DEBUG("Snapshot result code: {}", static_cast<int32_t>(result));
       if (result != exchange::core::common::cmd::CommandResultCode::SUCCESS) {
         throw std::runtime_error("Failed to create snapshot");
       }
 
+      // Match Java: log.info("Running commands on original state...");
+      LOG_INFO("Running commands on original state...");
       // Run benchmark commands
       auto genResult = testDataFutures.genResult.get();
       auto benchmarkCommandsFuture = genResult->GetApiCommandsBenchmark();
@@ -78,102 +102,180 @@ void JournalingTestsModule::JournalingTestImpl(
       if (!benchmarkCommands.empty()) {
         container->GetApi()->SubmitCommandsSync(benchmarkCommands);
       }
-
-      // Get original final state hash
-      originalFinalStateHash = container->RequestStateHash();
-
+      // Match Java:
+      // assertTrue(container.totalBalanceReport().isGlobalBalancesAllZero());
       // Verify total balance report is zero
       auto balanceReport = container->TotalBalanceReport();
       if (balanceReport) {
-        // Check all balances are zero
-        bool allZero = true;
-        if (balanceReport->accountBalances) {
-          for (const auto &pair : *balanceReport->accountBalances) {
+        if (!balanceReport->IsGlobalBalancesAllZero()) {
+          // Log non-zero balances for debugging
+          auto globalBalances = balanceReport->GetGlobalBalancesSum();
+          std::string errorMsg =
+              "Total balance report is not zero. Non-zero balances: ";
+          bool first = true;
+          for (const auto &pair : globalBalances) {
             if (pair.second != 0) {
-              allZero = false;
-              break;
+              if (!first)
+                errorMsg += ", ";
+              errorMsg += "currency " + std::to_string(pair.first) + " = " +
+                          std::to_string(pair.second);
+              first = false;
             }
           }
-        }
-        if (allZero && balanceReport->fees) {
-          for (const auto &pair : *balanceReport->fees) {
+
+          // DIAGNOSIS: Log detailed breakdown for non-zero currency
+          for (const auto &pair : globalBalances) {
             if (pair.second != 0) {
-              allZero = false;
-              break;
+              int32_t currency = pair.first;
+              LOG_ERROR("Balance breakdown for currency {}:", currency);
+              LOG_ERROR("  GetGlobalBalancesSum() result: {}", pair.second);
+
+              // Manual calculation to verify
+              int64_t manualSum = 0;
+              if (balanceReport->accountBalances) {
+                auto it = balanceReport->accountBalances->find(currency);
+                if (it != balanceReport->accountBalances->end()) {
+                  LOG_ERROR("  accountBalances: {}", it->second);
+                  manualSum += it->second;
+                }
+              }
+              if (balanceReport->ordersBalances) {
+                auto it = balanceReport->ordersBalances->find(currency);
+                if (it != balanceReport->ordersBalances->end()) {
+                  LOG_ERROR("  ordersBalances: {}", it->second);
+                  manualSum += it->second;
+                }
+              }
+              if (balanceReport->fees) {
+                auto it = balanceReport->fees->find(currency);
+                if (it != balanceReport->fees->end()) {
+                  LOG_ERROR("  fees: {}", it->second);
+                  manualSum += it->second;
+                }
+              }
+              LOG_ERROR("  Manual sum: {}", manualSum);
+              LOG_ERROR("  Difference (GetGlobalBalancesSum - manual): {}",
+                        pair.second - manualSum);
             }
           }
-        }
-        if (allZero && balanceReport->ordersBalances) {
-          for (const auto &pair : *balanceReport->ordersBalances) {
-            if (pair.second != 0) {
-              allZero = false;
-              break;
-            }
-          }
-        }
-        if (!allZero) {
-          throw std::runtime_error("Total balance report is not zero");
+
+          throw std::runtime_error(errorMsg);
         }
       }
+
+      // Match Java: originalFinalStateHash = container.requestStateHash();
+      originalFinalStateHash = container->RequestStateHash();
+      // Match Java: log.info("Original state checks completed");
+      LOG_INFO("Original state checks completed");
     }
 
-    // Recreate from snapshot + journal
+    // Match Java: // TODO Discover snapshots and journals with
+    // DiskSerializationProcessor
     const long snapshotBaseSeq = 0L;
     auto fromSnapshotConfig =
         exchange::core::common::config::InitialStateConfiguration::
             LastKnownStateFromJournal(exchangeId, stateId, snapshotBaseSeq);
 
+    // Match Java: log.debug("Creating new exchange from persisted state...");
+    LOG_DEBUG("Creating new exchange from persisted state...");
+    // Match Java: final long tLoad = System.currentTimeMillis();
+    auto tLoad = std::chrono::steady_clock::now();
     {
       auto recreatedContainer = ExchangeTestContainer::Create(
           performanceCfg, fromSnapshotConfig,
           exchange::core::common::config::SerializationConfiguration::
               DiskJournaling());
 
-      // Wait for core to be ready
+      // Match Java: // simple sync query in order to wait until core is started
+      // to respond
+      // Match Java: recreatedContainer.totalBalanceReport();
       recreatedContainer->TotalBalanceReport();
 
-      // Verify restored state hash matches original
+      // Match Java: float loadTimeSec = (float) (System.currentTimeMillis() -
+      // tLoad) / 1000.0f;
+      auto loadEnd = std::chrono::steady_clock::now();
+      auto loadTimeMs =
+          std::chrono::duration_cast<std::chrono::milliseconds>(loadEnd - tLoad)
+              .count();
+      float loadTimeSec = static_cast<float>(loadTimeMs) / 1000.0f;
+      // Match Java: log.debug("Load+start+replay time: {}s",
+      // String.format("%.3f", loadTimeSec));
+      std::ostringstream loadTimeStr;
+      loadTimeStr << std::fixed << std::setprecision(3) << loadTimeSec;
+      LOG_DEBUG("Load+start+replay time: {}s", loadTimeStr.str());
+
+      // Match Java: final long restoredStateHash =
+      // recreatedContainer.requestStateHash();
+      // Match Java: assertThat(restoredStateHash, is(originalFinalStateHash));
       long restoredStateHash = recreatedContainer->RequestStateHash();
       if (restoredStateHash != originalFinalStateHash) {
         throw std::runtime_error("Restored state hash mismatch");
       }
 
+      // Match Java:
+      // assertTrue(recreatedContainer.totalBalanceReport().isGlobalBalancesAllZero());
       // Verify total balance report is zero
       auto balanceReport = recreatedContainer->TotalBalanceReport();
       if (balanceReport) {
-        // Check all balances are zero
-        bool allZero = true;
-        if (balanceReport->accountBalances) {
-          for (const auto &pair : *balanceReport->accountBalances) {
+        if (!balanceReport->IsGlobalBalancesAllZero()) {
+          // Log non-zero balances for debugging
+          auto globalBalances = balanceReport->GetGlobalBalancesSum();
+          std::string errorMsg =
+              "Restored total balance report is not zero. Non-zero balances: ";
+          bool first = true;
+          for (const auto &pair : globalBalances) {
             if (pair.second != 0) {
-              allZero = false;
-              break;
+              if (!first)
+                errorMsg += ", ";
+              errorMsg += "currency " + std::to_string(pair.first) + " = " +
+                          std::to_string(pair.second);
+              first = false;
             }
           }
-        }
-        if (allZero && balanceReport->fees) {
-          for (const auto &pair : *balanceReport->fees) {
+
+          // DIAGNOSIS: Log detailed breakdown for non-zero currency
+          for (const auto &pair : globalBalances) {
             if (pair.second != 0) {
-              allZero = false;
-              break;
+              int32_t currency = pair.first;
+              LOG_ERROR("Restored balance breakdown for currency {}:",
+                        currency);
+              LOG_ERROR("  GetGlobalBalancesSum() result: {}", pair.second);
+
+              // Manual calculation to verify
+              int64_t manualSum = 0;
+              if (balanceReport->accountBalances) {
+                auto it = balanceReport->accountBalances->find(currency);
+                if (it != balanceReport->accountBalances->end()) {
+                  LOG_ERROR("  accountBalances: {}", it->second);
+                  manualSum += it->second;
+                }
+              }
+              if (balanceReport->ordersBalances) {
+                auto it = balanceReport->ordersBalances->find(currency);
+                if (it != balanceReport->ordersBalances->end()) {
+                  LOG_ERROR("  ordersBalances: {}", it->second);
+                  manualSum += it->second;
+                }
+              }
+              if (balanceReport->fees) {
+                auto it = balanceReport->fees->find(currency);
+                if (it != balanceReport->fees->end()) {
+                  LOG_ERROR("  fees: {}", it->second);
+                  manualSum += it->second;
+                }
+              }
+              LOG_ERROR("  Manual sum: {}", manualSum);
+              LOG_ERROR("  Difference (GetGlobalBalancesSum - manual): {}",
+                        pair.second - manualSum);
             }
           }
-        }
-        if (allZero && balanceReport->ordersBalances) {
-          for (const auto &pair : *balanceReport->ordersBalances) {
-            if (pair.second != 0) {
-              allZero = false;
-              break;
-            }
-          }
-        }
-        if (!allZero) {
-          throw std::runtime_error("Restored total balance report is not zero");
+
+          throw std::runtime_error(errorMsg);
         }
       }
+      // Match Java: log.info("Restored snapshot+journal is valid");
+      LOG_INFO("Restored snapshot+journal is valid");
     }
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
   }
 }
 
