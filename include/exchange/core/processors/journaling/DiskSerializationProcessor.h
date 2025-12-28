@@ -22,8 +22,13 @@
 #include "DiskSerializationProcessorConfiguration.h"
 #include "ISerializationProcessor.h"
 #include <cstdint>
+#include <fstream>
+#include <istream>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <vector>
 
 // Forward declarations
 class ExchangeApi;
@@ -32,6 +37,10 @@ namespace exchange {
 namespace core {
 namespace processors {
 namespace journaling {
+
+// Forward declarations
+struct JournalDescriptor;
+struct SnapshotDescriptor;
 
 /**
  * DiskSerializationProcessor - disk-based serialization processor
@@ -50,21 +59,21 @@ public:
   void WriteToJournal(common::cmd::OrderCommand *cmd, int64_t dSeq,
                       bool eob) override;
 
-  void EnableJournaling(int64_t afterSeq, ExchangeApi *api) override;
+  void EnableJournaling(int64_t afterSeq, void *api) override;
 
   std::map<int64_t, SnapshotDescriptor *> FindAllSnapshotPoints() override;
 
   void ReplayJournalStep(int64_t snapshotId, int64_t seqFrom, int64_t seqTo,
-                         ExchangeApi *api) override;
+                         void *api) override;
 
   int64_t ReplayJournalFull(const common::config::InitialStateConfiguration
                                 *initialStateConfiguration,
-                            ExchangeApi *api) override;
+                            void *api) override;
 
   void ReplayJournalFullAndThenEnableJouraling(
       const common::config::InitialStateConfiguration
           *initialStateConfiguration,
-      ExchangeApi *api) override;
+      void *api) override;
 
   bool CheckSnapshotExists(int64_t snapshotId, SerializedModuleType type,
                            int32_t instanceId) override;
@@ -87,11 +96,32 @@ private:
 
   int32_t filesCounter_;
   int64_t writtenBytes_;
+  int64_t lastWrittenSeq_; // Track last written sequence number for seqLast
+
+  // Journal writing buffers
+  std::vector<char> journalWriteBuffer_;
+  std::vector<char> lz4WriteBuffer_;
+  size_t journalWriteBufferPos_;
+
+  // File handles for journal writing
+  std::unique_ptr<std::fstream> journalFile_;
+  std::mutex journalMutex_;
 
   // Internal methods
   std::string GetSnapshotPath(int64_t snapshotId, SerializedModuleType type,
                               int32_t instanceId);
   std::string GetJournalPath(int64_t snapshotId, int32_t fileIndex);
+
+  // Journal writing helpers
+  void FlushBufferSync(bool forceStartNextFile, int64_t timestampNs);
+  void StartNewFile(int64_t timestampNs);
+  void RegisterNextJournal(int64_t seq, int64_t timestampNs);
+  void RegisterNextSnapshot(int64_t snapshotId, int64_t seq,
+                            int64_t timestampNs);
+
+  // Journal replay helpers
+  void ReadCommands(std::istream &is, void *api, int64_t &lastSeq,
+                    bool insideCompressedBlock);
 };
 
 } // namespace journaling

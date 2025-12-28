@@ -16,36 +16,48 @@
 
 #pragma once
 
+#include <functional>
+
 namespace exchange {
 namespace core {
+// Forward declaration for ISerializationProcessor (outside config namespace)
+namespace processors {
+namespace journaling {
+class ISerializationProcessor;
+}
+} // namespace processors
 namespace common {
 namespace config {
 
-// Forward declaration
+// Forward declarations
 class ExchangeConfiguration;
 
 /**
  * SerializationConfiguration - serialization (snapshots and journaling)
- * configuration Simplified version for now
+ * configuration
+ * Match Java: SerializationConfiguration with factory pattern
  */
 class SerializationConfiguration {
 public:
   bool enableJournaling;
+  // Use fully qualified namespace to avoid ambiguity in config namespace
+  std::function<
+      ::exchange::core::processors::journaling::ISerializationProcessor *(
+          const ExchangeConfiguration *)>
+      serializationProcessorFactory;
 
-  SerializationConfiguration(bool enableJournaling)
-      : enableJournaling(enableJournaling) {}
+  SerializationConfiguration(
+      bool enableJournaling,
+      std::function<
+          ::exchange::core::processors::journaling::ISerializationProcessor *(
+              const ExchangeConfiguration *)>
+          factory)
+      : enableJournaling(enableJournaling),
+        serializationProcessorFactory(factory) {}
 
-  static SerializationConfiguration Default() {
-    return SerializationConfiguration(false);
-  }
-
-  static SerializationConfiguration DiskSnapshotOnly() {
-    return SerializationConfiguration(false);
-  }
-
-  static SerializationConfiguration DiskJournaling() {
-    return SerializationConfiguration(true);
-  }
+  static SerializationConfiguration Default();
+  static SerializationConfiguration DiskSnapshotOnly();
+  static SerializationConfiguration DiskJournaling();
 };
 
 } // namespace config

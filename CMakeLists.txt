@@ -190,6 +190,7 @@ list(APPEND EXCHANGE_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/processors/journaling/DummySerializationProcessor.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/utils/AffinityThreadFactory.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/common/api/reports/TotalCurrencyBalanceReportResult.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/common/config/SerializationConfiguration.cpp"
 )
 
 # Create library (placeholder for now)

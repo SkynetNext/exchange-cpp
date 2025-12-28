@@ -25,12 +25,14 @@
 
 // Forward declarations
 class ExchangeApi;
-class SnapshotDescriptor;
 
 namespace exchange {
 namespace core {
 namespace processors {
 namespace journaling {
+
+// Forward declarations
+struct SnapshotDescriptor;
 
 /**
  * ISerializationProcessor - interface for serialization/deserialization

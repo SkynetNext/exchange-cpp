@@ -24,18 +24,33 @@ namespace core {
 namespace processors {
 namespace journaling {
 
+// Forward declaration
+struct SnapshotDescriptor;
+
 /**
  * JournalDescriptor - describes a journal file
+ * Matches Java: JournalDescriptor with linked list structure
  */
 struct JournalDescriptor {
-  int64_t snapshotId;
-  int64_t seqFrom;
-  int64_t seqTo;
-  std::string path;
+  int64_t timestampNs;
+  int64_t seqFirst;
+  int64_t seqLast; // -1 if not finished yet
 
-  JournalDescriptor(int64_t snapshotId, int64_t seqFrom, int64_t seqTo,
-                    const std::string &path)
-      : snapshotId(snapshotId), seqFrom(seqFrom), seqTo(seqTo), path(path) {}
+  SnapshotDescriptor *baseSnapshot;
+
+  // Linked list structure
+  JournalDescriptor *prev; // can be null
+  JournalDescriptor *next; // can be null
+
+  JournalDescriptor(int64_t timestampNs, int64_t seqFirst,
+                    SnapshotDescriptor *baseSnapshot,
+                    JournalDescriptor *prev)
+      : timestampNs(timestampNs), seqFirst(seqFirst), seqLast(-1),
+        baseSnapshot(baseSnapshot), prev(prev), next(nullptr) {
+    if (prev) {
+      prev->next = this;
+    }
+  }
 };
 
 } // namespace journaling

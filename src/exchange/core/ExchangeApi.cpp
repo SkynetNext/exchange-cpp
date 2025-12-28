@@ -16,6 +16,7 @@
 
 #include <chrono>
 #include <disruptor/EventTranslatorOneArg.h>
+#include <disruptor/EventTranslatorTwoArg.h>
 #include <disruptor/RingBuffer.h>
 #include <exchange/core/ExchangeApi.h>
 #include <exchange/core/common/BalanceAdjustmentType.h>
@@ -49,6 +50,7 @@
 #include <exchange/core/utils/Logger.h>
 #include <exchange/core/utils/SerializationUtils.h>
 #include <functional>
+#include <future>
 #include <stdexcept>
 #include <vector>
 
@@ -231,6 +233,20 @@ public:
   }
 };
 
+// Grouping control translator
+class GroupingControlTranslator
+    : public disruptor::EventTranslatorTwoArg<common::cmd::OrderCommand,
+                                              int64_t, int64_t> {
+public:
+  void translateTo(common::cmd::OrderCommand &cmd, int64_t seq,
+                   int64_t timestampNs, int64_t mode) override {
+    cmd.command = common::cmd::OrderCommandType::GROUPING_CONTROL;
+    cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    cmd.orderId = mode;
+    cmd.timestamp = timestampNs;
+  }
+};
+
 // Static translator instances
 static NewOrderTranslator NEW_ORDER_TRANSLATOR;
 static MoveOrderTranslator MOVE_ORDER_TRANSLATOR;
@@ -243,6 +259,7 @@ static ResumeUserTranslator RESUME_USER_TRANSLATOR;
 static AdjustUserBalanceTranslator ADJUST_USER_BALANCE_TRANSLATOR;
 static ResetTranslator RESET_TRANSLATOR;
 static NopTranslator NOP_TRANSLATOR;
+static GroupingControlTranslator GROUPING_CONTROL_TRANSLATOR;
 } // namespace
 
 template <typename WaitStrategyT>
@@ -394,10 +411,28 @@ ExchangeApi<WaitStrategyT>::SubmitCommandAsync(common::api::ApiCommand *cmd) {
       promises_.insert(accessor2, seq2);
       accessor2->second = std::move(*promise2Ptr);
     });
-    // Return a combined future that waits for both
-    // For simplicity, just return the first future (both should complete with
-    // same result)
-    return future;
+    // Match Java: return future1.thenCombineAsync(future2,
+    // CommandResultCode::mergeToFirstFailed)
+    // Java thenCombineAsync: registers callback, executes when both futures
+    // complete (doesn't start thread immediately, uses thread pool when both
+    // ready) Use deferred launch to avoid starting thread immediately When
+    // .get() is called, it will wait for both futures and merge results
+    return std::async(
+        std::launch::deferred,
+        [future = std::move(future), future2 = std::move(future2)]() mutable {
+          // Wait for both futures to complete (matching Java thenCombineAsync
+          // behavior - executes when both are ready)
+          auto result1 = future.get();
+          auto result2 = future2.get();
+          // Match Java: CommandResultCode.mergeToFirstFailed(result1, result2)
+          // Java mergeToFirstFailed logic:
+          // - If any failed (not SUCCESS and not ACCEPTED), return first failed
+          // - Otherwise, if any SUCCESS, return SUCCESS
+          // - Otherwise return ACCEPTED
+          std::vector<common::cmd::CommandResultCode> results = {result1,
+                                                                 result2};
+          return common::cmd::MergeToFirstFailed(results);
+        });
   }
 
   // For other commands, claim sequence and translate
@@ -580,6 +615,264 @@ ExchangeApi<WaitStrategyT>::RequestOrderBookAsync(int32_t symbolId,
   ringBuffer_->publish(seq);
 
   return future;
+}
+
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::GroupingControl(int64_t timestampNs,
+                                                 int64_t mode) {
+  if (!ringBuffer_) {
+    throw std::runtime_error("GroupingControl: ringBuffer is nullptr");
+  }
+
+  // Match Java: ringBuffer.publishEvent((cmd, seq) -> {
+  //     cmd.command = OrderCommandType.GROUPING_CONTROL;
+  //     cmd.resultCode = CommandResultCode.NEW;
+  //     cmd.orderId = mode;
+  //     cmd.timestamp = timestampNs;
+  // });
+  ringBuffer_->publishEvent(GROUPING_CONTROL_TRANSLATOR, timestampNs, mode);
+}
+
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::BinaryData(int32_t serviceFlags,
+                                            int64_t eventsGroup,
+                                            int64_t timestampNs,
+                                            int8_t lastFlag, int64_t word0,
+                                            int64_t word1, int64_t word2,
+                                            int64_t word3, int64_t word4) {
+  if (!ringBuffer_) {
+    throw std::runtime_error("BinaryData: ringBuffer is nullptr");
+  }
+
+  // Match Java: ringBuffer.publishEvent(((cmd, seq) -> {
+  //     cmd.serviceFlags = serviceFlags;
+  //     cmd.eventsGroup = eventsGroup;
+  //     cmd.command = OrderCommandType.BINARY_DATA_COMMAND;
+  //     cmd.symbol = lastFlag;
+  //     cmd.orderId = word0;
+  //     cmd.price = word1;
+  //     cmd.reserveBidPrice = word2;
+  //     cmd.size = word3;
+  //     cmd.uid = word4;
+  //     cmd.timestamp = timestampNs;
+  //     cmd.resultCode = CommandResultCode.NEW;
+  // }));
+  int64_t seq = ringBuffer_->next();
+  auto &cmd = ringBuffer_->get(seq);
+  cmd.serviceFlags = serviceFlags;
+  cmd.eventsGroup = eventsGroup;
+  cmd.command = common::cmd::OrderCommandType::BINARY_DATA_COMMAND;
+  cmd.symbol = lastFlag;
+  cmd.orderId = word0;
+  cmd.price = word1;
+  cmd.reserveBidPrice = word2;
+  cmd.size = word3;
+  cmd.uid = word4;
+  cmd.timestamp = timestampNs;
+  cmd.resultCode = common::cmd::CommandResultCode::NEW;
+  ringBuffer_->publish(seq);
+}
+
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::PlaceOrderReplay(
+    int32_t serviceFlags, int64_t eventsGroup, int64_t timestampNs,
+    int64_t orderId, int32_t userCookie, int64_t price,
+    int64_t reservedBidPrice, int64_t size, common::OrderAction action,
+    common::OrderType orderType, int32_t symbol, int64_t uid) {
+  if (!ringBuffer_) {
+    throw std::runtime_error("PlaceOrderReplay: ringBuffer is nullptr");
+  }
+  // Match Java: placeNewOrder(serviceFlags, eventsGroup, timestampNs, ...)
+  int64_t seq = ringBuffer_->next();
+  auto &cmd = ringBuffer_->get(seq);
+  cmd.serviceFlags = serviceFlags;
+  cmd.eventsGroup = eventsGroup;
+  cmd.command = common::cmd::OrderCommandType::PLACE_ORDER;
+  cmd.resultCode = common::cmd::CommandResultCode::NEW;
+  cmd.price = price;
+  cmd.reserveBidPrice = reservedBidPrice;
+  cmd.size = size;
+  cmd.orderId = orderId;
+  cmd.timestamp = timestampNs;
+  cmd.action = action;
+  cmd.orderType = orderType;
+  cmd.symbol = symbol;
+  cmd.uid = uid;
+  cmd.userCookie = userCookie;
+  ringBuffer_->publish(seq);
+}
+
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::MoveOrderReplay(int32_t serviceFlags,
+                                                 int64_t eventsGroup,
+                                                 int64_t timestampNs,
+                                                 int64_t price, int64_t orderId,
+                                                 int32_t symbol, int64_t uid) {
+  if (!ringBuffer_) {
+    throw std::runtime_error("MoveOrderReplay: ringBuffer is nullptr");
+  }
+  // Match Java: moveOrder(serviceFlags, eventsGroup, timestampNs, ...)
+  int64_t seq = ringBuffer_->next();
+  auto &cmd = ringBuffer_->get(seq);
+  cmd.serviceFlags = serviceFlags;
+  cmd.eventsGroup = eventsGroup;
+  cmd.command = common::cmd::OrderCommandType::MOVE_ORDER;
+  cmd.resultCode = common::cmd::CommandResultCode::NEW;
+  cmd.price = price;
+  cmd.orderId = orderId;
+  cmd.timestamp = timestampNs;
+  cmd.symbol = symbol;
+  cmd.uid = uid;
+  ringBuffer_->publish(seq);
+}
+
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::CancelOrderReplay(
+    int32_t serviceFlags, int64_t eventsGroup, int64_t timestampNs,
+    int64_t orderId, int32_t symbol, int64_t uid) {
+  if (!ringBuffer_) {
+    throw std::runtime_error("CancelOrderReplay: ringBuffer is nullptr");
+  }
+  // Match Java: cancelOrder(serviceFlags, eventsGroup, timestampNs, ...)
+  int64_t seq = ringBuffer_->next();
+  auto &cmd = ringBuffer_->get(seq);
+  cmd.serviceFlags = serviceFlags;
+  cmd.eventsGroup = eventsGroup;
+  cmd.command = common::cmd::OrderCommandType::CANCEL_ORDER;
+  cmd.resultCode = common::cmd::CommandResultCode::NEW;
+  cmd.orderId = orderId;
+  cmd.timestamp = timestampNs;
+  cmd.symbol = symbol;
+  cmd.uid = uid;
+  ringBuffer_->publish(seq);
+}
+
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::ReduceOrderReplay(
+    int32_t serviceFlags, int64_t eventsGroup, int64_t timestampNs,
+    int64_t reduceSize, int64_t orderId, int32_t symbol, int64_t uid) {
+  if (!ringBuffer_) {
+    throw std::runtime_error("ReduceOrderReplay: ringBuffer is nullptr");
+  }
+  // Match Java: reduceOrder(serviceFlags, eventsGroup, timestampNs, ...)
+  int64_t seq = ringBuffer_->next();
+  auto &cmd = ringBuffer_->get(seq);
+  cmd.serviceFlags = serviceFlags;
+  cmd.eventsGroup = eventsGroup;
+  cmd.command = common::cmd::OrderCommandType::REDUCE_ORDER;
+  cmd.resultCode = common::cmd::CommandResultCode::NEW;
+  cmd.size = reduceSize;
+  cmd.orderId = orderId;
+  cmd.timestamp = timestampNs;
+  cmd.symbol = symbol;
+  cmd.uid = uid;
+  ringBuffer_->publish(seq);
+}
+
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::BalanceAdjustmentReplay(
+    int32_t serviceFlags, int64_t eventsGroup, int64_t timestampNs, int64_t uid,
+    int64_t transactionId, int32_t currency, int64_t longAmount,
+    common::BalanceAdjustmentType adjustmentType) {
+  if (!ringBuffer_) {
+    throw std::runtime_error("BalanceAdjustmentReplay: ringBuffer is nullptr");
+  }
+  // Match Java: balanceAdjustment(serviceFlags, eventsGroup, timestampNs, ...)
+  int64_t seq = ringBuffer_->next();
+  auto &cmd = ringBuffer_->get(seq);
+  cmd.serviceFlags = serviceFlags;
+  cmd.eventsGroup = eventsGroup;
+  cmd.command = common::cmd::OrderCommandType::BALANCE_ADJUSTMENT;
+  cmd.orderId = transactionId;
+  cmd.symbol = currency;
+  cmd.uid = uid;
+  cmd.price = longAmount;
+  cmd.orderType = common::OrderTypeFromCode(
+      common::BalanceAdjustmentTypeToCode(adjustmentType));
+  cmd.size = 0;
+  cmd.timestamp = timestampNs;
+  cmd.resultCode = common::cmd::CommandResultCode::NEW;
+  ringBuffer_->publish(seq);
+}
+
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::CreateUserReplay(int32_t serviceFlags,
+                                                  int64_t eventsGroup,
+                                                  int64_t timestampNs,
+                                                  int64_t userId) {
+  if (!ringBuffer_) {
+    throw std::runtime_error("CreateUserReplay: ringBuffer is nullptr");
+  }
+  // Match Java: createUser(serviceFlags, eventsGroup, timestampNs, ...)
+  int64_t seq = ringBuffer_->next();
+  auto &cmd = ringBuffer_->get(seq);
+  cmd.serviceFlags = serviceFlags;
+  cmd.eventsGroup = eventsGroup;
+  cmd.command = common::cmd::OrderCommandType::ADD_USER;
+  cmd.orderId = -1;
+  cmd.symbol = -1;
+  cmd.uid = userId;
+  cmd.timestamp = timestampNs;
+  cmd.resultCode = common::cmd::CommandResultCode::NEW;
+  ringBuffer_->publish(seq);
+}
+
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::SuspendUserReplay(int32_t serviceFlags,
+                                                   int64_t eventsGroup,
+                                                   int64_t timestampNs,
+                                                   int64_t userId) {
+  if (!ringBuffer_) {
+    throw std::runtime_error("SuspendUserReplay: ringBuffer is nullptr");
+  }
+  // Match Java: suspendUser(serviceFlags, eventsGroup, timestampNs, ...)
+  int64_t seq = ringBuffer_->next();
+  auto &cmd = ringBuffer_->get(seq);
+  cmd.serviceFlags = serviceFlags;
+  cmd.eventsGroup = eventsGroup;
+  cmd.command = common::cmd::OrderCommandType::SUSPEND_USER;
+  cmd.orderId = -1;
+  cmd.symbol = -1;
+  cmd.uid = userId;
+  cmd.timestamp = timestampNs;
+  cmd.resultCode = common::cmd::CommandResultCode::NEW;
+  ringBuffer_->publish(seq);
+}
+
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::ResumeUserReplay(int32_t serviceFlags,
+                                                  int64_t eventsGroup,
+                                                  int64_t timestampNs,
+                                                  int64_t userId) {
+  if (!ringBuffer_) {
+    throw std::runtime_error("ResumeUserReplay: ringBuffer is nullptr");
+  }
+  // Match Java: resumeUser(serviceFlags, eventsGroup, timestampNs, ...)
+  int64_t seq = ringBuffer_->next();
+  auto &cmd = ringBuffer_->get(seq);
+  cmd.serviceFlags = serviceFlags;
+  cmd.eventsGroup = eventsGroup;
+  cmd.command = common::cmd::OrderCommandType::RESUME_USER;
+  cmd.orderId = -1;
+  cmd.symbol = -1;
+  cmd.uid = userId;
+  cmd.timestamp = timestampNs;
+  cmd.resultCode = common::cmd::CommandResultCode::NEW;
+  ringBuffer_->publish(seq);
+}
+
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::ResetReplay(int64_t timestampNs) {
+  if (!ringBuffer_) {
+    throw std::runtime_error("ResetReplay: ringBuffer is nullptr");
+  }
+  // Match Java: reset(timestampNs)
+  int64_t seq = ringBuffer_->next();
+  auto &cmd = ringBuffer_->get(seq);
+  cmd.command = common::cmd::OrderCommandType::RESET;
+  cmd.resultCode = common::cmd::CommandResultCode::NEW;
+  cmd.timestamp = timestampNs;
+  ringBuffer_->publish(seq);
 }
 
 template <typename WaitStrategyT>

@@ -66,7 +66,10 @@ public:
 
   void AddWord(int64_t word) {
     if (wordsTransferred >= static_cast<int>(dataArray.size())) {
-      // Resize if needed
+      // Resize if needed (should never happen)
+      LOG_WARN("[BinaryCommandsProcessor] Resizing incoming transfer buffer to "
+               "{} longs",
+               dataArray.size() * 2);
       dataArray.resize(dataArray.size() * 2);
     }
     dataArray[wordsTransferred++] = word;
@@ -150,170 +153,203 @@ common::cmd::CommandResultCode
 BinaryCommandsProcessor::AcceptBinaryFrame(common::cmd::OrderCommand *cmd) {
   const int32_t transferId = cmd->userCookie;
 
-  // Get or create transfer record
-  auto it = incomingData_.find(transferId);
-  TransferRecord *record = nullptr;
+  try {
+    // Get or create transfer record
+    auto it = incomingData_.find(transferId);
+    TransferRecord *record = nullptr;
 
-  if (it == incomingData_.end()) {
-    // First frame - extract expected length from orderId
-    // Format: (bytesLength << 32) | other_data
-    const int bytesLength = static_cast<int>((cmd->orderId >> 32) & 0x7FFFFFFF);
-    const int longsPerMessage = 5; // Each OrderCommand carries 5 longs
-    const int longArraySize =
-        RequiredLongArraySize(bytesLength, longsPerMessage);
-    record = new TransferRecord(longArraySize);
-    incomingData_[transferId] = record;
-  } else {
-    record = static_cast<TransferRecord *>(it->second);
-  }
+    if (it == incomingData_.end()) {
+      // First frame - extract expected length from orderId
+      // Format: (bytesLength << 32) | other_data
+      const int bytesLength =
+          static_cast<int>((cmd->orderId >> 32) & 0x7FFFFFFF);
+      const int longsPerMessage = 5; // Each OrderCommand carries 5 longs
+      const int longArraySize =
+          RequiredLongArraySize(bytesLength, longsPerMessage);
+      record = new TransferRecord(longArraySize);
+      incomingData_[transferId] = record;
+    } else {
+      record = static_cast<TransferRecord *>(it->second);
+    }
 
-  // Add words from this frame
-  record->AddWord(cmd->orderId);
-  record->AddWord(cmd->price);
-  record->AddWord(cmd->reserveBidPrice);
-  record->AddWord(cmd->size);
-  record->AddWord(cmd->uid);
+    // Add words from this frame
+    record->AddWord(cmd->orderId);
+    record->AddWord(cmd->price);
+    record->AddWord(cmd->reserveBidPrice);
+    record->AddWord(cmd->size);
+    record->AddWord(cmd->uid);
 
-  // Check if this is the last frame (symbol == -1 indicates last frame)
-  if (cmd->symbol == -1) {
-    // All frames received - process complete message
-    incomingData_.erase(transferId);
+    // Check if this is the last frame (symbol == -1 indicates last frame)
+    if (cmd->symbol == -1) {
+      // All frames received - process complete message
+      incomingData_.erase(transferId);
 
-    // Decompress with LZ4 and create BytesIn
-    std::vector<uint8_t> decompressedBytes =
-        utils::SerializationUtils::LongsLz4ToBytes(record->dataArray,
-                                                   record->wordsTransferred);
-    common::VectorBytesIn bytesIn(decompressedBytes);
+      // Decompress with LZ4 and create BytesIn
+      // IMPORTANT: Store decompressedBytes in a way that ensures it lives
+      // long enough for bytesIn to use it
+      std::vector<uint8_t> decompressedBytes =
+          utils::SerializationUtils::LongsLz4ToBytes(record->dataArray,
+                                                     record->wordsTransferred);
 
-    if (cmd->command == common::cmd::OrderCommandType::BINARY_DATA_QUERY) {
-      // Match Java:
-      // deserializeQuery(bytesIn).flatMap(reportQueriesHandler::handleReport).ifPresent(...)
-      if (!reportQueriesHandler_) {
-        LOG_WARN("[BinaryCommandsProcessor] BINARY_DATA_QUERY received but "
-                 "reportQueriesHandler_ is nullptr!");
-      } else {
-        // Read class code and deserialize query
-        int32_t classCode = bytesIn.ReadInt();
-        common::api::reports::ReportType reportType =
-            common::api::reports::ReportTypeFromCode(classCode);
+      if (decompressedBytes.empty()) {
+        LOG_ERROR("[BinaryCommandsProcessor] Empty decompressed bytes for "
+                  "transferId={}",
+                  transferId);
+        delete record;
+        return common::cmd::CommandResultCode::SUCCESS;
+      }
 
-        // Use factory to create report query
-        void *queryPtr =
-            common::api::reports::ReportQueryFactory::getInstance().createQuery(
-                reportType, bytesIn);
+      if (decompressedBytes.size() < sizeof(int32_t)) {
+        LOG_ERROR("[BinaryCommandsProcessor] Decompressed bytes too small for "
+                  "transferId={} size={}",
+                  transferId, decompressedBytes.size());
+        delete record;
+        return common::cmd::CommandResultCode::SUCCESS;
+      }
 
-        if (queryPtr != nullptr) {
-          std::optional<std::unique_ptr<common::api::reports::ReportResult>>
-              result;
+      // Create bytesIn - ensure decompressedBytes stays in scope
+      common::VectorBytesIn bytesIn(decompressedBytes);
 
-          // Cast to appropriate type and process (flatMap equivalent)
-          switch (reportType) {
-          case common::api::reports::ReportType::STATE_HASH: {
-            auto *query =
-                static_cast<common::api::reports::StateHashReportQuery *>(
-                    queryPtr);
-            result = reportQueriesHandler_->HandleReport(query);
-            delete query;
-            break;
-          }
-          case common::api::reports::ReportType::SINGLE_USER_REPORT: {
-            auto *query =
-                static_cast<common::api::reports::SingleUserReportQuery *>(
-                    queryPtr);
-            result = reportQueriesHandler_->HandleReport(query);
-            delete query;
-            break;
-          }
-          case common::api::reports::ReportType::TOTAL_CURRENCY_BALANCE: {
-            auto *query = static_cast<
-                common::api::reports::TotalCurrencyBalanceReportQuery *>(
-                queryPtr);
-            result = reportQueriesHandler_->HandleReport(query);
-            delete query;
-            break;
-          }
-          default:
-            delete static_cast<common::api::reports::ReportQuery<
-                common::api::reports::ReportResult> *>(queryPtr);
-            break;
-          }
+      if (cmd->command == common::cmd::OrderCommandType::BINARY_DATA_QUERY) {
+        // Match Java:
+        // deserializeQuery(bytesIn).flatMap(reportQueriesHandler::handleReport).ifPresent(...)
+        if (reportQueriesHandler_) {
+          // Read class code and deserialize query
+          int32_t classCode = bytesIn.ReadInt();
+          common::api::reports::ReportType reportType =
+              common::api::reports::ReportTypeFromCode(classCode);
 
-          // ifPresent equivalent: if result is available, create binary events
-          // chain
-          if (result.has_value() && eventsHelper_) {
-            // Serialize result to bytes
-            std::vector<uint8_t> serializedBytes;
-            serializedBytes.reserve(128);
-            common::VectorBytesOut bytesOut(serializedBytes);
+          // Use factory to create report query
+          void *queryPtr =
+              common::api::reports::ReportQueryFactory::getInstance()
+                  .createQuery(reportType, bytesIn);
 
-            // Serialize based on type
+          if (queryPtr != nullptr) {
+            std::optional<std::unique_ptr<common::api::reports::ReportResult>>
+                result;
+
+            // Cast to appropriate type and process (flatMap equivalent)
             switch (reportType) {
             case common::api::reports::ReportType::STATE_HASH: {
-              auto *stateHashResult =
-                  static_cast<common::api::reports::StateHashReportResult *>(
-                      result.value().get());
-              stateHashResult->WriteMarshallable(bytesOut);
+              auto *query =
+                  static_cast<common::api::reports::StateHashReportQuery *>(
+                      queryPtr);
+              result = reportQueriesHandler_->HandleReport(query);
+              delete query;
               break;
             }
             case common::api::reports::ReportType::SINGLE_USER_REPORT: {
-              auto *singleUserResult =
-                  static_cast<common::api::reports::SingleUserReportResult *>(
-                      result.value().get());
-              singleUserResult->WriteMarshallable(bytesOut);
+              auto *query =
+                  static_cast<common::api::reports::SingleUserReportQuery *>(
+                      queryPtr);
+              result = reportQueriesHandler_->HandleReport(query);
+              delete query;
               break;
             }
             case common::api::reports::ReportType::TOTAL_CURRENCY_BALANCE: {
-              auto *totalCurrencyResult = static_cast<
-                  common::api::reports::TotalCurrencyBalanceReportResult *>(
-                  result.value().get());
-              totalCurrencyResult->WriteMarshallable(bytesOut);
+              auto *query = static_cast<
+                  common::api::reports::TotalCurrencyBalanceReportQuery *>(
+                  queryPtr);
+              result = reportQueriesHandler_->HandleReport(query);
+              delete query;
               break;
             }
             default:
+              delete static_cast<common::api::reports::ReportQuery<
+                  common::api::reports::ReportResult> *>(queryPtr);
               break;
             }
 
-            // Resize serializedBytes to actual written size (VectorBytesOut
-            // may have grown the vector beyond what was written)
-            serializedBytes.resize(bytesOut.GetPosition());
+            // ifPresent equivalent: if result is available, create binary
+            // events chain
+            if (result.has_value() && eventsHelper_) {
+              // Serialize result to bytes
+              std::vector<uint8_t> serializedBytes;
+              serializedBytes.reserve(128);
+              common::VectorBytesOut bytesOut(serializedBytes);
 
-            // Create binary events chain
-            common::MatcherTradeEvent *binaryEventsChain =
-                eventsHelper_->CreateBinaryEventsChain(cmd->timestamp, section_,
-                                                       serializedBytes);
+              // Serialize based on type
+              switch (reportType) {
+              case common::api::reports::ReportType::STATE_HASH: {
+                auto *stateHashResult =
+                    static_cast<common::api::reports::StateHashReportResult *>(
+                        result.value().get());
+                stateHashResult->WriteMarshallable(bytesOut);
+                break;
+              }
+              case common::api::reports::ReportType::SINGLE_USER_REPORT: {
+                auto *singleUserResult =
+                    static_cast<common::api::reports::SingleUserReportResult *>(
+                        result.value().get());
+                singleUserResult->WriteMarshallable(bytesOut);
+                break;
+              }
+              case common::api::reports::ReportType::TOTAL_CURRENCY_BALANCE: {
+                auto *totalCurrencyResult = static_cast<
+                    common::api::reports::TotalCurrencyBalanceReportResult *>(
+                    result.value().get());
+                totalCurrencyResult->WriteMarshallable(bytesOut);
+                break;
+              }
+              default:
+                break;
+              }
 
-            // Append events to command using atomic operation
-            if (binaryEventsChain != nullptr) {
-              utils::UnsafeUtils::AppendEventsVolatile(cmd, binaryEventsChain);
+              // Resize serializedBytes to actual written size (VectorBytesOut
+              // may have grown the vector beyond what was written)
+              serializedBytes.resize(bytesOut.GetPosition());
+
+              // Create binary events chain
+              common::MatcherTradeEvent *binaryEventsChain =
+                  eventsHelper_->CreateBinaryEventsChain(
+                      cmd->timestamp, section_, serializedBytes);
+
+              // Append events to command using atomic operation
+              if (binaryEventsChain != nullptr) {
+                utils::UnsafeUtils::AppendEventsVolatile(cmd,
+                                                         binaryEventsChain);
+              }
             }
           }
         }
-      }
-    } else if (cmd->command ==
-               common::cmd::OrderCommandType::BINARY_DATA_COMMAND) {
-      // Handle binary data command
-      // Read class code and deserialize command
-      int32_t classCode = bytesIn.ReadInt();
-      common::api::binary::BinaryCommandType commandType =
-          common::api::binary::BinaryCommandTypeFromCode(classCode);
+      } else if (cmd->command ==
+                 common::cmd::OrderCommandType::BINARY_DATA_COMMAND) {
+        // Handle binary data command
+        // Match Java: deserializeBinaryCommand(bytesIn)
+        int32_t classCode = bytesIn.ReadInt();
+        common::api::binary::BinaryCommandType commandType =
+            common::api::binary::BinaryCommandTypeFromCode(classCode);
 
-      // Use factory to create binary command
-      auto binaryCommand =
-          common::api::binary::BinaryDataCommandFactory::getInstance()
-              .createCommand(commandType, bytesIn);
+        // Use factory to create binary command
+        auto binaryCommand =
+            common::api::binary::BinaryDataCommandFactory::getInstance()
+                .createCommand(commandType, bytesIn);
 
-      if (completeMessagesHandler_ && binaryCommand) {
-        completeMessagesHandler_(binaryCommand.get());
+        // Match Java: completeMessagesHandler.accept(binaryDataCommand)
+        if (completeMessagesHandler_ && binaryCommand) {
+          completeMessagesHandler_(binaryCommand.get());
+        }
+      } else {
+        throw std::runtime_error("Invalid binary command type");
       }
+
+      delete record;
+      return common::cmd::CommandResultCode::SUCCESS;
     } else {
-      throw std::runtime_error("Invalid binary command type");
+      // More frames expected
+      return common::cmd::CommandResultCode::ACCEPTED;
     }
-
-    delete record;
-    return common::cmd::CommandResultCode::SUCCESS;
-  } else {
-    // More frames expected
-    return common::cmd::CommandResultCode::ACCEPTED;
+  } catch (const std::exception &ex) {
+    LOG_ERROR("[BinaryCommandsProcessor] Exception in AcceptBinaryFrame "
+              "transferId={} command={}: {}",
+              transferId, static_cast<int>(cmd->command), ex.what());
+    // Clean up record if it exists
+    auto it = incomingData_.find(transferId);
+    if (it != incomingData_.end()) {
+      delete static_cast<TransferRecord *>(it->second);
+      incomingData_.erase(transferId);
+    }
+    throw;
   }
 }
 

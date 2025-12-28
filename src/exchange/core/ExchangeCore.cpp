@@ -135,11 +135,18 @@ public:
     const int riskEnginesNum = perfCfg.riskEnginesNum;
 
     // 1. Serialization Processor
-    auto *dummyProcessor =
-        processors::journaling::DummySerializationProcessor::Instance();
-    serializationProcessor_ =
-        static_cast<processors::journaling::ISerializationProcessor *>(
-            dummyProcessor);
+    // Match Java: use serializationProcessorFactory from config
+    if (serializationCfg.serializationProcessorFactory) {
+      serializationProcessor_ = serializationCfg.serializationProcessorFactory(
+          exchangeConfiguration_);
+    } else {
+      // Fallback to dummy processor if factory not set
+      auto *dummyProcessor =
+          processors::journaling::DummySerializationProcessor::Instance();
+      serializationProcessor_ =
+          static_cast<processors::journaling::ISerializationProcessor *>(
+              dummyProcessor);
+    }
 
     // 2. Shared Pool
     const int poolInitialSize = (matchingEnginesNum + riskEnginesNum) * 8;

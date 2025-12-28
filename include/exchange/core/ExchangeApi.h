@@ -16,7 +16,10 @@
 
 #pragma once
 
+#include "common/BalanceAdjustmentType.h"
 #include "common/BytesIn.h"
+#include "common/OrderAction.h"
+#include "common/OrderType.h"
 #include "common/VectorBytesIn.h"
 #include "common/VectorBytesOut.h"
 #include "common/api/ApiCommand.h"
@@ -116,6 +119,79 @@ public:
    */
   virtual std::future<std::shared_ptr<common::L2MarketData>>
   RequestOrderBookAsync(int32_t symbolId, int32_t depth) = 0;
+
+  /**
+   * Grouping control (matches Java groupingControl)
+   * @param timestampNs Timestamp in nanoseconds
+   * @param mode Grouping mode (0 = disable, 1 = enable)
+   */
+  virtual void GroupingControl(int64_t timestampNs, int64_t mode) = 0;
+
+  /**
+   * Binary data (matches Java binaryData)
+   * Used for replaying BINARY_DATA_COMMAND from journal
+   * @param serviceFlags Service flags
+   * @param eventsGroup Events group
+   * @param timestampNs Timestamp in nanoseconds
+   * @param lastFlag Last flag (0 or -1)
+   * @param word0 Word 0
+   * @param word1 Word 1
+   * @param word2 Word 2
+   * @param word3 Word 3
+   * @param word4 Word 4
+   */
+  virtual void BinaryData(int32_t serviceFlags, int64_t eventsGroup,
+                          int64_t timestampNs, int8_t lastFlag, int64_t word0,
+                          int64_t word1, int64_t word2, int64_t word3,
+                          int64_t word4) = 0;
+
+  // Replay methods for journaling (with serviceFlags and eventsGroup)
+  // Match Java: placeNewOrder(serviceFlags, eventsGroup, timestampNs, ...)
+  virtual void PlaceOrderReplay(int32_t serviceFlags, int64_t eventsGroup,
+                                int64_t timestampNs, int64_t orderId,
+                                int32_t userCookie, int64_t price,
+                                int64_t reservedBidPrice, int64_t size,
+                                common::OrderAction action,
+                                common::OrderType orderType, int32_t symbol,
+                                int64_t uid) = 0;
+
+  // Match Java: moveOrder(serviceFlags, eventsGroup, timestampNs, ...)
+  virtual void MoveOrderReplay(int32_t serviceFlags, int64_t eventsGroup,
+                               int64_t timestampNs, int64_t price,
+                               int64_t orderId, int32_t symbol,
+                               int64_t uid) = 0;
+
+  // Match Java: cancelOrder(serviceFlags, eventsGroup, timestampNs, ...)
+  virtual void CancelOrderReplay(int32_t serviceFlags, int64_t eventsGroup,
+                                 int64_t timestampNs, int64_t orderId,
+                                 int32_t symbol, int64_t uid) = 0;
+
+  // Match Java: reduceOrder(serviceFlags, eventsGroup, timestampNs, ...)
+  virtual void ReduceOrderReplay(int32_t serviceFlags, int64_t eventsGroup,
+                                 int64_t timestampNs, int64_t reduceSize,
+                                 int64_t orderId, int32_t symbol,
+                                 int64_t uid) = 0;
+
+  // Match Java: balanceAdjustment(serviceFlags, eventsGroup, timestampNs, ...)
+  virtual void BalanceAdjustmentReplay(
+      int32_t serviceFlags, int64_t eventsGroup, int64_t timestampNs,
+      int64_t uid, int64_t transactionId, int32_t currency, int64_t longAmount,
+      common::BalanceAdjustmentType adjustmentType) = 0;
+
+  // Match Java: createUser(serviceFlags, eventsGroup, timestampNs, ...)
+  virtual void CreateUserReplay(int32_t serviceFlags, int64_t eventsGroup,
+                                int64_t timestampNs, int64_t userId) = 0;
+
+  // Match Java: suspendUser(serviceFlags, eventsGroup, timestampNs, ...)
+  virtual void SuspendUserReplay(int32_t serviceFlags, int64_t eventsGroup,
+                                 int64_t timestampNs, int64_t userId) = 0;
+
+  // Match Java: resumeUser(serviceFlags, eventsGroup, timestampNs, ...)
+  virtual void ResumeUserReplay(int32_t serviceFlags, int64_t eventsGroup,
+                                int64_t timestampNs, int64_t userId) = 0;
+
+  // Match Java: reset(timestampNs)
+  virtual void ResetReplay(int64_t timestampNs) = 0;
 };
 
 /**
@@ -188,6 +264,67 @@ public:
    */
   std::future<std::shared_ptr<common::L2MarketData>>
   RequestOrderBookAsync(int32_t symbolId, int32_t depth) override;
+
+  /**
+   * Grouping control (matches Java groupingControl)
+   * @param timestampNs Timestamp in nanoseconds
+   * @param mode Grouping mode (0 = disable, 1 = enable)
+   */
+  void GroupingControl(int64_t timestampNs, int64_t mode) override;
+
+  /**
+   * Binary data (matches Java binaryData)
+   * Used for replaying BINARY_DATA_COMMAND from journal
+   * @param serviceFlags Service flags
+   * @param eventsGroup Events group
+   * @param timestampNs Timestamp in nanoseconds
+   * @param lastFlag Last flag (0 or -1)
+   * @param word0 Word 0
+   * @param word1 Word 1
+   * @param word2 Word 2
+   * @param word3 Word 3
+   * @param word4 Word 4
+   */
+  void BinaryData(int32_t serviceFlags, int64_t eventsGroup,
+                  int64_t timestampNs, int8_t lastFlag, int64_t word0,
+                  int64_t word1, int64_t word2, int64_t word3,
+                  int64_t word4) override;
+
+  // Replay methods for journaling (with serviceFlags and eventsGroup)
+  void PlaceOrderReplay(int32_t serviceFlags, int64_t eventsGroup,
+                        int64_t timestampNs, int64_t orderId,
+                        int32_t userCookie, int64_t price,
+                        int64_t reservedBidPrice, int64_t size,
+                        common::OrderAction action, common::OrderType orderType,
+                        int32_t symbol, int64_t uid) override;
+
+  void MoveOrderReplay(int32_t serviceFlags, int64_t eventsGroup,
+                       int64_t timestampNs, int64_t price, int64_t orderId,
+                       int32_t symbol, int64_t uid) override;
+
+  void CancelOrderReplay(int32_t serviceFlags, int64_t eventsGroup,
+                         int64_t timestampNs, int64_t orderId, int32_t symbol,
+                         int64_t uid) override;
+
+  void ReduceOrderReplay(int32_t serviceFlags, int64_t eventsGroup,
+                         int64_t timestampNs, int64_t reduceSize,
+                         int64_t orderId, int32_t symbol, int64_t uid) override;
+
+  void BalanceAdjustmentReplay(
+      int32_t serviceFlags, int64_t eventsGroup, int64_t timestampNs,
+      int64_t uid, int64_t transactionId, int32_t currency, int64_t longAmount,
+      common::BalanceAdjustmentType adjustmentType) override;
+
+  void CreateUserReplay(int32_t serviceFlags, int64_t eventsGroup,
+                        int64_t timestampNs, int64_t userId) override;
+
+  void SuspendUserReplay(int32_t serviceFlags, int64_t eventsGroup,
+                         int64_t timestampNs, int64_t userId) override;
+
+  void ResumeUserReplay(int32_t serviceFlags, int64_t eventsGroup,
+                        int64_t timestampNs, int64_t userId) override;
+
+  void ResetReplay(int64_t timestampNs) override;
 
 private:
   disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>
