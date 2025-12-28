@@ -105,16 +105,22 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
   int64_t l2dataLastNs = 0;
   bool triggerL2DataRequest = false;
 
-  const int32_t tradeEventChainLengthTarget = sharedPool_->GetChainLength();
-  common::MatcherTradeEvent *tradeEventHead = nullptr;
-  common::MatcherTradeEvent *tradeEventTail = nullptr;
-  int32_t tradeEventCounter = 0;
-
   bool groupingEnabled = true;
 
   // Use OrderBookEventsHelper::EVENTS_POOLING to match Java behavior
   constexpr bool EVENTS_POOLING =
       orderbook::OrderBookEventsHelper::EVENTS_POOLING;
+
+  // Event chain collection variables (only used when EVENTS_POOLING is true)
+  common::MatcherTradeEvent *tradeEventHead = nullptr;
+  common::MatcherTradeEvent *tradeEventTail = nullptr;
+  int32_t tradeEventCounter = 0;
+  int32_t tradeEventChainLengthTarget = 0;
+  if constexpr (EVENTS_POOLING) {
+    if (sharedPool_ != nullptr) {
+      tradeEventChainLengthTarget = sharedPool_->GetChainLength();
+    }
+  }
 
   // Performance optimization: Use thread_local epoch to reduce time conversion
   // overhead This avoids calling time_since_epoch() repeatedly, using relative
@@ -178,7 +184,8 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
           // cleaning attached events
           // Match Java: if (EVENTS_POOLING && cmd.matcherEvent != null)
           if constexpr (EVENTS_POOLING) {
-            if (cmd->matcherEvent != nullptr) {
+            if (cmd->matcherEvent != nullptr && sharedPool_ != nullptr &&
+                tradeEventChainLengthTarget > 0) {
               // update tail
               if (tradeEventTail == nullptr) {
                 tradeEventHead = cmd->matcherEvent;
@@ -202,6 +209,10 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
                 tradeEventTail = nullptr;
                 tradeEventHead = nullptr;
               }
+            } else if (cmd->matcherEvent != nullptr) {
+              // EVENTS_POOLING is true but sharedPool_ is nullptr or
+              // tradeEventChainLengthTarget is 0, delete chain to prevent leak
+              SharedPool::DeleteChain(cmd->matcherEvent);
             }
           } else {
             // When EVENTS_POOLING is false, delete event chains to prevent

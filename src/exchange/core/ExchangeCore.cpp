@@ -35,6 +35,7 @@
 #include <exchange/core/common/config/ExchangeConfiguration.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
+#include <exchange/core/orderbook/OrderBookEventsHelper.h>
 #include <exchange/core/processors/DisruptorExceptionHandler.h>
 #include <exchange/core/processors/GroupingProcessor.h>
 #include <exchange/core/processors/MatchingEngineRouter.h>
@@ -150,7 +151,10 @@ public:
 
     // 2. Shared Pool
     const int poolInitialSize = (matchingEnginesNum + riskEnginesNum) * 8;
-    const int chainLength = false ? 1024 : 1; // EVENTS_POOLING
+    // Use OrderBookEventsHelper::EVENTS_POOLING to determine chain length
+    constexpr bool EVENTS_POOLING =
+        orderbook::OrderBookEventsHelper::EVENTS_POOLING;
+    const int chainLength = EVENTS_POOLING ? 1024 : 1;
     sharedPool_ = std::make_unique<processors::SharedPool>(
         poolInitialSize * 4, poolInitialSize, chainLength);
 
