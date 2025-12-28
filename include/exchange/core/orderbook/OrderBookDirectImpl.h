@@ -18,10 +18,14 @@
 
 #include "../collections/art/LongAdaptiveRadixTreeMap.h"
 #include "../common/CoreSymbolSpecification.h"
+#include "../common/IOrder.h"
+#include "../common/MatcherTradeEvent.h"
 #include "../common/Order.h"
+#include "../common/cmd/OrderCommand.h"
 #include "../common/config/LoggingConfiguration.h"
 #include "IOrderBook.h"
 #include "OrderBookEventsHelper.h"
+#include <algorithm>
 #include <cstdint>
 #include <vector>
 
@@ -46,7 +50,7 @@ public:
     int32_t numOrders = 0;   // Number of orders at this price level
   };
 
-  struct DirectOrder : public common::IOrder,
+  struct DirectOrder : public common::IOrderBase<DirectOrder>,
                        public common::WriteBytesMarshallable,
                        public common::StateHash {
     int64_t orderId = 0; // Unique order identifier
@@ -76,15 +80,17 @@ public:
      */
     DirectOrder(common::BytesIn &bytes);
 
-    // IOrder interface
-    int64_t GetOrderId() const override { return orderId; }
-    int64_t GetPrice() const override { return price; }
-    int64_t GetSize() const override { return size; }
-    int64_t GetFilled() const override { return filled; }
-    int64_t GetReserveBidPrice() const override { return reserveBidPrice; }
-    common::OrderAction GetAction() const override { return action; }
-    int64_t GetUid() const override { return uid; }
-    int64_t GetTimestamp() const override { return timestamp; }
+    // CRTP methods - used by IOrderBase<DirectOrder> for compile-time
+    // polymorphism These are non-virtual methods, eliminating virtual function
+    // overhead in hot paths
+    int64_t GetOrderId() const { return orderId; }
+    int64_t GetPrice() const { return price; }
+    int64_t GetSize() const { return size; }
+    int64_t GetFilled() const { return filled; }
+    int64_t GetReserveBidPrice() const { return reserveBidPrice; }
+    common::OrderAction GetAction() const { return action; }
+    int64_t GetUid() const { return uid; }
+    int64_t GetTimestamp() const { return timestamp; }
 
     // StateHash interface
     int32_t GetStateHash() const override;
@@ -175,12 +181,125 @@ private:
   Bucket *GetOrCreateBucket(int64_t price, bool isAsk);
   Bucket *RemoveOrder(DirectOrder *order);
   void insertOrder(DirectOrder *order, Bucket *freeBucket);
+  // Template function for hot path - uses CRTP, no virtual function overhead
+  // Accepts any type that implements IOrderBase<Self> or has direct field
+  // access
+  template <typename OrderT>
+  int64_t tryMatchInstantly(OrderT *takerOrder,
+                            common::cmd::OrderCommand *triggerCmd);
+
+  // Legacy overload for backward compatibility (non-hot path)
+  // Delegates to template version
   int64_t tryMatchInstantly(common::IOrder *takerOrder,
                             common::cmd::OrderCommand *triggerCmd);
   int64_t checkBudgetToFill(common::OrderAction action, int64_t size);
   bool isBudgetLimitSatisfied(common::OrderAction orderAction,
                               int64_t calculated, int64_t limit);
 };
+
+// Template implementation of tryMatchInstantly - uses CRTP, no virtual function
+// overhead
+template <typename OrderT>
+int64_t
+OrderBookDirectImpl::tryMatchInstantly(OrderT *takerOrder,
+                                       common::cmd::OrderCommand *triggerCmd) {
+  // Use CRTP methods from IOrderBase<OrderT> - compile-time polymorphism
+  const bool isBidAction = takerOrder->GetAction() == common::OrderAction::BID;
+  // For FOK_BUDGET ASK orders, use 0 as limitPrice to match all available bids
+  const int64_t limitPrice =
+      (triggerCmd->command == common::cmd::OrderCommandType::PLACE_ORDER &&
+       triggerCmd->orderType == common::OrderType::FOK_BUDGET && !isBidAction)
+          ? 0L
+          : takerOrder->GetPrice();
+
+  DirectOrder *makerOrder;
+  if (isBidAction) {
+    makerOrder = bestAskOrder_;
+    if (makerOrder == nullptr || makerOrder->price > limitPrice) {
+      return takerOrder->GetFilled();
+    }
+  } else {
+    makerOrder = bestBidOrder_;
+    if (makerOrder == nullptr || makerOrder->price < limitPrice) {
+      return takerOrder->GetFilled();
+    }
+  }
+
+  int64_t remainingSize = takerOrder->GetSize() - takerOrder->GetFilled();
+  if (remainingSize == 0)
+    return takerOrder->GetFilled();
+
+  DirectOrder *priceBucketTail = makerOrder->bucket->lastOrder;
+  common::MatcherTradeEvent *eventsTail = nullptr;
+
+  const int64_t takerReserveBidPrice = takerOrder->GetReserveBidPrice();
+
+  do {
+    const int64_t tradeSize =
+        std::min(remainingSize, makerOrder->size - makerOrder->filled);
+    makerOrder->filled += tradeSize;
+    makerOrder->bucket->totalVolume -= tradeSize;
+    remainingSize -= tradeSize;
+
+    const bool makerCompleted = (makerOrder->size == makerOrder->filled);
+    if (makerCompleted) {
+      makerOrder->bucket->numOrders--;
+    }
+
+    const int64_t bidderHoldPrice =
+        isBidAction ? takerReserveBidPrice : makerOrder->reserveBidPrice;
+    // Use adapter to convert DirectOrder* to IOrder* for non-hot path interface
+    common::IOrderAdapter<DirectOrder> adapter(makerOrder);
+    common::MatcherTradeEvent *tradeEvent = eventsHelper_->SendTradeEvent(
+        &adapter, makerCompleted, remainingSize == 0, tradeSize,
+        bidderHoldPrice);
+
+    if (eventsTail == nullptr) {
+      triggerCmd->matcherEvent = tradeEvent;
+    } else {
+      eventsTail->nextEvent = tradeEvent;
+    }
+    eventsTail = tradeEvent;
+
+    if (!makerCompleted)
+      break;
+
+    orderIdIndex_.Remove(makerOrder->orderId);
+    DirectOrder *toRecycle = makerOrder;
+
+    if (makerOrder == priceBucketTail) {
+      auto &buckets = isBidAction ? askPriceBuckets_ : bidPriceBuckets_;
+      buckets.Remove(makerOrder->price);
+      objectsPool_->Put(
+          ::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
+          makerOrder->bucket);
+
+      if (makerOrder->prev != nullptr) {
+        priceBucketTail = makerOrder->prev->bucket->lastOrder;
+      }
+    }
+
+    makerOrder = makerOrder->prev;
+    objectsPool_->Put(
+        ::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER,
+        toRecycle);
+
+  } while (makerOrder != nullptr && remainingSize > 0 &&
+           (isBidAction ? makerOrder->price <= limitPrice
+                        : makerOrder->price >= limitPrice));
+
+  if (makerOrder != nullptr) {
+    makerOrder->next = nullptr;
+  }
+
+  if (isBidAction) {
+    bestAskOrder_ = makerOrder;
+  } else {
+    bestBidOrder_ = makerOrder;
+  }
+
+  return takerOrder->GetSize() - remainingSize;
+}
 
 } // namespace orderbook
 } // namespace core

@@ -36,7 +36,10 @@ namespace common {
  * No external references allowed to such object - order objects only live
  * inside OrderBook.
  */
-class Order : public IOrder, public StateHash, public WriteBytesMarshallable {
+class Order : public IOrderBase<Order>,
+              public IOrder,
+              public StateHash,
+              public WriteBytesMarshallable {
 public:
   int64_t orderId = 0;
   int64_t price = 0;

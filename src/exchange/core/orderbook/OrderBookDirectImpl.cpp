@@ -235,7 +235,9 @@ CommandResultCode OrderBookDirectImpl::MoveOrder(OrderCommand *cmd) {
   cmd->action = orderToMove->action;
 
   const int64_t filled =
-      this->tryMatchInstantly(static_cast<common::IOrder *>(orderToMove), cmd);
+      // Use template version directly - orderToMove is DirectOrder*, no need
+      // for virtual call
+      this->tryMatchInstantly(orderToMove, cmd);
   if (filled == orderToMove->size) {
     orderIdIndex_.Remove(cmd->orderId);
     objectsPool_->Put(
@@ -294,15 +296,23 @@ CommandResultCode OrderBookDirectImpl::ReduceOrder(OrderCommand *cmd) {
   } else {
     order->size -= reduceBy;
     order->bucket->totalVolume -= reduceBy;
-    cmd->matcherEvent = eventsHelper_->SendReduceEvent(order, reduceBy, false);
+    // Use adapter to convert DirectOrder* to IOrder* for non-hot path interface
+    common::IOrderAdapter<DirectOrder> adapter(order);
+    cmd->matcherEvent =
+        eventsHelper_->SendReduceEvent(&adapter, reduceBy, false);
     cmd->action = order->action;
   }
   return CommandResultCode::SUCCESS;
 }
 
+// Legacy overload for backward compatibility - delegates to template version
+// This is for non-hot paths that use IOrder* (e.g., from other OrderBook
+// implementations)
 int64_t OrderBookDirectImpl::tryMatchInstantly(common::IOrder *takerOrder,
                                                OrderCommand *triggerCmd) {
-  const bool isBidAction = takerOrder->GetAction() == OrderAction::BID;
+  // For IOrder*, we need to use virtual functions (non-hot path)
+  // In hot paths, use template version directly with DirectOrder*
+  const bool isBidAction = takerOrder->GetAction() == common::OrderAction::BID;
   // For FOK_BUDGET ASK orders, use 0 as limitPrice to match all available bids
   const int64_t limitPrice =
       (triggerCmd->command == common::cmd::OrderCommandType::PLACE_ORDER &&
@@ -346,8 +356,10 @@ int64_t OrderBookDirectImpl::tryMatchInstantly(common::IOrder *takerOrder,
 
     const int64_t bidderHoldPrice =
         isBidAction ? takerReserveBidPrice : makerOrder->reserveBidPrice;
+    // Use adapter to convert DirectOrder* to IOrder* for non-hot path interface
+    common::IOrderAdapter<DirectOrder> adapter(makerOrder);
     MatcherTradeEvent *tradeEvent = eventsHelper_->SendTradeEvent(
-        makerOrder, makerCompleted, remainingSize == 0, tradeSize,
+        &adapter, makerCompleted, remainingSize == 0, tradeSize,
         bidderHoldPrice);
 
     if (eventsTail == nullptr) {
@@ -579,7 +591,21 @@ std::vector<common::Order *> OrderBookDirectImpl::FindUserOrders(int64_t uid) {
 }
 
 common::IOrder *OrderBookDirectImpl::GetOrderById(int64_t orderId) {
-  return orderIdIndex_.Get(orderId);
+  DirectOrder *order = orderIdIndex_.Get(orderId);
+  if (order == nullptr) {
+    return nullptr;
+  }
+  // WARNING: This returns a pointer to a thread-local adapter.
+  // The adapter is valid only for the current thread and only during the
+  // current call. Callers must not store this pointer or use it across threads.
+  // For proper memory management, consider changing IOrderBook interface to
+  // return DirectOrder* or use std::variant, or allocate adapter on heap (but
+  // then caller must delete).
+  static thread_local common::IOrderAdapter<DirectOrder> adapter(nullptr);
+  // Re-initialize adapter with current order
+  adapter = common::IOrderAdapter<DirectOrder>(order);
+  return const_cast<common::IOrder *>(
+      static_cast<const common::IOrder *>(&adapter));
 }
 
 void OrderBookDirectImpl::ValidateInternalState() {
@@ -794,7 +820,9 @@ void OrderBookDirectImpl::ProcessAskOrders(
   // bestAskOrder and traverses via prev pointer
   DirectOrder *current = bestAskOrder_;
   while (current != nullptr) {
-    consumer(current);
+    // Use adapter to convert DirectOrder* to IOrder* for callback
+    common::IOrderAdapter<DirectOrder> adapter(current);
+    consumer(&adapter);
     current = current->prev;
   }
 }
@@ -805,7 +833,9 @@ void OrderBookDirectImpl::ProcessBidOrders(
   // bestBidOrder and traverses via prev pointer
   DirectOrder *current = bestBidOrder_;
   while (current != nullptr) {
-    consumer(current);
+    // Use adapter to convert DirectOrder* to IOrder* for callback
+    common::IOrderAdapter<DirectOrder> adapter(current);
+    consumer(&adapter);
     current = current->prev;
   }
 }
