@@ -306,6 +306,15 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
 
     } catch (const disruptor::AlertException &ex) {
       if (running_.load() != RUNNING) {
+        // Put remaining event chain back to pool before halting
+        if constexpr (EVENTS_POOLING) {
+          if (tradeEventHead != nullptr && sharedPool_ != nullptr) {
+            sharedPool_->PutChain(tradeEventHead);
+            tradeEventHead = nullptr;
+            tradeEventTail = nullptr;
+            tradeEventCounter = 0;
+          }
+        }
         break;
       }
     } catch (...) {
