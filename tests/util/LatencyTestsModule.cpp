@@ -18,6 +18,7 @@
 #include "ExchangeTestContainer.h"
 #include "LatencyTools.h"
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <exchange/core/utils/Logger.h>
@@ -115,50 +116,61 @@ void LatencyTestsModule::LatencyTestImpl(
           .count();
     };
 
-    // Match Java: container.setConsumer((cmd, seq) -> { ...
-    // latchBenchmark.countDown(); });
-    container->SetConsumer(
-        [&latencies, &latenciesMutex, &latchBenchmark, getNanoTime](
-            exchange::core::common::cmd::OrderCommand *cmd, int64_t seq) {
-          if (cmd && cmd->timestamp > 0) {
-            // Match Java: final long latency = System.nanoTime() -
-            // cmd.timestamp;
-            // cmd->timestamp stores absolute nanoseconds (matching Java
-            // System.nanoTime() - absolute time)
-            auto nowNs = getNanoTime();
-            // Latency = current absolute time (ns) - command absolute timestamp
-            // (ns)
-            auto latency = nowNs - cmd->timestamp;
-            std::lock_guard<std::mutex> lock(latenciesMutex);
-            latencies.push_back(latency);
-          }
-          // Match Java: latchBenchmark.countDown();
-          latchBenchmark.countDown();
-        });
+    // Match Java: final AtomicLong orderProgressCounter = new
+    // AtomicLong(0);
+    std::atomic<int64_t> orderProgressCounter{0};
+
+    // Match Java: container.setConsumer((cmd, seq) -> {
+    //     orderProgressCounter.lazySet(cmd.timestamp);
+    //     final long latency = System.nanoTime() - cmd.timestamp;
+    //     ...
+    // });
+    container->SetConsumer([&latencies, &latenciesMutex, &latchBenchmark,
+                            &orderProgressCounter, getNanoTime](
+                               exchange::core::common::cmd::OrderCommand *cmd,
+                               int64_t seq) {
+      if (cmd && cmd->timestamp > 0) {
+        // Match Java: orderProgressCounter.lazySet(cmd.timestamp);
+        // Use relaxed memory order (equivalent to Java lazySet)
+        orderProgressCounter.store(cmd->timestamp, std::memory_order_relaxed);
+
+        // Match Java: final long latency = System.nanoTime() -
+        // cmd.timestamp;
+        auto nowNs = getNanoTime();
+        // Latency = current absolute time (ns) - command absolute timestamp
+        // (ns)
+        auto latency = nowNs - cmd->timestamp;
+        std::lock_guard<std::mutex> lock(latenciesMutex);
+        latencies.push_back(latency);
+      }
+      // Match Java: latchBenchmark.countDown();
+      latchBenchmark.countDown();
+    });
 
     const int nanosPerCmd = 1'000'000'000 / tps;
     auto startTime = std::chrono::steady_clock::now();
 
-    // Match Java: long plannedTimestamp = System.nanoTime();
-    // Use absolute nanoseconds (matching Java System.nanoTime() - absolute
-    // time)
-    int64_t plannedTimestampNs = getNanoTime();
-
     // Match Java: for (ApiCommand cmd :
     // genResult.getApiCommandsBenchmark().join())
+    // Match Java: long t = System.nanoTime();
+    //           cmd.timestamp = t;
+    //           api.submitCommand(cmd);
+    //           while (orderProgressCounter.get() != t) {
+    //               // spin until command is processed
+    //           }
     for (auto *cmd : benchmarkCommands) {
-      // Match Java: while (System.nanoTime() < plannedTimestamp) { }
-      // Directly compare nanoseconds (matching Java behavior)
-      while (getNanoTime() < plannedTimestampNs) {
+      // Match Java: long t = System.nanoTime();
+      int64_t t = getNanoTime();
+      // Match Java: cmd.timestamp = t;
+      cmd->timestamp = t;
+      // Match Java: api.submitCommand(cmd);
+      container->GetApi()->SubmitCommand(cmd);
+      // Match Java: while (orderProgressCounter.get() != t) {
+      //               // spin until command is processed
+      //           }
+      while (orderProgressCounter.load(std::memory_order_relaxed) != t) {
         std::this_thread::yield();
       }
-      // Match Java: cmd.timestamp = plannedTimestamp;
-      // Store absolute nanoseconds (matching Java System.nanoTime() - absolute
-      // time, not relative)
-      // OrderCommand.timestamp is int64_t, can store nanosecondsp
-      cmd->timestamp = plannedTimestampNs;
-      container->GetApi()->SubmitCommand(cmd);
-      plannedTimestampNs += nanosPerCmd; // Increment absolute timestamp
     }
 
     // Match Java: latchBenchmark.await();
@@ -280,50 +292,61 @@ void LatencyTestsModule::LatencyTestImpl(
           .count();
     };
 
-    // Match Java: container.setConsumer((cmd, seq) -> { ...
-    // latchBenchmark.countDown(); });
-    container->SetConsumer(
-        [&latencies, &latenciesMutex, &latchBenchmark, getNanoTime](
-            exchange::core::common::cmd::OrderCommand *cmd, int64_t seq) {
-          if (cmd && cmd->timestamp > 0) {
-            // Match Java: final long latency = System.nanoTime() -
-            // cmd.timestamp;
-            // cmd->timestamp stores absolute nanoseconds (matching Java
-            // System.nanoTime() - absolute time)
-            auto nowNs = getNanoTime();
-            // Latency = current absolute time (ns) - command absolute timestamp
-            // (ns)
-            auto latency = nowNs - cmd->timestamp;
-            std::lock_guard<std::mutex> lock(latenciesMutex);
-            latencies.push_back(latency);
-          }
-          // Match Java: latchBenchmark.countDown();
-          latchBenchmark.countDown();
-        });
+    // Match Java: final AtomicLong orderProgressCounter = new
+    // AtomicLong(0);
+    std::atomic<int64_t> orderProgressCounter{0};
+
+    // Match Java: container.setConsumer((cmd, seq) -> {
+    //     orderProgressCounter.lazySet(cmd.timestamp);
+    //     final long latency = System.nanoTime() - cmd.timestamp;
+    //     ...
+    // });
+    container->SetConsumer([&latencies, &latenciesMutex, &latchBenchmark,
+                            &orderProgressCounter, getNanoTime](
+                               exchange::core::common::cmd::OrderCommand *cmd,
+                               int64_t seq) {
+      if (cmd && cmd->timestamp > 0) {
+        // Match Java: orderProgressCounter.lazySet(cmd.timestamp);
+        // Use relaxed memory order (equivalent to Java lazySet)
+        orderProgressCounter.store(cmd->timestamp, std::memory_order_relaxed);
+
+        // Match Java: final long latency = System.nanoTime() -
+        // cmd.timestamp;
+        auto nowNs = getNanoTime();
+        // Latency = current absolute time (ns) - command absolute timestamp
+        // (ns)
+        auto latency = nowNs - cmd->timestamp;
+        std::lock_guard<std::mutex> lock(latenciesMutex);
+        latencies.push_back(latency);
+      }
+      // Match Java: latchBenchmark.countDown();
+      latchBenchmark.countDown();
+    });
 
     const int nanosPerCmd = 1'000'000'000 / tps;
     auto startTime = std::chrono::steady_clock::now();
 
-    // Match Java: long plannedTimestamp = System.nanoTime();
-    // Use absolute nanoseconds (matching Java System.nanoTime() - absolute
-    // time)
-    int64_t plannedTimestampNs = getNanoTime();
-
     // Match Java: for (ApiCommand cmd :
     // genResult.getApiCommandsBenchmark().join())
+    // Match Java: long t = System.nanoTime();
+    //           cmd.timestamp = t;
+    //           api.submitCommand(cmd);
+    //           while (orderProgressCounter.get() != t) {
+    //               // spin until command is processed
+    //           }
     for (auto *cmd : benchmarkCommands) {
-      // Match Java: while (System.nanoTime() < plannedTimestamp) { }
-      // Directly compare nanoseconds (matching Java behavior)
-      while (getNanoTime() < plannedTimestampNs) {
+      // Match Java: long t = System.nanoTime();
+      int64_t t = getNanoTime();
+      // Match Java: cmd.timestamp = t;
+      cmd->timestamp = t;
+      // Match Java: api.submitCommand(cmd);
+      container->GetApi()->SubmitCommand(cmd);
+      // Match Java: while (orderProgressCounter.get() != t) {
+      //               // spin until command is processed
+      //           }
+      while (orderProgressCounter.load(std::memory_order_relaxed) != t) {
         std::this_thread::yield();
       }
-      // Match Java: cmd.timestamp = plannedTimestamp;
-      // Store absolute nanoseconds (matching Java System.nanoTime() - absolute
-      // time, not relative)
-      // OrderCommand.timestamp is int64_t, can store nanoseconds
-      cmd->timestamp = plannedTimestampNs;
-      container->GetApi()->SubmitCommand(cmd);
-      plannedTimestampNs += nanosPerCmd; // Increment absolute timestamp
     }
 
     // Match Java: latchBenchmark.await();
