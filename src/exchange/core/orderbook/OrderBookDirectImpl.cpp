@@ -17,7 +17,6 @@
 #include "exchange/core/orderbook/OrderBookDirectImpl.h"
 #include "exchange/core/collections/objpool/ObjectsPool.h"
 #include "exchange/core/common/L2MarketData.h"
-#include "exchange/core/common/MatcherTradeEvent.h"
 #include "exchange/core/common/OrderAction.h"
 #include "exchange/core/common/OrderType.h"
 #include "exchange/core/common/cmd/OrderCommand.h"
