@@ -27,7 +27,7 @@ namespace core {
 namespace orderbook {
 
 OrderBookEventsHelper::OrderBookEventsHelper(EventFactory factory)
-    : eventFactory_(std::move(factory)) {}
+    : eventFactory_(std::move(factory)), eventsChainHead_(nullptr) {}
 
 common::MatcherTradeEvent *
 OrderBookEventsHelper::SendTradeEvent(const common::IOrder *matchingOrder,
@@ -104,7 +104,20 @@ void OrderBookEventsHelper::AttachRejectEvent(common::cmd::OrderCommand *cmd,
 
 ::exchange::core::common::MatcherTradeEvent *
 OrderBookEventsHelper::NewMatcherEvent() {
-  return eventFactory_();
+  if constexpr (EVENTS_POOLING) {
+    // Match Java: consume nodes from current chain sequentially
+    if (eventsChainHead_ == nullptr) {
+      // Chain exhausted, get new chain from SharedPool
+      eventsChainHead_ = eventFactory_();
+    }
+    // Return current head and advance to next node
+    common::MatcherTradeEvent *res = eventsChainHead_;
+    eventsChainHead_ = eventsChainHead_->nextEvent;
+    return res;
+  } else {
+    // Not using pooling, create new event
+    return eventFactory_();
+  }
 }
 
 common::MatcherTradeEvent *OrderBookEventsHelper::CreateBinaryEventsChain(

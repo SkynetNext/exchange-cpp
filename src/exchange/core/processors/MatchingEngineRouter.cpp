@@ -56,10 +56,15 @@ MatchingEngineRouter::MatchingEngineRouter(
   }
 
   // Create OrderBookEventsHelper with SharedPool
+  // Note: EVENTS_POOLING is a constexpr constant, so the code path is
+  // determined at compile time
   if (sharedPool != nullptr) {
+    // When using SharedPool, factory returns chains and we consume nodes
+    // sequentially
     eventsHelper_ = std::make_unique<orderbook::OrderBookEventsHelper>(
         [sharedPool]() { return sharedPool->GetChain(); });
   } else {
+    // Not using pooling, factory returns single events
     eventsHelper_ = std::make_unique<orderbook::OrderBookEventsHelper>();
   }
 

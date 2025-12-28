@@ -35,13 +35,23 @@ namespace orderbook {
 
 /**
  * Helper class for creating and managing MatcherTradeEvent chains
- * Simplified version without object pooling for now
+ * Match Java: OrderBookEventsHelper with EVENTS_POOLING support
  */
 class OrderBookEventsHelper {
 public:
+  // Enable MatcherTradeEvent pooling (matches Java EVENTS_POOLING)
+  // Set to true to enable SharedPool-based event pooling
+  static constexpr bool EVENTS_POOLING = true;
+
   // Factory function type for creating events
   using EventFactory = std::function<common::MatcherTradeEvent *()>;
 
+  /**
+   * Constructor
+   * @param factory Factory function for creating events
+   * When EVENTS_POOLING is true, factory should return chains from SharedPool.
+   * When EVENTS_POOLING is false, factory should return single events.
+   */
   explicit OrderBookEventsHelper(EventFactory factory = []() {
     return new common::MatcherTradeEvent();
   });
@@ -88,6 +98,10 @@ public:
 
 private:
   EventFactory eventFactory_;
+  // Current chain head for event pooling (matches Java eventsChainHead)
+  // When EVENTS_POOLING is true, we maintain a current chain and consume nodes
+  // sequentially
+  common::MatcherTradeEvent *eventsChainHead_ = nullptr;
 
   common::MatcherTradeEvent *NewMatcherEvent();
 };
