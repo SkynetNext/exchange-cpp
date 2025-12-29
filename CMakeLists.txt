@@ -20,6 +20,23 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
 endif()
 
+# Enable Link Time Optimization (LTO) for Release builds
+# LTO can provide 10-30% performance improvement by enabling cross-module inlining
+# and better optimization across translation units
+include(CheckIPOSupported)
+check_ipo_supported(RESULT IPO_SUPPORTED OUTPUT error LANGUAGES CXX)
+
+if(IPO_SUPPORTED)
+    # Enable LTO for Release builds
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+    message(STATUS "Link Time Optimization (LTO) is ENABLED for Release builds")
+    message(STATUS "  Note: LTO will significantly increase build time and memory usage")
+    message(STATUS "  Expected performance improvement: 10-30% (especially for P90 latency)")
+else()
+    message(WARNING "Link Time Optimization (LTO) is NOT supported: ${error}")
+    message(WARNING "  LTO requires CMake 3.9+ and a compatible compiler (GCC 4.9+, Clang 3.9+)")
+endif()
+
 # Find dependencies
 find_package(Threads REQUIRED)
 
@@ -198,6 +215,13 @@ add_library(exchange-cpp STATIC
     ${EXCHANGE_SOURCES}
 )
 
+# Enable LTO for exchange-cpp target if supported
+if(IPO_SUPPORTED)
+    set_target_properties(exchange-cpp PROPERTIES
+        INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+    )
+endif()
+
 # Include directories - use target_include_directories for better IDE support
 target_include_directories(exchange-cpp
     PUBLIC
@@ -302,6 +326,11 @@ message(STATUS "")
 message(STATUS "========== Exchange-CPP Configuration ==========")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ standard: ${CMAKE_CXX_STANDARD}")
+if(IPO_SUPPORTED)
+    message(STATUS "Link Time Optimization (LTO): ENABLED")
+else()
+    message(STATUS "Link Time Optimization (LTO): DISABLED")
+endif()
 message(STATUS "Build tests: ${BUILD_TESTING}")
 message(STATUS "Build benchmarks: ${BUILD_BENCHMARKS}")
 message(STATUS "Build examples: ${BUILD_EXAMPLES}")
