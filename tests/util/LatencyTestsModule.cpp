@@ -227,13 +227,11 @@ void LatencyTestsModule::LatencyTestImpl(
     // Output latency breakdown statistics
     utils::LatencyBreakdown::SetEnabled(true);
     auto stats = utils::LatencyBreakdown::GetStatistics();
-    LOG_INFO("exchange_core") << "=== Latency Breakdown Statistics ===";
+    LOG_INFO("=== Latency Breakdown Statistics ===");
     for (const auto &[stage, percentiles] : stats) {
-      LOG_INFO("exchange_core") << stage << ": P50=" << percentiles[0] << "ns "
-                                << "P90=" << percentiles[1] << "ns "
-                                << "P95=" << percentiles[2] << "ns "
-                                << "P99=" << percentiles[3] << "ns "
-                                << "P99.9=" << percentiles[4] << "ns";
+      LOG_INFO("{}: P50={}ns P90={}ns P95={}ns P99={}ns P99.9={}ns", stage,
+               percentiles[0], percentiles[1], percentiles[2], percentiles[3],
+               percentiles[4]);
     }
     utils::LatencyBreakdown::Clear();
 #endif
