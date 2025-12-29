@@ -128,11 +128,22 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           utils::LatencyBreakdown::Record(
               cmd, nextSequence, utils::LatencyBreakdown::Stage::R1_START);
 #endif
-          bool forcedPublish = eventHandler_->OnEvent(nextSequence, cmd);
+          bool forcedPublish = false;
+          try {
+            forcedPublish = eventHandler_->OnEvent(nextSequence, cmd);
 #ifdef ENABLE_LATENCY_BREAKDOWN
-          utils::LatencyBreakdown::Record(
-              cmd, nextSequence, utils::LatencyBreakdown::Stage::R1_END);
+            utils::LatencyBreakdown::Record(
+                cmd, nextSequence, utils::LatencyBreakdown::Stage::R1_END);
 #endif
+          } catch (...) {
+            // Record R1_END even on exception to maintain correct latency
+            // statistics
+#ifdef ENABLE_LATENCY_BREAKDOWN
+            utils::LatencyBreakdown::Record(
+                cmd, nextSequence, utils::LatencyBreakdown::Stage::R1_END);
+#endif
+            throw; // Re-throw to outer catch block
+          }
           nextSequence++;
 
           if (forcedPublish) {

@@ -184,11 +184,21 @@ void MatchingEngineRouter::ProcessOrder(int64_t seq,
       utils::LatencyBreakdown::Record(cmd, seq,
                                       utils::LatencyBreakdown::Stage::ME_START);
 #endif
-      ProcessMatchingCommand(cmd);
+      try {
+        ProcessMatchingCommand(cmd);
 #ifdef ENABLE_LATENCY_BREAKDOWN
-      utils::LatencyBreakdown::Record(cmd, seq,
-                                      utils::LatencyBreakdown::Stage::ME_END);
+        utils::LatencyBreakdown::Record(cmd, seq,
+                                        utils::LatencyBreakdown::Stage::ME_END);
 #endif
+      } catch (...) {
+        // Record ME_END even on exception to maintain correct latency
+        // statistics
+#ifdef ENABLE_LATENCY_BREAKDOWN
+        utils::LatencyBreakdown::Record(cmd, seq,
+                                        utils::LatencyBreakdown::Stage::ME_END);
+#endif
+        throw; // Re-throw exception
+      }
     }
     return;
   }
