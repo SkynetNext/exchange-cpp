@@ -141,8 +141,10 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
 
       if (nextSequence <= availableSequence) {
         // Update sequence every N messages to avoid long batch delays
-        constexpr int64_t SEQUENCE_UPDATE_INTERVAL =
-            10; // Update every 10 messages
+        // Target: 1µs delay = 1000ns
+        // GROUPING processing: ~50ns per message
+        // Calculation: 1000ns / 50ns = 20 messages
+        constexpr int64_t SEQUENCE_UPDATE_INTERVAL = 20;
         int64_t processedCount = 0;
         int64_t lastPublishedSequence = sequence_.get();
 
