@@ -17,7 +17,6 @@
 #pragma once
 
 #include "../common/MatcherTradeEvent.h"
-#include <atomic>
 #include <cstdint>
 #include <memory>
 
@@ -88,11 +87,11 @@ public:
 private:
   // Lock-free concurrent queue for high-performance event chain management
   // Replaces std::queue + std::mutex with lock-free implementation
-  // Note: moodycamel::ConcurrentQueue is unbounded, but we enforce poolMaxSize_
-  // by tracking queue size with atomic counter and deleting chains when full.
+  // Note: moodycamel::ConcurrentQueue is unbounded for maximum performance.
+  // poolMaxSize_ is kept for API compatibility but not enforced (matches Java
+  // behavior where offer() return value is ignored).
   moodycamel::ConcurrentQueue<common::MatcherTradeEvent *> eventChainsBuffer_;
-  std::atomic<int32_t> queueSize_; // Track queue size to enforce poolMaxSize_
-  int32_t poolMaxSize_;
+  int32_t poolMaxSize_; // Kept for API compatibility, not enforced
   int32_t chainLength_;
 };
 

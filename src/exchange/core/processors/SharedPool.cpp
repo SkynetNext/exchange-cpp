@@ -28,7 +28,7 @@ std::unique_ptr<SharedPool> SharedPool::CreateTestSharedPool() {
 
 SharedPool::SharedPool(int32_t poolMaxSize, int32_t poolInitialSize,
                        int32_t chainLength)
-    : queueSize_(0), poolMaxSize_(poolMaxSize), chainLength_(chainLength) {
+    : poolMaxSize_(poolMaxSize), chainLength_(chainLength) {
   if (poolInitialSize > poolMaxSize) {
     throw std::invalid_argument("too big poolInitialSize");
   }
@@ -38,7 +38,6 @@ SharedPool::SharedPool(int32_t poolMaxSize, int32_t poolInitialSize,
     common::MatcherTradeEvent *chain =
         common::MatcherTradeEvent::CreateEventChain(chainLength);
     eventChainsBuffer_.enqueue(chain);
-    queueSize_.fetch_add(1, std::memory_order_relaxed);
   }
 }
 
@@ -46,7 +45,6 @@ common::MatcherTradeEvent *SharedPool::GetChain() {
   common::MatcherTradeEvent *head = nullptr;
   // Lock-free try_dequeue - much faster than mutex-based approach
   if (eventChainsBuffer_.try_dequeue(head)) {
-    queueSize_.fetch_sub(1, std::memory_order_relaxed);
     return head;
   }
   // Pool is empty, create new chain
@@ -58,19 +56,11 @@ void SharedPool::PutChain(common::MatcherTradeEvent *head) {
     return;
   }
 
-  // Match Java: LinkedBlockingQueue.offer() - bounded queue behavior
-  // Check if queue is full before enqueueing
-  int32_t currentSize = queueSize_.load(std::memory_order_relaxed);
-  if (currentSize >= poolMaxSize_) {
-    // Queue is full, delete chain instead of enqueueing (match Java behavior)
-    // In Java, offer() returns false and chain is discarded (GC will reclaim)
-    DeleteChain(head);
-    return;
-  }
-
-  // Enqueue chain and update size counter
+  // Match Java: LinkedBlockingQueue.offer() behavior
+  // Java version ignores offer() return value, so we also use unbounded queue
+  // for maximum performance. Unbounded queue performs better under high load
+  // (see PERFORMANCE_BENCHMARK_COMPARISON.md).
   eventChainsBuffer_.enqueue(head);
-  queueSize_.fetch_add(1, std::memory_order_relaxed);
 }
 
 void SharedPool::DeleteChain(common::MatcherTradeEvent *head) {
@@ -82,7 +72,6 @@ SharedPool::~SharedPool() {
   common::MatcherTradeEvent *chain = nullptr;
   while (eventChainsBuffer_.try_dequeue(chain)) {
     DeleteChain(chain);
-    queueSize_.fetch_sub(1, std::memory_order_relaxed);
   }
 }
 
