@@ -56,8 +56,10 @@ void LatencyBreakdown::Record(common::cmd::OrderCommand *cmd, int64_t seq,
   auto &record = (*threadRecords_)[seq];
 
   if (stage == Stage::SUBMIT) {
-    record.submitTimeNs = cmd->timestamp;
-    record.stageTimes[stageIdx] = cmd->timestamp;
+    // SUBMIT stage: record actual submission time (not cmd->timestamp which is
+    // business timestamp)
+    record.submitTimeNs = nowNs;
+    record.stageTimes[stageIdx] = nowNs;
     record.hasStage[stageIdx] = true;
   } else {
     record.stageTimes[stageIdx] = nowNs;
