@@ -115,8 +115,11 @@ OrderBookEventsHelper::NewMatcherEvent() {
       }
     }
     // Return current head and advance to next node
+    // CRITICAL: Clear nextEvent to avoid chain corruption when this node is
+    // used
     common::MatcherTradeEvent *res = eventsChainHead_;
     eventsChainHead_ = eventsChainHead_->nextEvent;
+    res->nextEvent = nullptr; // Clear nextEvent to break the chain link
     return res;
   } else {
     // Not using pooling, create new event
