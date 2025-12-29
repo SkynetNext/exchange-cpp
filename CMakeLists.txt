@@ -8,7 +8,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Compiler flags for performance
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native -mtune=native")
+    # Enable LTO with parallel processing for faster link time
+    # -flto=auto: Use all available CPU cores for LTO optimization
+    # This reduces the "serial compilation" warnings and speeds up linking
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native -mtune=native -flto=auto")
     set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -DDEBUG -fsanitize=address")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     set(CMAKE_CXX_FLAGS_RELEASE "/O2 /DNDEBUG")
