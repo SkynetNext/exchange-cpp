@@ -175,13 +175,16 @@ void LatencyBreakdown::Clear() {
   }
 
   // Clear all thread records (requires lock)
+  // Note: Do NOT clear allThreadRecords_ vector itself, only clear the data
+  // in each thread's map. This preserves the thread-local storage pointers
+  // so that subsequent iterations can continue to collect statistics.
   std::lock_guard<std::mutex> lock(mergeMutex_);
   for (auto *records : allThreadRecords_) {
     if (records != nullptr) {
       records->clear();
     }
   }
-  allThreadRecords_.clear();
+  // Do not clear allThreadRecords_ - keep the pointers for next iteration
 }
 
 } // namespace utils

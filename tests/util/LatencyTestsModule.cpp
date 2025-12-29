@@ -225,13 +225,16 @@ void LatencyTestsModule::LatencyTestImpl(
 
 #ifdef ENABLE_LATENCY_BREAKDOWN
     // Output latency breakdown statistics
-    utils::LatencyBreakdown::SetEnabled(true);
     auto stats = utils::LatencyBreakdown::GetStatistics();
     LOG_INFO("=== Latency Breakdown Statistics ===");
-    for (const auto &[stage, percentiles] : stats) {
-      LOG_INFO("{}: P50={}ns P90={}ns P95={}ns P99={}ns P99.9={}ns", stage,
-               percentiles[0], percentiles[1], percentiles[2], percentiles[3],
-               percentiles[4]);
+    if (stats.empty()) {
+      LOG_INFO("No latency breakdown data collected");
+    } else {
+      for (const auto &[stage, percentiles] : stats) {
+        LOG_INFO("{}: P50={}ns P90={}ns P95={}ns P99={}ns P99.9={}ns", stage,
+                 percentiles[0], percentiles[1], percentiles[2], percentiles[3],
+                 percentiles[4]);
+      }
     }
     utils::LatencyBreakdown::Clear();
 #endif
