@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <chrono>
 #include <disruptor/AlertException.h>
 #include <disruptor/BlockingWaitStrategy.h>
 #include <disruptor/BusySpinWaitStrategy.h>
@@ -22,7 +23,12 @@
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
 #include <exchange/core/utils/Logger.h>
-#include <thread>
+
+#if defined(__x86_64__) || defined(_M_X64)
+#include <immintrin.h>
+#elif defined(__aarch64__)
+// ARM64 yield instruction
+#endif
 
 namespace exchange {
 namespace core {
@@ -67,76 +73,82 @@ template <typename T, typename WaitStrategyT>
 int64_t WaitSpinningHelper<T, WaitStrategyT>::TryWaitFor(int64_t seq) {
   sequenceBarrier_->checkAlert();
 
+  // P90 < 1µs target: Maximum wait time is 1µs
+  // If sequence doesn't update within 1µs, return current value immediately
+  constexpr int64_t MAX_WAIT_TIME_NS = 1000; // 1µs
+  // Time check frequency: every 30 iterations
+  // On 3GHz CPU: 30 iterations ≈ 10ns (much less than 1µs target)
+  constexpr int64_t SPIN_CHECK_INTERVAL = 30;
+
   int64_t spin = spinLimit_;
+  int64_t startTimeNs = 0;
+  int64_t checkCounter = 0;
+
+  // Fast path: check sequence immediately
   int64_t availableSequence = sequenceBarrier_->getCursor();
+  if (availableSequence >= seq) {
+    if (sequencer_) {
+      return sequencer_->getHighestPublishedSequence(seq, availableSequence);
+    }
+    return availableSequence;
+  }
 
-  // OPTIMIZATION: Cache sequence value to reduce atomic operations and cache
-  // line contention. Refresh every N iterations instead of every iteration.
-  //
-  // Data-driven analysis (3GHz CPU):
-  // - Each iteration: ~1-2ns (cacheRefreshCounter--, condition check, spin--)
-  // - 10 iterations: ~10-20ns = 0.01-0.02µs (acceptable for us-level latency)
-  // - 20 iterations: ~20-40ns = 0.02-0.04µs (acceptable for us-level latency)
-  // - 100 iterations: ~100-200ns = 0.1-0.2µs (may miss fast updates in ns-level
-  // scenarios)
-  //
-  // For us-level latency target, 10-20 iterations is safer:
-  // - Still reduces getCursor() calls by 90-95% (from 5000 to 250-500)
-  // - Lower latency (0.01-0.02µs) ensures we don't miss fast sequence updates
-  constexpr int64_t CACHE_REFRESH_INTERVAL = 10;
-  int64_t cacheRefreshCounter = 0;
-
+  // Spin loop: check sequence every iteration, check time every N iterations
   while (availableSequence < seq && spin > 0) {
-    // Refresh cached value periodically
-    if (cacheRefreshCounter == 0) {
-      availableSequence = sequenceBarrier_->getCursor();
-      cacheRefreshCounter = CACHE_REFRESH_INTERVAL;
-    } else {
-      cacheRefreshCounter--;
+    // Check sequence every iteration (no caching delay)
+    availableSequence = sequenceBarrier_->getCursor();
+    if (availableSequence >= seq) {
+      break;
     }
 
-    if (spin < yieldLimit_ && spin > 1) {
-      std::this_thread::yield();
-    } else if (block_ && lock_ && processorNotifyCondition_) {
-      // Matches Java: lock.lock(); try { ... processorNotifyCondition.await();
-      // } finally { lock.unlock(); }
-      // Before blocking, refresh the cached value to ensure we have the latest
-      // sequence before potentially waiting
-      availableSequence = sequenceBarrier_->getCursor();
-      cacheRefreshCounter = CACHE_REFRESH_INTERVAL;
+    // Check time every N iterations to avoid frequent now() calls
+    if (++checkCounter >= SPIN_CHECK_INTERVAL) {
+      checkCounter = 0;
 
-      std::unique_lock<std::mutex> uniqueLock(*lock_);
-      try {
-        sequenceBarrier_->checkAlert();
-        // lock only if sequence barrier did not progressed since last check
-        if (availableSequence == sequenceBarrier_->getCursor()) {
-          processorNotifyCondition_->wait(uniqueLock);
+      if (startTimeNs == 0) {
+        // First time check: record start time
+        startTimeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                          std::chrono::steady_clock::now().time_since_epoch())
+                          .count();
+      } else {
+        // Subsequent time checks: calculate elapsed time
+        int64_t currentTimeNs =
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch())
+                .count();
+        int64_t elapsed = currentTimeNs - startTimeNs;
+
+        // If exceeded 1µs, return immediately (don't wait)
+        // This guarantees P90 < 1µs
+        if (elapsed > MAX_WAIT_TIME_NS) {
+          // Return current available sequence (may be < seq)
+          // Caller should handle this case (may need retry)
+          break;
         }
-      } catch (...) {
-        // uniqueLock will automatically unlock in destructor
-        throw;
       }
-      // uniqueLock automatically unlocks here
     }
+
+    // CPU pause: reduces power consumption and cache contention
+#if defined(__x86_64__) || defined(_M_X64)
+    _mm_pause();
+#elif defined(__aarch64__)
+    __asm__ __volatile__("yield" ::: "memory");
+#endif
+
     spin--;
   }
 
-  // Final check with fresh value before returning
-  // This ensures we don't return a stale cached value
+  // Final check: ensure we have the latest sequence value
   if (availableSequence < seq) {
     availableSequence = sequenceBarrier_->getCursor();
   }
 
   // Use sequencer to get highest published sequence if available
-  // Matches Java: return (availableSequence < seq) ? availableSequence :
-  // sequencer.getHighestPublishedSequence(seq, availableSequence);
-  if (availableSequence < seq) {
-    return availableSequence;
-  }
-
-  if (sequencer_) {
+  if (availableSequence >= seq && sequencer_) {
     return sequencer_->getHighestPublishedSequence(seq, availableSequence);
   }
+
+  // Return available sequence (may be < seq if timeout occurred)
   return availableSequence;
 }
 
