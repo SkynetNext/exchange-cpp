@@ -140,10 +140,17 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
       int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
 
       if (nextSequence <= availableSequence) {
+        // Update sequence every N messages to avoid long batch delays
+        constexpr int64_t SEQUENCE_UPDATE_INTERVAL =
+            10; // Update every 10 messages
+        int64_t processedCount = 0;
+        int64_t lastPublishedSequence = sequence_.get();
+
         while (nextSequence <= availableSequence) {
           common::cmd::OrderCommand *cmd = &ringBuffer_->get(nextSequence);
           int64_t currentSeq = nextSequence;
           nextSequence++;
+          processedCount++;
 
 #ifdef ENABLE_LATENCY_BREAKDOWN
           utils::LatencyBreakdown::Record(
@@ -164,6 +171,13 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
             utils::LatencyBreakdown::Record(
                 cmd, currentSeq, utils::LatencyBreakdown::Stage::GROUPING_END);
 #endif
+            // Update sequence periodically even for disabled grouping
+            if (processedCount >= SEQUENCE_UPDATE_INTERVAL) {
+              sequence_.set(currentSeq);
+              waitSpinningHelper_->SignalAllWhenBlocking();
+              lastPublishedSequence = currentSeq;
+              processedCount = 0;
+            }
             continue;
           }
 
@@ -272,9 +286,21 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
           utils::LatencyBreakdown::Record(
               cmd, currentSeq, utils::LatencyBreakdown::Stage::GROUPING_END);
 #endif
+
+          // Update sequence periodically to avoid long batch delays
+          // This allows downstream processors (R1) to start processing earlier
+          if (processedCount >= SEQUENCE_UPDATE_INTERVAL) {
+            sequence_.set(currentSeq);
+            waitSpinningHelper_->SignalAllWhenBlocking();
+            lastPublishedSequence = currentSeq;
+            processedCount = 0;
+          }
         }
-        sequence_.set(availableSequence);
-        waitSpinningHelper_->SignalAllWhenBlocking();
+        // Update sequence for any remaining messages
+        if (processedCount > 0 || lastPublishedSequence < availableSequence) {
+          sequence_.set(availableSequence);
+          waitSpinningHelper_->SignalAllWhenBlocking();
+        }
         // Performance optimization: Use relative time calculation to reduce
         // conversion overhead
         auto now = std::chrono::steady_clock::now();
