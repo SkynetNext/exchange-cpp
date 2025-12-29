@@ -117,7 +117,8 @@ LatencyBreakdown::GetBreakdown(int64_t seq) {
   return {};
 }
 
-std::map<std::string, std::vector<int64_t>> LatencyBreakdown::GetStatistics() {
+std::vector<std::pair<std::string, std::vector<int64_t>>>
+LatencyBreakdown::GetStatistics() {
   // Merge all thread-local records (requires lock, but only during statistics)
   std::lock_guard<std::mutex> lock(mergeMutex_);
 
@@ -166,7 +167,8 @@ std::map<std::string, std::vector<int64_t>> LatencyBreakdown::GetStatistics() {
   }
 
   // Calculate percentiles for each stage
-  std::map<std::string, std::vector<int64_t>> result;
+  // Use map to collect by stage index, then convert to vector in index order
+  std::map<int, std::vector<int64_t>> stagePercentiles;
   auto getPercentile = [](std::vector<int64_t> &values,
                           double percentile) -> int64_t {
     if (values.empty()) {
@@ -190,8 +192,14 @@ std::map<std::string, std::vector<int64_t>> LatencyBreakdown::GetStatistics() {
       percentiles.push_back(getPercentile(sorted, 95.0)); // P95
       percentiles.push_back(getPercentile(sorted, 99.0)); // P99
       percentiles.push_back(getPercentile(sorted, 99.9)); // P99.9
-      result[StageNames[stageIdx]] = percentiles;
+      stagePercentiles[stageIdx] = percentiles;
     }
+  }
+
+  // Convert to vector in stage index order (so START comes before END)
+  std::vector<std::pair<std::string, std::vector<int64_t>>> result;
+  for (const auto &[stageIdx, percentiles] : stagePercentiles) {
+    result.emplace_back(StageNames[stageIdx], percentiles);
   }
 
   return result;

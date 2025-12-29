@@ -19,7 +19,6 @@
 #include "../common/cmd/OrderCommand.h"
 #include <chrono>
 #include <cstdint>
-#include <map>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -89,9 +88,11 @@ public:
 
   /**
    * Collect statistics for all recorded commands
-   * Returns map: stage_name -> {P50, P90, P95, P99, P99.9} in nanoseconds
+   * Returns vector of pairs: (stage_name, {P50, P90, P95, P99, P99.9}) in
+   * nanoseconds Ordered by stage index (so START comes before END)
    */
-  static std::map<std::string, std::vector<int64_t>> GetStatistics();
+  static std::vector<std::pair<std::string, std::vector<int64_t>>>
+  GetStatistics();
 
   /**
    * Clear all recorded data
