@@ -43,7 +43,7 @@ public:
   // Set to true to enable SharedPool-based event pooling
   // NOTE: Currently disabled due to complexity - Java version also has this
   // disabled
-  static constexpr bool EVENTS_POOLING = true;
+  static constexpr bool EVENTS_POOLING = false;
 
   // Factory function type for creating events
   using EventFactory = std::function<common::MatcherTradeEvent *()>;
