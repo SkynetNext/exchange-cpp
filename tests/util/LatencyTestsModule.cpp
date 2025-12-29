@@ -22,6 +22,7 @@
 #include <climits>
 #include <condition_variable>
 #include <ctime>
+#include <exchange/core/utils/LatencyBreakdown.h>
 #include <exchange/core/utils/Logger.h>
 #include <iomanip>
 #include <map>
@@ -144,6 +145,12 @@ void LatencyTestsModule::LatencyTestImpl(
     // Match Java: final long startTimeMs = System.currentTimeMillis();
     auto startTimeMs = getCurrentTimeMillis();
 
+#ifdef ENABLE_LATENCY_BREAKDOWN
+    // Enable latency breakdown recording
+    utils::LatencyBreakdown::SetEnabled(true);
+    utils::LatencyBreakdown::Clear();
+#endif
+
     // Match Java: long plannedTimestamp = System.nanoTime();
     int64_t plannedTimestamp = getNanoTime();
 
@@ -215,6 +222,21 @@ void LatencyTestsModule::LatencyTestImpl(
     int64_t p99_9 = getPercentile(99.9);
     int64_t p99_99 = getPercentile(99.99);
     int64_t maxLatency = latencies.empty() ? 0 : latencies.back();
+
+#ifdef ENABLE_LATENCY_BREAKDOWN
+    // Output latency breakdown statistics
+    utils::LatencyBreakdown::SetEnabled(true);
+    auto stats = utils::LatencyBreakdown::GetStatistics();
+    LOG_INFO("exchange_core") << "=== Latency Breakdown Statistics ===";
+    for (const auto &[stage, percentiles] : stats) {
+      LOG_INFO("exchange_core") << stage << ": P50=" << percentiles[0] << "ns "
+                                << "P90=" << percentiles[1] << "ns "
+                                << "P95=" << percentiles[2] << "ns "
+                                << "P99=" << percentiles[3] << "ns "
+                                << "P99.9=" << percentiles[4] << "ns";
+    }
+    utils::LatencyBreakdown::Clear();
+#endif
 
     // Match Java: log.info("{} {}", tag,
     // LatencyTools.createLatencyReportFast(histogram));

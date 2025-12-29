@@ -21,6 +21,7 @@
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/processors/TwoStepSlaveProcessor.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
+#include <exchange/core/utils/LatencyBreakdown.h>
 #include <exchange/core/utils/Logger.h>
 
 namespace exchange {
@@ -87,7 +88,18 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
       while (nextSequence_ <= availableSequence &&
              nextSequence_ < processUpToSequence) {
         event = &ringBuffer_->get(nextSequence_);
+#ifdef ENABLE_LATENCY_BREAKDOWN
+        // Check if this is R2 (name starts with "R2")
+        if (name_.find("R2") == 0) {
+          utils::LatencyBreakdown::Record(event, nextSequence_, utils::LatencyBreakdown::Stage::R2_START);
+        }
+#endif
         eventHandler_->OnEvent(nextSequence_, event);
+#ifdef ENABLE_LATENCY_BREAKDOWN
+        if (name_.find("R2") == 0) {
+          utils::LatencyBreakdown::Record(event, nextSequence_, utils::LatencyBreakdown::Stage::R2_END);
+        }
+#endif
         nextSequence_++;
       }
 

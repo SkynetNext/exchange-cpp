@@ -27,6 +27,7 @@
 #include <exchange/core/processors/GroupingProcessor.h>
 #include <exchange/core/processors/SharedPool.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
+#include <exchange/core/utils/LatencyBreakdown.h>
 #include <exchange/core/utils/Logger.h>
 
 namespace exchange {
@@ -141,8 +142,13 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
       if (nextSequence <= availableSequence) {
         while (nextSequence <= availableSequence) {
           common::cmd::OrderCommand *cmd = &ringBuffer_->get(nextSequence);
-
+          int64_t currentSeq = nextSequence;
           nextSequence++;
+
+#ifdef ENABLE_LATENCY_BREAKDOWN
+          utils::LatencyBreakdown::Record(
+              cmd, currentSeq, utils::LatencyBreakdown::Stage::GROUPING_START);
+#endif
 
           if (cmd->command == common::cmd::OrderCommandType::GROUPING_CONTROL) {
             groupingEnabled = (cmd->orderId == 1);
@@ -255,6 +261,11 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
             groupCounter++;
             msgsInGroup = 0;
           }
+
+#ifdef ENABLE_LATENCY_BREAKDOWN
+          utils::LatencyBreakdown::Record(
+              cmd, currentSeq, utils::LatencyBreakdown::Stage::GROUPING_END);
+#endif
         }
         sequence_.set(availableSequence);
         waitSpinningHelper_->SignalAllWhenBlocking();

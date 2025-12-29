@@ -47,6 +47,7 @@
 #include <exchange/core/common/cmd/OrderCommandType.h>
 #include <exchange/core/orderbook/OrderBookEventsHelper.h>
 #include <exchange/core/processors/BinaryCommandsProcessor.h>
+#include <exchange/core/utils/LatencyBreakdown.h>
 #include <exchange/core/utils/Logger.h>
 #include <exchange/core/utils/SerializationUtils.h>
 #include <functional>
@@ -321,6 +322,58 @@ void ExchangeApi<WaitStrategyT>::ProcessResult(int64_t seq,
 
 template <typename WaitStrategyT>
 void ExchangeApi<WaitStrategyT>::SubmitCommand(common::api::ApiCommand *cmd) {
+#ifdef ENABLE_LATENCY_BREAKDOWN
+  // Get sequence manually to record timestamp
+  int64_t seq = ringBuffer_->next();
+  auto &event = ringBuffer_->get(seq);
+
+  // Translate command
+  if (auto *placeOrder = dynamic_cast<common::api::ApiPlaceOrder *>(cmd)) {
+    NEW_ORDER_TRANSLATOR.translateTo(event, seq, *placeOrder);
+  } else if (auto *moveOrder = dynamic_cast<common::api::ApiMoveOrder *>(cmd)) {
+    MOVE_ORDER_TRANSLATOR.translateTo(event, seq, *moveOrder);
+  } else if (auto *cancelOrder =
+                 dynamic_cast<common::api::ApiCancelOrder *>(cmd)) {
+    CANCEL_ORDER_TRANSLATOR.translateTo(event, seq, *cancelOrder);
+  } else if (auto *reduceOrder =
+                 dynamic_cast<common::api::ApiReduceOrder *>(cmd)) {
+    REDUCE_ORDER_TRANSLATOR.translateTo(event, seq, *reduceOrder);
+  } else if (auto *orderBookRequest =
+                 dynamic_cast<common::api::ApiOrderBookRequest *>(cmd)) {
+    ORDER_BOOK_REQUEST_TRANSLATOR.translateTo(event, seq, *orderBookRequest);
+  } else if (auto *addUser = dynamic_cast<common::api::ApiAddUser *>(cmd)) {
+    ADD_USER_TRANSLATOR.translateTo(event, seq, *addUser);
+  } else if (auto *suspendUser =
+                 dynamic_cast<common::api::ApiSuspendUser *>(cmd)) {
+    SUSPEND_USER_TRANSLATOR.translateTo(event, seq, *suspendUser);
+  } else if (auto *resumeUser =
+                 dynamic_cast<common::api::ApiResumeUser *>(cmd)) {
+    RESUME_USER_TRANSLATOR.translateTo(event, seq, *resumeUser);
+  } else if (auto *adjustBalance =
+                 dynamic_cast<common::api::ApiAdjustUserBalance *>(cmd)) {
+    ADJUST_USER_BALANCE_TRANSLATOR.translateTo(event, seq, *adjustBalance);
+  } else if (auto *reset = dynamic_cast<common::api::ApiReset *>(cmd)) {
+    RESET_TRANSLATOR.translateTo(event, seq, *reset);
+  } else if (auto *nop = dynamic_cast<common::api::ApiNop *>(cmd)) {
+    NOP_TRANSLATOR.translateTo(event, seq, *nop);
+  } else if (auto *binaryData =
+                 dynamic_cast<common::api::ApiBinaryDataCommand *>(cmd)) {
+    PublishBinaryData(binaryData, [](int64_t) {});
+    return;
+  } else if (auto *persistState =
+                 dynamic_cast<common::api::ApiPersistState *>(cmd)) {
+    PublishPersistCmd(persistState, [](int64_t, int64_t) {});
+    return;
+  } else {
+    throw std::invalid_argument("Unsupported command type");
+  }
+
+  // Record timestamp after translation, before publish
+  utils::LatencyBreakdown::Record(
+      &event, seq, utils::LatencyBreakdown::Stage::RING_BUFFER_PUBLISH);
+  ringBuffer_->publish(seq);
+#else
+  // Use publishEvent for normal path (no timestamp recording needed)
   if (auto *placeOrder = dynamic_cast<common::api::ApiPlaceOrder *>(cmd)) {
     ringBuffer_->publishEvent(NEW_ORDER_TRANSLATOR, *placeOrder);
   } else if (auto *moveOrder = dynamic_cast<common::api::ApiMoveOrder *>(cmd)) {
@@ -358,6 +411,7 @@ void ExchangeApi<WaitStrategyT>::SubmitCommand(common::api::ApiCommand *cmd) {
   } else {
     throw std::invalid_argument("Unsupported command type");
   }
+#endif
 }
 
 template <typename WaitStrategyT>

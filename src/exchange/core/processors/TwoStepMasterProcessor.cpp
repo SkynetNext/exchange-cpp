@@ -23,6 +23,7 @@
 #include <exchange/core/processors/TwoStepMasterProcessor.h>
 #include <exchange/core/processors/TwoStepSlaveProcessor.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
+#include <exchange/core/utils/LatencyBreakdown.h>
 #include <exchange/core/utils/Logger.h>
 #include <thread>
 
@@ -123,7 +124,15 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           }
           // Match Java: direct call without inner try-catch
           // Exception will be caught by outer catch block
+#ifdef ENABLE_LATENCY_BREAKDOWN
+          utils::LatencyBreakdown::Record(
+              cmd, nextSequence, utils::LatencyBreakdown::Stage::R1_START);
+#endif
           bool forcedPublish = eventHandler_->OnEvent(nextSequence, cmd);
+#ifdef ENABLE_LATENCY_BREAKDOWN
+          utils::LatencyBreakdown::Record(
+              cmd, nextSequence, utils::LatencyBreakdown::Stage::R1_END);
+#endif
           nextSequence++;
 
           if (forcedPublish) {

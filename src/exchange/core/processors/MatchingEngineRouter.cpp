@@ -29,6 +29,7 @@
 #include <exchange/core/processors/MatchingEngineRouter.h>
 #include <exchange/core/processors/SharedPool.h>
 #include <exchange/core/processors/journaling/DiskSerializationProcessorConfiguration.h>
+#include <exchange/core/utils/LatencyBreakdown.h>
 #include <exchange/core/utils/SerializationUtils.h>
 #include <exchange/core/utils/UnsafeUtils.h>
 #include <stdexcept>
@@ -179,7 +180,15 @@ void MatchingEngineRouter::ProcessOrder(int64_t seq,
       command == common::cmd::OrderCommandType::ORDER_BOOK_REQUEST) {
     // Process specific symbol group only
     if (SymbolForThisHandler(cmd->symbol)) {
+#ifdef ENABLE_LATENCY_BREAKDOWN
+      utils::LatencyBreakdown::Record(cmd, seq,
+                                      utils::LatencyBreakdown::Stage::ME_START);
+#endif
       ProcessMatchingCommand(cmd);
+#ifdef ENABLE_LATENCY_BREAKDOWN
+      utils::LatencyBreakdown::Record(cmd, seq,
+                                      utils::LatencyBreakdown::Stage::ME_END);
+#endif
     }
     return;
   }
