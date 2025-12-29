@@ -124,6 +124,12 @@ std::map<std::string, std::vector<int64_t>> LatencyBreakdown::GetStatistics() {
   for (auto *records : allThreadRecords_) {
     if (records != nullptr) {
       for (const auto &[seq, record] : *records) {
+        // Skip records without SUBMIT stage (can't calculate relative
+        // latencies)
+        if (record.submitTimeNs == 0) {
+          continue;
+        }
+
         int64_t lastTimeNs = record.submitTimeNs;
         for (int i = 0; i < static_cast<int>(Stage::MAX_STAGES); i++) {
           if (record.hasStage[i]) {
