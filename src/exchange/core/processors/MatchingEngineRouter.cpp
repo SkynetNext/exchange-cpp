@@ -180,20 +180,20 @@ void MatchingEngineRouter::ProcessOrder(int64_t seq,
       command == common::cmd::OrderCommandType::ORDER_BOOK_REQUEST) {
     // Process specific symbol group only
     if (SymbolForThisHandler(cmd->symbol)) {
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
       utils::LatencyBreakdown::Record(cmd, seq,
                                       utils::LatencyBreakdown::Stage::ME_START);
 #endif
       try {
         ProcessMatchingCommand(cmd);
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
         utils::LatencyBreakdown::Record(cmd, seq,
                                         utils::LatencyBreakdown::Stage::ME_END);
 #endif
       } catch (...) {
         // Record ME_END even on exception to maintain correct latency
         // statistics
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
         utils::LatencyBreakdown::Record(cmd, seq,
                                         utils::LatencyBreakdown::Stage::ME_END);
 #endif

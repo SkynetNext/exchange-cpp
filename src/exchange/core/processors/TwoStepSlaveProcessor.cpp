@@ -98,7 +98,7 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
         event = &ringBuffer_->get(nextSequence_);
         processedCount++;
         bool isR2 = false;
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
         // Check if this is R2 (name starts with "R2")
         isR2 = (name_.find("R2") == 0);
         if (isR2) {
@@ -108,7 +108,7 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
 #endif
         try {
           eventHandler_->OnEvent(nextSequence_, event);
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
           if (isR2) {
             utils::LatencyBreakdown::Record(
                 event, nextSequence_, utils::LatencyBreakdown::Stage::R2_END);
@@ -117,7 +117,7 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
         } catch (...) {
           // Record R2_END even on exception to maintain correct latency
           // statistics
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
           if (isR2) {
             utils::LatencyBreakdown::Record(
                 event, nextSequence_, utils::LatencyBreakdown::Stage::R2_END);

@@ -322,7 +322,7 @@ void ExchangeApi<WaitStrategyT>::ProcessResult(int64_t seq,
 
 template <typename WaitStrategyT>
 void ExchangeApi<WaitStrategyT>::SubmitCommand(common::api::ApiCommand *cmd) {
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
   // Get sequence manually to record timestamp
   int64_t seq = ringBuffer_->next();
   auto &event = ringBuffer_->get(seq);

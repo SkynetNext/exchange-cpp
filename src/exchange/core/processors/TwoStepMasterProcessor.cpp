@@ -133,21 +133,21 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           }
           // Match Java: direct call without inner try-catch
           // Exception will be caught by outer catch block
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
           utils::LatencyBreakdown::Record(
               cmd, nextSequence, utils::LatencyBreakdown::Stage::R1_START);
 #endif
           bool forcedPublish = false;
           try {
             forcedPublish = eventHandler_->OnEvent(nextSequence, cmd);
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
             utils::LatencyBreakdown::Record(
                 cmd, nextSequence, utils::LatencyBreakdown::Stage::R1_END);
 #endif
           } catch (...) {
             // Record R1_END even on exception to maintain correct latency
             // statistics
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
             utils::LatencyBreakdown::Record(
                 cmd, nextSequence, utils::LatencyBreakdown::Stage::R1_END);
 #endif

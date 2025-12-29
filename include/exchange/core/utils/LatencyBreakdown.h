@@ -24,6 +24,11 @@
 #include <unordered_map>
 #include <vector>
 
+// Define ENABLE_LATENCY_BREAKDOWN if not already defined (default: false)
+#ifndef ENABLE_LATENCY_BREAKDOWN
+#define ENABLE_LATENCY_BREAKDOWN 0
+#endif
+
 namespace exchange {
 namespace core {
 namespace utils {
@@ -32,7 +37,7 @@ namespace utils {
  * LatencyBreakdown - Records timestamps at each processing stage
  *
  * Usage:
- *   #ifdef ENABLE_LATENCY_BREAKDOWN
+ *   #if ENABLE_LATENCY_BREAKDOWN
  *   LatencyBreakdown::Record(cmd, seq, Stage::GROUPING_START);
  *   // ... process ...
  *   LatencyBreakdown::Record(cmd, seq, Stage::GROUPING_END);

@@ -154,7 +154,7 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
           nextSequence++;
           processedCount++;
 
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
           utils::LatencyBreakdown::Record(
               cmd, currentSeq, utils::LatencyBreakdown::Stage::GROUPING_START);
 #endif
@@ -167,7 +167,7 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
           if (!groupingEnabled) {
             cmd->matcherEvent = nullptr;
             cmd->marketData = nullptr;
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
             // Record GROUPING_END even when grouping is disabled to maintain
             // correct latency statistics
             utils::LatencyBreakdown::Record(
@@ -284,7 +284,7 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
             msgsInGroup = 0;
           }
 
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
           utils::LatencyBreakdown::Record(
               cmd, currentSeq, utils::LatencyBreakdown::Stage::GROUPING_END);
 #endif

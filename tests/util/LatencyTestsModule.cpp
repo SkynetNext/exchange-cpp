@@ -145,7 +145,7 @@ void LatencyTestsModule::LatencyTestImpl(
     // Match Java: final long startTimeMs = System.currentTimeMillis();
     auto startTimeMs = getCurrentTimeMillis();
 
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
     // Enable latency breakdown recording
     utils::LatencyBreakdown::SetEnabled(true);
     utils::LatencyBreakdown::Clear();
@@ -223,7 +223,7 @@ void LatencyTestsModule::LatencyTestImpl(
     int64_t p99_99 = getPercentile(99.99);
     int64_t maxLatency = latencies.empty() ? 0 : latencies.back();
 
-#ifdef ENABLE_LATENCY_BREAKDOWN
+#if ENABLE_LATENCY_BREAKDOWN
     // Output latency breakdown statistics
     auto stats = utils::LatencyBreakdown::GetStatistics();
     LOG_INFO("=== Latency Breakdown Statistics ===");
