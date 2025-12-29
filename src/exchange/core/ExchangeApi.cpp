@@ -368,6 +368,10 @@ void ExchangeApi<WaitStrategyT>::SubmitCommand(common::api::ApiCommand *cmd) {
     throw std::invalid_argument("Unsupported command type");
   }
 
+  // Record SUBMIT stage (uses cmd->timestamp which was copied to
+  // event.timestamp during translation)
+  utils::LatencyBreakdown::Record(&event, seq,
+                                  utils::LatencyBreakdown::Stage::SUBMIT);
   // Record timestamp after translation, before publish
   utils::LatencyBreakdown::Record(
       &event, seq, utils::LatencyBreakdown::Stage::RING_BUFFER_PUBLISH);
