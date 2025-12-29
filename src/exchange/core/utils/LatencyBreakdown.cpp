@@ -121,25 +121,43 @@ std::map<std::string, std::vector<int64_t>> LatencyBreakdown::GetStatistics() {
   // Merge all thread-local records (requires lock, but only during statistics)
   std::lock_guard<std::mutex> lock(mergeMutex_);
 
-  // Collect stage latencies from all threads
-  std::map<int, std::vector<int64_t>> stageLatencies;
+  // First, merge records from all threads by sequence number
+  // Different threads record different stages for the same seq
+  std::unordered_map<int64_t, CommandLatency> mergedRecords;
   for (auto *records : allThreadRecords_) {
     if (records != nullptr) {
       for (const auto &[seq, record] : *records) {
-        // Skip records without SUBMIT stage (can't calculate relative
-        // latencies)
-        if (record.submitTimeNs == 0) {
-          continue;
+        auto &merged = mergedRecords[seq];
+        // Merge submitTimeNs (use the first non-zero value)
+        if (merged.submitTimeNs == 0 && record.submitTimeNs != 0) {
+          merged.submitTimeNs = record.submitTimeNs;
         }
-
-        int64_t lastTimeNs = record.submitTimeNs;
+        // Merge stage times and flags
         for (int i = 0; i < static_cast<int>(Stage::MAX_STAGES); i++) {
           if (record.hasStage[i]) {
-            int64_t stageTimeNs = record.stageTimes[i] - lastTimeNs;
-            stageLatencies[i].push_back(stageTimeNs);
-            lastTimeNs = record.stageTimes[i];
+            merged.stageTimes[i] = record.stageTimes[i];
+            merged.hasStage[i] = true;
           }
         }
+      }
+    }
+  }
+
+  // Now calculate stage latencies from merged records
+  std::map<int, std::vector<int64_t>> stageLatencies;
+  for (const auto &[seq, record] : mergedRecords) {
+    // Use submitTimeNs as baseline (must be present for valid latency
+    // calculation)
+    if (record.submitTimeNs == 0) {
+      continue; // Skip records without SUBMIT stage
+    }
+
+    int64_t lastTimeNs = record.submitTimeNs;
+    for (int i = 0; i < static_cast<int>(Stage::MAX_STAGES); i++) {
+      if (record.hasStage[i]) {
+        int64_t stageTimeNs = record.stageTimes[i] - lastTimeNs;
+        stageLatencies[i].push_back(stageTimeNs);
+        lastTimeNs = record.stageTimes[i];
       }
     }
   }
