@@ -152,13 +152,14 @@ std::map<std::string, std::vector<int64_t>> LatencyBreakdown::GetStatistics() {
       continue; // Skip records without SUBMIT stage
     }
 
-    // Calculate cumulative latency from SUBMIT for each stage
+    // Calculate stage latencies (time spent in each stage, not cumulative)
+    int64_t lastTimeNs = record.submitTimeNs;
     for (int i = 0; i < static_cast<int>(Stage::MAX_STAGES); i++) {
       if (record.hasStage[i]) {
-        // Cumulative latency from SUBMIT to this stage
-        int64_t cumulativeLatencyNs =
-            record.stageTimes[i] - record.submitTimeNs;
-        stageLatencies[i].push_back(cumulativeLatencyNs);
+        // Stage latency: time from last stage to this stage
+        int64_t stageTimeNs = record.stageTimes[i] - lastTimeNs;
+        stageLatencies[i].push_back(stageTimeNs);
+        lastTimeNs = record.stageTimes[i];
       }
     }
   }
