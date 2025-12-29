@@ -229,18 +229,32 @@ strace -c -f ./tests/test_perf_latency --gtest_filter=PerfLatency.TestLatencyExc
 
 **优化前数据（无批量更新）**：
 ```
-R1_START:  P50=151ns  P90=2164543ns (2.16ms)  P95=5900171ns  P99=9041133ns
-ME_START:  P50=140ns  P90=44416ns (44µs)     P95=48843ns    P99=63715ns
-R2_START:  P50=73650ns P90=220960ns (221µs)  P95=229984ns   P99=232697ns
-整体延迟:  P90=2.73ms  P95=3.5ms  P99=23.1ms  P99.9=39ms
+SUBMIT:            P50=0ns    P90=0ns     P95=0ns     P99=0ns     P99.9=0ns
+RING_BUFFER_PUBLISH: P50=50ns  P90=60ns   P95=70ns    P99=261ns   P99.9=521ns
+GROUPING_START:    P50=110ns  P90=160ns   P95=211ns   P99=470ns   P99.9=5438ns
+GROUPING_END:      P50=70ns   P90=90ns    P95=100ns   P99=281ns   P99.9=600ns
+R1_START:          P50=151ns  P90=2164543ns (2.16ms) P95=2683608ns P99=3772214ns P99.9=7567933ns
+R1_END:            P50=60ns   P90=120ns   P95=221ns   P99=401ns   P99.9=761ns
+ME_START:          P50=140ns  P90=44416ns (44µs)     P95=48843ns  P99=63715ns   P99.9=3150705ns
+ME_END:            P50=141ns  P90=220ns   P95=300ns   P99=481ns   P99.9=1071ns
+R2_START:          P50=73650ns P90=220960ns (221µs)  P95=230344ns P99=233829ns P99.9=3208362ns
+R2_END:            P50=40ns   P90=81ns    P95=100ns   P99=290ns   P99.9=521ns
+整体延迟:          P90=2.73ms P95=3.5ms   P99=23.1ms  P99.9=39ms
 ```
 
-**优化后数据（批量更新）**：
+**优化后数据（批量更新，每20/25条更新）**：
 ```
-R1_START:  P50=160ns  P90=277675ns (0.28ms)  P95=492646ns  P99=2728816ns
-ME_START:  P50=80ns   P90=7922ns (7.9µs)    P95=16294ns   P99=24778ns
-R2_START:  P50=121351ns P90=228261ns (228µs) P95=230865ns  P99=234350ns
-整体延迟:  P90=1.45ms  P95=2.23ms  P99=9.8ms  P99.9=30ms
+SUBMIT:            P50=0ns    P90=0ns     P95=0ns     P99=0ns     P99.9=0ns
+RING_BUFFER_PUBLISH: P50=50ns  P90=61ns   P95=70ns    P99=270ns   P99.9=491ns
+GROUPING_START:    P50=110ns  P90=150ns   P95=180ns   P99=450ns   P99.9=110696ns
+GROUPING_END:      P50=70ns   P90=90ns    P95=100ns   P99=281ns   P99.9=571ns
+R1_START:          P50=160ns  P90=277675ns (0.28ms)  P95=492646ns P99=2728816ns P99.9=3070767ns
+R1_END:            P50=60ns   P90=140ns   P95=240ns   P99=401ns   P99.9=661ns
+ME_START:          P50=80ns   P90=7922ns (7.9µs)     P95=16294ns  P99=24778ns  P99.9=43555ns
+ME_END:            P50=130ns  P90=220ns   P95=290ns   P99=470ns   P99.9=1041ns
+R2_START:          P50=121351ns P90=228261ns (228µs) P95=230865ns P99=234350ns P99.9=3147590ns
+R2_END:            P50=40ns   P90=81ns    P95=110ns   P99=290ns   P99.9=471ns
+整体延迟:          P90=1.45ms P95=2.23ms  P99=9.8ms   P99.9=30ms
 ```
 
 **改善情况**：
