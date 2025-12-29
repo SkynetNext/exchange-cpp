@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <exchange/core/utils/LatencyBreakdown.h>
+#include <map>
 
 namespace exchange {
 namespace core {
@@ -153,15 +154,15 @@ LatencyBreakdown::GetStatistics() {
       continue; // Skip records without SUBMIT stage
     }
 
-    // Calculate cumulative latencies for each stage (time from submit to this
-    // stage) This matches the expected output format where each stage shows its
-    // cumulative delay
+    // Calculate latency for each stage: time difference from previous stage
+    // (in stage index order)
+    int64_t lastTimeNs = record.submitTimeNs;
     for (int i = 0; i < static_cast<int>(Stage::MAX_STAGES); i++) {
       if (record.hasStage[i]) {
-        // Cumulative latency: time from submit to this stage
-        int64_t cumulativeLatencyNs =
-            record.stageTimes[i] - record.submitTimeNs;
-        stageLatencies[i].push_back(cumulativeLatencyNs);
+        // Time difference from previous stage to current stage
+        int64_t latencyNs = record.stageTimes[i] - lastTimeNs;
+        stageLatencies[i].push_back(latencyNs);
+        lastTimeNs = record.stageTimes[i];
       }
     }
   }
