@@ -252,13 +252,27 @@ target_link_libraries(exchange-cpp
 )
 
 # Link mimalloc if available as submodule
+# Disable LTO for mimalloc to avoid "plugin needed to handle lto object" errors
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mimalloc/CMakeLists.txt)
+    if(IPO_SUPPORTED AND TARGET mimalloc-static)
+        # Disable LTO for mimalloc static library to avoid linker plugin issues
+        set_target_properties(mimalloc-static PROPERTIES
+            INTERPROCEDURAL_OPTIMIZATION OFF
+        )
+    endif()
     target_link_libraries(exchange-cpp PUBLIC mimalloc-static)
     message(STATUS "Linking mimalloc-static for high-performance memory allocation")
 endif()
 
 # Link lz4 if available
+# Disable LTO for lz4 to avoid "plugin needed to handle lto object" errors
 if(TARGET lz4)
+    if(IPO_SUPPORTED)
+        # Disable LTO for lz4 static library to avoid linker plugin issues
+        set_target_properties(lz4 PROPERTIES
+            INTERPROCEDURAL_OPTIMIZATION OFF
+        )
+    endif()
     target_link_libraries(exchange-cpp PUBLIC lz4)
     message(STATUS "Linking lz4 for compression support")
 elseif(lz4_FOUND)
