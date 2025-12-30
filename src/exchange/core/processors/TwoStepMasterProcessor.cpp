@@ -96,8 +96,19 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
   // Match Java: Thread.currentThread().setName("Thread-" + name);
   // Note: C++ doesn't have thread naming in standard library, skip for now
 
-  int64_t nextSequence = sequence_.get() + 1L;
-  int64_t currentSequenceGroup = 0;
+  // Reuse sequence_.get() result to avoid redundant atomic operation
+  // sequence_.get() uses relaxed load + acquire fence, so we cache it once
+  // Note: sequence is int64_t (max 2^63-1). At 1M msgs/sec, overflow would take
+  // ~292K years. Ring buffer uses bitwise masking (sequence & indexMask_) for
+  // indexing, so overflow doesn't affect index calculation. However, comparison
+  // operations (e.g., lastProcessedSequence > lastTriggeredSequence) may have
+  // issues after overflow (wrap-around from max to min), but this is
+  // practically impossible in real-world usage.
+  int64_t initialSequence = sequence_.get();
+  int64_t nextSequence = initialSequence + 1L;
+  int64_t currentSequenceGroup = 0; // Match Java: initialize to 0
+  int64_t lastTriggeredSequence =
+      initialSequence; // Track last triggered sequence
 
   // wait until slave processor has instructed to run
   // Match Java: while (!slaveProcessor.isRunning())
@@ -113,13 +124,17 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
 
       if (nextSequence <= availableSequence) {
+        int64_t startSequence = nextSequence; // Track start to detect if any
+                                              // messages were processed
         while (nextSequence <= availableSequence) {
           cmd = &ringBuffer_->get(nextSequence);
 
           // switch to next group - let slave processor start doing its handling
           // cycle
           if (cmd->eventsGroup != currentSequenceGroup) {
+            // Trigger previous group when detecting new group boundary
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
+            lastTriggeredSequence = nextSequence - 1;
             currentSequenceGroup = cmd->eventsGroup;
           }
           // Match Java: direct call without inner try-catch
@@ -162,6 +177,19 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           }
         }
         // Match Java: update sequence after processing all available messages
+        // Also trigger slave processor for the last group if it hasn't been
+        // triggered. This ensures that even if all messages are in the same
+        // group (e.g., < 20 messages), the slave processor will still process
+        // the group. This is an improvement over Java version which may miss
+        // the last group if it's incomplete.
+        if (nextSequence > startSequence) {
+          int64_t lastProcessedSequence = nextSequence - 1;
+          // If the last group hasn't been triggered (no group change detected
+          // in loop), trigger it now
+          if (lastProcessedSequence > lastTriggeredSequence) {
+            PublishProgressAndTriggerSlaveProcessor(nextSequence);
+          }
+        }
         sequence_.set(availableSequence);
         waitSpinningHelper_->SignalAllWhenBlocking();
       }
