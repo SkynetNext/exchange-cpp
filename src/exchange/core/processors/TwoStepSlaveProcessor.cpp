@@ -84,19 +84,10 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
       int64_t availableSequence =
           waitSpinningHelper_->TryWaitFor(nextSequence_);
 
-      // Update sequence every N messages to avoid long batch delays
-      // Target: 1µs delay = 1000ns
-      // R2 processing: ~40ns per message (estimated from R2_END P50)
-      // Calculation: 1000ns / 40ns = 25 messages
-      constexpr int64_t SEQUENCE_UPDATE_INTERVAL = 25;
-      int64_t processedCount = 0;
-      int64_t lastPublishedSequence = sequence_.get();
-
       // process batch
       while (nextSequence_ <= availableSequence &&
              nextSequence_ < processUpToSequence) {
         event = &ringBuffer_->get(nextSequence_);
-        processedCount++;
         bool isR2 = false;
 #if ENABLE_LATENCY_BREAKDOWN
         // Check if this is R2 (name starts with "R2")
@@ -126,25 +117,13 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
           throw; // Re-throw to outer catch block
         }
         nextSequence_++;
-
-        // Update sequence periodically to avoid long batch delays
-        // This allows downstream processors to start processing earlier
-        if (processedCount >= SEQUENCE_UPDATE_INTERVAL) {
-          sequence_.set(nextSequence_ - 1);
-          waitSpinningHelper_->SignalAllWhenBlocking();
-          lastPublishedSequence = nextSequence_ - 1;
-          processedCount = 0;
-        }
       }
 
       // exit if finished processing entire group (up to specified sequence)
+      // Match Java: sequence.set(processUpToSequence - 1);
       if (nextSequence_ == processUpToSequence) {
-        // Update sequence for any remaining messages
-        if (processedCount > 0 ||
-            lastPublishedSequence < processUpToSequence - 1) {
-          sequence_.set(processUpToSequence - 1);
-          waitSpinningHelper_->SignalAllWhenBlocking();
-        }
+        sequence_.set(processUpToSequence - 1);
+        waitSpinningHelper_->SignalAllWhenBlocking();
         return;
       }
 

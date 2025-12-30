@@ -184,6 +184,21 @@ The project uses the following submodules:
 
 Both are automatically initialized when cloning with `--recursive` or running `git submodule update --init --recursive`.
 
+## System Optimization
+
+For better performance, configure CPU isolation to reduce kernel scheduler overhead.
+
+```bash
+sudo nano /etc/default/grub
+# Add to GRUB_CMDLINE_LINUX: isolcpus=8-15 nohz_full=8-15 rcu_nocbs=8-15
+sudo update-grub
+sudo reboot
+```
+
+**Verify:** `cat /sys/devices/system/cpu/isolated` should show `8-15`
+
+**Note:** Reserve some CPUs (e.g., 0-7) for system use. Never isolate all CPUs.
+
 ## Testing
 
 ```bash

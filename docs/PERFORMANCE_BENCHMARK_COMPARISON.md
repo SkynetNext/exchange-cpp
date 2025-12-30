@@ -6,8 +6,8 @@ Performance comparison between C++ and Java implementations of the exchange core
 
 ## Test Environment
 
-**Date**: 2025-12-28 
-**Platform**: Linux  
+**Date**: 2025-12-30 
+**Platform**: Linux (Ubuntu)  
 **CPU**: AMD EPYC 9Y24 96-Core Processor (16 cores, 8 cores/socket, 2 threads/core)  
 **CPU Caches**: L1d: 256 KiB (8×), L1i: 256 KiB (8×), L2: 8 MiB (8×), L3: 32 MiB (1×)  
 **Memory**: 61 GiB total, 48 GiB available  
@@ -16,158 +16,9 @@ Performance comparison between C++ and Java implementations of the exchange core
 - /dev/vdb: 500 GiB (Virtual Disk, virtio-blk) - Data/journaling storage (/data, ext4)
 - **Backend**: KVM virtualized storage (actual physical storage type unknown from guest)
 **Virtualization**: KVM  
-**Build**: C++ (optimized native), Java (JVM with JIT)  
-**CPU Affinity**: Enabled
-
-## Test Configuration
-
-| Parameter | Value |
-|-----------|-------|
-| Symbol Type | `CURRENCY_EXCHANGE_PAIR` |
-| Symbols | 1 |
-| Benchmark Commands | 3,000,000 |
-| PreFill Commands | 1,000 |
-| Users | 2,000 accounts (1,325 unique) |
-| Currencies | 2 |
-| Iterations | 5 |
-| Ring Buffer | 32,768 |
-| Matching Engines | 1 |
-| Risk Engines | 1 |
-
-**Note**: The standard configuration uses 3,000,000 benchmark commands (matching Java `TestDataParameters.singlePairExchangeBuilder()`). Historical test results may show 1,000,000 if tests were run with a modified configuration.
-
-**Command Distribution**: 
-- C++: GTC ~17.58%, IOC ~1.30%, Cancel ~12.10%, Move ~60.54%, Reduce ~8.48%
-- Java: GTC ~12.60%, IOC ~1.80%, Cancel ~7.20%, Move ~71.13%, Reduce ~7.22%
-- Note: Distribution varies due to different random seed in test data generation
-
-## Results
-
-### C++ Implementation
-
-| Iteration | Throughput (MT/s) | Time (ms) |
-|-----------|-------------------|-----------|
-| 0 | 5.085 | 590 |
-| 1 | 4.862 | 617 |
-| 2 | 5.291 | 567 |
-| 3 | 6.550 | 458 |
-| 4 | 6.579 | 456 |
-| **Average** | **5.673 MT/s** | **537.6 ms** |
-
-**Total Time**: ~2.7 seconds  
-**Variance**: ±0.8 MT/s (moderate variance, improving over iterations)  
-**Warm-up**: None  
-**Performance Trend**: Throughput improves from 5.085 MT/s to 6.579 MT/s (29% improvement)
-
-### Java Implementation
-
-| Iteration | Throughput (MT/s) | Time (ms) |
-|-----------|-------------------|-----------|
-| 0 | 2.427 | ~1,236 |
-| 1 | 3.293 | ~911 |
-| 2 | 3.597 | ~833 |
-| 3 | 4.710 | ~636 |
-| 4 | 3.846 | ~780 |
-| **Average** | **3.575 MT/s** | **879.2 ms** |
-
-**Total Time**: ~4.4 seconds  
-**Variance**: ±0.8 MT/s (moderate variance, improving then declining)  
-**Warm-up**: First iteration 2.1x slower than average  
-**Performance Trend**: Throughput improves from 2.427 MT/s to peak 4.710 MT/s (94% improvement), then declines
-
-## Performance Comparison
-
-| Metric | C++ | Java | Ratio |
-|--------|-----|------|-------|
-| Average Throughput | 5.673 MT/s | 3.575 MT/s | **1.59x** |
-| Peak Throughput | 6.579 MT/s | 4.710 MT/s | **1.40x** |
-| First Iteration Throughput | 5.085 MT/s | 2.427 MT/s | **2.10x** |
-| Avg Execution Time | 537.6 ms | 879.2 ms | **1.64x faster** |
-| Total Test Time | ~2.7s | ~4.4s | **1.63x faster** |
-| Performance Variance | ±0.8 MT/s | ±0.8 MT/s | Similar variance |
-| Warm-up Impact | None | First iteration 2.1x slower | C++ no warm-up needed |
-
-## Observations
-
-- **C++ throughput**: 5.673 MT/s average, showing improvement trend (5.085 → 6.579 MT/s, +29%)
-- **Java throughput**: 3.575 MT/s average, showing improvement then decline (2.427 → 4.710 → 3.846 MT/s)
-- **C++ execution time**: 537.6 ms per iteration, improving from 590ms to 456ms
-- **Java execution time**: 879.2 ms per iteration, improving from 1,236ms to 636ms (peak), then 780ms
-- **Java warm-up**: First iteration 2.427 MT/s (2.1x slower than average, 1.5x slower than peak)
-- **Performance gap**: C++ is 1.59x faster on average, with consistent improvement trend
-- **Command distribution**: C++ shows GTC ~17.58%, Java shows GTC ~12.60% (different test data generation)
-
----
-
-## TestThroughputPeak Results
-
-Peak load test with multi-symbol, high-volume configuration to test system scalability under stress.
-
-### Test Configuration
-
-| Parameter | Value |
-|-----------|-------|
-| Symbol Type | `BOTH` (FUTURES_CONTRACT + CURRENCY_EXCHANGE_PAIR) |
-| Symbols | 100 |
-| Benchmark Commands | 3,000,000 |
-| PreFill Commands | 10,000 |
-| Users | 10,000 accounts (4,810 unique) |
-| Currencies | 40 |
-| Iterations | 5 |
-| Ring Buffer | 32,768 |
-| Matching Engines | 4 |
-| Risk Engines | 2 |
-| Messages in Group Limit | 1,536 |
-
-**Command Distribution**: GTC ~14%, IOC ~3%, Cancel ~10%, Move ~67%, Reduce ~6%
-
-### C++ Implementation
-
-| Iteration | Throughput (MT/s) | Time (ms) |
-|-----------|-------------------|-----------|
-| 0 | 5.671 | 529 |
-| 1 | 4.754 | 631 |
-| 2 | 2.976 | 1,008 |
-| 3 | 3.006 | 998 |
-| 4 | 3.927 | 764 |
-| **Average** | **4.067 MT/s** | **786.0 ms** |
-
-**Total Time**: 7.3 seconds  
-**Variance**: ±1.0 MT/s (higher variance due to multi-symbol load)  
-**Warm-up**: None
-
-### Java Implementation
-
-| Iteration | Throughput (MT/s) | Time (ms) |
-|-----------|-------------------|-----------|
-| 0 | 1.121 | ~2,676 |
-| 1 | 0.604 | ~4,970 |
-| 2 | 1.904 | ~1,575 |
-| 3 | 0.878 | ~3,415 |
-| 4 | 1.302 | ~2,303 |
-| **Average** | **1.162 MT/s** | **~2,988 ms** |
-
-**Total Time**: ~23 seconds  
-**Variance**: ±0.5 MT/s (high variance, significant performance degradation)  
-**Warm-up**: Not clearly visible (all iterations slow)
-
-### Performance Comparison
-
-| Metric | C++ | Java | Ratio |
-|--------|-----|------|-------|
-| Average Throughput | 4.067 MT/s | 1.162 MT/s | **3.50x** |
-| Peak Throughput | 5.671 MT/s | 1.904 MT/s | **2.98x** |
-| Avg Execution Time | 786.0 ms | ~2,988 ms | **3.80x faster** |
-| Total Test Time | 7.3s | ~23s | **3.15x faster** |
-| Performance Variance | ±1.0 MT/s | ±0.5 MT/s | C++ more stable under load |
-
-### Observations
-
-- **C++ performance**: 4.067 MT/s average, handles 100 symbols with 4+2 configuration effectively
-- **Java performance**: 1.162 MT/s average, significant degradation under multi-symbol load
-- **C++ advantage**: 3.5x faster throughput, better scalability with multiple matching/risk engines
-- **Java limitations**: High variance, poor performance under peak load (100 symbols, 3M commands)
-- **Multi-threading**: C++ benefits from lock-free `moodycamel::ConcurrentQueue` in SharedPool (6 threads accessing pool)
+**Build**: C++ (optimized native), Java (JVM with JIT, Java 8u192)  
+**CPU Affinity**: Enabled  
+**Kernel Optimization**: `isolcpus=8-15 nohz_full=8-15 rcu_nocbs=8-15` (CPU 8-15 isolated for application)
 
 ---
 
@@ -193,354 +44,209 @@ Latency test for single symbol (Exchange mode) with progressive TPS increase to 
 
 **Test Strategy**: Progressive TPS increase (200K → 300K → 400K → ...) until median latency exceeds 10ms (10,000,000 nanoseconds)
 
-### C++ Implementation
+### C++ Implementation 
 
 | TPS | Throughput (MT/s) | 50% | 90% | 95% | 99% | 99.9% | 99.99% | Max |
 |-----|-------------------|-----|-----|-----|-----|-------|--------|-----|
-| 200K | 0.200 | 0.66µs | 1.6ms | 2.22ms | 4.2ms | 33ms | 46ms | 48ms |
-| 300K | 0.300 | 0.64µs | 1.45ms | 2.11ms | 2.73ms | 12.5ms | 20.5ms | 21.4ms |
-| 400K | 0.399 | 0.61µs | 1.06ms | 1.99ms | 2.98ms | 6ms | 17.3ms | 18ms |
-| 500K | 0.500 | 0.61µs | 1.5ms | 2.14ms | 3.1ms | 5.7ms | 9.1ms | 9.5ms |
-| 600K | 0.600 | 0.62µs | 1.72ms | 2.25ms | 3.8ms | 11.4ms | 15.2ms | 15.6ms |
-| 700K | 0.700 | 0.62µs | 2.25ms | 3.7ms | 10ms | 16.3ms | 17.4ms | 17.8ms |
-| 800K | 0.800 | 0.63µs | 1.97ms | 2.39ms | 4.3ms | 8.7ms | 10.1ms | 10.4ms |
-| 900K | 0.900 | 0.64µs | 2.05ms | 2.43ms | 4.2ms | 6.6ms | 7.9ms | 8.1ms |
-| 1.0M | 1.000 | 0.61µs | 1.98ms | 2.53ms | 15.9ms | 30ms | 32ms | 32ms |
-| 1.1M | 1.099 | 0.63µs | 1.92ms | 2.29ms | 2.61ms | 4.5ms | 5.1ms | 5.2ms |
-| 1.2M | 1.200 | 0.61µs | 1.52ms | 2.19ms | 2.79ms | 12.7ms | 14.4ms | 14.5ms |
-| 1.3M | 1.300 | 0.63µs | 1.82ms | 2.3ms | 3.3ms | 8.1ms | 9.6ms | 9.8ms |
-| 1.4M | 1.400 | 0.66µs | 2.01ms | 2.33ms | 2.62ms | 6.3ms | 7.7ms | 7.8ms |
-| 1.5M | 1.500 | 0.62µs | 1.61ms | 2.19ms | 2.67ms | 11ms | 12.2ms | 12.3ms |
-| 1.6M | 1.600 | 0.63µs | 1.93ms | 2.34ms | 2.72ms | 9ms | 10.2ms | 10.3ms |
-| 1.7M | 1.701 | 0.63µs | 1.86ms | 2.33ms | 2.75ms | 6.4ms | 7.4ms | 7.5ms |
-| 1.8M | 1.800 | 0.68µs | 2.08ms | 2.39ms | 2.65ms | 2.81ms | 2.93ms | 2.99ms |
-| 1.9M | 1.899 | 0.71µs | 2.11ms | 2.4ms | 2.68ms | 5.2ms | 5.6ms | 5.6ms |
-| 2.0M | 2.000 | 0.64µs | 2.02ms | 2.39ms | 3.2ms | 5ms | 5.3ms | 5.3ms |
-| 2.1M | 2.101 | 0.61µs | 1.7ms | 2.56ms | 14.2ms | 21.5ms | 22.3ms | 22.4ms |
-| 2.2M | 2.203 | 0.64µs | 1.95ms | 2.44ms | 8.2ms | 16.7ms | 17.5ms | 17.5ms |
-| 2.3M | 2.304 | 0.65µs | 1.84ms | 2.27ms | 2.64ms | 3.2ms | 3.9ms | 3.9ms |
-| 2.4M | 2.404 | 0.67µs | 2.04ms | 2.38ms | 2.65ms | 2.84ms | 2.95ms | 2.99ms |
-| 2.5M | 2.500 | 69µs | 2.49ms | 3.6ms | 5.5ms | 8.5ms | 9.1ms | 9.2ms |
-| 2.6M | 2.602 | 0.64µs | 2.53ms | 5.6ms | 28.6ms | 32ms | 32ms | 33ms |
-| 2.7M | 2.698 | 22.4µs | 2.18ms | 2.43ms | 2.65ms | 2.78ms | 2.85ms | 2.88ms |
-| 2.8M | 2.801 | 63µs | 2.28ms | 2.54ms | 5.7ms | 11.4ms | 11.9ms | 11.9ms |
-| 2.9M | 2.904 | 4.1µs | 2.37ms | 2.72ms | 5ms | 9.5ms | 9.9ms | 10ms |
-| 3.0M | 3.000 | 462µs | 2.44ms | 2.84ms | 4.8ms | 5.3ms | 5.7ms | 5.7ms |
-| 3.1M | 3.106 | 0.62µs | 1.19ms | 1.99ms | 2.6ms | 2.8ms | 2.93ms | 2.98ms |
-| 3.2M | 3.205 | 730µs | 51ms | 56ms | 59ms | 61ms | 61ms | 61ms |
-| 3.3M | 3.300 | 113µs | 2.25ms | 2.5ms | 2.71ms | 2.86ms | 2.94ms | 2.96ms |
-| 3.4M | 3.401 | 612µs | 2.31ms | 2.5ms | 2.72ms | 4.9ms | 5.2ms | 5.2ms |
-| 3.5M | 3.509 | 0.64µs | 1.23ms | 2.03ms | 2.65ms | 2.89ms | 3ms | 3ms |
-| 3.6M | 3.610 | 0.64µs | 1.37ms | 2.1ms | 2.64ms | 2.92ms | 3.2ms | 3.2ms |
-| 3.7M | 3.704 | 0.64µs | 1.36ms | 2.14ms | 2.73ms | 2.97ms | 3.1ms | 3.1ms |
-| 3.8M | 3.745 | 573µs | 3.4ms | 15ms | 22.8ms | 24.5ms | 24.6ms | 24.7ms |
-| 3.9M | 3.906 | 542µs | 2.32ms | 2.53ms | 2.73ms | 2.85ms | 2.88ms | 2.91ms |
-| 4.0M | 3.995 | 597µs | 2.31ms | 2.5ms | 2.67ms | 2.77ms | 2.81ms | 2.83ms |
-| 4.1M | 4.115 | 1.22µs | 2.03ms | 2.4ms | 2.7ms | 2.89ms | 2.98ms | 3ms |
-| 4.2M | 4.202 | 97µs | 2.8ms | 9.5ms | 14.1ms | 16.7ms | 16.8ms | 16.8ms |
-| 4.3M | 4.304 | 677µs | 2.35ms | 2.55ms | 2.79ms | 3.9ms | 4ms | 4ms |
-| 4.4M | 4.399 | 1.31ms | 2.65ms | 4ms | 7.2ms | 8.8ms | 8.9ms | 8.9ms |
-| 4.5M | 4.348 | 1.33µs | 2.46ms | 20.8ms | 25.4ms | 27.2ms | 27.3ms | 27.4ms |
-| 4.6M | 4.608 | 899µs | 2.43ms | 2.61ms | 2.87ms | 3.7ms | 3.7ms | 3.7ms |
-| 4.7M | 4.702 | 1.1ms | 2.49ms | 2.65ms | 4.2ms | 5.3ms | 5.4ms | 5.5ms |
-| 4.8M | 4.808 | 906µs | 2.52ms | 2.71ms | 3ms | 3.5ms | 3.6ms | 3.6ms |
-| 4.8M | 4.808 | 5.8µs | 12.5ms | 14.7ms | 18.5ms | 19.9ms | 20ms | 20ms |
-| 4.9M | 4.967 | 1.44ms | 2.79ms | 3.3ms | 5.1ms | 5.8ms | 5.8ms | 5.8ms |
-| 5.0M | 4.992 | 9.7ms | 23ms | 25.3ms | 28ms | 29.4ms | 29.4ms | 29.4ms |
-| 5.2M | 5.190 | 144µs | 2.29ms | 2.54ms | 2.77ms | 2.92ms | 3ms | 3ms |
-| ~5.0M | 4.724 | **64ms** | 69ms | 70ms | 72ms | 73ms | 73ms | 73ms |
+| 200K | 0.200 | 0.51µs | 0.66µs | 0.76µs | 2.76µs | 12.1µs | 49µs | 102µs |
+| 300K | 0.300 | 0.51µs | 0.63µs | 0.71µs | 3.2µs | 9.8µs | 39µs | 96µs |
+| 400K | 0.400 | 0.5µs | 0.61µs | 0.69µs | 4.1µs | 10.9µs | 41µs | 117µs |
+| 500K | 0.500 | 0.5µs | 0.61µs | 0.69µs | 4.5µs | 9.1µs | 33µs | 79µs |
+| 600K | 0.600 | 0.5µs | 0.61µs | 0.69µs | 4.8µs | 8.9µs | 35µs | 91µs |
+| 700K | 0.700 | 0.5µs | 0.6µs | 0.68µs | 5.1µs | 9.4µs | 43µs | 86µs |
+| 800K | 0.800 | 0.5µs | 0.6µs | 0.68µs | 5.4µs | 11.3µs | 27.9µs | 71µs |
+| 900K | 0.900 | 0.49µs | 0.6µs | 0.68µs | 5.4µs | 9.2µs | 34µs | 85µs |
+| 1.0M | 1.000 | 0.49µs | 0.59µs | 0.69µs | 5.6µs | 9.7µs | 46µs | 113µs |
+| 1.1M | 1.100 | 0.49µs | 0.6µs | 0.71µs | 5.8µs | 9.7µs | 43µs | 93µs |
+| 1.2M | 1.200 | 0.49µs | 0.6µs | 0.73µs | 5.9µs | 11.4µs | 40µs | 87µs |
+| 1.3M | 1.300 | 0.49µs | 0.6µs | 0.75µs | 5.9µs | 9.6µs | 36µs | 100µs |
+| 1.4M | 1.401 | 0.5µs | 0.61µs | 0.84µs | 6.1µs | 16.9µs | 410µs | 571µs |
+| 1.5M | 1.502 | 0.51µs | 0.62µs | 0.98µs | 6.1µs | 12µs | 46µs | 86µs |
+| 1.6M | 1.600 | 0.5µs | 0.61µs | 1.17µs | 6.4µs | 15.1µs | 47µs | 86µs |
+| 1.7M | 1.701 | 0.5µs | 0.61µs | 1.55µs | 6.3µs | 14.3µs | 65µs | 113µs |
+| 1.8M | 1.802 | 0.5µs | 0.62µs | 2.13µs | 6.6µs | 31µs | 126µs | 247µs |
+| 1.9M | 1.901 | 0.5µs | 0.63µs | 2.37µs | 6.5µs | 14.2µs | 55µs | 96µs |
+| 2.0M | 2.000 | 0.51µs | 0.65µs | 2.77µs | 6.8µs | 17µs | 60µs | 102µs |
+| 2.1M | 2.101 | 0.5µs | 0.66µs | 3.1µs | 6.8µs | 19.3µs | 104µs | 221µs |
+| 2.2M | 2.203 | 0.5µs | 0.66µs | 3.2µs | 6.8µs | 11.1µs | 29.1µs | 56µs |
+| 2.3M | 2.304 | 0.51µs | 0.68µs | 3.7µs | 7.2µs | 27.2µs | 69µs | 108µs |
+| 2.4M | 2.404 | 0.51µs | 0.72µs | 3.9µs | 7.2µs | 21.7µs | 69µs | 96µs |
+| 2.5M | 2.500 | 0.51µs | 0.76µs | 4µs | 7.2µs | 14.6µs | 51µs | 98µs |
+| 2.6M | 2.604 | 0.51µs | 0.87µs | 4.3µs | 7.3µs | 22.8µs | 69µs | 106µs |
+| 2.7M | 2.703 | 0.51µs | 1.06µs | 4.5µs | 7.4µs | 22.3µs | 67µs | 101µs |
+| 2.8M | 2.801 | 0.52µs | 1.38µs | 4.9µs | 7.6µs | 21.9µs | 71µs | 95µs |
+| 2.9M | 2.907 | 0.52µs | 1.71µs | 5µs | 7.7µs | 23.7µs | 66µs | 108µs |
+| 3.0M | 3.003 | 0.52µs | 1.97µs | 5.1µs | 7.7µs | 17.4µs | 62µs | 88µs |
+| 3.1M | 3.106 | 0.51µs | 2.29µs | 5.3µs | 7.9µs | 25.9µs | 60µs | 80µs |
+| 3.2M | 3.205 | 0.51µs | 2.54µs | 5.4µs | 7.9µs | 22.1µs | 78µs | 121µs |
+| 3.3M | 3.300 | 0.51µs | 2.77µs | 5.5µs | 7.9µs | 15.6µs | 36µs | 56µs |
+| 3.4M | 3.401 | 0.51µs | 3µs | 5.6µs | 8µs | 18.2µs | 56µs | 76µs |
+| 3.5M | 3.509 | 0.52µs | 3.4µs | 5.9µs | 8.2µs | 21.6µs | 62µs | 82µs |
+| 3.6M | 3.610 | 0.52µs | 3.7µs | 6µs | 8.3µs | 19.8µs | 62µs | 91µs |
+| 3.7M | 3.704 | 0.52µs | 3.8µs | 6.1µs | 8.3µs | 25.1µs | 68µs | 106µs |
+| 3.8M | 3.802 | 0.52µs | 4µs | 6.1µs | 8.2µs | 20.8µs | 57µs | 83µs |
+| 3.9M | 3.906 | 0.53µs | 4.3µs | 6.3µs | 8.3µs | 16.8µs | 45µs | 66µs |
+| 4.0M | 4.000 | 0.53µs | 4.4µs | 6.4µs | 8.4µs | 17.6µs | 47µs | 70µs |
+| 4.1M | 4.115 | 0.53µs | 4.6µs | 6.4µs | 8.4µs | 19.5µs | 48µs | 74µs |
+| 4.2M | 4.202 | 0.54µs | 4.8µs | 6.6µs | 8.5µs | 31µs | 129µs | 160µs |
+| 4.3M | 4.310 | 0.54µs | 4.9µs | 6.6µs | 8.5µs | 34µs | 98µs | 128µs |
+| 4.4M | 4.405 | 0.55µs | 5.1µs | 6.8µs | 8.6µs | 22.5µs | 50µs | 67µs |
+| 4.5M | 4.505 | 0.55µs | 5.2µs | 6.8µs | 8.5µs | 20.3µs | 65µs | 80µs |
+| 4.6M | 4.608 | 0.57µs | 5.4µs | 6.9µs | 8.7µs | 27.6µs | 86µs | 120µs |
+| 4.7M | 4.717 | 0.59µs | 5.6µs | 7µs | 8.8µs | 23.7µs | 57µs | 76µs |
+| 4.8M | 4.808 | 0.6µs | 5.7µs | 7µs | 8.6µs | 15.7µs | 60µs | 94µs |
+| 4.9M | 4.902 | 0.62µs | 5.8µs | 7.1µs | 8.7µs | 16.7µs | 49µs | 69µs |
+| 5.0M | 5.000 | 0.62µs | 6µs | 7.2µs | 8.8µs | 21.5µs | 82µs | 115µs |
+| 5.1M | 5.102 | 0.63µs | 6.1µs | 7.3µs | 9.1µs | 25µs | 60µs | 80µs |
+| 5.2M | 5.208 | 0.63µs | 6.3µs | 7.4µs | 9.2µs | 28.5µs | 53µs | 64µs |
+| 5.3M | 5.319 | 0.64µs | 6.4µs | 7.4µs | 9.1µs | 22µs | 59µs | 78µs |
+| 5.4M | 5.405 | 0.64µs | 6.5µs | 7.5µs | 9.5µs | 31µs | 66µs | 80µs |
+| 5.5M | 5.525 | 0.65µs | 6.6µs | 7.6µs | 9.6µs | 18.7µs | 40µs | 71µs |
+| 5.6M | 5.618 | 0.68µs | 6.8µs | 7.7µs | 9.8µs | 33µs | 61µs | 80µs |
+| 5.7M | 5.714 | 0.72µs | 6.9µs | 7.9µs | 10.3µs | 37µs | 69µs | 79µs |
+| 5.8M | 5.814 | 0.76µs | 7.1µs | 7.9µs | 10.6µs | 35µs | 60µs | 75µs |
+| 5.9M | 5.917 | 0.81µs | 7.1µs | 7.9µs | 10.6µs | 35µs | 60µs | 75µs |
+| 6.0M | 6.024 | 0.95µs | 7.2µs | 8µs | 10.5µs | 37µs | 62µs | 70µs |
+| 6.1M | 6.122 | 1.18µs | 7.3µs | 8.1µs | 10.8µs | 32µs | 57µs | 67µs |
+| 6.2M | 6.211 | 1.46µs | 7.5µs | 8.3µs | 11µs | 27.7µs | 91µs | 100µs |
+| 6.3M | 6.329 | 1.94µs | 7.6µs | 8.4µs | 12.7µs | 97µs | 206µs | 215µs |
+| 6.4M | 6.410 | 2.25µs | 7.7µs | 8.4µs | 11.2µs | 39µs | 67µs | 75µs |
+| 6.5M | 6.536 | 2.57µs | 7.8µs | 8.6µs | 12µs | 58µs | 82µs | 94µs |
+| 6.6M | 6.623 | 3.2µs | 7.9µs | 8.8µs | 12.2µs | 27µs | 55µs | 65µs |
+| 6.7M | 6.711 | 3.5µs | 8µs | 8.9µs | 13.5µs | 123µs | 203µs | 211µs |
+| 6.8M | 6.803 | 3.9µs | 8.2µs | 9µs | 12.6µs | 45µs | 74µs | 84µs |
+| 6.9M | 6.944 | 4.5µs | 8.4µs | 9.4µs | 14.6µs | 41µs | 78µs | 85µs |
+| 7.0M | 7.042 | 5.1µs | 8.7µs | 9.7µs | 15.9µs | 56µs | 66µs | 72µs |
+| 7.1M | 7.143 | 5.4µs | 8.9µs | 10.1µs | 17.6µs | 60µs | 82µs | 93µs |
+| 7.2M | 7.246 | 5.8µs | 9.1µs | 10.3µs | 19.6µs | 69µs | 80µs | 85µs |
+| 7.3M | 7.353 | 6.1µs | 9.3µs | 10.6µs | 16.7µs | 56µs | 67µs | 73µs |
+| 7.4M | 7.407 | 6.5µs | 9.5µs | 10.6µs | 15.1µs | 41µs | 92µs | 102µs |
+| 7.5M | 7.519 | 6.6µs | 9.6µs | 10.7µs | 17.9µs | 51µs | 69µs | 74µs |
+| 7.6M | 7.634 | 7.2µs | 10.2µs | 11.9µs | 44µs | 86µs | 99µs | 102µs |
+| 7.7M | 7.752 | 7.5µs | 10.4µs | 11.9µs | 28.4µs | 66µs | 88µs | 96µs |
+| 7.8M | 7.812 | 7.6µs | 10.7µs | 12.7µs | 47µs | 87µs | 100µs | 107µs |
+| 7.9M | 7.937 | 7.9µs | 11.2µs | 13.5µs | 48µs | 213µs | 226µs | 229µs |
+| 8.0M | 8.000 | 8.3µs | 12.3µs | 22.8µs | 82µs | 121µs | 126µs | 129µs |
+| 8.1M | 8.086 | 9.6µs | 1.68ms | 1.73ms | 1.99ms | 2.05ms | 2.05ms | 2.05ms |
+| 8.2M | 8.242 | 9µs | 18.2µs | 305µs | 481µs | 493µs | 501µs | 503µs |
+| 8.3M | 8.310 | 9.7µs | 188µs | 699µs | 1.02ms | 1.05ms | 1.05ms | 1.06ms |
+| 8.4M | 8.380 | 10µs | 327µs | 843µs | 1.3ms | 1.32ms | 1.33ms | 1.34ms |
+| 8.5M | 8.475 | 15.4µs | 1.2ms | 2.1ms | 2.73ms | 2.78ms | 2.79ms | 2.8ms |
+| 8.5M | 8.523 | 71µs | 1.76ms | 2.84ms | 3.7ms | 3.8ms | 3.8ms | 3.8ms |
+| 8.6M | 8.596 | 284µs | 4.6ms | 6ms | 7ms | 7.2ms | 7.2ms | 7.2ms |
+| 8.6M | 8.621 | 735µs | 5.9ms | 7.4ms | 8.6ms | 8.8ms | 8.8ms | 8.8ms |
+| 8.7M | 8.671 | 1.08ms | 7.5ms | 9.2ms | 10.5ms | 10.8ms | 10.8ms | 10.8ms |
+| 8.6M | 8.646 | 2.94ms | 10.9ms | 12.7ms | 14ms | 14.2ms | 14.2ms | 14.3ms |
+| 8.7M | 8.721 | 3.9ms | 13.4ms | 15.4ms | 17ms | 17.3ms | 17.3ms | 17.3ms |
+| 8.7M | 8.671 | 6.2ms | 17.4ms | 19.9ms | 21.7ms | 22ms | 22ms | 22.1ms |
+| 8.6M | 8.621 | **11.1ms** | 24.9ms | 27.4ms | 29.3ms | 29.6ms | 29.7ms | 29.7ms |
 
-**Test Status**: Test stopped at ~5.0M TPS (4.724 MT/s) when median latency exceeded 10ms threshold (64ms)  
-**Best Performance**: Consistent sub-microsecond median latency (0.61-0.71µs) across 200K-1.9M TPS range  
-**Stable Range**: Up to ~4.8M TPS with median latency < 10ms (most iterations < 1ms)
-
-### Java Implementation
-
-| TPS | Throughput (MT/s) | 50% | 90% | 95% | 99% | 99.9% | 99.99% | Max |
-|-----|-------------------|-----|-----|-----|-----|-------|--------|-----|
-| 200K | 0.200 | 422µs | 5.1ms | 6.9ms | 13.6ms | 44ms | 57ms | 58ms |
-| 300K | 0.300 | 487µs | 6.0ms | 8.3ms | 14.0ms | 37ms | 44ms | 45ms |
-| 400K | 0.400 | 22.9µs | 4.2ms | 6.2ms | 13.3ms | 26.6ms | 31ms | 32ms |
-| 500K | 0.500 | 909µs | 5.8ms | 7.8ms | 12.2ms | 19.0ms | 20.7ms | 21.1ms |
-| 600K | 0.600 | 1.64ms | 11.9ms | 25.3ms | 36ms | 43ms | 47ms | 47ms |
-| 700K | 0.699 | 3.1ms | 27.0ms | 39ms | 52ms | 57ms | 59ms | 60ms |
-| 800K | 0.799 | 1.88ms | 12.5ms | 20.1ms | 33ms | 38ms | 40ms | 40ms |
-| 900K | 0.899 | 1.38ms | 12.5ms | 34ms | 45ms | 50ms | 51ms | 52ms |
-| 1.0M | 0.998 | 4.8ms | 42ms | 69ms | 91ms | 96ms | 98ms | 98ms |
-| 1.1M | 1.097 | 158ms | 243ms | 273ms | 285ms | 292ms | 292ms | 292ms |
-
-**Stopped at**: 1.1M TPS (median latency 114ms > 10ms threshold at 1.043 MT/s)  
-**Best Performance**: 400K TPS (median latency 22.9µs, but high variance)
-
-### Performance Comparison
-
-| Metric | C++ | Java | Ratio |
-|--------|-----|------|-------|
-| **Best Median Latency** | 0.61µs (400K TPS) | 22.9µs (400K TPS) | **C++ 37.5x better** |
-| **Median Latency at 200K TPS** | 0.66µs | 422µs | **C++ 639x better** |
-| **Median Latency at 1.0M TPS** | 0.61µs | 4.8ms | **C++ 7,869x better** |
-| **Median Latency at 1.1M TPS** | 0.63µs | 158ms | **C++ 250,794x better** |
-| **99% Latency at 200K TPS** | 4.2ms | 13.6ms | **C++ 3.2x better** |
-| **99% Latency at 1.0M TPS** | 15.9ms | 91ms | **C++ 5.7x better** |
-| **Max Latency at 200K TPS** | 48ms | 58ms | **C++ 1.2x better** |
-| **Max Latency at 1.0M TPS** | 32ms | 98ms | **C++ 3.1x better** |
-| **Stable TPS Range** | Up to ~4.8M TPS (median < 10ms) | Up to 500K TPS | C++ handles 9.6x higher load |
-| **Latency Consistency** | Sub-microsecond median up to 1.9M TPS | Exceeds 1ms at 600K TPS | C++ much more consistent |
-| **Maximum Stable TPS** | ~4.8M TPS (median < 10ms) | 500K TPS | C++ 9.6x higher |
-| **Test Stop Condition** | Stopped at 4.724 MT/s (p50=64ms > 10ms) | Stopped at 1.043 MT/s (p50=114ms > 10ms) | C++ reached 4.5x higher throughput |
-
-### Observations
-
-- **C++ latency advantage**: Consistent sub-microsecond median latency (0.61-0.71µs) across 200K-1.9M TPS range
-- **Java latency**: Best median latency 22.9µs at 400K TPS, but high variance; typically 422µs-3.1ms in stable range
-- **C++ stability**: Maintains sub-microsecond median latency up to 1.9M TPS, remains <10ms up to ~4.8M TPS
-- **Java stability**: Median latency exceeds 1ms at 600K TPS (1.64ms), degrades to 158ms at 1.1M TPS
-- **Tail latency**: C++ shows significantly better 99% latency (15.9ms vs 91ms at 1.0M TPS)
-- **Throughput correlation**: Both implementations show similar throughput (MT/s) at same TPS, but C++ maintains much lower latency
-- **Scalability**: C++ can handle 9.6x higher TPS (~4.8M vs 500K) while maintaining <10ms median latency
-- **Latency variance**: C++ shows consistent performance; Java shows high variance (22.9µs to 158ms at different TPS levels)
-- **Performance degradation**: C++ shows occasional spikes but recovers; maintains <10ms median up to ~4.8M TPS before stopping at 64ms
-- **Optimal range**: C++ optimal performance range is 200K-1.9M TPS with sub-microsecond median latency
-- **Test completion**: C++ test stopped at 4.724 MT/s (p50=64ms > 10ms threshold), Java stopped at 1.043 MT/s (p50=114ms > 10ms threshold)
-
----
-
-## TestLatencyExchangeJournaling Results
-
-Latency test for single symbol (Exchange mode) **with Journaling enabled** to measure latency impact of disk I/O operations.
-
-### Test Configuration
-
-Same as `TestLatencyExchange` above, with **Journaling enabled**:
-- Symbol Type: `CURRENCY_EXCHANGE_PAIR`
-- Symbols: 1
-- Benchmark Commands: 3,000,000
-- PreFill Commands: 1,000
-- Users: 2,000 accounts (1,325 unique)
-- Currencies: 2
-- Warmup Cycles: 6
-- Ring Buffer: 32,768
-- Matching Engines: 1
-- Risk Engines: 1
-- Messages in Group Limit: 256
-- **Journaling**: Enabled (DiskJournaling)
-
-**Test Strategy**: Progressive TPS increase (200K → 300K → 400K → ...) until median latency exceeds 10ms (10,000,000 nanoseconds)
-
-### C++ Implementation (With Journaling)
+### Java Implementation 
 
 | TPS | Throughput (MT/s) | 50% | 90% | 95% | 99% | 99.9% | 99.99% | Max |
 |-----|-------------------|-----|-----|-----|-----|-------|--------|-----|
-| 200K | 0.200 | 1.31ms | 9ms | 11.5ms | 17.8ms | 68ms | 81ms | 83ms |
-| 300K | 0.300 | 1.42ms | 13.9ms | 20.9ms | 121ms | 198ms | 207ms | 208ms |
-| 400K | 0.400 | 779µs | 11.3ms | 15.9ms | 25.2ms | 59ms | 65ms | 66ms |
-| 500K | 0.500 | 257µs | 6.6ms | 9ms | 13.9ms | 19.7ms | 23ms | 23.6ms |
-| 600K | 0.599 | 5.3ms | 14.1ms | 16.7ms | 22.1ms | 31ms | 35ms | 35ms |
-| 700K | 0.700 | 316µs | 7.4ms | 9.9ms | 17.7ms | 44ms | 47ms | 48ms |
-| 800K | 0.800 | 2.66ms | 12.2ms | 14.7ms | 19.8ms | 27ms | 30ms | 30ms |
-| 900K | 0.897 | 3.1ms | 10.8ms | 13.9ms | 45ms | 72ms | 75ms | 76ms |
-| 1.0M | 0.999 | 6.7ms | 15.1ms | 19.8ms | 79ms | 99ms | 102ms | 102ms |
-| 1.1M | 1.099 | 1.26ms | 8.2ms | 10.9ms | 15.3ms | 18.3ms | 20ms | 20.3ms |
-| 1.2M | 1.197 | 5.2ms | 11.3ms | 13.2ms | 18ms | 27.9ms | 29.7ms | 29.9ms |
-| 1.3M | 1.298 | 8.7ms | 16.9ms | 19.5ms | 24.2ms | 32ms | 33ms | 34ms |
-| 1.4M | 1.397 | 3.1ms | 13.6ms | 16.8ms | 32ms | 41ms | 43ms | 43ms |
-| 1.5M | 1.502 | 923µs | 11ms | 14.1ms | 19.3ms | 25.6ms | 27.2ms | 27.4ms |
-| 1.6M | 1.598 | 6.2µs | 25ms | 37ms | 49ms | 57ms | 58ms | 58ms |
-| 1.65M | 1.652 | **68ms** | 141ms | 151ms | 158ms | 168ms | 169ms | 169ms |
+| 200K | 0.200 | 0.54µs | 0.69µs | 0.77µs | 1.9µs | 10.5µs | 40µs | 131µs |
+| 300K | 0.300 | 0.53µs | 0.66µs | 0.74µs | 2.29µs | 9.3µs | 40µs | 127µs |
+| 400K | 0.400 | 0.52µs | 0.64µs | 0.72µs | 3.0µs | 8.9µs | 38µs | 91µs |
+| 500K | 0.500 | 0.51µs | 0.63µs | 0.71µs | 3.6µs | 9.9µs | 42µs | 117µs |
+| 600K | 0.600 | 0.51µs | 0.63µs | 0.71µs | 3.9µs | 8.7µs | 38µs | 86µs |
+| 700K | 0.700 | 0.51µs | 0.63µs | 0.7µs | 4.2µs | 9.9µs | 47µs | 102µs |
+| 800K | 0.800 | 0.51µs | 0.63µs | 0.7µs | 4.3µs | 8.4µs | 33µs | 94µs |
+| 900K | 0.900 | 0.51µs | 0.64µs | 0.72µs | 4.8µs | 9.3µs | 46µs | 100µs |
+| 1.0M | 1.000 | 0.51µs | 0.63µs | 0.72µs | 4.7µs | 9.3µs | 50µs | 137µs |
+| 1.1M | 1.100 | 0.51µs | 0.63µs | 0.72µs | 4.8µs | 9.5µs | 57µs | 141µs |
+| 1.2M | 1.200 | 0.51µs | 0.63µs | 0.73µs | 5.0µs | 11.3µs | 53µs | 101µs |
+| 1.3M | 1.300 | 0.51µs | 0.63µs | 0.74µs | 5.0µs | 9.7µs | 40µs | 72µs |
+| 1.4M | 1.401 | 0.51µs | 0.64µs | 0.76µs | 5.1µs | 10.0µs | 38µs | 62µs |
+| 1.5M | 1.502 | 0.51µs | 0.64µs | 0.8µs | 5.2µs | 10.9µs | 37µs | 60µs |
+| 1.6M | 1.600 | 0.51µs | 0.64µs | 0.87µs | 5.4µs | 17.8µs | 56µs | 97µs |
+| 1.7M | 1.701 | 0.51µs | 0.65µs | 0.93µs | 5.4µs | 10.4µs | 34µs | 63µs |
+| 1.8M | 1.802 | 0.51µs | 0.66µs | 1.06µs | 5.5µs | 10.6µs | 46µs | 102µs |
+| 1.9M | 1.901 | 0.51µs | 0.68µs | 1.33µs | 5.6µs | 13.7µs | 54µs | 87µs |
+| 2.0M | 2.000 | 0.52µs | 0.71µs | 1.63µs | 5.8µs | 12.2µs | 50µs | 94µs |
+| 2.1M | 2.101 | 0.52µs | 0.71µs | 1.89µs | 5.8µs | 12.2µs | 39µs | 71µs |
+| 2.2M | 2.203 | 0.52µs | 0.71µs | 2.24µs | 6.0µs | 15.2µs | 62µs | 127µs |
+| 2.3M | 2.304 | 0.53µs | 0.72µs | 2.46µs | 6.0µs | 15.5µs | 56µs | 101µs |
+| 2.4M | 2.404 | 0.55µs | 0.74µs | 2.8µs | 6.3µs | 14.0µs | 50µs | 89µs |
+| 2.5M | 2.500 | 0.55µs | 0.75µs | 2.96µs | 6.3µs | 15.6µs | 49µs | 91µs |
+| 2.6M | 2.604 | 0.58µs | 0.77µs | 3.2µs | 6.4µs | 12.8µs | 44µs | 80µs |
+| 2.7M | 2.703 | 0.58µs | 0.79µs | 3.4µs | 6.5µs | 15.9µs | 52µs | 90µs |
+| 2.8M | 2.801 | 0.58µs | 0.82µs | 3.6µs | 6.6µs | 15.4µs | 46µs | 78µs |
+| 2.9M | 2.907 | 0.59µs | 0.92µs | 3.8µs | 6.7µs | 14.5µs | 47µs | 100µs |
+| 3.0M | 3.003 | 0.59µs | 1.03µs | 4.0µs | 6.8µs | 12.8µs | 40µs | 72µs |
+| 3.1M | 3.106 | 0.59µs | 1.19µs | 4.2µs | 6.9µs | 12.8µs | 36µs | 56µs |
+| 3.2M | 3.205 | 0.59µs | 1.39µs | 4.3µs | 7.0µs | 13.5µs | 39µs | 62µs |
+| 3.3M | 3.300 | 0.59µs | 1.65µs | 4.5µs | 7.3µs | 27.6µs | 69µs | 85µs |
+| 3.4M | 3.401 | 0.59µs | 1.86µs | 4.6µs | 7.2µs | 13.4µs | 52µs | 112µs |
+| 3.5M | 3.509 | 0.59µs | 2.19µs | 4.8µs | 7.4µs | 14.4µs | 46µs | 79µs |
+| 3.6M | 3.610 | 0.59µs | 2.46µs | 4.9µs | 7.5µs | 16.8µs | 55µs | 78µs |
+| 3.7M | 3.704 | 0.59µs | 2.72µs | 5.1µs | 7.6µs | 18.7µs | 70µs | 120µs |
+| 3.8M | 3.802 | 0.59µs | 2.94µs | 5.2µs | 7.7µs | 21.4µs | 137µs | 167µs |
+| 3.9M | 3.906 | 0.59µs | 3.3µs | 5.3µs | 7.9µs | 27.5µs | 75µs | 101µs |
+| 4.0M | 4.000 | 0.6µs | 3.5µs | 5.4µs | 8.0µs | 38µs | 137µs | 168µs |
+| 4.1M | 4.115 | 0.6µs | 3.8µs | 5.6µs | 8.2µs | 22.0µs | 79µs | 120µs |
+| 4.2M | 4.202 | 0.61µs | 4.0µs | 5.8µs | 8.4µs | 21.1µs | 50µs | 71µs |
+| 4.3M | 4.310 | 0.62µs | 4.2µs | 5.9µs | 8.5µs | 27.6µs | 73µs | 105µs |
+| 4.4M | 4.405 | 0.64µs | 4.4µs | 6.0µs | 8.6µs | 22.5µs | 56µs | 72µs |
+| 4.5M | 4.505 | 0.64µs | 4.5µs | 6.1µs | 8.5µs | 22.3µs | 77µs | 93µs |
+| 4.6M | 4.608 | 0.65µs | 4.7µs | 6.2µs | 8.7µs | 20.9µs | 60µs | 102µs |
+| 4.7M | 4.717 | 0.66µs | 4.9µs | 6.4µs | 9.0µs | 42µs | 135µs | 158µs |
+| 4.8M | 4.808 | 0.66µs | 5.0µs | 6.5µs | 9.0µs | 32µs | 96µs | 123µs |
+| 4.9M | 4.902 | 0.67µs | 5.2µs | 6.6µs | 9.1µs | 23.7µs | 60µs | 81µs |
+| 5.0M | 5.000 | 0.68µs | 5.3µs | 6.7µs | 9.5µs | 47µs | 142µs | 161µs |
+| 5.1M | 5.102 | 0.7µs | 5.5µs | 6.9µs | 9.6µs | 51µs | 145µs | 167µs |
+| 5.2M | 5.208 | 0.75µs | 5.7µs | 7.0µs | 9.5µs | 25.6µs | 78µs | 113µs |
+| 5.3M | 5.319 | 0.76µs | 5.8µs | 7.1µs | 9.9µs | 49µs | 100µs | 128µs |
+| 5.4M | 5.405 | 0.8µs | 5.9µs | 7.1µs | 9.5µs | 17.3µs | 34µs | 48µs |
+| 5.5M | 5.525 | 0.83µs | 6.1µs | 7.3µs | 9.7µs | 18.7µs | 40µs | 71µs |
+| 5.6M | 5.618 | 0.89µs | 6.2µs | 7.5µs | 10.0µs | 25.1µs | 52µs | 73µs |
+| 5.7M | 5.714 | 1.0µs | 6.6µs | 7.9µs | 15.0µs | 101µs | 137µs | 154µs |
+| 5.8M | 5.814 | 1.03µs | 6.6µs | 7.7µs | 11.0µs | 36µs | 55µs | 68µs |
+| 5.9M | 5.917 | 1.17µs | 6.7µs | 7.9µs | 11.1µs | 77µs | 152µs | 167µs |
+| 6.0M | 6.024 | 1.37µs | 6.9µs | 8.0µs | 11.5µs | 41µs | 67µs | 77µs |
+| 6.1M | 6.135 | 1.54µs | 7.0µs | 8.2µs | 11.8µs | 39µs | 82µs | 100µs |
+| 6.2M | 6.211 | 1.77µs | 7.2µs | 8.3µs | 12.7µs | 47µs | 64µs | 75µs |
+| 6.3M | 6.329 | 2.21µs | 7.4µs | 8.6µs | 15.8µs | 67µs | 79µs | 91µs |
+| 6.4M | 6.410 | 2.51µs | 7.5µs | 8.6µs | 12.3µs | 33µs | 58µs | 70µs |
+| 6.5M | 6.536 | 2.93µs | 7.7µs | 8.8µs | 13.5µs | 37µs | 72µs | 93µs |
+| 6.6M | 6.623 | 3.5µs | 8.2µs | 9.7µs | 25.6µs | 62µs | 78µs | 92µs |
+| 6.7M | 6.711 | 4.2µs | 31µs | 205µs | 266µs | 301µs | 307µs | 313µs |
+| 6.7M | 6.696 | **3.1ms** | 6.4ms | 7.3ms | 7.6ms | 7.7ms | 7.7ms | 7.7ms |
+| 6.7M | 6.711 | **6.5ms** | 13.4ms | 14.9ms | 15.5ms | 15.6ms | 15.7ms | 15.7ms |
+| 6.7M | 6.711 | **8.9ms** | 18.1ms | 19.8ms | 20.6ms | 20.8ms | 20.8ms | 20.8ms |
+| 6.6M | 6.637 | **16.4ms** | 28.6ms | 31ms | 32ms | 32ms | 32ms | 32ms |
 
-**Test Status**: Test stopped at ~1.65M TPS (1.652 MT/s) when median latency exceeded 10ms threshold (68ms)  
-**Best Performance**: Best median latency 257µs at 500K TPS, but high variance  
-**Stable Range**: Up to ~1.5M TPS with median latency < 10ms (most iterations 1-9ms)
+### Performance Comparison by Rate
 
-### Performance Comparison: With vs Without Journaling
+**C++ Implementation:**
 
-| Metric | Without Journaling | With Journaling | Impact |
-|--------|-------------------|-----------------|--------|
-| **Best Median Latency** | 0.61µs (400K TPS) | 257µs (500K TPS) | **421x slower** |
-| **Median Latency at 200K TPS** | 0.66µs | 1.31ms | **1,985x slower** |
-| **Median Latency at 500K TPS** | 0.61µs | 257µs | **421x slower** |
-| **Median Latency at 1.0M TPS** | 0.61µs | 6.7ms | **10,984x slower** |
-| **99% Latency at 200K TPS** | 4.2ms | 17.8ms | **4.2x slower** |
-| **99% Latency at 1.0M TPS** | 15.9ms | 79ms | **5.0x slower** |
-| **Max Latency at 200K TPS** | 48ms | 83ms | **1.7x slower** |
-| **Max Latency at 1.0M TPS** | 32ms | 102ms | **3.2x slower** |
-| **Stable TPS Range** | Up to ~4.8M TPS (median < 10ms) | Up to ~1.5M TPS | **3.2x lower capacity** |
-| **Maximum Stable TPS** | ~4.8M TPS (median < 10ms) | ~1.5M TPS | **3.2x lower** |
-| **Test Stop Condition** | Stopped at 4.724 MT/s (p50=64ms) | Stopped at 1.652 MT/s (p50=68ms) | **2.9x lower throughput** |
+|rate|50.0%|90.0%|95.0%|99.0%|99.9%|99.99%|worst|
+|----|-----|-----|-----|-----|-----|------|-----|
+|125K|0.51µs|0.66µs|0.76µs|2.76µs|12.1µs|49µs|102µs|
+|250K|0.51µs|0.63µs|0.71µs|3.2µs|9.8µs|39µs|96µs|
+|500K|0.5µs|0.61µs|0.69µs|4.5µs|9.1µs|33µs|79µs|
+|1M|0.49µs|0.59µs|0.69µs|5.6µs|9.7µs|46µs|113µs|
+|2M|0.51µs|0.65µs|2.77µs|6.8µs|17µs|60µs|102µs|
+|3M|0.52µs|1.97µs|5.1µs|7.7µs|17.4µs|62µs|88µs|
+|4M|0.53µs|4.4µs|6.4µs|8.4µs|17.6µs|47µs|70µs|
+|5M|0.62µs|6µs|7.2µs|8.8µs|21.5µs|82µs|115µs|
+|6M|0.95µs|7.2µs|8µs|10.5µs|37µs|62µs|70µs|
 
-### Observations
+**Java Implementation:**
 
-- **Journaling overhead**: Significant latency impact, especially at low TPS (200K: 0.66µs → 1.31ms, 1,985x slower)
-- **Median latency degradation**: Best case 257µs (vs 0.61µs without journaling), typically 1-9ms in stable range
-- **Tail latency impact**: 99% latency increases 4-5x (17.8ms vs 4.2ms at 200K TPS)
-- **Throughput capacity**: Maximum stable TPS reduced from ~4.8M to ~1.5M (3.2x reduction)
-- **Latency variance**: Higher variance with journaling, especially at 300K TPS (1.42ms median, 121ms 99%)
-- **Optimal range**: Best performance at 500K TPS (257µs median), but overall much higher latency than without journaling
-- **Disk I/O impact**: Journaling writes to disk (/data on /dev/vdb) add significant overhead to hot path
-- **Test completion**: Stopped at 1.652 MT/s (p50=68ms > 10ms threshold), vs 4.724 MT/s without journaling
+|rate|50.0%|90.0%|95.0%|99.0%|99.9%|99.99%|worst|
+|----|-----|-----|-----|-----|-----|------|-----|
+|125K|0.54µs|0.69µs|0.77µs|1.9µs|10.5µs|40µs|131µs|
+|250K|0.53µs|0.66µs|0.74µs|2.29µs|9.3µs|40µs|127µs|
+|500K|0.51µs|0.63µs|0.71µs|3.6µs|9.9µs|42µs|117µs|
+|1M|0.51µs|0.63µs|0.72µs|4.7µs|9.3µs|50µs|137µs|
+|2M|0.52µs|0.71µs|1.63µs|5.8µs|12.2µs|50µs|94µs|
+|3M|0.59µs|1.03µs|4.0µs|6.8µs|12.8µs|40µs|72µs|
+|4M|0.6µs|3.5µs|5.4µs|8.0µs|38µs|137µs|168µs|
+|5M|0.68µs|5.3µs|6.7µs|9.5µs|47µs|142µs|161µs|
+|6M|1.37µs|6.9µs|8.0µs|11.5µs|41µs|67µs|77µs|
 
-**Conclusion**: Journaling adds substantial latency overhead (421-10,984x for median latency) and reduces maximum stable throughput by 3.2x. For low-latency trading systems, journaling should be disabled in production or use faster storage (NVMe SSD) to minimize impact.
-
----
-
-## SharedPool Queue Implementation Comparison
-
-Performance comparison between `moodycamel::ConcurrentQueue` (unbounded) and `tbb::concurrent_bounded_queue` (bounded) in `SharedPool` for `TestLatencyExchange`.
-
-### Test Configuration
-
-Same as `TestLatencyExchange` above:
-- Symbol Type: `CURRENCY_EXCHANGE_PAIR`
-- Symbols: 1
-- Benchmark Commands: 3,000,000
-- PreFill Commands: 1,000
-- Users: 2,000 accounts (1,325 unique)
-- Currencies: 2
-- Warmup Cycles: 16
-- Ring Buffer: 2,048
-- Matching Engines: 1
-- Risk Engines: 1
-- Messages in Group Limit: 256
-
-**Pool Configuration**: `poolMaxSize = poolInitialSize * 4` (where `poolInitialSize = (matchingEnginesNum + riskEnginesNum) * 8 = 16`), so `poolMaxSize = 64`
-
-### moodycamel::ConcurrentQueue (Unbounded) - Baseline
-
-**Data**: See [C++ Implementation](#c-implementation) section above (lines 192-247) for complete performance data.
-
-**Performance Characteristics**:
-- Consistent sub-microsecond median latency (0.61-0.71µs) across 200K-1.9M TPS range
-- Stable performance up to ~4.8M TPS with median latency < 10ms (most iterations < 1ms)
-- No performance cliff or sudden degradation
-- Unbounded queue allows all chains to be recycled, minimizing allocations
-- Test stopped at ~5.0M TPS (4.724 MT/s) when median latency exceeded 10ms threshold (64ms)
-
-### tbb::concurrent_bounded_queue (Bounded, poolMaxSize=64)
-
-| TPS | Throughput (MT/s) | 50% | 90% | 95% | 99% | 99.9% | 99.99% | Max |
-|-----|-------------------|-----|-----|-----|-----|-------|--------|-----|
-| 200K | 0.200 | 0.55µs | 0.68µs | 0.77µs | 1.58µs | 16.7µs | 87µs | 207µs |
-| 300K | 0.300 | 0.55µs | 0.67µs | 0.75µs | 3.2µs | 50µs | 1.6ms | 2.13ms |
-| 400K | 0.400 | 0.55µs | 0.66µs | 0.74µs | 3.6µs | 30µs | 107µs | 216µs |
-| 500K | 0.500 | 0.53µs | 0.64µs | 0.71µs | 3.8µs | 36µs | 108µs | 254µs |
-| 600K | 0.600 | 0.53µs | 0.64µs | 0.71µs | 4.1µs | 39µs | 114µs | 238µs |
-| 700K | 0.700 | 0.53µs | 0.64µs | 0.71µs | 4.5µs | 51µs | 120µs | 274µs |
-| 800K | 0.800 | 0.53µs | 0.63µs | 0.71µs | 4.8µs | 90µs | 1.08ms | 1.42ms |
-| 900K | 0.900 | 0.54µs | 0.63µs | 0.71µs | 5µs | 124µs | 1.58ms | 1.87ms |
-| 1.0M | 1.000 | 0.53µs | 0.62µs | 0.7µs | 4.8µs | 64µs | 155µs | 274µs |
-| 1.1M | 1.100 | 0.54µs | 0.64µs | 0.73µs | 5µs | 104µs | 1.28ms | 1.51ms |
-| 1.2M | 1.200 | 0.54µs | 0.63µs | 0.75µs | 5.3µs | 167µs | 1.23ms | 1.45ms |
-| 1.3M | 1.300 | 0.54µs | 0.63µs | 0.77µs | 5.3µs | 101µs | 313µs | 493µs |
-| 1.4M | 1.401 | 0.53µs | 0.64µs | 1.4µs | 13.7µs | 1.22ms | 1.78ms | 1.96ms |
-| 1.5M | 1.502 | 0.54µs | 0.64µs | 0.87µs | 6µs | 1.11ms | 2.44ms | 2.55ms |
-| 1.6M | 1.600 | 0.54µs | 0.64µs | 0.88µs | 5.6µs | 89µs | 157µs | 290µs |
-| 1.7M | 1.701 | 0.55µs | 0.65µs | 1.16µs | 6.2µs | 169µs | 576µs | 713µs |
-| **1.8M** | **1.790** | **0.66µs** | **6ms** | **7.6ms** | **12.4ms** | **16ms** | **16.5ms** | **16.6ms** |
-| **1.9M** | **0.409** | **2.15s** | **2.15s** | **2.15s** | **2.15s** | **2.15s** | **2.15s** | **2.15s** |
-
-**Performance Characteristics**:
-- **Low Load (<1.7M TPS)**: TBB p90 latency significantly better (0.63-0.65µs vs 1.5-1.93ms)
-- **High Load (≥1.8M TPS)**: Performance cliff at 1.790 MT/s → queue full → latency spikes (0.66µs → 2.15s)
-- **Throughput Collapse**: 1.790 MT/s → 0.409 MT/s (4.4x reduction)
-
-### Performance Comparison
-
-| Metric | moodycamel::ConcurrentQueue | tbb::concurrent_bounded_queue | Impact |
-|--------|----------------------------|-------------------------------|--------|
-| **90% Latency at 1.6M TPS** | 1.93ms | 0.64µs | **TBB 3,016x better** |
-| **90% Latency at 1.7M TPS** | 1.86ms | 0.65µs | **TBB 2,862x better** |
-| **90% Latency at 1.8M TPS** | 2.08ms | 6ms → 2.15s | **TBB worse after cliff** |
-| **Stable TPS Range** | Up to ~4.8M TPS | Up to 1.7M TPS | **moodycamel 2.8x higher** |
-| **Performance Cliff** | None | At 1.790 MT/s | TBB fails at peak load |
-| **Test Completion** | 4.724 MT/s (p50=64ms) | 0.409 MT/s (p50=2.15s) | **moodycamel 11.6x higher** |
-
-### Summary
-
-**Key Finding**: TBB bounded queue excels at low load (p90 latency 3,000x better), but fails at peak load due to queue capacity limit.
-
-**Root Cause**: Bounded queue (`poolMaxSize=64`) full → `try_push()` fails → chains discarded → frequent allocations → severe degradation.
-
-**Memory Safety Note**: 
-- **Java**: `offer()` returns false → GC automatically reclaims discarded chains (no leak)
-- **C++ with TBB**: `try_push()` returns false → chains must be explicitly deleted to avoid memory leak
-- **C++ with moodycamel**: `enqueue()` always succeeds (unbounded) → no leak risk
-
-**Recommendation**: Choose based on load profile:
-- **Low/Moderate Load (<1.7M TPS)**: TBB bounded queue for better p90 latency (requires explicit chain deletion on `try_push()` failure)
-- **High/Variable Load (≥1.8M TPS)**: moodycamel unbounded queue for stability and peak performance (no memory leak risk)
-
----
-
-## TestLatencyExchange Results (2025-12-30 - After Batch Update Optimization)
-
-### Test Configuration
-
-Same as previous `TestLatencyExchange` test, with **batch update optimization** applied:
-- GROUPING: Sequence update every 20 messages
-- R1: Sequence update every 20 messages  
-- R2: Sequence update every 25 messages
-
-### C++ Implementation (After Optimization)
-
-| TPS | Throughput (MT/s) | 50% | 90% | 95% | 99% | 99.9% | 99.99% | Max |
-|-----|-------------------|-----|-----|-----|-----|-------|--------|-----|
-| 200K | 0.200 | 0.66µs | 3ms | 4.8ms | 7.9ms | 52ms | 65ms | 67ms |
-| 300K | 0.300 | 0.65µs | 2.34ms | 3.9ms | 31ms | 105ms | 114ms | 115ms |
-| 400K | 0.400 | 0.64µs | 2.58ms | 4.5ms | 7.5ms | 12.2ms | 17.1ms | 17.7ms |
-| 500K | 0.500 | 0.62µs | 2.71ms | 4.9ms | 10.6ms | 48ms | 53ms | 54ms |
-| 600K | 0.600 | 0.7µs | 5.1ms | 6.9ms | 9.7ms | 12.5ms | 13.5ms | 13.7ms |
-| 700K | 0.700 | 0.65µs | 3.4ms | 5ms | 7.6ms | 14.4ms | 17.6ms | 17.9ms |
-| 800K | 0.800 | 0.63µs | 3ms | 4.9ms | 7.7ms | 12ms | 14.3ms | 14.6ms |
-| 900K | 0.900 | 0.59µs | 538µs | 1.76ms | 2.79ms | 15.3ms | 17.9ms | 18.1ms |
-| 1.0M | 0.999 | 0.59µs | 1.66ms | 2.57ms | 9.6ms | 33ms | 36ms | 36ms |
-| 1.1M | 1.098 | 0.62µs | 3.2ms | 5.2ms | 15.6ms | 37ms | 39ms | 39ms |
-| 1.2M | 1.200 | 0.67µs | 2.52ms | 3.6ms | 6.6ms | 8.7ms | 10.6ms | 10.8ms |
-| 1.3M | 1.299 | 456µs | 4.9ms | 6.2ms | 8.1ms | 10.5ms | 10.9ms | 11ms |
-| 1.4M | 1.399 | 0.63µs | 2.38ms | 2.91ms | 5.4ms | 11.6ms | 13.2ms | 13.3ms |
-| 1.5M | 1.501 | 0.62µs | 2.44ms | 3.6ms | 5.4ms | 11.9ms | 13.4ms | 13.4ms |
-| 1.6M | 1.600 | 3.5µs | 3ms | 4.3ms | 5.3ms | 5.6ms | 6.7ms | 6.8ms |
-| 1.7M | 1.701 | 0.66µs | 2.21ms | 2.55ms | 4.1ms | 5.4ms | 5.6ms | 5.7ms |
-| 1.8M | 1.799 | 0.6µs | 1.88ms | 2.53ms | 4.8ms | 9.5ms | 10.6ms | 10.7ms |
-| 1.9M | 1.901 | 0.6µs | 1.84ms | 2.34ms | 2.76ms | 5ms | 5.4ms | 5.4ms |
-| 2.0M | 1.997 | 0.66µs | 2.27ms | 2.63ms | 5ms | 9.8ms | 10.7ms | 10.8ms |
-| 2.1M | 2.101 | 0.78µs | 2.17ms | 2.47ms | 2.73ms | 2.92ms | 3.7ms | 3.7ms |
-| 2.2M | 2.203 | 4.7µs | 2.55ms | 6.6ms | 37ms | 40ms | 41ms | 41ms |
-| 2.3M | 2.304 | 0.68µs | 2.15ms | 2.5ms | 2.84ms | 5ms | 5.4ms | 5.5ms |
-| 2.4M | 2.404 | 0.6µs | 471µs | 1.73ms | 2.73ms | 3ms | 3.1ms | 3.2ms |
-| 2.5M | 2.498 | 0.6µs | 1.27ms | 2.39ms | 7.5ms | 14.9ms | 15.6ms | 15.6ms |
-| 2.6M | 2.600 | 169µs | 2.59ms | 3.6ms | 5.6ms | 10ms | 10.7ms | 10.7ms |
-| 2.7M | 2.703 | 4.6µs | 2.21ms | 2.49ms | 2.73ms | 2.85ms | 2.97ms | 3ms |
-| 2.8M | 2.786 | 1.62µs | 4.2ms | 5.2ms | 7.4ms | 9.4ms | 9.9ms | 10ms |
-| 2.9M | 2.907 | 0.95µs | 2.64ms | 3.7ms | 5.3ms | 5.7ms | 6ms | 6ms |
-| 3.0M | 2.997 | 1.17ms | 4.8ms | 5.5ms | 7.7ms | 10.3ms | 10.8ms | 10.9ms |
-| 3.1M | 3.106 | 1.29ms | 5.2ms | 6.7ms | 9.5ms | 10.7ms | 11.1ms | 11.2ms |
-| 3.2M | 3.198 | 552µs | 2.77ms | 4.1ms | 5.3ms | 7.7ms | 8.2ms | 8.2ms |
-| 3.3M | 3.300 | 483µs | 2.82ms | 4.4ms | 6.3ms | 8ms | 8.1ms | 8.1ms |
-| 3.4M | 3.390 | 0.64µs | 1.82ms | 2.33ms | 2.72ms | 2.93ms | 3.1ms | 3.1ms |
-| 3.5M | 3.509 | 0.62µs | 1.46ms | 2.18ms | 2.79ms | 4.8ms | 5.1ms | 5.2ms |
-| 3.6M | 3.610 | 1.04µs | 2.11ms | 2.46ms | 2.74ms | 2.92ms | 3.1ms | 3.1ms |
-| 3.7M | 3.699 | 2.53µs | 2.25ms | 2.59ms | 2.91ms | 3.1ms | 3.2ms | 3.2ms |
-| 3.8M | 3.802 | 3.6ms | 6.9ms | 7.8ms | 9.5ms | 10.7ms | 11ms | 11ms |
-| 3.9M | 3.906 | 5.2µs | 2.19ms | 2.49ms | 2.73ms | 2.87ms | 2.91ms | 2.93ms |
-| 4.0M | 3.995 | 0.68µs | 1.68ms | 2.25ms | 2.71ms | 2.92ms | 3ms | 3ms |
-| 4.1M | 4.115 | 2.41ms | 8.9ms | 10.3ms | 13ms | 13.9ms | 14.1ms | 14.2ms |
-| ~4.0M | 4.060 | **13ms** | 24.7ms | 25.8ms | 27.5ms | 28.7ms | 29ms | 29ms |
-
-**Test Status**: Test stopped at ~4.0M TPS (4.060 MT/s) when median latency exceeded 10ms threshold (13ms)
-
-### Summary
-
-**Compared to baseline (2025-12-28)**:
-- ✅ **Low-Mid TPS (200K-1.0M)**: Improved stability, P50 remains sub-microsecond (0.59-0.7µs)
-  - 200K: P50 similar (0.66µs vs 0.66µs), P90 degraded (3ms vs 1.6ms), P99 degraded (7.9ms vs 4.2ms)
-  - 900K: P50 improved (0.59µs vs 0.64µs), P90 significantly improved (538µs vs 2.05ms), P99 improved (2.79ms vs 4.2ms)
-  - 1.0M: P50 improved (0.59µs vs 0.61µs), P90 similar (1.66ms vs 1.98ms), P99 improved (9.6ms vs 15.9ms, 40% better)
-- ✅ **High TPS (3.0M-4.0M)**: Good performance maintained
-  - 3.5M: P50 improved (0.62µs vs 0.64µs), P90 improved (1.46ms vs 1.23ms), P99 similar (2.79ms vs 2.65ms)
-  - 4.0M: P50 improved (0.68µs vs 597µs), P90 improved (1.68ms vs 2.31ms), P99 similar (2.71ms vs 2.67ms)
-- ⚠️ **Test stopped earlier**: 4.060 MT/s vs 4.724 MT/s (14% lower throughput before hitting 10ms threshold)
-
-**Conclusion**: Batch update optimization shows **improved stability** at low-mid TPS (especially 900K-1.0M), with P50 consistently sub-microsecond. High TPS performance remains good. The optimization successfully reduces downstream waiting time while maintaining low latency at moderate loads.
+**Note**: For 125K and 250K rates, data from 200K and 300K TPS tests are used respectively as closest approximations.
 
 ---
 
