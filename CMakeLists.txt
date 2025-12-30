@@ -107,8 +107,14 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mimalloc/CMakeLists.txt)
     set(MI_BUILD_EXAMPLES OFF CACHE BOOL "Build mimalloc examples" FORCE)
     set(MI_BUILD_SHARED OFF CACHE BOOL "Build shared library" FORCE)
     set(MI_BUILD_STATIC ON CACHE BOOL "Build static library" FORCE)
+    # Temporarily disable LTO for mimalloc to avoid "plugin needed to handle lto object" errors
+    # Clang's LTO requires all objects to be LTO or none, mixing causes linker plugin issues
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_SAVED ${CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE})
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF)
     add_subdirectory(third_party/mimalloc)
-    message(STATUS "Using mimalloc from submodule (tests disabled)")
+    # Restore LTO setting for main project
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ${CMAKE_INTERPROCEDURAL_OPTIMIZATION_SAVED})
+    message(STATUS "Using mimalloc from submodule (tests disabled, LTO disabled for compatibility)")
 else()
     message(WARNING "mimalloc submodule not found. Please run: git submodule add https://github.com/microsoft/mimalloc.git third_party/mimalloc")
 endif()
@@ -116,8 +122,14 @@ endif()
 # lz4: Fast compression library (required dependency, 1:1 with Java version)
 # Java version uses lz4-java as required dependency, so C++ version should too
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lz4/lib/lz4.h)
+    # Temporarily disable LTO for lz4 to avoid "plugin needed to handle lto object" errors
+    # Clang's LTO requires all objects to be LTO or none, mixing causes linker plugin issues
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_SAVED ${CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE})
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF)
     add_subdirectory(third_party/lz4/build/cmake)
-    message(STATUS "Using lz4 from submodule")
+    # Restore LTO setting for main project
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ${CMAKE_INTERPROCEDURAL_OPTIMIZATION_SAVED})
+    message(STATUS "Using lz4 from submodule (LTO disabled for compatibility)")
 else()
     find_package(lz4 REQUIRED)
     if(lz4_FOUND)
@@ -252,27 +264,15 @@ target_link_libraries(exchange-cpp
 )
 
 # Link mimalloc if available as submodule
-# Disable LTO for mimalloc to avoid "plugin needed to handle lto object" errors
+# Note: LTO is disabled during mimalloc build (see add_subdirectory above)
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mimalloc/CMakeLists.txt)
-    if(IPO_SUPPORTED AND TARGET mimalloc-static)
-        # Disable LTO for mimalloc static library to avoid linker plugin issues
-        set_target_properties(mimalloc-static PROPERTIES
-            INTERPROCEDURAL_OPTIMIZATION OFF
-        )
-    endif()
     target_link_libraries(exchange-cpp PUBLIC mimalloc-static)
     message(STATUS "Linking mimalloc-static for high-performance memory allocation")
 endif()
 
 # Link lz4 if available
-# Disable LTO for lz4 to avoid "plugin needed to handle lto object" errors
+# Note: LTO is disabled during lz4 build (see add_subdirectory above)
 if(TARGET lz4)
-    if(IPO_SUPPORTED)
-        # Disable LTO for lz4 static library to avoid linker plugin issues
-        set_target_properties(lz4 PROPERTIES
-            INTERPROCEDURAL_OPTIMIZATION OFF
-        )
-    endif()
     target_link_libraries(exchange-cpp PUBLIC lz4)
     message(STATUS "Linking lz4 for compression support")
 elseif(lz4_FOUND)
