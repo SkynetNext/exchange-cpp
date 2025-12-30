@@ -17,25 +17,25 @@ Performance comparison between C++ and Java implementations of the exchange core
 - **Backend**: KVM virtualized storage (actual physical storage type unknown from guest)
 **Virtualization**: KVM  
 **Build**: C++ (optimized native), Java (JVM with JIT, Java 8u192)  
-**CPU Affinity**: Enabled  
+**CPU Affinity**: Enabled
 **Kernel Optimization**: `isolcpus=8-15 nohz_full=8-15 rcu_nocbs=8-15` (CPU 8-15 isolated for application)
 
 ---
 
-## TestLatencyExchange Results
+## TestLatencyMargin Results
 
-Latency test for single symbol (Exchange mode) with progressive TPS increase to measure latency characteristics under different load conditions.
+Latency test for single symbol (Margin mode) with progressive TPS increase to measure latency characteristics under different load conditions.
 
 ### Test Configuration
 
 | Parameter | Value |
 |-----------|-------|
-| Symbol Type | `CURRENCY_EXCHANGE_PAIR` |
+| Symbol Type | `FUTURES_CONTRACT` |
 | Symbols | 1 |
 | Benchmark Commands | 3,000,000 |
 | PreFill Commands | 1,000 |
-| Users | 2,000 accounts (1,325 unique) |
-| Currencies | 2 |
+| Users | 2,000 currency accounts (1,325 unique users) |
+| Currencies | 2 (USD, EUR) |
 | Warmup Cycles | 16 |
 | Ring Buffer | 2,048 |
 | Matching Engines | 1 |
@@ -44,7 +44,7 @@ Latency test for single symbol (Exchange mode) with progressive TPS increase to 
 
 **Test Strategy**: Progressive TPS increase (200K → 300K → 400K → ...) until median latency exceeds 10ms (10,000,000 nanoseconds)
 
-### C++ Implementation 
+### C++ Implementation
 
 | TPS | Throughput (MT/s) | 50% | 90% | 95% | 99% | 99.9% | 99.99% | Max |
 |-----|-------------------|-----|-----|-----|-----|-------|--------|-----|
@@ -141,7 +141,7 @@ Latency test for single symbol (Exchange mode) with progressive TPS increase to 
 | 8.7M | 8.671 | 6.2ms | 17.4ms | 19.9ms | 21.7ms | 22ms | 22ms | 22.1ms |
 | 8.6M | 8.621 | **11.1ms** | 24.9ms | 27.4ms | 29.3ms | 29.6ms | 29.7ms | 29.7ms |
 
-### Java Implementation 
+### Java Implementation
 
 | TPS | Throughput (MT/s) | 50% | 90% | 95% | 99% | 99.9% | 99.99% | Max |
 |-----|-------------------|-----|-----|-----|-----|-------|--------|-----|
@@ -250,4 +250,4 @@ Latency test for single symbol (Exchange mode) with progressive TPS increase to 
 
 ---
 
-**Version**: 1.6 | **Date**: 2025-12-30 | **Tests**: `TestThroughputExchange`, `TestThroughputPeak`, `TestLatencyExchange`, `TestLatencyExchangeJournaling`, `SharedPool Queue Comparison`, `TestLatencyExchange (Batch Update Optimization)`
+**Version**: 1.6 | **Date**: 2025-12-30 | **Tests**: `TestThroughputExchange`, `TestThroughputPeak`, `TestLatencyMargin`, `TestLatencyExchangeJournaling`, `SharedPool Queue Comparison`

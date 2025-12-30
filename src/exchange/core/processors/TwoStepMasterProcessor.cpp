@@ -113,8 +113,17 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
 
       if (nextSequence <= availableSequence) {
+        // Update sequence every N messages to avoid long batch delays
+        // Target: 1µs delay = 1000ns
+        // R1 processing: ~50ns per message (estimated from R1_END P50)
+        // Calculation: 1000ns / 50ns = 20 messages
+        constexpr int64_t SEQUENCE_UPDATE_INTERVAL = 20;
+        int64_t processedCount = 0;
+        int64_t lastPublishedSequence = sequence_.get();
+
         while (nextSequence <= availableSequence) {
           cmd = &ringBuffer_->get(nextSequence);
+          processedCount++;
 
           // switch to next group - let slave processor start doing its handling
           // cycle
@@ -149,6 +158,8 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           if (forcedPublish) {
             sequence_.set(nextSequence - 1);
             waitSpinningHelper_->SignalAllWhenBlocking();
+            lastPublishedSequence = nextSequence - 1;
+            processedCount = 0;
           }
 
           if (cmd->command == common::cmd::OrderCommandType::SHUTDOWN_SIGNAL) {
@@ -160,10 +171,21 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
                      name_);
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
           }
+
+          // Update sequence periodically to avoid long batch delays
+          // This allows downstream processors (ME) to start processing earlier
+          if (processedCount >= SEQUENCE_UPDATE_INTERVAL) {
+            sequence_.set(nextSequence - 1);
+            waitSpinningHelper_->SignalAllWhenBlocking();
+            lastPublishedSequence = nextSequence - 1;
+            processedCount = 0;
+          }
         }
-        // Match Java: sequence.set(availableSequence);
-        sequence_.set(availableSequence);
-        waitSpinningHelper_->SignalAllWhenBlocking();
+        // Update sequence for any remaining messages
+        if (processedCount > 0 || lastPublishedSequence < availableSequence) {
+          sequence_.set(availableSequence);
+          waitSpinningHelper_->SignalAllWhenBlocking();
+        }
       }
     } catch (const disruptor::AlertException &ex) {
       if (running_.load() != RUNNING) {
