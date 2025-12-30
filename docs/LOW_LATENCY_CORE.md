@@ -35,10 +35,10 @@ Measures end-to-end order processing: `Order Submission → Ring Buffer → Grou
 |--------|-----|------|-------|
 | **P50 @ 200K TPS** | 0.56µs | 0.54µs | **1.04x worse** |
 | **P50 @ 1M TPS** | 0.54µs | 0.51µs | **1.06x worse** |
-| **P50 @ 5M TPS** | 1.16µs | 0.68µs | **1.71x worse** |
+| **P50 @ 4M TPS** | 0.93µs | 0.6µs | **1.55x worse** |
 | **P50 @ 6M TPS** | 1.59µs | 1.37µs | **1.16x worse** |
 | **P99 @ 1M TPS** | 0.81µs | 4.7µs | **5.80x better** |
-| **P99 @ 5M TPS** | 2.65µs | 9.5µs | **3.58x better** |
+| **P99 @ 4M TPS** | 1.84µs | 8.0µs | **4.35x better** |
 | **P99 @ 6M TPS** | 9.8µs | 11.5µs | **1.17x better** |
 | **Max Stable TPS** | 8M | 6M | **1.33x higher** |
 
