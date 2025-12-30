@@ -124,27 +124,66 @@ int AffinityThreadFactory::AcquireAffinityLock(int32_t threadId) {
   }
 
 #ifdef _WIN32
-  // Windows implementation
+  // Windows implementation - match OpenHFT Affinity behavior
   HANDLE threadHandle = GetCurrentThread();
   DWORD_PTR processAffinityMask = 0;
   DWORD_PTR systemAffinityMask = 0;
 
   if (GetProcessAffinityMask(GetCurrentProcess(), &processAffinityMask,
                              &systemAffinityMask)) {
-    // Find an available CPU core
-    DWORD_PTR affinityMask = 0;
-    int coreId =
-        threadId % (sizeof(DWORD_PTR) * 8); // Use modulo to cycle through cores
+    // Build list of available CPUs from affinity mask
+    std::vector<int> availableCpus;
+    DWORD_PTR mask = processAffinityMask;
+    int cpuIndex = 0;
+    while (mask != 0) {
+      if (mask & 1) {
+        availableCpus.push_back(cpuIndex);
+      }
+      mask >>= 1;
+      cpuIndex++;
+    }
+
+    if (availableCpus.empty()) {
+      LOG_WARN("[AffinityThreadFactory] No available CPU cores in affinity "
+               "mask (processAffinityMask=0x{:x}), thread will run without "
+               "CPU pinning",
+               processAffinityMask);
+      return -1;
+    }
+
+    // Match OpenHFT Affinity: assign from last CPU backwards
+    // availableCpus is already sorted from low to high, so use reverse order
+    int cpuIdx = availableCpus.size() - 1 - (threadId % availableCpus.size());
+    int coreId = availableCpus[cpuIdx];
 
     if (threadAffinityMode_ ==
         ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_PHYSICAL_CORE) {
       // For physical cores, we would need to detect hyperthreading
       // For simplicity, use every other core (assuming hyperthreading)
-      coreId = (coreId / 2) * 2;
+      // Find the closest even CPU in availableCpus
+      int evenCpuId = (coreId / 2) * 2;
+      bool found = false;
+      for (int cpu : availableCpus) {
+        if (cpu == evenCpuId) {
+          coreId = evenCpuId;
+          found = true;
+          break;
+        }
+      }
+      if (!found && coreId % 2 == 1) {
+        // If odd CPU, try to find next even CPU in availableCpus
+        for (int cpu : availableCpus) {
+          if (cpu > coreId && cpu % 2 == 0) {
+            coreId = cpu;
+            found = true;
+            break;
+          }
+        }
+      }
     }
 
     // Set affinity mask to the selected core
-    affinityMask = static_cast<DWORD_PTR>(1) << coreId;
+    DWORD_PTR affinityMask = static_cast<DWORD_PTR>(1) << coreId;
     // Ensure the mask is within available cores
     affinityMask &= processAffinityMask;
 
@@ -185,8 +224,10 @@ int AffinityThreadFactory::AcquireAffinityLock(int32_t threadId) {
     return -1;
   }
 
-  // Calculate which CPU to use
-  int cpuId = threadId % numCpus;
+  // Match OpenHFT Affinity behavior: assign from last CPU backwards
+  // This avoids CPU 0 (system reserved) and prefers higher-numbered CPUs
+  // which are typically less used by system processes
+  int cpuId = numCpus - 1 - (threadId % numCpus);
 
   if (threadAffinityMode_ ==
       ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_PHYSICAL_CORE) {
