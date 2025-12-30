@@ -153,7 +153,8 @@ int AffinityThreadFactory::AcquireAffinityLock(int32_t threadId) {
 
     // Match OpenHFT Affinity: assign from last CPU backwards
     // availableCpus is already sorted from low to high, so use reverse order
-    int cpuIdx = availableCpus.size() - 1 - (threadId % availableCpus.size());
+    // threadId starts from 1, so use (threadId - 1) for indexing
+    int cpuIdx = availableCpus.size() - 1 - ((threadId - 1) % availableCpus.size());
     int coreId = availableCpus[cpuIdx];
 
     if (threadAffinityMode_ ==
@@ -227,7 +228,8 @@ int AffinityThreadFactory::AcquireAffinityLock(int32_t threadId) {
   // Match OpenHFT Affinity behavior: assign from last CPU backwards
   // This avoids CPU 0 (system reserved) and prefers higher-numbered CPUs
   // which are typically less used by system processes
-  int cpuId = numCpus - 1 - (threadId % numCpus);
+  // threadId starts from 1, so use (threadId - 1) for indexing
+  int cpuId = numCpus - 1 - ((threadId - 1) % numCpus);
 
   if (threadAffinityMode_ ==
       ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_PHYSICAL_CORE) {
