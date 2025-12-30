@@ -42,10 +42,10 @@ PerformanceConfiguration PerformanceConfiguration::Default() {
       16 * 1024, // ringBufferSize
       1,         // matchingEnginesNum
       1,         // riskEnginesNum
-      20,     // msgsInGroupLimit (synchronized with SEQUENCE_UPDATE_INTERVAL)
-      10'000, // maxGroupDurationNs (10 microseconds)
-      false,  // sendL2ForEveryCmd
-      8,      // l2RefreshDepth
+      32,        // msgsInGroupLimit
+      10'000,    // maxGroupDurationNs (10 microseconds)
+      false,     // sendL2ForEveryCmd
+      8,         // l2RefreshDepth
       CoreWaitStrategy::BLOCKING, std::make_shared<SimpleThreadFactory>(),
       [](const CoreSymbolSpecification *spec,
          ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
@@ -64,7 +64,7 @@ PerformanceConfiguration PerformanceConfiguration::LatencyPerformanceBuilder() {
       2 * 1024, // ringBufferSize
       1,        // matchingEnginesNum
       1,        // riskEnginesNum
-      20,       // msgsInGroupLimit (synchronized with SEQUENCE_UPDATE_INTERVAL)
+      32,       // msgsInGroupLimit
       10'000,   // maxGroupDurationNs (10 microseconds)
       false,    // sendL2ForEveryCmd
       8,        // l2RefreshDepth

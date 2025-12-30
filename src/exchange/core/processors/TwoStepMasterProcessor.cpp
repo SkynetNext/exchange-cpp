@@ -96,14 +96,9 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
   // Match Java: Thread.currentThread().setName("Thread-" + name);
   // Note: C++ doesn't have thread naming in standard library, skip for now
 
-  // Reuse sequence_.get() result to avoid redundant atomic operation
-  // sequence_.get() uses relaxed load + acquire fence, so we cache it once
-  // Note: sequence is int64_t (max 2^63-1). At 1M msgs/sec, overflow would take
-  // ~292K years. Ring buffer uses bitwise masking (sequence & indexMask_) for
-  // indexing, so overflow doesn't affect index calculation. However, comparison
-  // operations (e.g., lastProcessedSequence > lastTriggeredSequence) may have
-  // issues after overflow (wrap-around from max to min), but this is
-  // practically impossible in real-world usage.
+  // Cache sequence_.get() to avoid redundant atomic operation
+  // Sequence overflow is practically impossible (would take ~292K years at 1M
+  // msgs/sec)
   int64_t initialSequence = sequence_.get();
   int64_t nextSequence = initialSequence + 1L;
   int64_t currentSequenceGroup = 0; // Match Java: initialize to 0
