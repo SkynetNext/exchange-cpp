@@ -1,8 +1,99 @@
 # Exchange Core Performance Benchmark: C++ vs Java Comparison
 
-## Overview
+## Performance Summary
 
-Performance comparison between C++ and Java implementations of the exchange core system, focusing on throughput for `CURRENCY_EXCHANGE_PAIR` (Exchange) operations and peak load scenarios.
+### Latency Comparison by TPS Rate
+
+| TPS Rate | Metric | C++ | Java | Winner |
+|----------|--------|-----|------|--------|
+| **125K** | P50 | 0.51µs | 0.54µs | ✅ C++ (1.06x) |
+| | P90 | 0.66µs | 0.69µs | ✅ C++ (1.05x) |
+| | P99 | 2.76µs | 1.9µs | ✅ Java (1.45x) |
+| | P99.9 | 12.1µs | 10.5µs | ✅ Java (1.15x) |
+| **250K** | P50 | 0.51µs | 0.53µs | ✅ C++ (1.04x) |
+| | P90 | 0.63µs | 0.66µs | ✅ C++ (1.05x) |
+| | P99 | 3.2µs | 2.29µs | ✅ Java (1.40x) |
+| | P99.9 | 9.8µs | 9.3µs | ✅ Java (1.05x) |
+| **500K** | P50 | 0.5µs | 0.51µs | ✅ C++ (1.02x) |
+| | P90 | 0.61µs | 0.63µs | ✅ C++ (1.03x) |
+| | P99 | 4.5µs | 3.6µs | ✅ Java (1.25x) |
+| | P99.9 | 9.1µs | 9.9µs | ✅ C++ (1.09x) |
+| **1M** | P50 | 0.49µs | 0.51µs | ✅ C++ (1.04x) |
+| | P90 | 0.59µs | 0.63µs | ✅ C++ (1.07x) |
+| | P99 | 5.6µs | 4.7µs | ✅ Java (1.19x) |
+| | P99.9 | 9.7µs | 9.3µs | ✅ Java (1.04x) |
+| **2M** | P50 | 0.51µs | 0.52µs | ✅ C++ (1.02x) |
+| | P90 | 0.65µs | 0.71µs | ✅ C++ (1.09x) |
+| | P99 | 6.8µs | 5.8µs | ✅ Java (1.17x) |
+| | P99.9 | 17µs | 12.2µs | ✅ Java (1.39x) |
+| **3M** | P50 | 0.52µs | 0.59µs | ✅ C++ (1.13x) |
+| | P90 | 1.97µs | 1.03µs | ✅ Java (1.91x) |
+| | P99 | 7.7µs | 6.8µs | ✅ Java (1.13x) |
+| | P99.9 | 17.4µs | 12.8µs | ✅ Java (1.36x) |
+| **4M** | P50 | 0.53µs | 0.6µs | ✅ C++ (1.13x) |
+| | P90 | 4.4µs | 3.5µs | ✅ Java (1.26x) |
+| | P99 | 8.4µs | 8.0µs | ✅ Java (1.05x) |
+| | P99.9 | 17.6µs | 38µs | ✅ C++ (2.16x) |
+| **5M** | P50 | 0.62µs | 0.68µs | ✅ C++ (1.10x) |
+| | P90 | 6µs | 5.3µs | ✅ Java (1.13x) |
+| | P99 | 8.8µs | 9.5µs | ✅ C++ (1.08x) |
+| | P99.9 | 21.5µs | 47µs | ✅ C++ (2.19x) |
+| **6M** | P50 | 0.95µs | 1.37µs | ✅ C++ (1.44x) |
+| | P90 | 7.2µs | 6.9µs | ✅ Java (1.04x) |
+| | P99 | 10.5µs | 11.5µs | ✅ C++ (1.10x) |
+| | P99.9 | 37µs | 41µs | ✅ Java (1.11x) |
+
+### Key Performance Metrics
+
+| Metric | C++ | Java | Winner |
+|--------|-----|------|--------|
+| **Max Stable TPS** | 8M TPS | 6M TPS | ✅ C++ (1.33x) |
+| **P50 @ 1M TPS** | 0.49µs | 0.51µs | ✅ C++ (1.04x) |
+| **P99 @ 1M TPS** | 5.6µs | 4.7µs | ✅ Java (1.19x) |
+| **P50 @ 5M TPS** | 0.62µs | 0.68µs | ✅ C++ (1.10x) |
+| **P99 @ 5M TPS** | 8.8µs | 9.5µs | ✅ C++ (1.08x) |
+| **P50 @ 6M TPS** | 0.95µs | 1.37µs | ✅ C++ (1.44x) |
+| **P99 @ 6M TPS** | 10.5µs | 11.5µs | ✅ C++ (1.10x) |
+
+**Summary**: C++ shows superior median latency (P50) across all TPS rates and higher maximum stable throughput (8M vs 6M TPS). Java shows better P99 latency at lower TPS rates (≤3M), but C++ outperforms at higher TPS rates (≥5M).
+
+---
+
+## Detailed Performance Data
+
+### Performance Comparison by Rate
+
+**C++ Implementation:**
+
+| rate | 50.0% | 90.0% | 95.0% | 99.0% | 99.9% | 99.99% | worst |
+|------|-------|-------|-------|-------|-------|--------|-------|
+| 125K | 0.51µs | 0.66µs | 0.76µs | 2.76µs | 12.1µs | 49µs | 102µs |
+| 250K | 0.51µs | 0.63µs | 0.71µs | 3.2µs | 9.8µs | 39µs | 96µs |
+| 500K | 0.5µs | 0.61µs | 0.69µs | 4.5µs | 9.1µs | 33µs | 79µs |
+| 1M | 0.49µs | 0.59µs | 0.69µs | 5.6µs | 9.7µs | 46µs | 113µs |
+| 2M | 0.51µs | 0.65µs | 2.77µs | 6.8µs | 17µs | 60µs | 102µs |
+| 3M | 0.52µs | 1.97µs | 5.1µs | 7.7µs | 17.4µs | 62µs | 88µs |
+| 4M | 0.53µs | 4.4µs | 6.4µs | 8.4µs | 17.6µs | 47µs | 70µs |
+| 5M | 0.62µs | 6µs | 7.2µs | 8.8µs | 21.5µs | 82µs | 115µs |
+| 6M | 0.95µs | 7.2µs | 8µs | 10.5µs | 37µs | 62µs | 70µs |
+
+**Java Implementation:**
+
+| rate | 50.0% | 90.0% | 95.0% | 99.0% | 99.9% | 99.99% | worst |
+|------|-------|-------|-------|-------|-------|--------|-------|
+| 125K | 0.54µs | 0.69µs | 0.77µs | 1.9µs | 10.5µs | 40µs | 131µs |
+| 250K | 0.53µs | 0.66µs | 0.74µs | 2.29µs | 9.3µs | 40µs | 127µs |
+| 500K | 0.51µs | 0.63µs | 0.71µs | 3.6µs | 9.9µs | 42µs | 117µs |
+| 1M | 0.51µs | 0.63µs | 0.72µs | 4.7µs | 9.3µs | 50µs | 137µs |
+| 2M | 0.52µs | 0.71µs | 1.63µs | 5.8µs | 12.2µs | 50µs | 94µs |
+| 3M | 0.59µs | 1.03µs | 4.0µs | 6.8µs | 12.8µs | 40µs | 72µs |
+| 4M | 0.6µs | 3.5µs | 5.4µs | 8.0µs | 38µs | 137µs | 168µs |
+| 5M | 0.68µs | 5.3µs | 6.7µs | 9.5µs | 47µs | 142µs | 161µs |
+| 6M | 1.37µs | 6.9µs | 8.0µs | 11.5µs | 41µs | 67µs | 77µs |
+
+**Note**: For 125K and 250K rates, data from 200K and 300K TPS tests are used respectively as closest approximations.
+
+---
 
 ## Test Environment
 
@@ -216,38 +307,5 @@ Latency test for single symbol (Margin mode) with progressive TPS increase to me
 | 6.7M | 6.711 | **8.9ms** | 18.1ms | 19.8ms | 20.6ms | 20.8ms | 20.8ms | 20.8ms |
 | 6.6M | 6.637 | **16.4ms** | 28.6ms | 31ms | 32ms | 32ms | 32ms | 32ms |
 
-### Performance Comparison by Rate
-
-**C++ Implementation:**
-
-|rate|50.0%|90.0%|95.0%|99.0%|99.9%|99.99%|worst|
-|----|-----|-----|-----|-----|-----|------|-----|
-|125K|0.51µs|0.66µs|0.76µs|2.76µs|12.1µs|49µs|102µs|
-|250K|0.51µs|0.63µs|0.71µs|3.2µs|9.8µs|39µs|96µs|
-|500K|0.5µs|0.61µs|0.69µs|4.5µs|9.1µs|33µs|79µs|
-|1M|0.49µs|0.59µs|0.69µs|5.6µs|9.7µs|46µs|113µs|
-|2M|0.51µs|0.65µs|2.77µs|6.8µs|17µs|60µs|102µs|
-|3M|0.52µs|1.97µs|5.1µs|7.7µs|17.4µs|62µs|88µs|
-|4M|0.53µs|4.4µs|6.4µs|8.4µs|17.6µs|47µs|70µs|
-|5M|0.62µs|6µs|7.2µs|8.8µs|21.5µs|82µs|115µs|
-|6M|0.95µs|7.2µs|8µs|10.5µs|37µs|62µs|70µs|
-
-**Java Implementation:**
-
-|rate|50.0%|90.0%|95.0%|99.0%|99.9%|99.99%|worst|
-|----|-----|-----|-----|-----|-----|------|-----|
-|125K|0.54µs|0.69µs|0.77µs|1.9µs|10.5µs|40µs|131µs|
-|250K|0.53µs|0.66µs|0.74µs|2.29µs|9.3µs|40µs|127µs|
-|500K|0.51µs|0.63µs|0.71µs|3.6µs|9.9µs|42µs|117µs|
-|1M|0.51µs|0.63µs|0.72µs|4.7µs|9.3µs|50µs|137µs|
-|2M|0.52µs|0.71µs|1.63µs|5.8µs|12.2µs|50µs|94µs|
-|3M|0.59µs|1.03µs|4.0µs|6.8µs|12.8µs|40µs|72µs|
-|4M|0.6µs|3.5µs|5.4µs|8.0µs|38µs|137µs|168µs|
-|5M|0.68µs|5.3µs|6.7µs|9.5µs|47µs|142µs|161µs|
-|6M|1.37µs|6.9µs|8.0µs|11.5µs|41µs|67µs|77µs|
-
-**Note**: For 125K and 250K rates, data from 200K and 300K TPS tests are used respectively as closest approximations.
-
----
 
 **Version**: 1.6 | **Date**: 2025-12-30 | **Tests**: `TestThroughputExchange`, `TestThroughputPeak`, `TestLatencyMargin`, `TestLatencyExchangeJournaling`, `SharedPool Queue Comparison`
