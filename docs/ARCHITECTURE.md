@@ -254,6 +254,196 @@ Grouping (G) - Sequence G
 - **R1 depends on G**: Serial path (trading chain)
 - **J depends on G**: Parallel path (journaling)
 
+### Architecture from Sequence/Barrier Perspective
+
+This diagram shows the architecture from the perspective of **Sequence**, **SequenceBarrier**, and **FixedSequenceGroup** components:
+
+```mermaid
+graph TB
+    subgraph RB[Ring Buffer]
+        Cursor[Producer Cursor<br/>cursorSequence_<br/>atomic int64_t]
+    end
+
+    subgraph G[Grouping Processor]
+        SeqG[Sequence G<br/>getSequence<br/>atomic int64_t]
+        BarrierG[ProcessingSequenceBarrier G<br/>cursorSequence_ → Cursor<br/>dependentSequence_ → Cursor]
+    end
+
+    subgraph R1[Risk Pre-hold R1]
+        SeqR1[Sequence R1<br/>getSequence<br/>atomic int64_t]
+        BarrierR1[ProcessingSequenceBarrier R1<br/>cursorSequence_ → Cursor<br/>dependentSequence_ → SeqG]
+    end
+
+    subgraph ME[Matching Engine ME]
+        SeqME[Sequence ME<br/>getSequence<br/>atomic int64_t]
+        BarrierME[ProcessingSequenceBarrier ME<br/>cursorSequence_ → Cursor<br/>dependentSequence_ → SeqR1]
+    end
+
+    subgraph J[Journaling J]
+        SeqJ[Sequence J<br/>getSequence<br/>atomic int64_t]
+        BarrierJ[ProcessingSequenceBarrier J<br/>cursorSequence_ → Cursor<br/>dependentSequence_ → SeqG]
+    end
+
+    subgraph R2[Risk Release R2]
+        SeqR2[Sequence R2<br/>getSequence<br/>atomic int64_t]
+        BarrierR2[ProcessingSequenceBarrier R2<br/>cursorSequence_ → Cursor<br/>dependentSequence_ → SeqME]
+    end
+
+    subgraph E[Results Handler E]
+        SeqE[Sequence E<br/>getSequence<br/>atomic int64_t]
+        FSG[FixedSequenceGroup<br/>sequences: SeqME, SeqJ<br/>get = min SeqME, SeqJ]
+        BarrierE[ProcessingSequenceBarrier E<br/>cursorSequence_ → Cursor<br/>dependentSequence_ → FSG]
+    end
+
+    %% Sequence dependencies (Barrier construction)
+    Cursor -->|newBarrier null, 0| BarrierG
+    SeqG -->|newBarrier SeqG, 1| BarrierR1
+    SeqG -->|newBarrier SeqG, 1| BarrierJ
+    SeqR1 -->|newBarrier SeqR1, 1| BarrierME
+    SeqME -->|newBarrier SeqME, 1| BarrierR2
+    SeqME -->|newBarrier SeqME, SeqJ, 2| FSG
+    SeqJ -->|newBarrier SeqME, SeqJ, 2| FSG
+    FSG -->|newBarrier FSG, 1| BarrierE
+
+    %% Sequence updates (after processing)
+    BarrierG -.->|waitFor → set| SeqG
+    BarrierR1 -.->|waitFor → set| SeqR1
+    BarrierME -.->|waitFor → set| SeqME
+    BarrierJ -.->|waitFor → set| SeqJ
+    BarrierR2 -.->|waitFor → set| SeqR2
+    BarrierE -.->|waitFor → set| SeqE
+
+    %% Styling
+    style Cursor fill:#ff9999,stroke:#333,stroke-width:2px
+    style SeqG fill:#99ccff,stroke:#333,stroke-width:2px
+    style SeqR1 fill:#99ccff,stroke:#333,stroke-width:2px
+    style SeqME fill:#99ccff,stroke:#333,stroke-width:2px
+    style SeqJ fill:#99ccff,stroke:#333,stroke-width:2px
+    style SeqR2 fill:#99ccff,stroke:#333,stroke-width:2px
+    style SeqE fill:#99ccff,stroke:#333,stroke-width:2px
+    style BarrierG fill:#ffcc99,stroke:#333,stroke-width:2px
+    style BarrierR1 fill:#ffcc99,stroke:#333,stroke-width:2px
+    style BarrierME fill:#ffcc99,stroke:#333,stroke-width:2px
+    style BarrierJ fill:#ffcc99,stroke:#333,stroke-width:2px
+    style BarrierR2 fill:#ffcc99,stroke:#333,stroke-width:2px
+    style BarrierE fill:#ffcc99,stroke:#333,stroke-width:2px
+    style FSG fill:#99ff99,stroke:#333,stroke-width:3px
+```
+
+**Component Details**:
+
+1. **Sequence Objects** (Blue):
+   - Each processor maintains its own `Sequence` object
+   - Tracks the last processed sequence number
+   - Updated via `sequence.set(availableSeq)` after processing
+
+2. **SequenceBarrier Objects** (Orange):
+   - Created via `ringBuffer.newBarrier(dependentSequences, count)`
+   - Contains:
+     - `cursorSequence_`: Ring Buffer's producer cursor (生产者序列)
+     - `dependentSequence_`: Points to dependency (single Sequence or FixedSequenceGroup) (依赖的消费者序列)
+   - `waitFor(sequence)`: **Called by CONSUMER**, waits for BOTH:
+     - **Producer** (Ring Buffer cursor): Ensures event is published
+     - **Dependent Consumer** (upstream processor): Ensures upstream processing is complete
+
+3. **FixedSequenceGroup** (Green):
+   - Used when a processor depends on **multiple** sequences
+   - Created when `count > 1` in `newBarrier()`
+   - Returns `min(Seq1, Seq2, ...)` via `get()` method
+   - Example: Results Handler (E) uses FixedSequenceGroup to wait for both ME and J
+
+**How It Works**:
+
+```cpp
+// 1. ProcessingSequenceBarrier construction
+// When ringBuffer.newBarrier(dependentSequences, count) is called:
+ProcessingSequenceBarrier(SequencerT& sequencer,
+                          WaitStrategyT& waitStrategy,
+                          Sequence& cursorSequence,  // Ring Buffer's cursor
+                          Sequence* const* dependentSequences,  // Array of dependencies
+                          int dependentCount)       // Number of dependencies
+    : cursorSequence_(&cursorSequence) {
+    if (dependentCount == 0) {
+        // No dependencies (e.g., Grouping): use cursor directly
+        dependentSequence_ = &cursorSequence;
+    } else if (dependentCount == 1) {
+        // Single dependency (e.g., R1, ME, J, R2): use it directly
+        dependentSequence_ = dependentSequences[0];
+    } else {
+        // Multiple dependencies (e.g., E): create FixedSequenceGroup
+        fixedGroup_ = std::make_unique<FixedSequenceGroup>(
+            dependentSequences, dependentCount);
+        dependentSequence_ = fixedGroup_.get();
+    }
+}
+
+// 2. FixedSequenceGroup returns minimum of all sequences
+int64_t FixedSequenceGroup::get() const noexcept {
+    // Returns the minimum sequence number among all dependencies
+    // This ensures E waits for BOTH ME and J to complete
+    return disruptor::util::Util::getMinimumSequence(sequences_);
+}
+
+// 3. Barrier waits for BOTH producer AND dependent consumer during processing
+int64_t availableSeq = barrier->waitFor(nextSequence);
+// Internally (BlockingWaitStrategy example):
+//   Step 1: Wait for PRODUCER (Ring Buffer cursor)
+//     - Checks cursorSequence_->get() (Ring Buffer's published sequence)
+//     - Blocks until producer publishes the event
+//   Step 2: Wait for DEPENDENT CONSUMER (upstream processor)
+//     - Checks dependentSequence_->get() (dependency progress)
+//     - Spins until upstream processor completes processing
+//   Returns: min(cursor, dependency) to ensure both are satisfied
+//   Uses WaitStrategy (Blocking/Yielding/BusySpin) for waiting
+
+// 4. Processor updates its Sequence after processing
+sequence_.set(availableSeq);
+// This allows downstream processors to proceed
+```
+
+**Processor Configuration Summary**:
+
+| Processor | Sequence | Barrier Dependencies | Barrier Type | FixedSequenceGroup? |
+|-----------|----------|---------------------|--------------|---------------------|
+| **G** (Grouping) | `SeqG` | None (depends on Ring Buffer cursor) | `newBarrier(nullptr, 0)` | No |
+| **R1** (Risk Pre-hold) | `SeqR1` | `SeqG` | `newBarrier(&SeqG, 1)` | No |
+| **ME** (Matching Engine) | `SeqME` | `SeqR1` | `newBarrier(&SeqR1, 1)` | No |
+| **J** (Journaling) | `SeqJ` | `SeqG` | `newBarrier(&SeqG, 1)` | No |
+| **R2** (Risk Release) | `SeqR2` | `SeqME` | `newBarrier(&SeqME, 1)` | No |
+| **E** (Results Handler) | `SeqE` | `SeqME`, `SeqJ` | `newBarrier({SeqME, SeqJ}, 2)` | **Yes** |
+
+**Key Observations**:
+
+- **Single Dependency** (G, R1, ME, J, R2): `dependentSequence_` points directly to the dependency Sequence
+- **Multiple Dependencies** (E): `dependentSequence_` points to a `FixedSequenceGroup` that tracks the minimum of all dependencies
+- **No Dependencies** (G): `dependentSequence_` points to Ring Buffer's cursor directly
+- **Sequence Updates**: Each processor updates its Sequence after processing, allowing downstream processors to proceed
+- **FixedSequenceGroup Usage**: Only Results Handler (E) uses FixedSequenceGroup because it must wait for both ME and J to complete before processing results
+
+**Important: `waitFor` Waits for BOTH Producer AND Consumer**
+
+`waitFor` is called by **consumers** (processors) and waits for **TWO things**:
+
+1. **Producer (Ring Buffer Cursor)**: Ensures the event has been **published** by the producer
+   - Checks `cursorSequence_->get()` - Ring Buffer's published sequence
+   - Blocks until producer publishes the event (if not yet published)
+
+2. **Dependent Consumer (Upstream Processor)**: Ensures the **upstream processor** has **processed** the event
+   - Checks `dependentSequence_->get()` - Upstream processor's completed sequence
+   - Spins/blocks until upstream processing is complete
+
+**Example Flow**:
+```
+Producer writes event at sequence 100 → cursorSequence_ = 100
+R1 waits: waitFor(100) checks:
+  - cursorSequence_ >= 100? ✓ (producer published)
+  - SeqG >= 100? ✗ (Grouping not done yet) → WAIT
+Grouping processes event 100 → SeqG = 100
+R1 continues: SeqG >= 100? ✓ → Process event 100
+```
+
+This ensures **correct ordering**: consumers only process events that are both **published** (by producer) and **ready** (upstream processed).
+
 ### Implementation Example
 
 ```cpp
