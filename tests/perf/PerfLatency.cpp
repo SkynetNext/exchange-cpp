@@ -52,7 +52,6 @@ void PerfLatency::TestLatencyExchange() {
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
   perfCfg.msgsInGroupLimit = 256;
-  perfCfg.maxGroupDurationNs = 2000; // 2µs (was 10µs)
 
   auto testParams = TestDataParameters::SinglePairExchange();
 
