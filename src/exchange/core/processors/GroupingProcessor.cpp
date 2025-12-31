@@ -260,8 +260,8 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
         // Record number of messages processed in this loop iteration
         int64_t messagesProcessed = nextSequence - batchStart;
         if (messagesProcessed > 0) {
-          utils::ProcessorMessageCounter::RecordBatchSize("GroupingProcessor",
-                                                          messagesProcessed);
+          utils::ProcessorMessageCounter::RecordBatchSize(
+              utils::ProcessorType::GROUPING, 0, messagesProcessed);
         }
 
         // Match Java: update sequence after processing all available messages
@@ -319,8 +319,8 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
       // Record number of messages processed before exception
       int64_t messagesProcessed = nextSequence - batchStart;
       if (messagesProcessed > 0) {
-        utils::ProcessorMessageCounter::RecordBatchSize("GroupingProcessor",
-                                                        messagesProcessed);
+        utils::ProcessorMessageCounter::RecordBatchSize(
+            utils::ProcessorType::GROUPING, 0, messagesProcessed);
       }
       sequence_.set(nextSequence);
       waitSpinningHelper_->SignalAllWhenBlocking();

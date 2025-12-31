@@ -388,7 +388,7 @@ public:
         // Record batch size when batch ends
         if (endOfBatch && currentBatchSize_ > 0) {
           utils::ProcessorMessageCounter::RecordBatchSize(
-              "ME_" + std::to_string(shardId_), currentBatchSize_);
+              utils::ProcessorType::ME, shardId_, currentBatchSize_);
           currentBatchSize_ = 0;
         }
       }

@@ -46,7 +46,16 @@ TwoStepSlaveProcessor<WaitStrategyT>::TwoStepSlaveProcessor(
               common::CoreWaitStrategy::SECOND_STEP_NO_WAIT, name)),
       eventHandler_(eventHandler), exceptionHandler_(exceptionHandler),
       name_(name), sequence_(disruptor::Sequence::INITIAL_VALUE),
-      nextSequence_(-1) {}
+      nextSequence_(-1) {
+  // Parse processor type and ID from name (e.g., "R2_0" -> R2, 0)
+  if (name.size() >= 3 && name.substr(0, 3) == "R2_") {
+    processorType_ = utils::ProcessorType::R2;
+    processorId_ = std::stoi(name.substr(3));
+  } else {
+    processorType_ = utils::ProcessorType::R2; // Default
+    processorId_ = 0;
+  }
+}
 
 template <typename WaitStrategyT>
 disruptor::Sequence &TwoStepSlaveProcessor<WaitStrategyT>::getSequence() {
@@ -78,7 +87,9 @@ void TwoStepSlaveProcessor<WaitStrategyT>::run() {
 template <typename WaitStrategyT>
 void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
     int64_t processUpToSequence) {
-  int64_t batchStart = nextSequence_; // Track how many messages processed in this loop (moved outside while for exception handling)
+  int64_t batchStart =
+      nextSequence_; // Track how many messages processed in this loop (moved
+                     // outside while for exception handling)
   while (true) {
     common::cmd::OrderCommand *event = nullptr;
     try {
@@ -98,10 +109,12 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
         // Record number of messages processed in this loop iteration
         int64_t messagesProcessed = nextSequence_ - batchStart;
         if (messagesProcessed > 0) {
-          utils::ProcessorMessageCounter::RecordBatchSize(name_, messagesProcessed);
+          utils::ProcessorMessageCounter::RecordBatchSize(
+              processorType_, processorId_, messagesProcessed);
         }
-        
-        // Match Java: update sequence after processing all messages in the group
+
+        // Match Java: update sequence after processing all messages in the
+        // group
         sequence_.set(processUpToSequence - 1);
         waitSpinningHelper_->SignalAllWhenBlocking();
         return;
@@ -111,8 +124,8 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
       // Record number of messages processed before exception
       int64_t messagesProcessed = nextSequence_ - batchStart;
       if (messagesProcessed > 0) {
-        utils::ProcessorMessageCounter::RecordBatchSize(name_,
-                                                        messagesProcessed);
+        utils::ProcessorMessageCounter::RecordBatchSize(
+            processorType_, processorId_, messagesProcessed);
       }
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(ex, nextSequence_, event);
@@ -125,8 +138,8 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
       // Record number of messages processed before exception
       int64_t messagesProcessed = nextSequence_ - batchStart;
       if (messagesProcessed > 0) {
-        utils::ProcessorMessageCounter::RecordBatchSize(name_,
-                                                        messagesProcessed);
+        utils::ProcessorMessageCounter::RecordBatchSize(
+            processorType_, processorId_, messagesProcessed);
       }
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(

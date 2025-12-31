@@ -23,47 +23,82 @@ namespace exchange {
 namespace core {
 namespace utils {
 
-std::mutex ProcessorMessageCounter::mutex_;
-std::unordered_map<std::string, ProcessorMessageCounter::BatchSizeData *>
-    ProcessorMessageCounter::processors_;
+// Fast lookup array: [type][processorId] -> BatchSizeData*
+ProcessorMessageCounter::BatchSizeData
+    *ProcessorMessageCounter::processors_[static_cast<size_t>(
+        ProcessorType::MAX_TYPES)][MAX_PROCESSORS_PER_TYPE] = {};
+
+// Thread-local storage
+thread_local ProcessorMessageCounter::ThreadLocalData
+    ProcessorMessageCounter::threadLocalData_;
+
+void ProcessorMessageCounter::ThreadLocalData::FlushToGlobal() {
+  if (count_ == 0) {
+    return;
+  }
+
+  BatchSizeData *data =
+      ProcessorMessageCounter::GetOrCreateProcessor(type_, processorId_);
+  if (data == nullptr) {
+    count_ = 0; // Skip invalid processor
+    return;
+  }
+  std::lock_guard<std::mutex> lock(data->mutex);
+
+  for (size_t i = 0; i < count_; i++) {
+    int64_t batchSize = batchSizes_[i];
+    if (batchSize <= 0) {
+      continue;
+    }
+
+    data->batchSizes.push_back(batchSize);
+    data->totalBatches++;
+
+    if (data->totalBatches == 1) {
+      data->min = batchSize;
+      data->max = batchSize;
+    } else {
+      if (batchSize < data->min) {
+        data->min = batchSize;
+      }
+      if (batchSize > data->max) {
+        data->max = batchSize;
+      }
+    }
+  }
+
+  count_ = 0;
+}
 
 ProcessorMessageCounter::BatchSizeData *
-ProcessorMessageCounter::GetOrCreateProcessor(
-    const std::string &processorName) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  auto it = processors_.find(processorName);
-  if (it != processors_.end()) {
-    return it->second;
+ProcessorMessageCounter::GetOrCreateProcessor(ProcessorType type,
+                                              int32_t processorId) {
+  if (processorId < 0 ||
+      processorId >= static_cast<int32_t>(MAX_PROCESSORS_PER_TYPE)) {
+    return nullptr; // Invalid processor ID
   }
-  // Create new processor data
-  auto *data = new BatchSizeData();
-  processors_[processorName] = data;
+
+  size_t typeIdx = static_cast<size_t>(type);
+  if (typeIdx >= static_cast<size_t>(ProcessorType::MAX_TYPES)) {
+    return nullptr; // Invalid processor type
+  }
+
+  BatchSizeData *&data = processors_[typeIdx][processorId];
+  if (data == nullptr) {
+    data = new BatchSizeData();
+  }
   return data;
 }
 
-void ProcessorMessageCounter::RecordBatchSize(const std::string &processorName,
+void ProcessorMessageCounter::RecordBatchSize(ProcessorType type,
+                                              int32_t processorId,
                                               int64_t batchSize) {
   if (batchSize <= 0) {
-    return; // Skip zero or negative batch sizes
+    return;
   }
 
-  BatchSizeData *data = GetOrCreateProcessor(processorName);
-  std::lock_guard<std::mutex> lock(data->mutex);
-
-  data->batchSizes.push_back(batchSize);
-  data->totalBatches++;
-
-  if (data->totalBatches == 1) {
-    data->min = batchSize;
-    data->max = batchSize;
-  } else {
-    if (batchSize < data->min) {
-      data->min = batchSize;
-    }
-    if (batchSize > data->max) {
-      data->max = batchSize;
-    }
-  }
+  // Use thread-local storage to reduce lock contention
+  threadLocalData_.Add(type, processorId, batchSize);
 }
 
 int64_t
@@ -93,8 +128,12 @@ ProcessorMessageCounter::CalculatePercentile(const std::vector<int64_t> &sorted,
 }
 
 std::vector<int64_t>
-ProcessorMessageCounter::GetStatistics(const std::string &processorName) {
-  BatchSizeData *data = GetOrCreateProcessor(processorName);
+ProcessorMessageCounter::GetStatistics(ProcessorType type,
+                                       int32_t processorId) {
+  // Flush thread-local data first
+  FlushThreadLocalData();
+
+  BatchSizeData *data = GetOrCreateProcessor(type, processorId);
   std::lock_guard<std::mutex> lock(data->mutex);
 
   std::vector<int64_t> result(
@@ -123,47 +162,70 @@ ProcessorMessageCounter::GetStatistics(const std::string &processorName) {
 
 std::unordered_map<std::string, std::vector<int64_t>>
 ProcessorMessageCounter::GetAllStatistics() {
-  std::lock_guard<std::mutex> lock(mutex_);
+  // Flush all thread-local data first
+  FlushThreadLocalData();
+
   std::unordered_map<std::string, std::vector<int64_t>> result;
 
-  for (const auto &pair : processors_) {
-    std::lock_guard<std::mutex> dataLock(pair.second->mutex);
+  // Iterate through enum-based processors
+  for (size_t typeIdx = 0;
+       typeIdx < static_cast<size_t>(ProcessorType::MAX_TYPES); typeIdx++) {
+    ProcessorType type = static_cast<ProcessorType>(typeIdx);
+    for (int32_t processorId = 0; processorId < MAX_PROCESSORS_PER_TYPE;
+         processorId++) {
+      BatchSizeData *data = processors_[typeIdx][processorId];
+      if (data == nullptr) {
+        continue;
+      }
 
-    std::vector<int64_t> stats(8, 0);
-    if (!pair.second->batchSizes.empty()) {
-      stats[0] = pair.second->totalBatches;
-      stats[1] = pair.second->min;
-      stats[2] = pair.second->max;
+      std::lock_guard<std::mutex> dataLock(data->mutex);
+      std::vector<int64_t> stats(8, 0);
+      if (!data->batchSizes.empty()) {
+        stats[0] = data->totalBatches;
+        stats[1] = data->min;
+        stats[2] = data->max;
 
-      std::vector<int64_t> sorted = pair.second->batchSizes;
-      std::sort(sorted.begin(), sorted.end());
+        std::vector<int64_t> sorted = data->batchSizes;
+        std::sort(sorted.begin(), sorted.end());
 
-      stats[3] = CalculatePercentile(sorted, 50.0);
-      stats[4] = CalculatePercentile(sorted, 90.0);
-      stats[5] = CalculatePercentile(sorted, 95.0);
-      stats[6] = CalculatePercentile(sorted, 99.0);
-      stats[7] = CalculatePercentile(sorted, 99.9);
+        stats[3] = CalculatePercentile(sorted, 50.0);
+        stats[4] = CalculatePercentile(sorted, 90.0);
+        stats[5] = CalculatePercentile(sorted, 95.0);
+        stats[6] = CalculatePercentile(sorted, 99.0);
+        stats[7] = CalculatePercentile(sorted, 99.9);
+      }
+
+      result[GetProcessorName(type, processorId)] = stats;
     }
-
-    result[pair.first] = stats;
   }
 
   return result;
 }
 
 void ProcessorMessageCounter::Reset() {
-  std::lock_guard<std::mutex> lock(mutex_);
-  for (auto &pair : processors_) {
-    std::lock_guard<std::mutex> dataLock(pair.second->mutex);
-    pair.second->batchSizes.clear();
-    pair.second->min = 0;
-    pair.second->max = 0;
-    pair.second->totalBatches = 0;
+  FlushThreadLocalData();
+
+  // Reset enum-based processors
+  for (size_t typeIdx = 0;
+       typeIdx < static_cast<size_t>(ProcessorType::MAX_TYPES); typeIdx++) {
+    for (int32_t processorId = 0; processorId < MAX_PROCESSORS_PER_TYPE;
+         processorId++) {
+      BatchSizeData *data = processors_[typeIdx][processorId];
+      if (data != nullptr) {
+        std::lock_guard<std::mutex> dataLock(data->mutex);
+        data->batchSizes.clear();
+        data->min = 0;
+        data->max = 0;
+        data->totalBatches = 0;
+      }
+    }
   }
 }
 
-void ProcessorMessageCounter::Reset(const std::string &processorName) {
-  BatchSizeData *data = GetOrCreateProcessor(processorName);
+void ProcessorMessageCounter::Reset(ProcessorType type, int32_t processorId) {
+  FlushThreadLocalData();
+
+  BatchSizeData *data = GetOrCreateProcessor(type, processorId);
   std::lock_guard<std::mutex> lock(data->mutex);
   data->batchSizes.clear();
   data->min = 0;
@@ -171,16 +233,21 @@ void ProcessorMessageCounter::Reset(const std::string &processorName) {
   data->totalBatches = 0;
 }
 
-void ProcessorMessageCounter::PrintStatistics(
-    const std::string &processorName) {
-  auto stats = GetStatistics(processorName);
+void ProcessorMessageCounter::FlushThreadLocalData() {
+  threadLocalData_.FlushToGlobal();
+}
+
+void ProcessorMessageCounter::PrintStatistics(ProcessorType type,
+                                              int32_t processorId) {
+  auto stats = GetStatistics(type, processorId);
+  std::string name = GetProcessorName(type, processorId);
 
   if (stats[0] == 0) {
-    LOG_INFO("[{}] No batch statistics available", processorName);
+    LOG_INFO("[{}] No batch statistics available", name);
     return;
   }
 
-  LOG_INFO("[{}] Batch Size Statistics:", processorName);
+  LOG_INFO("[{}] Batch Size Statistics:", name);
   LOG_INFO("  Total Batches: {}", stats[0]);
   LOG_INFO("  Min: {}, Max: {}", stats[1], stats[2]);
   LOG_INFO("  P50: {}, P90: {}, P95: {}, P99: {}, P99.9: {}", stats[3],
@@ -208,6 +275,23 @@ void ProcessorMessageCounter::PrintAllStatistics() {
              stats[6], stats[7]);
   }
   LOG_INFO("========================================");
+}
+
+std::string ProcessorMessageCounter::GetProcessorName(ProcessorType type,
+                                                      int32_t processorId) {
+  switch (type) {
+  case ProcessorType::GROUPING:
+    return "GroupingProcessor";
+  case ProcessorType::R1:
+    return "R1_" + std::to_string(processorId);
+  case ProcessorType::R2:
+    return "R2_" + std::to_string(processorId);
+  case ProcessorType::ME:
+    return "ME_" + std::to_string(processorId);
+  default:
+    return "Unknown_" + std::to_string(static_cast<int>(type)) + "_" +
+           std::to_string(processorId);
+  }
 }
 
 } // namespace utils

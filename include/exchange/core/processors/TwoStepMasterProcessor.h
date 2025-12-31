@@ -20,6 +20,7 @@
 #include "DisruptorExceptionHandler.h"
 #include "SimpleEventHandler.h"
 #include "WaitSpinningHelper.h"
+#include <exchange/core/utils/ProcessorMessageCounter.h>
 #include <atomic>
 #include <cstdint>
 #include <disruptor/EventProcessor.h>
@@ -80,6 +81,8 @@ private:
   SimpleEventHandler *eventHandler_;
   DisruptorExceptionHandler<common::cmd::OrderCommand> *exceptionHandler_;
   std::string name_;
+  utils::ProcessorType processorType_;
+  int32_t processorId_;
   disruptor::Sequence sequence_; // Changed from pointer to value (matches Java)
   TwoStepSlaveProcessor<WaitStrategyT> *slaveProcessor_;
 

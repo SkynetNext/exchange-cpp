@@ -49,7 +49,16 @@ TwoStepMasterProcessor<WaitStrategyT>::TwoStepMasterProcessor(
               name)),
       eventHandler_(eventHandler), exceptionHandler_(exceptionHandler),
       name_(name), sequence_(disruptor::Sequence::INITIAL_VALUE),
-      slaveProcessor_(nullptr) {}
+      slaveProcessor_(nullptr) {
+  // Parse processor type and ID from name (e.g., "R1_0" -> R1, 0)
+  if (name.size() >= 3 && name.substr(0, 3) == "R1_") {
+    processorType_ = utils::ProcessorType::R1;
+    processorId_ = std::stoi(name.substr(3));
+  } else {
+    processorType_ = utils::ProcessorType::R1; // Default
+    processorId_ = 0;
+  }
+}
 
 template <typename WaitStrategyT>
 disruptor::Sequence &TwoStepMasterProcessor<WaitStrategyT>::getSequence() {
@@ -134,7 +143,7 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
             int64_t messagesProcessed = nextSequence - batchStart;
             if (messagesProcessed > 0) {
               utils::ProcessorMessageCounter::RecordBatchSize(
-                  name_, messagesProcessed);
+                  processorType_, processorId_, messagesProcessed);
             }
             // Trigger previous group when detecting new group boundary
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
@@ -152,7 +161,7 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
             int64_t messagesProcessed = nextSequence - batchStart;
             if (messagesProcessed > 0) {
               utils::ProcessorMessageCounter::RecordBatchSize(
-                  name_, messagesProcessed);
+                  processorType_, processorId_, messagesProcessed);
             }
             sequence_.set(nextSequence - 1);
             waitSpinningHelper_->SignalAllWhenBlocking();
@@ -170,7 +179,7 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
             int64_t messagesProcessed = nextSequence - batchStart;
             if (messagesProcessed > 0) {
               utils::ProcessorMessageCounter::RecordBatchSize(
-                  name_, messagesProcessed);
+                  processorType_, processorId_, messagesProcessed);
             }
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
           }
@@ -190,18 +199,22 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
             int64_t messagesProcessed = nextSequence - batchStart;
             if (messagesProcessed > 0) {
               utils::ProcessorMessageCounter::RecordBatchSize(
-                  name_, messagesProcessed);
+                  processorType_, processorId_, messagesProcessed);
             }
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
           }
         }
 
         // Record number of messages processed in this loop iteration
+        // Note: This may include messages already recorded at group boundaries,
+        // forced publishes, etc. But it ensures we capture any remaining
+        // messages that weren't recorded at those points.
         int64_t messagesProcessed = nextSequence - batchStart;
         if (messagesProcessed > 0) {
-          utils::ProcessorMessageCounter::RecordBatchSize(name_,
-                                                          messagesProcessed);
+          utils::ProcessorMessageCounter::RecordBatchSize(
+              processorType_, processorId_, messagesProcessed);
         }
+        batchStart = nextSequence; // Reset for next iteration
 
         sequence_.set(availableSequence);
         waitSpinningHelper_->SignalAllWhenBlocking();
@@ -217,8 +230,8 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       // Record number of messages processed before exception
       int64_t messagesProcessed = nextSequence - batchStart;
       if (messagesProcessed > 0) {
-        utils::ProcessorMessageCounter::RecordBatchSize(name_,
-                                                        messagesProcessed);
+        utils::ProcessorMessageCounter::RecordBatchSize(
+            processorType_, processorId_, messagesProcessed);
       }
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(ex, nextSequence, cmd);
@@ -234,8 +247,8 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       // Record number of messages processed before exception
       int64_t messagesProcessed = nextSequence - batchStart;
       if (messagesProcessed > 0) {
-        utils::ProcessorMessageCounter::RecordBatchSize(name_,
-                                                        messagesProcessed);
+        utils::ProcessorMessageCounter::RecordBatchSize(
+            processorType_, processorId_, messagesProcessed);
       }
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(
