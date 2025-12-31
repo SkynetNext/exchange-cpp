@@ -27,8 +27,8 @@
 #include <exchange/core/processors/GroupingProcessor.h>
 #include <exchange/core/processors/SharedPool.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
-#include <exchange/core/utils/LatencyBreakdown.h>
 #include <exchange/core/utils/Logger.h>
+#include <exchange/core/utils/ProcessorMessageCounter.h>
 
 namespace exchange {
 namespace core {
@@ -140,15 +140,11 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
       int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
 
       if (nextSequence <= availableSequence) {
+        int64_t batchStart = nextSequence;
         while (nextSequence <= availableSequence) {
           common::cmd::OrderCommand *cmd = &ringBuffer_->get(nextSequence);
           int64_t currentSeq = nextSequence;
           nextSequence++;
-
-#if ENABLE_LATENCY_BREAKDOWN
-          utils::LatencyBreakdown::Record(
-              cmd, currentSeq, utils::LatencyBreakdown::Stage::GROUPING_START);
-#endif
 
           if (cmd->command == common::cmd::OrderCommandType::GROUPING_CONTROL) {
             groupingEnabled = (cmd->orderId == 1);
@@ -158,12 +154,6 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
           if (!groupingEnabled) {
             cmd->matcherEvent = nullptr;
             cmd->marketData = nullptr;
-#if ENABLE_LATENCY_BREAKDOWN
-            // Record GROUPING_END even when grouping is disabled to maintain
-            // correct latency statistics
-            utils::LatencyBreakdown::Record(
-                cmd, currentSeq, utils::LatencyBreakdown::Stage::GROUPING_END);
-#endif
             continue;
           }
 
@@ -267,12 +257,16 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
             groupCounter++;
             msgsInGroup = 0;
           }
-
-#if ENABLE_LATENCY_BREAKDOWN
-          utils::LatencyBreakdown::Record(
-              cmd, currentSeq, utils::LatencyBreakdown::Stage::GROUPING_END);
-#endif
         }
+
+        // Record batch size (number of messages processed in this loop
+        // iteration)
+        int64_t batchSize = nextSequence - batchStart;
+        if (batchSize > 0) {
+          utils::ProcessorMessageCounter::RecordBatchSize("GroupingProcessor",
+                                                          batchSize);
+        }
+
         // Match Java: update sequence after processing all available messages
         sequence_.set(availableSequence);
         waitSpinningHelper_->SignalAllWhenBlocking();

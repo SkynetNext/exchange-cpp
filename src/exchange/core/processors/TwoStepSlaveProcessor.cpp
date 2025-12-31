@@ -21,8 +21,8 @@
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/processors/TwoStepSlaveProcessor.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
-#include <exchange/core/utils/LatencyBreakdown.h>
 #include <exchange/core/utils/Logger.h>
+#include <exchange/core/utils/ProcessorMessageCounter.h>
 
 namespace exchange {
 namespace core {
@@ -85,38 +85,18 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
           waitSpinningHelper_->TryWaitFor(nextSequence_);
 
       // process batch
+      int64_t batchStart = nextSequence_;
       while (nextSequence_ <= availableSequence &&
              nextSequence_ < processUpToSequence) {
         event = &ringBuffer_->get(nextSequence_);
-        bool isR2 = false;
-#if ENABLE_LATENCY_BREAKDOWN
-        // Check if this is R2 (name starts with "R2")
-        isR2 = (name_.find("R2") == 0);
-        if (isR2) {
-          utils::LatencyBreakdown::Record(
-              event, nextSequence_, utils::LatencyBreakdown::Stage::R2_START);
-        }
-#endif
-        try {
-          eventHandler_->OnEvent(nextSequence_, event);
-#if ENABLE_LATENCY_BREAKDOWN
-          if (isR2) {
-            utils::LatencyBreakdown::Record(
-                event, nextSequence_, utils::LatencyBreakdown::Stage::R2_END);
-          }
-#endif
-        } catch (...) {
-          // Record R2_END even on exception to maintain correct latency
-          // statistics
-#if ENABLE_LATENCY_BREAKDOWN
-          if (isR2) {
-            utils::LatencyBreakdown::Record(
-                event, nextSequence_, utils::LatencyBreakdown::Stage::R2_END);
-          }
-#endif
-          throw; // Re-throw to outer catch block
-        }
+        eventHandler_->OnEvent(nextSequence_, event);
         nextSequence_++;
+      }
+
+      // Record batch size (number of messages processed in this loop iteration)
+      int64_t batchSize = nextSequence_ - batchStart;
+      if (batchSize > 0) {
+        utils::ProcessorMessageCounter::RecordBatchSize(name_, batchSize);
       }
 
       // exit if finished processing entire group (up to specified sequence)

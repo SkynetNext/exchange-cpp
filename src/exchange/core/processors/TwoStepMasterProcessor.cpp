@@ -23,8 +23,8 @@
 #include <exchange/core/processors/TwoStepMasterProcessor.h>
 #include <exchange/core/processors/TwoStepSlaveProcessor.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
-#include <exchange/core/utils/LatencyBreakdown.h>
 #include <exchange/core/utils/Logger.h>
+#include <exchange/core/utils/ProcessorMessageCounter.h>
 #include <thread>
 
 namespace exchange {
@@ -121,6 +121,7 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       if (nextSequence <= availableSequence) {
         int64_t startSequence = nextSequence; // Track start to detect if any
                                               // messages were processed
+        int64_t batchStart = nextSequence;
         while (nextSequence <= availableSequence) {
           cmd = &ringBuffer_->get(nextSequence);
 
@@ -134,26 +135,7 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           }
           // Match Java: direct call without inner try-catch
           // Exception will be caught by outer catch block
-#if ENABLE_LATENCY_BREAKDOWN
-          utils::LatencyBreakdown::Record(
-              cmd, nextSequence, utils::LatencyBreakdown::Stage::R1_START);
-#endif
-          bool forcedPublish = false;
-          try {
-            forcedPublish = eventHandler_->OnEvent(nextSequence, cmd);
-#if ENABLE_LATENCY_BREAKDOWN
-            utils::LatencyBreakdown::Record(
-                cmd, nextSequence, utils::LatencyBreakdown::Stage::R1_END);
-#endif
-          } catch (...) {
-            // Record R1_END even on exception to maintain correct latency
-            // statistics
-#if ENABLE_LATENCY_BREAKDOWN
-            utils::LatencyBreakdown::Record(
-                cmd, nextSequence, utils::LatencyBreakdown::Stage::R1_END);
-#endif
-            throw; // Re-throw to outer catch block
-          }
+          bool forcedPublish = eventHandler_->OnEvent(nextSequence, cmd);
           nextSequence++;
 
           if (forcedPublish) {
@@ -185,6 +167,14 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
           }
         }
+
+        // Record batch size (number of messages processed in this loop
+        // iteration)
+        int64_t batchSize = nextSequence - batchStart;
+        if (batchSize > 0) {
+          utils::ProcessorMessageCounter::RecordBatchSize(name_, batchSize);
+        }
+
         sequence_.set(availableSequence);
         waitSpinningHelper_->SignalAllWhenBlocking();
       }

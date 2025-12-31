@@ -29,7 +29,6 @@
 #include <exchange/core/processors/MatchingEngineRouter.h>
 #include <exchange/core/processors/SharedPool.h>
 #include <exchange/core/processors/journaling/DiskSerializationProcessorConfiguration.h>
-#include <exchange/core/utils/LatencyBreakdown.h>
 #include <exchange/core/utils/SerializationUtils.h>
 #include <exchange/core/utils/UnsafeUtils.h>
 #include <stdexcept>
@@ -180,25 +179,7 @@ void MatchingEngineRouter::ProcessOrder(int64_t seq,
       command == common::cmd::OrderCommandType::ORDER_BOOK_REQUEST) {
     // Process specific symbol group only
     if (SymbolForThisHandler(cmd->symbol)) {
-#if ENABLE_LATENCY_BREAKDOWN
-      utils::LatencyBreakdown::Record(cmd, seq,
-                                      utils::LatencyBreakdown::Stage::ME_START);
-#endif
-      try {
-        ProcessMatchingCommand(cmd);
-#if ENABLE_LATENCY_BREAKDOWN
-        utils::LatencyBreakdown::Record(cmd, seq,
-                                        utils::LatencyBreakdown::Stage::ME_END);
-#endif
-      } catch (...) {
-        // Record ME_END even on exception to maintain correct latency
-        // statistics
-#if ENABLE_LATENCY_BREAKDOWN
-        utils::LatencyBreakdown::Record(cmd, seq,
-                                        utils::LatencyBreakdown::Stage::ME_END);
-#endif
-        throw; // Re-throw exception
-      }
+      ProcessMatchingCommand(cmd);
     }
     return;
   }

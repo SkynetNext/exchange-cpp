@@ -49,6 +49,7 @@
 #include <exchange/core/processors/journaling/DummySerializationProcessor.h>
 #include <exchange/core/processors/journaling/ISerializationProcessor.h>
 #include <exchange/core/utils/Logger.h>
+#include <exchange/core/utils/ProcessorMessageCounter.h>
 #include <latch>
 #include <memory>
 #include <stdexcept>
@@ -375,16 +376,27 @@ public:
         : public disruptor::EventHandler<common::cmd::OrderCommand> {
     public:
       MatchingEngineEventHandler(
-          processors::MatchingEngineRouter *matchingEngine)
-          : matchingEngine_(matchingEngine) {}
+          processors::MatchingEngineRouter *matchingEngine, int32_t shardId)
+          : matchingEngine_(matchingEngine), shardId_(shardId),
+            currentBatchSize_(0) {}
 
       void onEvent(common::cmd::OrderCommand &cmd, int64_t sequence,
                    bool endOfBatch) override {
         matchingEngine_->ProcessOrder(sequence, &cmd);
+        currentBatchSize_++;
+
+        // Record batch size when batch ends
+        if (endOfBatch && currentBatchSize_ > 0) {
+          utils::ProcessorMessageCounter::RecordBatchSize(
+              "ME_" + std::to_string(shardId_), currentBatchSize_);
+          currentBatchSize_ = 0;
+        }
       }
 
     private:
       processors::MatchingEngineRouter *matchingEngine_;
+      int32_t shardId_;
+      int64_t currentBatchSize_;
     };
 
     // Create afterR1 group (wait for all R1 processors to complete)
@@ -400,8 +412,9 @@ public:
     // Create all MatchingEngine handlers first (matches Java:
     // matchingEngineHandlers array) Java: final EventHandler<OrderCommand>[]
     // matchingEngineHandlers = ...
-    for (auto &me : matchingEngines_) {
-      auto handler = std::make_unique<MatchingEngineEventHandler>(me.get());
+    for (size_t i = 0; i < matchingEngines_.size(); i++) {
+      auto handler = std::make_unique<MatchingEngineEventHandler>(
+          matchingEngines_[i].get(), static_cast<int32_t>(i));
       matchingEngineHandlers_.push_back(std::move(handler));
     }
 
