@@ -112,15 +112,25 @@ ProcessorMessageCounter::CalculatePercentile(const std::vector<int64_t> &sorted,
     return sorted.back();
   }
 
-  double index = (percentile / 100.0) * (sorted.size() - 1);
-  size_t lower = static_cast<size_t>(index);
-  size_t upper = lower + 1;
+  // Calculate the position: percentile * (n - 1) / 100
+  // For n elements, valid indices are 0 to n-1
+  double position = (percentile / 100.0) * (sorted.size() - 1);
+  size_t lower = static_cast<size_t>(position);
 
+  // Handle edge case: if position is exactly at the last element
+  if (lower >= sorted.size() - 1) {
+    return sorted.back();
+  }
+
+  size_t upper = lower + 1;
+  // This check should not be needed if percentile < 100.0, but keep it for
+  // safety
   if (upper >= sorted.size()) {
     return sorted.back();
   }
 
-  double weight = index - lower;
+  // Linear interpolation between lower and upper
+  double weight = position - static_cast<double>(lower);
   return static_cast<int64_t>(sorted[lower] * (1.0 - weight) +
                               sorted[upper] * weight);
 }
