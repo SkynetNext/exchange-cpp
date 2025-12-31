@@ -37,32 +37,32 @@ void ProcessorMessageCounter::ThreadLocalData::FlushToGlobal() {
     return;
   }
 
-  BatchSizeData *data =
-      ProcessorMessageCounter::GetOrCreateProcessor(type_, processorId_);
-  if (data == nullptr) {
-    count_ = 0; // Skip invalid processor
-    return;
-  }
-  std::lock_guard<std::mutex> lock(data->mutex);
-
+  // Group entries by processor to minimize lock contention
   for (size_t i = 0; i < count_; i++) {
-    int64_t batchSize = batchSizes_[i];
-    if (batchSize <= 0) {
+    const auto &entry = entries_[i];
+    if (entry.batchSize <= 0) {
       continue;
     }
 
-    data->batchSizes.push_back(batchSize);
+    BatchSizeData *data = ProcessorMessageCounter::GetOrCreateProcessor(
+        entry.type, entry.processorId);
+    if (data == nullptr) {
+      continue; // Skip invalid processor
+    }
+
+    std::lock_guard<std::mutex> lock(data->mutex);
+    data->batchSizes.push_back(entry.batchSize);
     data->totalBatches++;
 
     if (data->totalBatches == 1) {
-      data->min = batchSize;
-      data->max = batchSize;
+      data->min = entry.batchSize;
+      data->max = entry.batchSize;
     } else {
-      if (batchSize < data->min) {
-        data->min = batchSize;
+      if (entry.batchSize < data->min) {
+        data->min = entry.batchSize;
       }
-      if (batchSize > data->max) {
-        data->max = batchSize;
+      if (entry.batchSize > data->max) {
+        data->max = entry.batchSize;
       }
     }
   }

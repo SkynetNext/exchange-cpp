@@ -98,28 +98,25 @@ public:
   // Thread-local storage to reduce lock contention
   struct ThreadLocalData {
     static constexpr size_t BATCH_SIZE = 64;
-    int64_t batchSizes_[BATCH_SIZE];
+    struct BatchEntry {
+      ProcessorType type;
+      int32_t processorId;
+      int64_t batchSize;
+    };
+    BatchEntry entries_[BATCH_SIZE];
     size_t count_ = 0;
-    ProcessorType type_;
-    int32_t processorId_;
 
-    ThreadLocalData()
-        : batchSizes_{}, count_(0), type_(ProcessorType::GROUPING),
-          processorId_(0) {}
+    ThreadLocalData() : entries_{}, count_(0) {}
 
     void Add(ProcessorType type, int32_t processorId, int64_t batchSize) {
       if (count_ < BATCH_SIZE) {
-        batchSizes_[count_] = batchSize;
+        entries_[count_] = {type, processorId, batchSize};
         count_++;
-        type_ = type;
-        processorId_ = processorId;
       } else {
         // Flush when full
         FlushToGlobal();
-        batchSizes_[0] = batchSize;
+        entries_[0] = {type, processorId, batchSize};
         count_ = 1;
-        type_ = type;
-        processorId_ = processorId;
       }
     }
 

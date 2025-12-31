@@ -182,6 +182,7 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
                   processorType_, processorId_, messagesProcessed);
             }
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
+            batchStart = nextSequence; // Reset to avoid duplicate recording
           }
         }
         // Match Java: update sequence after processing all available messages
@@ -202,13 +203,13 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
                   processorType_, processorId_, messagesProcessed);
             }
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
+            batchStart = nextSequence; // Reset to avoid duplicate recording
           }
         }
 
         // Record number of messages processed in this loop iteration
-        // Note: This may include messages already recorded at group boundaries,
-        // forced publishes, etc. But it ensures we capture any remaining
-        // messages that weren't recorded at those points.
+        // Only record if batchStart hasn't been reset (i.e., no group boundary,
+        // forced publish, or slave trigger happened)
         int64_t messagesProcessed = nextSequence - batchStart;
         if (messagesProcessed > 0) {
           utils::ProcessorMessageCounter::RecordBatchSize(
