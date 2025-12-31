@@ -28,6 +28,9 @@ ProcessorMessageCounter::BatchSizeData
     *ProcessorMessageCounter::processors_[static_cast<size_t>(
         ProcessorType::MAX_TYPES)][MAX_PROCESSORS_PER_TYPE] = {};
 
+// Mutex to protect processor creation
+std::mutex ProcessorMessageCounter::processors_mutex_;
+
 // Thread-local storage
 thread_local ProcessorMessageCounter::ThreadLocalData
     ProcessorMessageCounter::threadLocalData_;
@@ -37,11 +40,11 @@ void ProcessorMessageCounter::ThreadLocalData::FlushToGlobal() {
     return;
   }
 
-  // Group entries by processor to minimize lock contention
+  // Batch flush to minimize lock contention - just append data
   for (size_t i = 0; i < count_; i++) {
     const auto &entry = entries_[i];
     if (entry.batchSize <= 0) {
-      continue;
+      continue; // Skip invalid entries
     }
 
     BatchSizeData *data = ProcessorMessageCounter::GetOrCreateProcessor(
@@ -52,19 +55,6 @@ void ProcessorMessageCounter::ThreadLocalData::FlushToGlobal() {
 
     std::lock_guard<std::mutex> lock(data->mutex);
     data->batchSizes.push_back(entry.batchSize);
-    data->totalBatches++;
-
-    if (data->totalBatches == 1) {
-      data->min = entry.batchSize;
-      data->max = entry.batchSize;
-    } else {
-      if (entry.batchSize < data->min) {
-        data->min = entry.batchSize;
-      }
-      if (entry.batchSize > data->max) {
-        data->max = entry.batchSize;
-      }
-    }
   }
 
   count_ = 0;
@@ -83,11 +73,19 @@ ProcessorMessageCounter::GetOrCreateProcessor(ProcessorType type,
     return nullptr; // Invalid processor type
   }
 
-  BatchSizeData *&data = processors_[typeIdx][processorId];
-  if (data == nullptr) {
-    data = new BatchSizeData();
+  // Fast path: check without lock (double-checked locking pattern)
+  BatchSizeData *data = processors_[typeIdx][processorId];
+  if (data != nullptr) {
+    return data;
   }
-  return data;
+
+  // Slow path: acquire lock and create if still needed
+  std::lock_guard<std::mutex> lock(processors_mutex_);
+  // Double-check after acquiring lock
+  if (processors_[typeIdx][processorId] == nullptr) {
+    processors_[typeIdx][processorId] = new BatchSizeData();
+  }
+  return processors_[typeIdx][processorId];
 }
 
 void ProcessorMessageCounter::RecordBatchSize(ProcessorType type,
@@ -147,16 +145,12 @@ ProcessorMessageCounter::GetStatistics(ProcessorType type,
     return result;
   }
 
-  // Use batchSizes.size() as source of truth (more reliable than totalBatches)
   result[0] = static_cast<int64_t>(data->batchSizes.size());
 
-  // Calculate percentiles (need sorted array anyway)
+  // Sort once for all percentile calculations
   std::vector<int64_t> sorted = data->batchSizes;
   std::sort(sorted.begin(), sorted.end());
 
-  // Recalculate min/max from sorted data to ensure correctness
-  // (more reliable than maintaining them, especially after potential
-  // inconsistencies)
   result[1] = sorted.front(); // min
   result[2] = sorted.back();  // max
 
@@ -190,13 +184,11 @@ ProcessorMessageCounter::GetAllStatistics() {
       std::lock_guard<std::mutex> dataLock(data->mutex);
       std::vector<int64_t> stats(8, 0);
       if (!data->batchSizes.empty()) {
-        // Use batchSizes.size() as source of truth
         stats[0] = static_cast<int64_t>(data->batchSizes.size());
 
         std::vector<int64_t> sorted = data->batchSizes;
         std::sort(sorted.begin(), sorted.end());
 
-        // Recalculate min/max from sorted data to ensure correctness
         stats[1] = sorted.front(); // min
         stats[2] = sorted.back();  // max
 
@@ -226,9 +218,6 @@ void ProcessorMessageCounter::Reset() {
       if (data != nullptr) {
         std::lock_guard<std::mutex> dataLock(data->mutex);
         data->batchSizes.clear();
-        data->min = 0;
-        data->max = 0;
-        data->totalBatches = 0;
       }
     }
   }
@@ -244,9 +233,6 @@ void ProcessorMessageCounter::Reset(ProcessorType type, int32_t processorId) {
 
   std::lock_guard<std::mutex> lock(data->mutex);
   data->batchSizes.clear();
-  data->min = 0;
-  data->max = 0;
-  data->totalBatches = 0;
 }
 
 void ProcessorMessageCounter::FlushThreadLocalData() {

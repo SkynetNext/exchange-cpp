@@ -123,14 +123,11 @@ public:
     void FlushToGlobal();
   };
 
-  // Global storage structure
+  // Global storage structure - minimal overhead, only store raw data
   struct BatchSizeData {
     std::vector<int64_t>
         batchSizes; // Store batch sizes for percentile calculation
     std::mutex mutex;
-    int64_t min = 0;
-    int64_t max = 0;
-    int64_t totalBatches = 0;
   };
 
 private:
@@ -138,6 +135,9 @@ private:
   static constexpr size_t MAX_PROCESSORS_PER_TYPE = 64;
   static BatchSizeData *processors_[static_cast<size_t>(
       ProcessorType::MAX_TYPES)][MAX_PROCESSORS_PER_TYPE];
+
+  // Mutex to protect processor creation (rare contention)
+  static std::mutex processors_mutex_;
 
   // Thread-local storage
   static thread_local ThreadLocalData threadLocalData_;
