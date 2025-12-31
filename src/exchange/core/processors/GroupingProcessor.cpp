@@ -28,7 +28,6 @@
 #include <exchange/core/processors/WaitSpinningHelper.h>
 #include <exchange/core/utils/FastNanoTime.h>
 #include <exchange/core/utils/Logger.h>
-#include <exchange/core/utils/ProcessorMessageCounter.h>
 
 namespace exchange {
 namespace core {
@@ -131,9 +130,6 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
   static thread_local int64_t epoch_ns = utils::FastNanoTime::Now();
 
   while (true) {
-    int64_t batchStart =
-        nextSequence; // Track how many messages processed in this loop (moved
-                      // outside try for exception handling)
     try {
       // should spin and also check another barrier
       int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
@@ -257,13 +253,6 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
           }
         }
 
-        // Record number of messages processed in this loop iteration
-        int64_t messagesProcessed = nextSequence - batchStart;
-        if (messagesProcessed > 0) {
-          PROCESSOR_RECORD_BATCH_SIZE(utils::ProcessorType::GROUPING, 0,
-                                      messagesProcessed);
-        }
-
         // Match Java: update sequence after processing all available messages
         sequence_.set(availableSequence);
         waitSpinningHelper_->SignalAllWhenBlocking();
@@ -316,12 +305,6 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
         break;
       }
     } catch (...) {
-      // Record number of messages processed before exception
-      int64_t messagesProcessed = nextSequence - batchStart;
-      if (messagesProcessed > 0) {
-        PROCESSOR_RECORD_BATCH_SIZE(utils::ProcessorType::GROUPING, 0,
-                                    messagesProcessed);
-      }
       sequence_.set(nextSequence);
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;

@@ -24,7 +24,6 @@
 #include <exchange/core/processors/TwoStepSlaveProcessor.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
 #include <exchange/core/utils/Logger.h>
-#include <exchange/core/utils/ProcessorMessageCounter.h>
 #include <thread>
 
 namespace exchange {
@@ -49,16 +48,7 @@ TwoStepMasterProcessor<WaitStrategyT>::TwoStepMasterProcessor(
               name)),
       eventHandler_(eventHandler), exceptionHandler_(exceptionHandler),
       name_(name), sequence_(disruptor::Sequence::INITIAL_VALUE),
-      slaveProcessor_(nullptr) {
-  // Parse processor type and ID from name (e.g., "R1_0" -> R1, 0)
-  if (name.size() >= 3 && name.substr(0, 3) == "R1_") {
-    processorType_ = utils::ProcessorType::R1;
-    processorId_ = std::stoi(name.substr(3));
-  } else {
-    processorType_ = utils::ProcessorType::R1; // Default
-    processorId_ = 0;
-  }
-}
+      slaveProcessor_(nullptr) {}
 
 template <typename WaitStrategyT>
 disruptor::Sequence &TwoStepMasterProcessor<WaitStrategyT>::getSequence() {
@@ -123,9 +113,6 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
 
   while (true) {
     common::cmd::OrderCommand *cmd = nullptr;
-    int64_t batchStart =
-        nextSequence; // Track how many messages processed in this loop (moved
-                      // outside try for exception handling)
     try {
       // should spin and also check another barrier
       int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
@@ -139,17 +126,10 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           // switch to next group - let slave processor start doing its handling
           // cycle
           if (cmd->eventsGroup != currentSequenceGroup) {
-            // Record number of messages processed before group boundary
-            int64_t messagesProcessed = nextSequence - batchStart;
-            if (messagesProcessed > 0) {
-              PROCESSOR_RECORD_BATCH_SIZE(processorType_, processorId_,
-                                          messagesProcessed);
-            }
             // Trigger previous group when detecting new group boundary
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
             lastTriggeredSequence = nextSequence - 1;
             currentSequenceGroup = cmd->eventsGroup;
-            batchStart = nextSequence; // Reset for next batch
           }
           // Match Java: direct call without inner try-catch
           // Exception will be caught by outer catch block
@@ -157,15 +137,8 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           nextSequence++;
 
           if (forcedPublish) {
-            // Record number of messages processed before forced publish
-            int64_t messagesProcessed = nextSequence - batchStart;
-            if (messagesProcessed > 0) {
-              PROCESSOR_RECORD_BATCH_SIZE(processorType_, processorId_,
-                                          messagesProcessed);
-            }
             sequence_.set(nextSequence - 1);
             waitSpinningHelper_->SignalAllWhenBlocking();
-            batchStart = nextSequence; // Reset for next batch
           }
 
           if (cmd->command == common::cmd::OrderCommandType::SHUTDOWN_SIGNAL) {
@@ -175,14 +148,7 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
             // SHUTDOWN_SIGNAL, C++ adds LOG_INFO for debugging
             LOG_INFO("[TwoStepMasterProcessor:{}] SHUTDOWN_SIGNAL detected",
                      name_);
-            // Record number of messages processed before shutdown
-            int64_t messagesProcessed = nextSequence - batchStart;
-            if (messagesProcessed > 0) {
-              PROCESSOR_RECORD_BATCH_SIZE(processorType_, processorId_,
-                                          messagesProcessed);
-            }
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
-            batchStart = nextSequence; // Reset to avoid duplicate recording
           }
         }
         // Match Java: update sequence after processing all available messages
@@ -196,26 +162,9 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           // If the last group hasn't been triggered (no group change detected
           // in loop), trigger it now
           if (lastProcessedSequence > lastTriggeredSequence) {
-            // Record number of messages processed before triggering slave
-            int64_t messagesProcessed = nextSequence - batchStart;
-            if (messagesProcessed > 0) {
-              PROCESSOR_RECORD_BATCH_SIZE(processorType_, processorId_,
-                                          messagesProcessed);
-            }
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
-            batchStart = nextSequence; // Reset to avoid duplicate recording
           }
         }
-
-        // Record number of messages processed in this loop iteration
-        // Only record if batchStart hasn't been reset (i.e., no group boundary,
-        // forced publish, or slave trigger happened)
-        int64_t messagesProcessed = nextSequence - batchStart;
-        if (messagesProcessed > 0) {
-          PROCESSOR_RECORD_BATCH_SIZE(processorType_, processorId_,
-                                      messagesProcessed);
-        }
-        batchStart = nextSequence; // Reset for next iteration
 
         sequence_.set(availableSequence);
         waitSpinningHelper_->SignalAllWhenBlocking();
@@ -228,29 +177,16 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       // Match Java: catch (final Throwable ex)
       // Java version doesn't log here, directly calls exceptionHandler
       // C++ adds LOG_ERROR for debugging, but behavior matches Java
-      // Record number of messages processed before exception
-      int64_t messagesProcessed = nextSequence - batchStart;
-      if (messagesProcessed > 0) {
-        PROCESSOR_RECORD_BATCH_SIZE(processorType_, processorId_,
-                                    messagesProcessed);
-      }
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(ex, nextSequence, cmd);
       }
       sequence_.set(nextSequence);
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;
-      batchStart = nextSequence; // Reset for next iteration
     } catch (...) {
       // Match Java: catch (final Throwable ex) - catches all exceptions
       // Java version doesn't log here, directly calls exceptionHandler
       // C++ adds LOG_ERROR for debugging, but behavior matches Java
-      // Record number of messages processed before exception
-      int64_t messagesProcessed = nextSequence - batchStart;
-      if (messagesProcessed > 0) {
-        PROCESSOR_RECORD_BATCH_SIZE(processorType_, processorId_,
-                                    messagesProcessed);
-      }
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(
             std::runtime_error("Unknown exception"), nextSequence, cmd);
@@ -258,7 +194,6 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       sequence_.set(nextSequence);
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;
-      batchStart = nextSequence; // Reset for next iteration
     }
   }
 }

@@ -49,7 +49,6 @@
 #include <exchange/core/processors/journaling/ISerializationProcessor.h>
 #include <exchange/core/utils/FastNanoTime.h>
 #include <exchange/core/utils/Logger.h>
-#include <exchange/core/utils/ProcessorMessageCounter.h>
 #include <latch>
 #include <memory>
 #include <stdexcept>
@@ -377,26 +376,16 @@ public:
     public:
       MatchingEngineEventHandler(
           processors::MatchingEngineRouter *matchingEngine, int32_t shardId)
-          : matchingEngine_(matchingEngine), shardId_(shardId),
-            currentBatchSize_(0) {}
+          : matchingEngine_(matchingEngine), shardId_(shardId) {}
 
       void onEvent(common::cmd::OrderCommand &cmd, int64_t sequence,
                    bool endOfBatch) override {
         matchingEngine_->ProcessOrder(sequence, &cmd);
-        currentBatchSize_++;
-
-        // Record batch size when batch ends
-        if (endOfBatch && currentBatchSize_ > 0) {
-          PROCESSOR_RECORD_BATCH_SIZE(utils::ProcessorType::ME, shardId_,
-                                      currentBatchSize_);
-          currentBatchSize_ = 0;
-        }
       }
 
     private:
       processors::MatchingEngineRouter *matchingEngine_;
       int32_t shardId_;
-      int64_t currentBatchSize_;
     };
 
     // Create afterR1 group (wait for all R1 processors to complete)
