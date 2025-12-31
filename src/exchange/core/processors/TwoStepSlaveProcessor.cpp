@@ -109,8 +109,8 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
         // Record number of messages processed in this loop iteration
         int64_t messagesProcessed = nextSequence_ - batchStart;
         if (messagesProcessed > 0) {
-          utils::ProcessorMessageCounter::RecordBatchSize(
-              processorType_, processorId_, messagesProcessed);
+          PROCESSOR_RECORD_BATCH_SIZE(processorType_, processorId_,
+                                      messagesProcessed);
         }
 
         // Match Java: update sequence after processing all messages in the
@@ -124,8 +124,8 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
       // Record number of messages processed before exception
       int64_t messagesProcessed = nextSequence_ - batchStart;
       if (messagesProcessed > 0) {
-        utils::ProcessorMessageCounter::RecordBatchSize(
-            processorType_, processorId_, messagesProcessed);
+        PROCESSOR_RECORD_BATCH_SIZE(processorType_, processorId_,
+                                    messagesProcessed);
       }
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(ex, nextSequence_, event);
@@ -138,8 +138,8 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
       // Record number of messages processed before exception
       int64_t messagesProcessed = nextSequence_ - batchStart;
       if (messagesProcessed > 0) {
-        utils::ProcessorMessageCounter::RecordBatchSize(
-            processorType_, processorId_, messagesProcessed);
+        PROCESSOR_RECORD_BATCH_SIZE(processorType_, processorId_,
+                                    messagesProcessed);
       }
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(

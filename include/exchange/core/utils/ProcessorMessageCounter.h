@@ -153,3 +153,21 @@ private:
 } // namespace utils
 } // namespace core
 } // namespace exchange
+
+/**
+ * Macro to record batch size statistics.
+ * Default: no-op (zero overhead when disabled)
+ * Enable: #define ENABLE_PROCESSOR_STATISTICS 1
+ * Disable: #define ENABLE_PROCESSOR_STATISTICS 0 (or leave undefined)
+ */
+#ifndef ENABLE_PROCESSOR_STATISTICS
+#define ENABLE_PROCESSOR_STATISTICS 1
+#endif
+
+#if ENABLE_PROCESSOR_STATISTICS == 1
+#define PROCESSOR_RECORD_BATCH_SIZE(type, id, size)                            \
+  exchange::core::utils::ProcessorMessageCounter::RecordBatchSize(type, id,    \
+                                                                  size)
+#else
+#define PROCESSOR_RECORD_BATCH_SIZE(type, id, size) ((void)0)
+#endif
