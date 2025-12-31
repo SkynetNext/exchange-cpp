@@ -22,6 +22,7 @@
 #include <climits>
 #include <condition_variable>
 #include <ctime>
+#include <exchange/core/utils/FastNanoTime.h>
 #include <exchange/core/utils/Logger.h>
 #include <exchange/core/utils/ProcessorMessageCounter.h>
 #include <iomanip>
@@ -58,18 +59,16 @@ void LatencyTestsModule::LatencyTestImpl(
 
   // Helper function to get absolute nanoseconds (matching Java
   // System.nanoTime())
-  auto getNanoTime = []() -> int64_t {
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(
-               std::chrono::steady_clock::now().time_since_epoch())
-        .count();
-  };
+  // Use optimized FastNanoTime for better performance (~10-30ns vs ~50-100ns)
+  utils::FastNanoTime::Initialize();
+  auto getNanoTime = []() -> int64_t { return utils::FastNanoTime::Now(); };
 
   // Helper function to get current time in milliseconds (matching Java
   // System.currentTimeMillis())
+  // Use FastNanoTime for better performance, convert nanoseconds to
+  // milliseconds
   auto getCurrentTimeMillis = []() -> int64_t {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-               std::chrono::system_clock::now().time_since_epoch())
-        .count();
+    return utils::FastNanoTime::Now() / 1'000'000LL;
   };
 
   // CountDownLatch implementation (match Java: CountDownLatch)
@@ -314,18 +313,16 @@ void LatencyTestsModule::HiccupTestImpl(
 
   // Helper function to get absolute nanoseconds (matching Java
   // System.nanoTime())
-  auto getNanoTime = []() -> int64_t {
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(
-               std::chrono::steady_clock::now().time_since_epoch())
-        .count();
-  };
+  // Use optimized FastNanoTime for better performance (~10-30ns vs ~50-100ns)
+  utils::FastNanoTime::Initialize();
+  auto getNanoTime = []() -> int64_t { return utils::FastNanoTime::Now(); };
 
   // Helper function to get current time in milliseconds (matching Java
   // System.currentTimeMillis())
+  // Use FastNanoTime for better performance, convert nanoseconds to
+  // milliseconds
   auto getCurrentTimeMillis = []() -> int64_t {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-               std::chrono::system_clock::now().time_since_epoch())
-        .count();
+    return utils::FastNanoTime::Now() / 1'000'000LL;
   };
 
   // CountDownLatch implementation (match Java: CountDownLatch)

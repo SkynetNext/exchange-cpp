@@ -85,7 +85,7 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
           waitSpinningHelper_->TryWaitFor(nextSequence_);
 
       // process batch
-      int64_t batchStart = nextSequence_;
+      int64_t batchStart = nextSequence_; // Track how many messages processed in this loop
       while (nextSequence_ <= availableSequence &&
              nextSequence_ < processUpToSequence) {
         event = &ringBuffer_->get(nextSequence_);
@@ -93,14 +93,14 @@ void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(
         nextSequence_++;
       }
 
-      // Record batch size (number of messages processed in this loop iteration)
-      int64_t batchSize = nextSequence_ - batchStart;
-      if (batchSize > 0) {
-        utils::ProcessorMessageCounter::RecordBatchSize(name_, batchSize);
-      }
-
       // exit if finished processing entire group (up to specified sequence)
       if (nextSequence_ == processUpToSequence) {
+        // Record number of messages processed in this loop iteration
+        int64_t messagesProcessed = nextSequence_ - batchStart;
+        if (messagesProcessed > 0) {
+          utils::ProcessorMessageCounter::RecordBatchSize(name_, messagesProcessed);
+        }
+        
         // Match Java: update sequence after processing all messages in the group
         sequence_.set(processUpToSequence - 1);
         waitSpinningHelper_->SignalAllWhenBlocking();

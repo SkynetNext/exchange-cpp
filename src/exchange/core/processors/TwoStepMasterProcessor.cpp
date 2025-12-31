@@ -121,17 +121,25 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       if (nextSequence <= availableSequence) {
         int64_t startSequence = nextSequence; // Track start to detect if any
                                               // messages were processed
-        int64_t batchStart = nextSequence;
+        int64_t batchStart =
+            nextSequence; // Track how many messages processed in this loop
         while (nextSequence <= availableSequence) {
           cmd = &ringBuffer_->get(nextSequence);
 
           // switch to next group - let slave processor start doing its handling
           // cycle
           if (cmd->eventsGroup != currentSequenceGroup) {
+            // Record number of messages processed before group boundary
+            int64_t messagesProcessed = nextSequence - batchStart;
+            if (messagesProcessed > 0) {
+              utils::ProcessorMessageCounter::RecordBatchSize(
+                  name_, messagesProcessed);
+            }
             // Trigger previous group when detecting new group boundary
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
             lastTriggeredSequence = nextSequence - 1;
             currentSequenceGroup = cmd->eventsGroup;
+            batchStart = nextSequence; // Reset for next batch
           }
           // Match Java: direct call without inner try-catch
           // Exception will be caught by outer catch block
@@ -139,8 +147,15 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           nextSequence++;
 
           if (forcedPublish) {
+            // Record number of messages processed before forced publish
+            int64_t messagesProcessed = nextSequence - batchStart;
+            if (messagesProcessed > 0) {
+              utils::ProcessorMessageCounter::RecordBatchSize(
+                  name_, messagesProcessed);
+            }
             sequence_.set(nextSequence - 1);
             waitSpinningHelper_->SignalAllWhenBlocking();
+            batchStart = nextSequence; // Reset for next batch
           }
 
           if (cmd->command == common::cmd::OrderCommandType::SHUTDOWN_SIGNAL) {
@@ -150,6 +165,12 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
             // SHUTDOWN_SIGNAL, C++ adds LOG_INFO for debugging
             LOG_INFO("[TwoStepMasterProcessor:{}] SHUTDOWN_SIGNAL detected",
                      name_);
+            // Record number of messages processed before shutdown
+            int64_t messagesProcessed = nextSequence - batchStart;
+            if (messagesProcessed > 0) {
+              utils::ProcessorMessageCounter::RecordBatchSize(
+                  name_, messagesProcessed);
+            }
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
           }
         }
@@ -164,15 +185,21 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
           // If the last group hasn't been triggered (no group change detected
           // in loop), trigger it now
           if (lastProcessedSequence > lastTriggeredSequence) {
+            // Record number of messages processed before triggering slave
+            int64_t messagesProcessed = nextSequence - batchStart;
+            if (messagesProcessed > 0) {
+              utils::ProcessorMessageCounter::RecordBatchSize(
+                  name_, messagesProcessed);
+            }
             PublishProgressAndTriggerSlaveProcessor(nextSequence);
           }
         }
 
-        // Record batch size (number of messages processed in this loop
-        // iteration)
-        int64_t batchSize = nextSequence - batchStart;
-        if (batchSize > 0) {
-          utils::ProcessorMessageCounter::RecordBatchSize(name_, batchSize);
+        // Record number of messages processed in this loop iteration
+        int64_t messagesProcessed = nextSequence - batchStart;
+        if (messagesProcessed > 0) {
+          utils::ProcessorMessageCounter::RecordBatchSize(name_,
+                                                          messagesProcessed);
         }
 
         sequence_.set(availableSequence);

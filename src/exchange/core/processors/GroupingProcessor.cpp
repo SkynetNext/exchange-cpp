@@ -140,7 +140,8 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
       int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
 
       if (nextSequence <= availableSequence) {
-        int64_t batchStart = nextSequence;
+        int64_t batchStart =
+            nextSequence; // Track how many messages processed in this loop
         while (nextSequence <= availableSequence) {
           common::cmd::OrderCommand *cmd = &ringBuffer_->get(nextSequence);
           int64_t currentSeq = nextSequence;
@@ -259,12 +260,11 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
           }
         }
 
-        // Record batch size (number of messages processed in this loop
-        // iteration)
-        int64_t batchSize = nextSequence - batchStart;
-        if (batchSize > 0) {
+        // Record number of messages processed in this loop iteration
+        int64_t messagesProcessed = nextSequence - batchStart;
+        if (messagesProcessed > 0) {
           utils::ProcessorMessageCounter::RecordBatchSize("GroupingProcessor",
-                                                          batchSize);
+                                                          messagesProcessed);
         }
 
         // Match Java: update sequence after processing all available messages
@@ -280,6 +280,8 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
         groupLastNs = t + maxGroupDurationNs_;
 
       } else {
+        // No messages available - this is an empty loop iteration
+        // Don't count this as it's just waiting/spinning
         // Performance optimization: Use relative time calculation to reduce
         // conversion overhead This is called frequently when no messages are
         // available, so optimization is important for maintaining 10ms L2 data
