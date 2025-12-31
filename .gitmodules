@@ -28,3 +28,12 @@
 [submodule "third_party/tbb"]
 	path = third_party/tbb
 	url = https://github.com/SkynetNext/oneTBB.git
+[submodule "reference/orderbook"]
+	path = reference/orderbook
+	url = https://github.com/exchange-core/orderbook.git
+[submodule "reference/exchange-gateway-rest"]
+	path = reference/exchange-gateway-rest
+	url = https://github.com/exchange-core/exchange-gateway-rest.git
+[submodule "reference/exchange-cluster"]
+	path = reference/exchange-cluster
+	url = https://github.com/exchange-core/exchange-cluster.git
