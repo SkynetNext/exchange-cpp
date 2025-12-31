@@ -34,7 +34,7 @@ void PerfLatency::TestLatencyMargin() {
   perfCfg.ringBufferSize = 2 * 1024;
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
-  perfCfg.msgsInGroupLimit = 32;
+  perfCfg.msgsInGroupLimit = 256;
 
   auto testParams = TestDataParameters::SinglePairMargin();
 
@@ -51,7 +51,7 @@ void PerfLatency::TestLatencyExchange() {
   perfCfg.ringBufferSize = 2 * 1024;
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
-  perfCfg.msgsInGroupLimit = 32;
+  perfCfg.msgsInGroupLimit = 256;
 
   auto testParams = TestDataParameters::SinglePairExchange();
 
@@ -68,7 +68,7 @@ void PerfLatency::TestLatencyMultiSymbolMedium() {
   perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 4;
   perfCfg.riskEnginesNum = 2;
-  perfCfg.msgsInGroupLimit = 32;
+  perfCfg.msgsInGroupLimit = 256;
 
   auto testParams = TestDataParameters::Medium();
 
@@ -84,7 +84,7 @@ void PerfLatency::TestLatencyMultiSymbolLarge() {
   perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 4;
   perfCfg.riskEnginesNum = 2;
-  perfCfg.msgsInGroupLimit = 32;
+  perfCfg.msgsInGroupLimit = 256;
 
   auto testParams = TestDataParameters::Large();
 
@@ -100,7 +100,7 @@ void PerfLatency::TestLatencyMultiSymbolHuge() {
   perfCfg.ringBufferSize = 64 * 1024;
   perfCfg.matchingEnginesNum = 4;
   perfCfg.riskEnginesNum = 2;
-  perfCfg.msgsInGroupLimit = 32;
+  perfCfg.msgsInGroupLimit = 256;
 
   auto testParams = TestDataParameters::Huge();
 
