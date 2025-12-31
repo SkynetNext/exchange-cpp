@@ -31,20 +31,25 @@ Measures end-to-end order processing: `Order Submission → Ring Buffer → Grou
 
 ## C++ vs Java Comparison
 
-| Metric | C++ | Java | Ratio |
-|--------|-----|------|-------|
-| **P50 @ 200K TPS** | 0.53µs | 0.54µs | **1.02x better** |
-| **P50 @ 1M TPS** | 0.51µs | 0.51µs | **Tie** |
-| **P50 @ 4M TPS** | 0.92µs | 0.6µs | **1.53x worse** |
-| **P50 @ 6M TPS** | 1.66µs | 1.37µs | **1.21x worse** |
-| **P90 @ 200K TPS** | 0.65µs | 0.69µs | **1.06x better** |
-| **P90 @ 1M TPS** | 0.58µs | 0.63µs | **1.09x better** |
-| **P90 @ 4M TPS** | 1.18µs | 3.5µs | **2.97x better** |
-| **P90 @ 6M TPS** | 2.38µs | 6.9µs | **2.90x better** |
-| **P99 @ 1M TPS** | 0.77µs | 4.7µs | **6.10x better** |
-| **P99 @ 4M TPS** | 1.84µs | 8.0µs | **4.35x better** |
-| **P99 @ 6M TPS** | 7.2µs | 11.5µs | **1.60x better** |
-| **Max Stable TPS** | 8.9M | 6M | **1.48x higher** |
+### By Throughput Level
+
+| TPS | Metric | C++ | Java | Ratio |
+|-----|--------|-----|------|-------|
+| **200K** | P50 | 0.53µs | 0.54µs | ✅ **1.02x better** |
+| | P90 | 0.65µs | 0.69µs | ✅ **1.06x better** |
+| | P99 | 0.93µs | 1.9µs | ✅ **2.04x better** |
+| **1M** | P50 | 0.51µs | 0.51µs | ➖ **Tie** |
+| | P90 | 0.58µs | 0.63µs | ✅ **1.09x better** |
+| | P99 | 0.77µs | 4.7µs | ✅ **6.10x better** |
+| **4M** | P50 | 0.92µs | 0.6µs | ⚠️ **1.53x worse** |
+| | P90 | 1.18µs | 3.5µs | ✅ **2.97x better** |
+| | P99 | 1.84µs | 8.0µs | ✅ **4.35x better** |
+| **6M** | P50 | 1.66µs | 1.37µs | ⚠️ **1.21x worse** |
+| | P90 | 2.38µs | 6.9µs | ✅ **2.90x better** |
+| | P99 | 7.2µs | 11.5µs | ✅ **1.60x better** |
+| **Max** | Stable TPS | 8.9M | 6M | ✅ **1.48x higher** |
+
+**Summary**: C++ shows superior P90/P99 latency across all TPS levels (1.06x-6.10x better). At high TPS (4M+), C++ P50 is slightly worse but P90/P99 remain significantly better. C++ achieves 48% higher maximum stable throughput.
 
 ## Conclusion
 
