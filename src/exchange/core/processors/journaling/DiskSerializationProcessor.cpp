@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <chrono>
+#include <exchange/core/utils/FastNanoTime.h>
 #include <ctime>
 #include <exchange/core/ExchangeApi.h>
 #include <exchange/core/common/VectorBytesIn.h>
@@ -224,9 +224,7 @@ bool DiskSerializationProcessor::StoreData(
       const std::string mainLogPath = folder_ + "/" + exchangeId_ + ".eca";
       std::ofstream mainLog(mainLogPath, std::ios::app);
       if (mainLog.is_open()) {
-        auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
-                       std::chrono::system_clock::now().time_since_epoch())
-                       .count();
+        auto now = utils::FastNanoTime::NowMillis();
         mainLog << now << " seq=" << seq << " timestampNs=" << timestampNs
                 << " snapshotId=" << snapshotId << " type="
                 << (type == SerializedModuleType::RISK_ENGINE ? "RE" : "ME")

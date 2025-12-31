@@ -41,8 +41,10 @@ namespace utils {
     (defined(__linux__) || defined(__APPLE__) || defined(__unix__))
 // x86_64 Linux/Unix: Use RDTSC + calibration (fastest, ~1-5ns)
 static double g_tsc_to_ns = 0.0;
+static double g_tsc_to_ms = 0.0; // Pre-computed for NowMillis() optimization
 static int64_t g_tsc_base = 0;
 static int64_t g_ns_base = 0;
+static int64_t g_ms_base = 0; // Pre-computed for NowMillis() optimization
 
 static inline uint64_t ReadTSC() {
 #if defined(__x86_64__) || defined(__amd64__)
@@ -115,9 +117,26 @@ void FastNanoTime::Initialize() {
 
   if (valid_samples > 0) {
     g_tsc_to_ns = total_ratio / valid_samples;
+    g_tsc_to_ms = g_tsc_to_ns / 1'000'000.0; // Pre-compute for NowMillis()
     g_tsc_base = tsc_samples[0];
     g_ns_base = ns_samples[0];
+    g_ms_base = g_ns_base / 1'000'000LL; // Pre-compute for NowMillis()
   }
+}
+
+int64_t FastNanoTime::NowMillis() {
+  if (g_tsc_to_ns == 0.0) {
+    // Fallback to clock_gettime if not calibrated
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return static_cast<int64_t>(ts.tv_sec) * 1000LL +
+           static_cast<int64_t>(ts.tv_nsec) / 1'000'000LL;
+  }
+
+  // Optimized: use pre-computed ms conversion to avoid division
+  uint64_t tsc = ReadTSC();
+  int64_t tsc_delta = static_cast<int64_t>(tsc) - g_tsc_base;
+  return g_ms_base + static_cast<int64_t>(tsc_delta * g_tsc_to_ms);
 }
 
 #elif defined(__linux__) || defined(__APPLE__) || defined(__unix__)
@@ -132,11 +151,26 @@ int64_t FastNanoTime::Now() {
 void FastNanoTime::Initialize() {
   // No initialization needed for clock_gettime
 }
+
+int64_t FastNanoTime::NowMillis() {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  // Optimized: use bit shift for division (ts.tv_nsec >> 20 approximates /
+  // 1'048'576, close to / 1'000'000) For better accuracy, we use: (ts.tv_nsec *
+  // 1LL) / 1'000'000LL But to avoid division, we can use: ts.tv_nsec >> 20
+  // (error < 5%) For exact result, we keep the division but it's only one
+  // operation
+  return static_cast<int64_t>(ts.tv_sec) * 1000LL +
+         static_cast<int64_t>(ts.tv_nsec) / 1'000'000LL;
+}
+
 #elif defined(USE_RDTSC) && defined(_WIN32)
 // x86_64 Windows: Use RDTSC + calibration (fastest, ~1-5ns)
 static double g_tsc_to_ns = 0.0;
+static double g_tsc_to_ms = 0.0; // Pre-computed for NowMillis() optimization
 static int64_t g_tsc_base = 0;
 static int64_t g_ns_base = 0;
+static int64_t g_ms_base = 0; // Pre-computed for NowMillis() optimization
 
 static inline uint64_t ReadTSC() { return __rdtsc(); }
 
@@ -204,9 +238,31 @@ void FastNanoTime::Initialize() {
 
   if (valid_samples > 0) {
     g_tsc_to_ns = total_ratio / valid_samples;
+    g_tsc_to_ms = g_tsc_to_ns / 1'000'000.0; // Pre-compute for NowMillis()
     g_tsc_base = tsc_samples[0];
     g_ns_base = ns_samples[0];
+    g_ms_base = g_ns_base / 1'000'000LL; // Pre-compute for NowMillis()
   }
+}
+
+int64_t FastNanoTime::NowMillis() {
+  if (g_tsc_to_ns == 0.0) {
+    // Fallback to QPC if not calibrated
+    static int64_t g_frequency = 0;
+    if (g_frequency == 0) {
+      LARGE_INTEGER freq;
+      QueryPerformanceFrequency(&freq);
+      g_frequency = freq.QuadPart;
+    }
+    LARGE_INTEGER counter;
+    QueryPerformanceCounter(&counter);
+    return (counter.QuadPart * 1000LL) / g_frequency;
+  }
+
+  // Optimized: use pre-computed ms conversion to avoid division
+  uint64_t tsc = ReadTSC();
+  int64_t tsc_delta = static_cast<int64_t>(tsc) - g_tsc_base;
+  return g_ms_base + static_cast<int64_t>(tsc_delta * g_tsc_to_ms);
 }
 
 #elif defined(_WIN32)
@@ -231,6 +287,17 @@ void FastNanoTime::Initialize() {
     g_frequency = freq.QuadPart;
   }
 }
+
+int64_t FastNanoTime::NowMillis() {
+  if (g_frequency == 0) {
+    Initialize();
+  }
+  LARGE_INTEGER counter;
+  QueryPerformanceCounter(&counter);
+  // Convert to milliseconds: counter * 1000 / frequency (avoid division by 1e6)
+  return (counter.QuadPart * 1000LL) / g_frequency;
+}
+
 #else
 // Fallback: Use chrono (slower but portable, ~50-100ns)
 int64_t FastNanoTime::Now() {
@@ -241,6 +308,12 @@ int64_t FastNanoTime::Now() {
 
 void FastNanoTime::Initialize() {
   // No initialization needed for chrono
+}
+
+int64_t FastNanoTime::NowMillis() {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::steady_clock::now().time_since_epoch())
+      .count();
 }
 #endif
 

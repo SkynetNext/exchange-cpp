@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <chrono>
+#include <exchange/core/utils/FastNanoTime.h>
 #include <disruptor/AlertException.h>
 #include <disruptor/BlockingWaitStrategy.h>
 #include <disruptor/BusySpinWaitStrategy.h>
@@ -107,15 +107,10 @@ int64_t WaitSpinningHelper<T, WaitStrategyT>::TryWaitFor(int64_t seq) {
 
       if (startTimeNs == 0) {
         // First time check: record start time
-        startTimeNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                          std::chrono::steady_clock::now().time_since_epoch())
-                          .count();
+        startTimeNs = utils::FastNanoTime::Now();
       } else {
         // Subsequent time checks: calculate elapsed time
-        int64_t currentTimeNs =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now().time_since_epoch())
-                .count();
+        int64_t currentTimeNs = utils::FastNanoTime::Now();
         int64_t elapsed = currentTimeNs - startTimeNs;
 
         // If exceeded 1µs, return immediately (don't wait)

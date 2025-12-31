@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <chrono>
 #include <disruptor/EventTranslatorOneArg.h>
 #include <disruptor/EventTranslatorTwoArg.h>
 #include <disruptor/RingBuffer.h>
@@ -47,6 +46,7 @@
 #include <exchange/core/common/cmd/OrderCommandType.h>
 #include <exchange/core/orderbook/OrderBookEventsHelper.h>
 #include <exchange/core/processors/BinaryCommandsProcessor.h>
+#include <exchange/core/utils/FastNanoTime.h>
 #include <exchange/core/utils/Logger.h>
 #include <exchange/core/utils/SerializationUtils.h>
 #include <functional>
@@ -607,9 +607,7 @@ ExchangeApi<WaitStrategyT>::RequestOrderBookAsync(int32_t symbolId,
   event.symbol = symbolId;
   event.uid = -1;
   event.size = depth;
-  event.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-                        std::chrono::system_clock::now().time_since_epoch())
-                        .count();
+  event.timestamp = utils::FastNanoTime::NowMillis();
   event.resultCode = common::cmd::CommandResultCode::NEW;
 
   // Publish event

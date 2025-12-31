@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <chrono>
 #include <disruptor/AlertException.h>
 #include <disruptor/BlockingWaitStrategy.h>
 #include <disruptor/BusySpinWaitStrategy.h>
@@ -27,6 +26,7 @@
 #include <exchange/core/processors/GroupingProcessor.h>
 #include <exchange/core/processors/SharedPool.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
+#include <exchange/core/utils/FastNanoTime.h>
 #include <exchange/core/utils/Logger.h>
 #include <exchange/core/utils/ProcessorMessageCounter.h>
 
@@ -128,11 +128,7 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
   // Performance optimization: Use thread_local epoch to reduce time conversion
   // overhead This avoids calling time_since_epoch() repeatedly, using relative
   // time instead
-  static thread_local auto epoch = std::chrono::steady_clock::now();
-  static thread_local int64_t epoch_ns =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(
-          epoch.time_since_epoch())
-          .count();
+  static thread_local int64_t epoch_ns = utils::FastNanoTime::Now();
 
   while (true) {
     try {
@@ -272,11 +268,7 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
         waitSpinningHelper_->SignalAllWhenBlocking();
         // Performance optimization: Use relative time calculation to reduce
         // conversion overhead
-        auto now = std::chrono::steady_clock::now();
-        int64_t t =
-            epoch_ns +
-            std::chrono::duration_cast<std::chrono::nanoseconds>(now - epoch)
-                .count();
+        int64_t t = utils::FastNanoTime::Now();
         groupLastNs = t + maxGroupDurationNs_;
 
       } else {
@@ -286,11 +278,7 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
         // conversion overhead This is called frequently when no messages are
         // available, so optimization is important for maintaining 10ms L2 data
         // publishing precision
-        auto now = std::chrono::steady_clock::now();
-        int64_t t =
-            epoch_ns +
-            std::chrono::duration_cast<std::chrono::nanoseconds>(now - epoch)
-                .count();
+        int64_t t = utils::FastNanoTime::Now();
         if (msgsInGroup > 0 && t > groupLastNs) {
           // switch group after T microseconds elapsed
           // Flush any remaining event chains before switching group

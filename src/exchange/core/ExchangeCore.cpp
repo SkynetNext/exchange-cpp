@@ -15,7 +15,6 @@
  */
 
 #include <atomic>
-#include <chrono>
 #include <disruptor/BlockingWaitStrategy.h>
 #include <disruptor/BusySpinWaitStrategy.h>
 #include <disruptor/EventFactory.h>
@@ -48,6 +47,7 @@
 #include <exchange/core/processors/WaitSpinningHelper.h>
 #include <exchange/core/processors/journaling/DummySerializationProcessor.h>
 #include <exchange/core/processors/journaling/ISerializationProcessor.h>
+#include <exchange/core/utils/FastNanoTime.h>
 #include <exchange/core/utils/Logger.h>
 #include <exchange/core/utils/ProcessorMessageCounter.h>
 #include <latch>
@@ -611,22 +611,21 @@ public:
     // This is the industrial-grade solution: threads signal when ready
     // No polling needed - latch.wait() blocks until all threads have started
     constexpr int maxWaitMs = 1000;
-    auto deadline =
-        std::chrono::steady_clock::now() + std::chrono::milliseconds(maxWaitMs);
+    auto deadline = utils::FastNanoTime::Now() + maxWaitMs * 1'000'000LL;
 
     const int expectedProcessors = disruptor_->getProcessorCount();
 
     // Wait for latch with timeout (defensive: prevent infinite wait)
     // Use wait() with timeout instead of polling try_wait()
-    auto startTime = std::chrono::steady_clock::now();
+    int64_t startTimeNs = utils::FastNanoTime::Now();
     bool allStarted = false;
     while (!allStarted) {
       if (processorStartupLatch_->try_wait()) {
         allStarted = true;
         break;
       }
-      auto elapsed = std::chrono::steady_clock::now() - startTime;
-      if (elapsed >= std::chrono::milliseconds(maxWaitMs)) {
+      int64_t elapsedNs = utils::FastNanoTime::Now() - startTimeNs;
+      if (elapsedNs >= maxWaitMs * 1'000'000LL) {
         LOG_WARN("[ExchangeCore] Processor startup latch timeout after {}ms. "
                  "Expected {} processors, but not all started.",
                  maxWaitMs, expectedProcessors);
@@ -636,11 +635,9 @@ public:
     }
 
     if (allStarted) {
-      auto elapsed = std::chrono::steady_clock::now() - startTime;
+      int64_t elapsedNs = utils::FastNanoTime::Now() - startTimeNs;
       LOG_DEBUG("[ExchangeCore] All {} processors have started in {}ms",
-                expectedProcessors,
-                std::chrono::duration_cast<std::chrono::milliseconds>(elapsed)
-                    .count());
+                expectedProcessors, elapsedNs / 1'000'000LL);
     }
 
     // MatchingEngine sequence values available after startup

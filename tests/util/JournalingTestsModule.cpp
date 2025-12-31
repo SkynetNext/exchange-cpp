@@ -17,10 +17,10 @@
 #include "JournalingTestsModule.h"
 #include "ExchangeTestContainer.h"
 #include "LatencyTools.h"
-#include <chrono>
 #include <exchange/core/common/api/ApiPersistState.h>
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
+#include <exchange/core/utils/FastNanoTime.h>
 #include <exchange/core/utils/Logger.h>
 #include <iomanip>
 #include <sstream>
@@ -65,25 +65,19 @@ void JournalingTestsModule::JournalingTestImpl(
       // Match Java: log.info("Creating snapshot...");
       LOG_INFO("Creating snapshot...");
       // Match Java: stateId = System.currentTimeMillis() * 1000 + iteration;
-      stateId = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::system_clock::now().time_since_epoch())
-                        .count() *
-                    1000 +
-                iteration;
+      stateId =
+          exchange::core::utils::FastNanoTime::NowMillis() * 1000 + iteration;
       // Match Java: try (ExecutionTime ignore = new ExecutionTime(t ->
       // log.debug("Snapshot {} created in {}", stateId, t))) {
-      auto snapshotStart = std::chrono::steady_clock::now();
+      int64_t snapshotStartNs = exchange::core::utils::FastNanoTime::Now();
       auto persistState =
           std::make_unique<exchange::core::common::api::ApiPersistState>(
               stateId, false);
       auto future =
           container->GetApi()->SubmitCommandAsync(persistState.release());
       auto result = future.get();
-      auto snapshotEnd = std::chrono::steady_clock::now();
-      auto snapshotDurationNs =
-          std::chrono::duration_cast<std::chrono::nanoseconds>(snapshotEnd -
-                                                               snapshotStart)
-              .count();
+      int64_t snapshotEndNs = exchange::core::utils::FastNanoTime::Now();
+      int64_t snapshotDurationNs = snapshotEndNs - snapshotStartNs;
       // Match Java: log.debug("Snapshot {} created in {}", stateId, t);
       LOG_DEBUG("Snapshot {} created in {}", stateId,
                 LatencyTools::FormatNanos(snapshotDurationNs));
@@ -183,7 +177,7 @@ void JournalingTestsModule::JournalingTestImpl(
     // Match Java: log.debug("Creating new exchange from persisted state...");
     LOG_DEBUG("Creating new exchange from persisted state...");
     // Match Java: final long tLoad = System.currentTimeMillis();
-    auto tLoad = std::chrono::steady_clock::now();
+    int64_t tLoadNs = exchange::core::utils::FastNanoTime::Now();
     {
       auto recreatedContainer = ExchangeTestContainer::Create(
           performanceCfg, fromSnapshotConfig,
@@ -197,10 +191,8 @@ void JournalingTestsModule::JournalingTestImpl(
 
       // Match Java: float loadTimeSec = (float) (System.currentTimeMillis() -
       // tLoad) / 1000.0f;
-      auto loadEnd = std::chrono::steady_clock::now();
-      auto loadTimeMs =
-          std::chrono::duration_cast<std::chrono::milliseconds>(loadEnd - tLoad)
-              .count();
+      int64_t loadEndNs = exchange::core::utils::FastNanoTime::Now();
+      int64_t loadTimeMs = (loadEndNs - tLoadNs) / 1'000'000LL;
       float loadTimeSec = static_cast<float>(loadTimeMs) / 1000.0f;
       // Match Java: log.debug("Load+start+replay time: {}s",
       // String.format("%.3f", loadTimeSec));

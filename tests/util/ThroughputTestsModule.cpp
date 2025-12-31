@@ -15,6 +15,7 @@
  */
 
 #include "ThroughputTestsModule.h"
+#include <exchange/core/utils/FastNanoTime.h>
 #include <exchange/core/utils/Logger.h>
 #include <numeric>
 #include <vector>
@@ -57,15 +58,13 @@ void ThroughputTestsModule::ThroughputTestImpl(
     auto benchmarkCommands = benchmarkCommandsFuture.get();
 
     // Match Java: System.currentTimeMillis() - use milliseconds precision
-    auto tStart = std::chrono::steady_clock::now();
+    int64_t tStartNs = exchange::core::utils::FastNanoTime::Now();
     if (!benchmarkCommands.empty()) {
       container->GetApi()->SubmitCommandsSync(benchmarkCommands);
     }
-    auto tEnd = std::chrono::steady_clock::now();
+    int64_t tEndNs = exchange::core::utils::FastNanoTime::Now();
     // Use milliseconds to match Java: System.currentTimeMillis()
-    auto tDurationMs =
-        std::chrono::duration_cast<std::chrono::milliseconds>(tEnd - tStart)
-            .count();
+    int64_t tDurationMs = (tEndNs - tStartNs) / 1'000'000LL;
 
     // Avoid division by zero - if duration is 0, use 1 millisecond minimum
     if (tDurationMs == 0) {

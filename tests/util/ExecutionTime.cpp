@@ -16,7 +16,7 @@
 
 #include "ExecutionTime.h"
 #include "LatencyTools.h"
-#include <chrono>
+#include <exchange/core/utils/FastNanoTime.h>
 
 namespace exchange {
 namespace core {
@@ -26,12 +26,12 @@ namespace util {
 ExecutionTime::ExecutionTime(
     std::function<void(const std::string &)> executionTimeConsumer)
     : executionTimeConsumer_(std::move(executionTimeConsumer)),
-      startTime_(std::chrono::high_resolution_clock::now()), elapsedNs_(0),
+      startTimeNs_(exchange::core::utils::FastNanoTime::Now()), elapsedNs_(0),
       timeCalculated_(false) {}
 
 ExecutionTime::ExecutionTime()
     : executionTimeConsumer_([](const std::string &) {}),
-      startTime_(std::chrono::high_resolution_clock::now()), elapsedNs_(0),
+      startTimeNs_(exchange::core::utils::FastNanoTime::Now()), elapsedNs_(0),
       timeCalculated_(false) {}
 
 ExecutionTime::~ExecutionTime() {
@@ -49,10 +49,8 @@ std::string ExecutionTime::GetTimeFormatted() {
 
 int64_t ExecutionTime::GetTimeNs() const {
   if (!timeCalculated_) {
-    auto endTime = std::chrono::high_resolution_clock::now();
-    elapsedNs_ = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                     endTime - startTime_)
-                     .count();
+    int64_t endTimeNs = exchange::core::utils::FastNanoTime::Now();
+    elapsedNs_ = endTimeNs - startTimeNs_;
     timeCalculated_ = true;
   }
   return elapsedNs_;

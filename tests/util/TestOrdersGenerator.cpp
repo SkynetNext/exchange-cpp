@@ -23,7 +23,7 @@
 #include "UserCurrencyAccountsGenerator.h"
 #include <algorithm>
 #include <atomic>
-#include <chrono>
+#include <exchange/core/utils/FastNanoTime.h>
 #include <climits>
 #include <cmath>
 #include <exchange/core/common/MatcherEventType.h>
@@ -90,9 +90,7 @@ TestOrdersGenerator::CreateAsyncProgressLogger(int64_t total) {
   constexpr int64_t progressLogIntervalNs =
       5'000'000'000LL; // 5 seconds in nanoseconds
   auto nextUpdateTime = std::make_shared<std::atomic<int64_t>>(
-      std::chrono::duration_cast<std::chrono::nanoseconds>(
-          std::chrono::steady_clock::now().time_since_epoch())
-          .count() +
+      exchange::core::utils::FastNanoTime::Now() +
       progressLogIntervalNs);
   auto progress = std::make_shared<std::atomic<int64_t>>(0);
 
@@ -100,10 +98,7 @@ TestOrdersGenerator::CreateAsyncProgressLogger(int64_t total) {
           progressLogIntervalNs](int64_t processed) {
     progress->fetch_add(processed);
     int64_t whenLogNext = nextUpdateTime->load();
-    const int64_t timeNow =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::steady_clock::now().time_since_epoch())
-            .count();
+    const int64_t timeNow = exchange::core::utils::FastNanoTime::Now();
     if (timeNow > whenLogNext) {
       int64_t expected = whenLogNext;
       if (nextUpdateTime->compare_exchange_strong(

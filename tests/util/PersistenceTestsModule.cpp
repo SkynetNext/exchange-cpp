@@ -16,11 +16,12 @@
 
 #include "PersistenceTestsModule.h"
 #include "ExchangeTestContainer.h"
-#include <chrono>
 #include <exchange/core/common/api/ApiPersistState.h>
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
+#include <exchange/core/utils/FastNanoTime.h>
 #include <thread>
+
 
 namespace exchange {
 namespace core {
@@ -37,18 +38,12 @@ void PersistenceTestsModule::PersistenceTestImpl(
         testDataParameters, iteration);
 
     const long stateId =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch())
-                .count() *
-            1000 +
-        iteration;
+        exchange::core::utils::FastNanoTime::NowMillis() * 1000 + iteration;
 
     char exchangeIdBuffer[32];
     snprintf(exchangeIdBuffer, sizeof(exchangeIdBuffer), "%012llX",
              static_cast<unsigned long long>(
-                 std::chrono::duration_cast<std::chrono::milliseconds>(
-                     std::chrono::system_clock::now().time_since_epoch())
-                     .count()));
+                 exchange::core::utils::FastNanoTime::NowMillis()));
     std::string exchangeId(exchangeIdBuffer);
 
     auto firstStartConfig =
@@ -86,13 +81,12 @@ void PersistenceTestsModule::PersistenceTestImpl(
       auto benchmarkCommandsFuture = genResult->GetApiCommandsBenchmark();
       auto benchmarkCommands = benchmarkCommandsFuture.get();
 
-      auto tStart = std::chrono::steady_clock::now();
+      int64_t tStartNs = exchange::core::utils::FastNanoTime::Now();
       if (!benchmarkCommands.empty()) {
         container->GetApi()->SubmitCommandsSync(benchmarkCommands);
       }
-      auto tDuration = std::chrono::duration_cast<std::chrono::milliseconds>(
-                           std::chrono::steady_clock::now() - tStart)
-                           .count();
+      int64_t tDuration =
+          (exchange::core::utils::FastNanoTime::Now() - tStartNs) / 1'000'000LL;
       originalPerfMt =
           benchmarkCommands.size() / static_cast<float>(tDuration) / 1000.0f;
 
@@ -196,13 +190,13 @@ void PersistenceTestsModule::PersistenceTestImpl(
       auto benchmarkCommandsFuture2 = genResult2->GetApiCommandsBenchmark();
       auto benchmarkCommands2 = benchmarkCommandsFuture2.get();
 
-      auto tStart2 = std::chrono::steady_clock::now();
+      int64_t tStart2Ns = exchange::core::utils::FastNanoTime::Now();
       if (!benchmarkCommands2.empty()) {
         recreatedContainer->GetApi()->SubmitCommandsSync(benchmarkCommands2);
       }
-      auto tDuration2 = std::chrono::duration_cast<std::chrono::milliseconds>(
-                            std::chrono::steady_clock::now() - tStart2)
-                            .count();
+      int64_t tDuration2 =
+          (exchange::core::utils::FastNanoTime::Now() - tStart2Ns) /
+          1'000'000LL;
       float perfMt =
           benchmarkCommands2.size() / static_cast<float>(tDuration2) / 1000.0f;
       float perfRatioPerc = perfMt / originalPerfMt * 100.0f;

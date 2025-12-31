@@ -65,10 +65,9 @@ void LatencyTestsModule::LatencyTestImpl(
 
   // Helper function to get current time in milliseconds (matching Java
   // System.currentTimeMillis())
-  // Use FastNanoTime for better performance, convert nanoseconds to
-  // milliseconds
+  // Use FastNanoTime for better performance
   auto getCurrentTimeMillis = []() -> int64_t {
-    return utils::FastNanoTime::Now() / 1'000'000LL;
+    return utils::FastNanoTime::NowMillis();
   };
 
   // CountDownLatch implementation (match Java: CountDownLatch)
@@ -319,10 +318,9 @@ void LatencyTestsModule::HiccupTestImpl(
 
   // Helper function to get current time in milliseconds (matching Java
   // System.currentTimeMillis())
-  // Use FastNanoTime for better performance, convert nanoseconds to
-  // milliseconds
+  // Use FastNanoTime for better performance
   auto getCurrentTimeMillis = []() -> int64_t {
-    return utils::FastNanoTime::Now() / 1'000'000LL;
+    return utils::FastNanoTime::NowMillis();
   };
 
   // CountDownLatch implementation (match Java: CountDownLatch)

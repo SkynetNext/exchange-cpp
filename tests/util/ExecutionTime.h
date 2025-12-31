@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <chrono>
 #include <functional>
 #include <string>
 
@@ -62,7 +61,7 @@ public:
 
 private:
   std::function<void(const std::string &)> executionTimeConsumer_;
-  std::chrono::high_resolution_clock::time_point startTime_;
+  int64_t startTimeNs_;
   mutable int64_t elapsedNs_;
   mutable bool timeCalculated_;
 };

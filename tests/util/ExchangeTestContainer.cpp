@@ -17,7 +17,6 @@
 #include "ExchangeTestContainer.h"
 #include "TestConstants.h"
 #include "UserCurrencyAccountsGenerator.h"
-#include <chrono>
 #include <exchange/core/ExchangeApi.h>
 #include <exchange/core/ExchangeCore.h>
 #include <exchange/core/common/VectorBytesIn.h>
@@ -43,6 +42,7 @@
 #include <exchange/core/common/config/OrdersProcessingConfiguration.h>
 #include <exchange/core/common/config/ReportsQueriesConfiguration.h>
 #include <exchange/core/utils/AffinityThreadFactory.h>
+#include <exchange/core/utils/FastNanoTime.h>
 #include <random>
 #include <unordered_map>
 
@@ -818,10 +818,7 @@ ExchangeTestContainer::GenerateRandomSymbols(
 }
 
 std::string ExchangeTestContainer::TimeBasedExchangeId() {
-  auto now = std::chrono::system_clock::now();
-  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                now.time_since_epoch())
-                .count();
+  auto ms = exchange::core::utils::FastNanoTime::NowMillis();
   char buffer[32];
   snprintf(buffer, sizeof(buffer), "%012llX",
            static_cast<unsigned long long>(ms));
