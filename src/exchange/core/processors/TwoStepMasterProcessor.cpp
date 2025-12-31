@@ -114,6 +114,9 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
 
   while (true) {
     common::cmd::OrderCommand *cmd = nullptr;
+    int64_t batchStart =
+        nextSequence; // Track how many messages processed in this loop (moved
+                      // outside try for exception handling)
     try {
       // should spin and also check another barrier
       int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
@@ -121,8 +124,6 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       if (nextSequence <= availableSequence) {
         int64_t startSequence = nextSequence; // Track start to detect if any
                                               // messages were processed
-        int64_t batchStart =
-            nextSequence; // Track how many messages processed in this loop
         while (nextSequence <= availableSequence) {
           cmd = &ringBuffer_->get(nextSequence);
 
@@ -213,16 +214,29 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       // Match Java: catch (final Throwable ex)
       // Java version doesn't log here, directly calls exceptionHandler
       // C++ adds LOG_ERROR for debugging, but behavior matches Java
+      // Record number of messages processed before exception
+      int64_t messagesProcessed = nextSequence - batchStart;
+      if (messagesProcessed > 0) {
+        utils::ProcessorMessageCounter::RecordBatchSize(name_,
+                                                        messagesProcessed);
+      }
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(ex, nextSequence, cmd);
       }
       sequence_.set(nextSequence);
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;
+      batchStart = nextSequence; // Reset for next iteration
     } catch (...) {
       // Match Java: catch (final Throwable ex) - catches all exceptions
       // Java version doesn't log here, directly calls exceptionHandler
       // C++ adds LOG_ERROR for debugging, but behavior matches Java
+      // Record number of messages processed before exception
+      int64_t messagesProcessed = nextSequence - batchStart;
+      if (messagesProcessed > 0) {
+        utils::ProcessorMessageCounter::RecordBatchSize(name_,
+                                                        messagesProcessed);
+      }
       if (exceptionHandler_) {
         exceptionHandler_->HandleEventException(
             std::runtime_error("Unknown exception"), nextSequence, cmd);
@@ -230,6 +244,7 @@ void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
       sequence_.set(nextSequence);
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;
+      batchStart = nextSequence; // Reset for next iteration
     }
   }
 }

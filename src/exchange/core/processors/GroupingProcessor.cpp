@@ -131,13 +131,14 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
   static thread_local int64_t epoch_ns = utils::FastNanoTime::Now();
 
   while (true) {
+    int64_t batchStart =
+        nextSequence; // Track how many messages processed in this loop (moved
+                      // outside try for exception handling)
     try {
       // should spin and also check another barrier
       int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
 
       if (nextSequence <= availableSequence) {
-        int64_t batchStart =
-            nextSequence; // Track how many messages processed in this loop
         while (nextSequence <= availableSequence) {
           common::cmd::OrderCommand *cmd = &ringBuffer_->get(nextSequence);
           int64_t currentSeq = nextSequence;
@@ -315,6 +316,12 @@ void GroupingProcessor<WaitStrategyT>::ProcessEvents() {
         break;
       }
     } catch (...) {
+      // Record number of messages processed before exception
+      int64_t messagesProcessed = nextSequence - batchStart;
+      if (messagesProcessed > 0) {
+        utils::ProcessorMessageCounter::RecordBatchSize("GroupingProcessor",
+                                                        messagesProcessed);
+      }
       sequence_.set(nextSequence);
       waitSpinningHelper_->SignalAllWhenBlocking();
       nextSequence++;
