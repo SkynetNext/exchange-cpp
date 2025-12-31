@@ -143,13 +143,18 @@ ProcessorMessageCounter::GetStatistics(ProcessorType type,
     return result;
   }
 
-  result[0] = data->totalBatches;
-  result[1] = data->min;
-  result[2] = data->max;
+  // Use batchSizes.size() as source of truth (more reliable than totalBatches)
+  result[0] = static_cast<int64_t>(data->batchSizes.size());
 
-  // Calculate percentiles
+  // Calculate percentiles (need sorted array anyway)
   std::vector<int64_t> sorted = data->batchSizes;
   std::sort(sorted.begin(), sorted.end());
+
+  // Recalculate min/max from sorted data to ensure correctness
+  // (more reliable than maintaining them, especially after potential
+  // inconsistencies)
+  result[1] = sorted.front(); // min
+  result[2] = sorted.back();  // max
 
   result[3] = CalculatePercentile(sorted, 50.0); // P50
   result[4] = CalculatePercentile(sorted, 90.0); // P90
@@ -181,12 +186,15 @@ ProcessorMessageCounter::GetAllStatistics() {
       std::lock_guard<std::mutex> dataLock(data->mutex);
       std::vector<int64_t> stats(8, 0);
       if (!data->batchSizes.empty()) {
-        stats[0] = data->totalBatches;
-        stats[1] = data->min;
-        stats[2] = data->max;
+        // Use batchSizes.size() as source of truth
+        stats[0] = static_cast<int64_t>(data->batchSizes.size());
 
         std::vector<int64_t> sorted = data->batchSizes;
         std::sort(sorted.begin(), sorted.end());
+
+        // Recalculate min/max from sorted data to ensure correctness
+        stats[1] = sorted.front(); // min
+        stats[2] = sorted.back();  // max
 
         stats[3] = CalculatePercentile(sorted, 50.0);
         stats[4] = CalculatePercentile(sorted, 90.0);
