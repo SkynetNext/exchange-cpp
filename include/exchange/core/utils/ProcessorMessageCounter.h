@@ -62,6 +62,16 @@ public:
    */
   static void Reset(const std::string &processorName);
 
+  /**
+   * Print statistics for a processor to log
+   */
+  static void PrintStatistics(const std::string &processorName);
+
+  /**
+   * Print all processor statistics to log
+   */
+  static void PrintAllStatistics();
+
 private:
   struct BatchSizeData {
     std::vector<int64_t>

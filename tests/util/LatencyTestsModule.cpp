@@ -23,6 +23,7 @@
 #include <condition_variable>
 #include <ctime>
 #include <exchange/core/utils/Logger.h>
+#include <exchange/core/utils/ProcessorMessageCounter.h>
 #include <iomanip>
 #include <map>
 #include <mutex>
@@ -230,6 +231,11 @@ void LatencyTestsModule::LatencyTestImpl(
 
     LOG_INFO("{}", report.str());
 
+    // Print processor batch size statistics for this iteration
+    if (!warmup) {
+      utils::ProcessorMessageCounter::PrintAllStatistics();
+    }
+
     // Match Java: container.resetExchangeCore();
     container->ResetExchangeCore();
 
@@ -242,6 +248,9 @@ void LatencyTestsModule::LatencyTestImpl(
     // Note: C++ doesn't have direct equivalent, but we can hint the compiler
     // Match Java: Thread.sleep(500);
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    // Reset statistics for next iteration
+    utils::ProcessorMessageCounter::Reset();
 
     // Match Java: return warmup || histogram.getValueAtPercentile(50.0) <
     // 10_000_000;
@@ -261,6 +270,9 @@ void LatencyTestsModule::LatencyTestImpl(
   //             .mapToObj(tps -> testIteration.apply(tps, false))
   //             .allMatch(x -> x);
   // });
+  // Reset statistics before starting
+  utils::ProcessorMessageCounter::Reset();
+
   LOG_DEBUG("Warming up {} cycles...", warmupCycles);
   for (int i = 0; i < warmupCycles; i++) {
     testIteration(warmupTps, true);
