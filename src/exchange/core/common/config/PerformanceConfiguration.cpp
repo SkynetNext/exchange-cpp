@@ -42,7 +42,7 @@ PerformanceConfiguration PerformanceConfiguration::Default() {
       16 * 1024, // ringBufferSize
       1,         // matchingEnginesNum
       1,         // riskEnginesNum
-      32,        // msgsInGroupLimit
+      256,       // msgsInGroupLimit
       10'000,    // maxGroupDurationNs (10 microseconds)
       false,     // sendL2ForEveryCmd
       8,         // l2RefreshDepth
@@ -64,7 +64,7 @@ PerformanceConfiguration PerformanceConfiguration::LatencyPerformanceBuilder() {
       2 * 1024, // ringBufferSize
       1,        // matchingEnginesNum
       1,        // riskEnginesNum
-      32,       // msgsInGroupLimit
+      256,      // msgsInGroupLimit
       10'000,   // maxGroupDurationNs (10 microseconds)
       false,    // sendL2ForEveryCmd
       8,        // l2RefreshDepth
