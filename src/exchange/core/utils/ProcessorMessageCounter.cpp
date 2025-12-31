@@ -134,6 +134,10 @@ ProcessorMessageCounter::GetStatistics(ProcessorType type,
   FlushThreadLocalData();
 
   BatchSizeData *data = GetOrCreateProcessor(type, processorId);
+  if (data == nullptr) {
+    return std::vector<int64_t>(8, 0); // Return zeros for invalid processor
+  }
+
   std::lock_guard<std::mutex> lock(data->mutex);
 
   std::vector<int64_t> result(
@@ -234,6 +238,10 @@ void ProcessorMessageCounter::Reset(ProcessorType type, int32_t processorId) {
   FlushThreadLocalData();
 
   BatchSizeData *data = GetOrCreateProcessor(type, processorId);
+  if (data == nullptr) {
+    return; // Invalid processor, nothing to reset
+  }
+
   std::lock_guard<std::mutex> lock(data->mutex);
   data->batchSizes.clear();
   data->min = 0;
