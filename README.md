@@ -2,9 +2,39 @@
 
 A high-performance, low-latency cryptocurrency exchange matching engine written in C++, 1:1 ported from [exchange-core](https://github.com/exchange-core/exchange-core).
 
-## Overview
+**Key Performance**: P50: 0.51µs, P99: 0.77µs @ 1M TPS | Up to 8.9M TPS | P90/P99 latency 1.09x-6.10x better than Java
 
-This project is a complete C++ rewrite of the Java-based exchange-core matching engine, utilizing [disruptor-cpp](https://github.com/SkynetNext/disruptor-cpp.git) for ultra-fast inter-thread communication, inspired by LMAX Disruptor.
+## Performance
+
+### Comparison with Java Implementation
+
+Our test configuration matches the original Java `exchange-core` reference implementation:
+- Single symbol (Margin mode)
+- ~1K active users (2K currency accounts)
+- 1K pending limit orders
+- 3M benchmark commands
+- Ring buffer size: 2,048
+- Messages in group limit: 256
+
+**Key Performance Highlights**:
+
+While both implementations achieve similar P50 (median) latency, the C++ version shows **significantly better P90/P99 tail latency**, especially at higher throughput:
+
+| TPS | Metric | C++ | Java | Improvement |
+|-----|--------|-----|------|-------------|
+| 1M | P50 | 0.51µs | 0.51µs | Tie |
+| | P90 | 0.58µs | 0.63µs | **1.09x better** |
+| | P99 | 0.77µs | 4.7µs | **6.10x better** |
+| 4M | P50 | 0.92µs | 0.6µs | 1.53x worse |
+| | P90 | 1.18µs | 3.5µs | **2.97x better** |
+| | P99 | 1.84µs | 8.0µs | **4.35x better** |
+| 6M | P50 | 1.66µs | 1.37µs | 1.21x worse |
+| | P90 | 2.38µs | 6.9µs | **2.90x better** |
+| | P99 | 7.2µs | 11.5µs | **1.60x better** |
+
+**Summary**: The Java version shows slightly better P50 latency at high TPS (4M+), but C++ maintains **superior P90/P99 performance across all throughput levels** (1.09x-6.10x better). C++ also achieves **48% higher maximum stable throughput** (8.9M vs 6M TPS).
+
+For detailed performance data, see [PERFORMANCE_BENCHMARK_COMPARISON.md](docs/PERFORMANCE_BENCHMARK_COMPARISON.md) and [LOW_LATENCY_CORE.md](docs/LOW_LATENCY_CORE.md).
 
 ## Features
 
@@ -25,7 +55,7 @@ This project is a complete C++ rewrite of the Java-based exchange-core matching 
 
 ## Project Status
 
-🚧 **In Development** - Initial planning and architecture phase
+✅ **Core Features Complete** - Matching engine, risk management, and performance optimizations are implemented and tested. See [PERFORMANCE_BENCHMARK_COMPARISON.md](docs/PERFORMANCE_BENCHMARK_COMPARISON.md) for benchmark results.
 
 ## System Architecture
 
@@ -103,43 +133,6 @@ graph TD
 4.  **Deterministic Execution**: Every thread acts as a pure state machine; same input sequence always produces identical memory state.
 5.  **Zero-Copy Memory**: `OrderCommand` is pre-allocated in the Ring Buffer; only logic ownership is transferred between stages.
 
-## Project Structure
-
-The directory structure is **1:1 mapped** to the Java `exchange-core` for easy reference during porting:
-
-```
-exchange-cpp/
-├── CMakeLists.txt          # Main CMake configuration
-├── README.md               # This file
-├── PROJECT_STATUS.md      # Project status, plan, and progress
-├── reference/              # Reference implementations
-│   └── exchange-core/      # Original Java implementation (git submodule)
-│       └── src/main/java/exchange/core2/core/
-│           ├── common/     # → include/exchange/core/common/
-│           ├── orderbook/  # → include/exchange/core/orderbook/
-│           ├── processors/ # → include/exchange/core/processors/
-│           └── utils/      # → include/exchange/core/utils/
-├── third_party/            # Third-party dependencies
-│   └── disruptor-cpp/      # Git submodule
-├── include/                # Public headers (simplified from Java package structure)
-│   └── exchange/
-│       └── core/
-│           ├── common/         # Common data models (Order, Trade, etc.)
-│           │   ├── api/        # API command definitions
-│           │   ├── cmd/        # OrderCommand, CommandResultCode
-│           │   └── config/     # Configuration classes
-│           ├── orderbook/      # OrderBook implementations
-│           ├── processors/     # Pipeline processors (G, R1, ME, R2, J, E)
-│           └── utils/          # Utility functions
-├── src/                    # Implementation files (mirrors include/)
-│   └── exchange/
-│       └── core/
-├── tests/                  # Unit tests
-├── benchmarks/             # Performance benchmarks
-├── examples/               # Usage examples
-└── docs/                   # Documentation
-```
-
 ## Building
 
 ### Prerequisites
@@ -151,13 +144,11 @@ exchange-cpp/
 ### Build Steps
 
 ```bash
-# Method 1: Clone with submodules (recommended)
-git clone --recursive https://github.com/your-org/exchange-cpp.git
+# Clone with submodules (recommended)
+git clone --recursive <repository-url>
 cd exchange-cpp
 
-# Method 2: If you already cloned without --recursive, initialize submodules:
-git clone https://github.com/your-org/exchange-cpp.git
-cd exchange-cpp
+# If you already cloned without --recursive, initialize submodules:
 git submodule update --init --recursive
 
 # Build
@@ -199,19 +190,15 @@ sudo reboot
 
 **Note:** Reserve some CPUs (e.g., 0-7) for system use. Never isolate all CPUs.
 
-## Testing
+## Testing & Benchmarks
 
 ```bash
 cd build
-ctest --output-on-failure
+ctest --output-on-failure  # Run all tests
+./tests/perf/PerfLatency   # Run latency benchmarks
 ```
 
-## Benchmarks
-
-```bash
-cd build
-./benchmarks/exchange_cpp_benchmarks
-```
+See [PERFORMANCE_BENCHMARK_COMPARISON.md](docs/PERFORMANCE_BENCHMARK_COMPARISON.md) for detailed results.
 
 ## References
 
