@@ -892,6 +892,86 @@ void ExchangeApi<WaitStrategyT>::SubmitCommandsSync(
 }
 
 template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::SubmitCommandsBatch(
+    const std::vector<common::api::ApiCommand *> &cmds) {
+  if (cmds.empty()) {
+    return;
+  }
+
+  if (!ringBuffer_) {
+    throw std::runtime_error("SubmitCommandsBatch: ringBuffer is nullptr");
+  }
+
+  const size_t batchSize = cmds.size();
+
+  // Batch claim sequences: next(n) instead of n calls to next()
+  const int64_t highSeq = ringBuffer_->next(static_cast<int>(batchSize));
+  const int64_t lowSeq = highSeq - static_cast<int64_t>(batchSize) + 1;
+
+  // Fill commands into ring buffer slots
+  for (size_t i = 0; i < batchSize; i++) {
+    int64_t seq = lowSeq + static_cast<int64_t>(i);
+    auto &cmd = ringBuffer_->get(seq);
+    auto *apiCmd = cmds[i];
+
+    if (!apiCmd) {
+      throw std::invalid_argument("SubmitCommandsBatch: cmd is nullptr");
+    }
+
+    // Translate command using appropriate translator (match SubmitCommand
+    // logic)
+    if (auto *placeOrder = dynamic_cast<common::api::ApiPlaceOrder *>(apiCmd)) {
+      NEW_ORDER_TRANSLATOR.translateTo(cmd, seq, *placeOrder);
+    } else if (auto *moveOrder =
+                   dynamic_cast<common::api::ApiMoveOrder *>(apiCmd)) {
+      MOVE_ORDER_TRANSLATOR.translateTo(cmd, seq, *moveOrder);
+    } else if (auto *cancelOrder =
+                   dynamic_cast<common::api::ApiCancelOrder *>(apiCmd)) {
+      CANCEL_ORDER_TRANSLATOR.translateTo(cmd, seq, *cancelOrder);
+    } else if (auto *reduceOrder =
+                   dynamic_cast<common::api::ApiReduceOrder *>(apiCmd)) {
+      REDUCE_ORDER_TRANSLATOR.translateTo(cmd, seq, *reduceOrder);
+    } else if (auto *orderBookRequest =
+                   dynamic_cast<common::api::ApiOrderBookRequest *>(apiCmd)) {
+      ORDER_BOOK_REQUEST_TRANSLATOR.translateTo(cmd, seq, *orderBookRequest);
+    } else if (auto *addUser =
+                   dynamic_cast<common::api::ApiAddUser *>(apiCmd)) {
+      ADD_USER_TRANSLATOR.translateTo(cmd, seq, *addUser);
+    } else if (auto *suspendUser =
+                   dynamic_cast<common::api::ApiSuspendUser *>(apiCmd)) {
+      SUSPEND_USER_TRANSLATOR.translateTo(cmd, seq, *suspendUser);
+    } else if (auto *resumeUser =
+                   dynamic_cast<common::api::ApiResumeUser *>(apiCmd)) {
+      RESUME_USER_TRANSLATOR.translateTo(cmd, seq, *resumeUser);
+    } else if (auto *adjustBalance =
+                   dynamic_cast<common::api::ApiAdjustUserBalance *>(apiCmd)) {
+      ADJUST_USER_BALANCE_TRANSLATOR.translateTo(cmd, seq, *adjustBalance);
+    } else if (auto *reset = dynamic_cast<common::api::ApiReset *>(apiCmd)) {
+      RESET_TRANSLATOR.translateTo(cmd, seq, *reset);
+    } else if (auto *nop = dynamic_cast<common::api::ApiNop *>(apiCmd)) {
+      NOP_TRANSLATOR.translateTo(cmd, seq, *nop);
+    } else if (auto *binaryData =
+                   dynamic_cast<common::api::ApiBinaryDataCommand *>(apiCmd)) {
+      // Binary data commands need special handling (they claim their own
+      // sequences) For batch, we can't mix them with regular commands
+      throw std::invalid_argument(
+          "SubmitCommandsBatch: BinaryDataCommand not supported in batch");
+    } else if (auto *persistState =
+                   dynamic_cast<common::api::ApiPersistState *>(apiCmd)) {
+      // Persist commands need special handling
+      throw std::invalid_argument(
+          "SubmitCommandsBatch: PersistState not supported in batch");
+    } else {
+      throw std::invalid_argument(
+          "SubmitCommandsBatch: Unsupported command type");
+    }
+  }
+
+  // Batch publish: publish(lo, hi) instead of n calls to publish()
+  ringBuffer_->publish(lowSeq, highSeq);
+}
+
+template <typename WaitStrategyT>
 void ExchangeApi<WaitStrategyT>::PublishCommand(common::api::ApiCommand *cmd,
                                                 int64_t seq) {
   SubmitCommand(cmd);

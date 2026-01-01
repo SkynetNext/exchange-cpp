@@ -497,27 +497,43 @@ void LatencyTestsModule::LatencyTestFixedTps(
     // Match Java: long plannedTimestamp = System.nanoTime();
     int64_t plannedTimestamp = getNanoTime();
 
-    // Match Java: for (ApiCommand cmd :
-    // genResult.getApiCommandsBenchmark().join())
-    // Match Java: while (System.nanoTime() < plannedTimestamp) {
-    //     // spin until its time to send next command
-    // }
-    // Match Java: cmd.timestamp = plannedTimestamp;
-    // Match Java: api.submitCommand(cmd);
-    // Match Java: plannedTimestamp += nanosPerCmd;
-    for (auto *cmd : benchmarkCommands) {
-      // Match Java: while (System.nanoTime() < plannedTimestamp) {
-      //     // spin until its time to send next command
-      // }
-      while (getNanoTime() < plannedTimestamp) {
-        // spin until its time to send next command
+    // Batch sending: send 10 commands at a time using SubmitCommandsBatch
+    // This reduces ring buffer overhead (next(n) + publish(lo, hi) instead of
+    // n calls to next() + publish())
+    constexpr int BATCH_SIZE = 16;
+    std::vector<exchange::core::common::api::ApiCommand *> batch;
+    batch.reserve(BATCH_SIZE);
+
+    // Use counter instead of modulo to avoid expensive % operation
+    int batchCounter = 0;
+    for (size_t i = 0; i < benchmarkCommands.size(); i++) {
+      auto *cmd = benchmarkCommands[i];
+
+      // Check time and limit rate only for the first command in each batch
+      if (batchCounter == 0) {
+        // Match Java: while (System.nanoTime() < plannedTimestamp) {
+        //     // spin until its time to send next command
+        // }
+        while (getNanoTime() < plannedTimestamp) {
+          // spin until its time to send next command
+        }
       }
+
       // Match Java: cmd.timestamp = plannedTimestamp;
       cmd->timestamp = plannedTimestamp;
-      // Match Java: api.submitCommand(cmd);
-      container->GetApi()->SubmitCommand(cmd);
+      batch.push_back(cmd);
+
       // Match Java: plannedTimestamp += nanosPerCmd;
       plannedTimestamp += nanosPerCmd;
+
+      // Increment counter and check if batch is full
+      batchCounter++;
+      if (batchCounter >= BATCH_SIZE || i == benchmarkCommands.size() - 1) {
+        // Match Java: api.submitCommand(cmd);
+        container->GetApi()->SubmitCommandsBatch(batch);
+        batch.clear();
+        batchCounter = 0;
+      }
     }
 
     // Match Java: latchBenchmark.await();

@@ -91,6 +91,13 @@ public:
   SubmitCommandsSync(const std::vector<common::api::ApiCommand *> &cmds) = 0;
 
   /**
+   * Submit commands in batch (true batch write to ring buffer)
+   * Uses next(n) and publish(lo, hi) for better performance
+   */
+  virtual void
+  SubmitCommandsBatch(const std::vector<common::api::ApiCommand *> &cmds) = 0;
+
+  /**
    * Process result from pipeline
    */
   virtual void ProcessResult(int64_t seq, common::cmd::OrderCommand *cmd) = 0;
@@ -233,6 +240,13 @@ public:
    * Submit commands synchronously
    */
   void SubmitCommandsSync(
+      const std::vector<common::api::ApiCommand *> &cmds) override;
+
+  /**
+   * Submit commands in batch (true batch write to ring buffer)
+   * Uses next(n) and publish(lo, hi) for better performance
+   */
+  void SubmitCommandsBatch(
       const std::vector<common::api::ApiCommand *> &cmds) override;
 
   /**
