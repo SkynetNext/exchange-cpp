@@ -116,7 +116,7 @@ void PerfLatency::TestLatencyMarginFixed8M() {
   perfCfg.ringBufferSize = 2 * 1024;
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
-  perfCfg.msgsInGroupLimit = 256;
+  perfCfg.msgsInGroupLimit = 32;
 
   auto testParams = TestDataParameters::SinglePairMargin();
 
