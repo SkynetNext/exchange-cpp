@@ -18,6 +18,7 @@
 #include "ExchangeTestContainer.h"
 #include "LatencyTools.h"
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <climits>
 #include <cmath>
@@ -40,7 +41,37 @@ namespace tests {
 namespace util {
 
 // Match Java: private static final boolean WRITE_HDR_HISTOGRAMS = false;
-static constexpr bool WRITE_HDR_HISTOGRAMS = true;
+static constexpr bool WRITE_HDR_HISTOGRAMS = false;
+
+// CountDownLatch implementation (optimized: use atomic to reduce lock
+// contention) Note: countDown() is called from single thread
+// (ResultsHandler), but await() is called from main thread, so we need
+// cross-thread synchronization
+// Match Java: java.util.concurrent.CountDownLatch
+class CountDownLatch {
+public:
+  explicit CountDownLatch(int64_t count) : count_(count) {}
+
+  void countDown() {
+    // Use atomic decrement (fast path, no lock needed for most cases)
+    int64_t old = count_.fetch_sub(1, std::memory_order_acq_rel);
+    if (old == 1) { // Count reached 0, need to notify waiting thread
+      std::lock_guard<std::mutex> lock(mu_);
+      cv_.notify_all();
+    }
+  }
+
+  void await() {
+    std::unique_lock<std::mutex> lock(mu_);
+    cv_.wait(lock,
+             [this] { return count_.load(std::memory_order_acquire) == 0; });
+  }
+
+private:
+  std::atomic<int64_t> count_;
+  std::mutex mu_;
+  std::condition_variable cv_;
+};
 
 /**
  * Output percentile distribution to file (match Java:
@@ -189,32 +220,6 @@ void LatencyTestsModule::LatencyTestImpl(
     return utils::FastNanoTime::NowMillis();
   };
 
-  // CountDownLatch implementation (match Java: CountDownLatch)
-  class CountDownLatch {
-  public:
-    explicit CountDownLatch(int64_t count) : count_(count) {}
-
-    void countDown() {
-      std::lock_guard<std::mutex> lock(mu_);
-      if (count_ > 0) {
-        --count_;
-      }
-      if (count_ == 0) {
-        cv_.notify_all();
-      }
-    }
-
-    void await() {
-      std::unique_lock<std::mutex> lock(mu_);
-      cv_.wait(lock, [this] { return count_ == 0; });
-    }
-
-  private:
-    mutable std::mutex mu_;
-    std::condition_variable cv_;
-    int64_t count_;
-  };
-
   // Match Java: testIteration function
   // BiFunction<Integer, Boolean, Boolean> testIteration = (tps, warmup) -> {
   auto testIteration = [&](int tps, bool warmup) -> bool {
@@ -226,10 +231,9 @@ void LatencyTestsModule::LatencyTestImpl(
 
     // Simple latency tracking (match Java: using HDR histogram, but we use
     // vector for now)
+    // Note: No lock needed - ResultsHandler is single-threaded (matches Java)
     std::vector<int64_t> latencies;
     latencies.reserve(benchmarkCommands.size());
-
-    std::mutex latenciesMutex;
 
     // Match Java: CountDownLatch latchBenchmark = new
     // CountDownLatch(genResult.getBenchmarkCommandsSize());
@@ -241,21 +245,20 @@ void LatencyTestsModule::LatencyTestImpl(
     //     hdrRecorder.recordValue(Math.min(latency, Integer.MAX_VALUE));
     //     latchBenchmark.countDown();
     // });
-    container->SetConsumer(
-        [&latencies, &latenciesMutex, &latchBenchmark, getNanoTime](
-            exchange::core::common::cmd::OrderCommand *cmd, int64_t seq) {
-          // Match Java: final long latency = System.nanoTime() - cmd.timestamp;
-          auto nowNs = getNanoTime();
-          auto latency = nowNs - cmd->timestamp;
-          // Match Java: hdrRecorder.recordValue(Math.min(latency,
-          // Integer.MAX_VALUE));
-          auto latencyClamped =
-              std::min(latency, static_cast<int64_t>(INT_MAX));
-          std::lock_guard<std::mutex> lock(latenciesMutex);
-          latencies.push_back(latencyClamped);
-          // Match Java: latchBenchmark.countDown();
-          latchBenchmark.countDown();
-        });
+    container->SetConsumer([&latencies, &latchBenchmark, getNanoTime](
+                               exchange::core::common::cmd::OrderCommand *cmd,
+                               int64_t seq) {
+      // Match Java: final long latency = System.nanoTime() - cmd.timestamp;
+      auto nowNs = getNanoTime();
+      auto latency = nowNs - cmd->timestamp;
+      // Match Java: hdrRecorder.recordValue(Math.min(latency,
+      // Integer.MAX_VALUE));
+      auto latencyClamped = std::min(latency, static_cast<int64_t>(INT_MAX));
+      // Note: No lock needed - ResultsHandler is single-threaded (matches Java)
+      latencies.push_back(latencyClamped);
+      // Match Java: latchBenchmark.countDown();
+      latchBenchmark.countDown();
+    });
 
     // Match Java: final int nanosPerCmd = 1_000_000_000 / tps;
     const int nanosPerCmd = 1'000'000'000 / tps;
@@ -308,7 +311,7 @@ void LatencyTestsModule::LatencyTestImpl(
     tagStream << std::fixed << std::setprecision(3) << perfMt << " MT/s";
 
     // Calculate latency statistics (match Java HDR histogram)
-    std::lock_guard<std::mutex> lock(latenciesMutex);
+    // Note: No lock needed - ResultsHandler is single-threaded (matches Java)
 
     // Match Java: HDR histogram always has values (returns 0 if no records)
     // Calculate percentiles (match Java HDR histogram percentiles)
@@ -450,32 +453,6 @@ void LatencyTestsModule::HiccupTestImpl(
     return utils::FastNanoTime::NowMillis();
   };
 
-  // CountDownLatch implementation (match Java: CountDownLatch)
-  class CountDownLatch {
-  public:
-    explicit CountDownLatch(int64_t count) : count_(count) {}
-
-    void countDown() {
-      std::lock_guard<std::mutex> lock(mu_);
-      if (count_ > 0) {
-        --count_;
-      }
-      if (count_ == 0) {
-        cv_.notify_all();
-      }
-    }
-
-    void await() {
-      std::unique_lock<std::mutex> lock(mu_);
-      cv_.wait(lock, [this] { return count_ == 0; });
-    }
-
-  private:
-    mutable std::mutex mu_;
-    std::condition_variable cv_;
-    int64_t count_;
-  };
-
   // Match Java: IntFunction<TreeMap<ZonedDateTime, Long>> testIteration = tps
   // -> {
   auto testIteration = [&](int tps) -> std::map<int64_t, int64_t> {
@@ -496,7 +473,7 @@ void LatencyTestsModule::HiccupTestImpl(
 
     // Match Java: final MutableLong nextHiccupAcceptTimestampNs = new
     // MutableLong(0);
-    std::mutex hiccupMutex;
+    // Note: ResultsHandler is single-threaded, so no lock needed (matches Java)
     int64_t nextHiccupAcceptTimestampNs = 0;
 
     // Match Java: container.setConsumer((cmd, seq) -> {
@@ -514,8 +491,8 @@ void LatencyTestsModule::HiccupTestImpl(
     //     latchBenchmark.countDown();
     // });
     container->SetConsumer(
-        [&hiccupTimestampsNs, &hiccupMutex, &nextHiccupAcceptTimestampNs,
-         hiccupThresholdNs, &latchBenchmark, getNanoTime](
+        [&hiccupTimestampsNs, &nextHiccupAcceptTimestampNs, hiccupThresholdNs,
+         &latchBenchmark, getNanoTime](
             exchange::core::common::cmd::OrderCommand *cmd, int64_t seq) {
           // Match Java: long now = System.nanoTime();
           int64_t now = getNanoTime();
@@ -523,12 +500,8 @@ void LatencyTestsModule::HiccupTestImpl(
           // Match Java: if (now < nextHiccupAcceptTimestampNs.value) {
           //     return;
           // }
-          std::lock_guard<std::mutex> lock(hiccupMutex);
-          // Match Java: if (now < nextHiccupAcceptTimestampNs.value) {
-          //     return;
-          // }
-          // Note: Java code returns without countDown, which may cause issues
-          // but we match Java behavior exactly
+          // Note: No lock needed - ResultsHandler is single-threaded (matches
+          // Java)
           if (now < nextHiccupAcceptTimestampNs) {
             return;
           }
@@ -612,23 +585,21 @@ void LatencyTestsModule::HiccupTestImpl(
     //                 Math::max));
     // Note: We'll use a simple map with timestamp in milliseconds as key
     // (matching the Java TreeMap<ZonedDateTime, Long> behavior)
+    // Note: No lock needed - ResultsHandler is single-threaded (matches Java)
     std::map<int64_t, int64_t> sorted;
-    {
-      std::lock_guard<std::mutex> lock(hiccupMutex);
-      for (const auto &pair : hiccupTimestampsNs) {
-        int64_t eventTimestampNs = pair.first;
-        int64_t delay = pair.second;
-        // Match Java: Instant.ofEpochMilli(startTimeMs + (eventTimestampNs -
-        // startTimeNs) / 1_000_000)
-        int64_t eventTimestampMs =
-            startTimeMs + (eventTimestampNs - startTimeNs) / 1'000'000;
-        // Match Java: sorted.merge(..., delay, Math::max)
-        auto it = sorted.find(eventTimestampMs);
-        if (it != sorted.end()) {
-          it->second = std::max(it->second, delay);
-        } else {
-          sorted[eventTimestampMs] = delay;
-        }
+    for (const auto &pair : hiccupTimestampsNs) {
+      int64_t eventTimestampNs = pair.first;
+      int64_t delay = pair.second;
+      // Match Java: Instant.ofEpochMilli(startTimeMs + (eventTimestampNs -
+      // startTimeNs) / 1_000_000)
+      int64_t eventTimestampMs =
+          startTimeMs + (eventTimestampNs - startTimeNs) / 1'000'000;
+      // Match Java: sorted.merge(..., delay, Math::max)
+      auto it = sorted.find(eventTimestampMs);
+      if (it != sorted.end()) {
+        it->second = std::max(it->second, delay);
+      } else {
+        sorted[eventTimestampMs] = delay;
       }
     }
 
