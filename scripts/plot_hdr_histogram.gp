@@ -6,9 +6,9 @@ set terminal pngcairo size 1000,600 enhanced font 'Verdana,10'
 set output 'hdr-histogram.png'
 
 set title 'Latency Distribution (HDR Histogram)'
-set xlabel 'Latency (microseconds)'
-set ylabel 'Percentile'
-set logscale x
+set xlabel 'Percentile'
+set ylabel 'Latency (microseconds)'
+set logscale y
 set grid
 set key top left
 
@@ -39,9 +39,10 @@ do for [file in file_list] {
         }
     }
     
-    # Plot: column 2 (Value/latency) vs column 1 (Percentile)
+    # Plot: column 1 (Percentile) vs column 2 (Value/latency*1000)
     # Skip header lines
-    plot_cmd = plot_cmd.sprintf("'%s' using 2:1 with lines title '%s'", file, label)
+    # Column 2 is already in microseconds, multiply by 1000 as requested
+    plot_cmd = plot_cmd.sprintf("'%s' using 1:($2*1000) with lines title '%s'", file, label)
     file_index = file_index + 1
 }
 
