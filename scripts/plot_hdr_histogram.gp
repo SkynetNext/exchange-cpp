@@ -12,6 +12,10 @@ set logscale y
 set grid
 set key top left
 
+# Set x-axis range to 0-1 (percentile as fraction)
+set xrange [0:1]
+set format x "%.2f"
+
 # Get list of .perc files sorted by throughput (extract number from filename)
 file_list = system("ls -1 *.perc 2>/dev/null | sort -t- -k2 -n")
 
@@ -39,10 +43,10 @@ do for [file in file_list] {
         }
     }
     
-    # Plot: column 1 (Percentile) vs column 2 (Value/latency*1000)
-    # Skip header lines
-    # Column 2 is already in microseconds, multiply by 1000 as requested
-    plot_cmd = plot_cmd.sprintf("'%s' using 1:($2*1000) with lines title '%s'", file, label)
+    # Plot: column 2 (Percentile 0.0-1.0) vs column 1 (Value/latency in microseconds)
+    # Skip header lines (lines starting with "Value" or "---")
+    # Format: Value Percentile TotalCount 1/(1-Percentile)
+    plot_cmd = plot_cmd.sprintf("'%s' using 2:1 with lines title '%s'", file, label)
     file_index = file_index + 1
 }
 
