@@ -612,15 +612,23 @@ fi
 
 **确保编译时包含调试符号**，用于生成准确的调用栈：
 
+使用 RelWithDebInfo 模式（推荐，CMake 标准做法）**
 ```bash
-# 使用 Release 模式但添加 -g（推荐，性能与符号兼顾）
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE="-O2 -g -DNDEBUG" -B build
+# RelWithDebInfo = Release 性能 + Debug 符号（自动配置 -O2 -g）
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -B build
 cmake --build build -t test_perf_latency
 ```
 
+**验证调试符号**：
+```bash
+# 检查是否有 DWARF 调试信息（应该看到 .debug_info, .debug_line 等）
+readelf -S build/tests/test_perf_latency | grep debug
+```
+
 **说明**：
-- `-O2`：适度优化，保留函数调用关系（比 `-O3` 更适合性能分析）
-- `-g`：保留调试符号，perf 可以解析函数名和行号
+- **RelWithDebInfo**：CMake 标准模式，自动配置 `-O2 -g`，最适合性能分析
+- **`-g3`**：生成最完整的调试信息（包括宏定义），比 `-g` 更完整
+- **禁用 LTO**：LTO 可能影响调试符号的完整性，性能分析时建议禁用
 - **不要使用 `-O0`**：会严重影响性能，分析结果不准确
 
 ### 生成火焰图（最佳实践）
@@ -629,7 +637,7 @@ cmake --build build -t test_perf_latency
 ```bash
 # 1. 记录性能数据（FlameGraph 推荐使用 -F 997）
 perf record -g -F 997 --call-graph dwarf -o perf.data \
-  ./tests/test_perf_latency --gtest_filter=PerfLatency.TestLatencyExchange
+  ./tests/test_perf_latency --gtest_filter=PerfLatency.TestLatencyMargin
 
 # 2. 生成火焰图
 perf script -i perf.data | \
