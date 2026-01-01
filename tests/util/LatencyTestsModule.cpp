@@ -529,13 +529,6 @@ void LatencyTestsModule::LatencyTestFixedTps(
       // Increment counter and check if batch is full
       batchCounter++;
       if (batchCounter >= BATCH_SIZE || i == benchmarkCommands.size() - 1) {
-        // Set timestamps for all commands in batch before sending
-        // Use actual time to ensure accurate latency measurement
-        int64_t batchTimestamp = getNanoTime();
-        for (auto *batchCmd : batch) {
-          batchCmd->timestamp = batchTimestamp;
-          batchTimestamp += nanosPerCmd;
-        }
         // Match Java: api.submitCommand(cmd);
         container->GetApi()->SubmitCommandsBatch(batch);
         batch.clear();
