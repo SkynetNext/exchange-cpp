@@ -604,3 +604,73 @@ fi
 - **≤3M TPS**：批次大小 P99=1，延迟 P99=1.58-2.23µs
 - **3.7M TPS**：延迟 P50 首次超过 1µs
 - **8.7M TPS**：批次大小 P50=256，延迟 P99=105µs-24.8ms（性能崩溃）
+
+
+## 火焰图生成（FlameGraph）
+
+### 编译参数（必须）
+
+**确保编译时包含调试符号**，用于生成准确的调用栈：
+
+```bash
+# 使用 Release 模式但添加 -g（推荐，性能与符号兼顾）
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE="-O2 -g -DNDEBUG" -B build
+cmake --build build -t test_perf_latency
+```
+
+**说明**：
+- `-O2`：适度优化，保留函数调用关系（比 `-O3` 更适合性能分析）
+- `-g`：保留调试符号，perf 可以解析函数名和行号
+- **不要使用 `-O0`**：会严重影响性能，分析结果不准确
+
+### 生成火焰图（最佳实践）
+
+**完整命令**：
+```bash
+# 1. 记录性能数据（FlameGraph 推荐使用 -F 997）
+perf record -g -F 997 --call-graph dwarf -o perf.data \
+  ./tests/test_perf_latency --gtest_filter=PerfLatency.TestLatencyExchange
+
+# 2. 生成火焰图
+perf script -i perf.data | \
+  stackcollapse-perf.pl | \
+  flamegraph.pl --title "Latency Performance Bottleneck" --width 1920 > flamegraph.svg
+```
+
+**参数说明**：
+- `-F 997`：采样频率 997 Hz
+  - **来源**：Brendan Gregg（FlameGraph 作者）在《Systems Performance》一书中推荐
+  - **原理**：避免与系统时钟频率（通常是 1000 Hz）产生谐振，减少采样偏差
+  - **替代值**：`-F 1000` 也可以，但 997 更不容易与系统时钟同步
+  - **开销**：997 Hz ≈ 每秒 1000 次采样，开销约 1-2%，适合生产环境
+- `-g --call-graph dwarf`：使用 DWARF 调试信息记录完整调用栈
+- `--title`：火焰图标题（可选）
+
+**安装 FlameGraph 工具**：
+```bash
+# 下载 FlameGraph
+git clone https://github.com/brendangregg/FlameGraph.git
+cd FlameGraph
+
+# 安装到系统路径（需要 root 权限）
+sudo cp *.pl /usr/local/bin/
+
+# 验证安装（检查工具是否在 PATH 中）
+which stackcollapse-perf.pl
+which flamegraph.pl
+```
+
+### 查看火焰图
+
+- **浏览器打开**：`flamegraph.svg`
+- **交互功能**：
+  - 点击函数名：展开/折叠调用栈
+  - 鼠标悬停：显示函数名和 CPU 时间占比
+  - 搜索框：快速定位瓶颈函数（如 `WaitSpinningHelper`、`FixedSequenceGroup`）
+
+### 火焰图解读
+
+- **宽度**：表示 CPU 时间占比（越宽 = 占用越多）
+- **高度**：表示调用栈深度
+- **颜色**：随机分配，用于区分不同函数
+- **瓶颈识别**：寻找最宽的函数栈，通常是性能瓶颈所在
