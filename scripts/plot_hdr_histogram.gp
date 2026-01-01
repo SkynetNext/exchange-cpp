@@ -31,10 +31,12 @@ do for [file in file_list] {
     # Format label
     if (throughput_num >= 1.0) {
         label = sprintf("%.1fM TPS", throughput_num)
-    } else if (throughput_num >= 0.001) {
-        label = sprintf("%.0fK TPS", throughput_num * 1000)
     } else {
-        label = sprintf("%.3f TPS", throughput_num)
+        if (throughput_num >= 0.001) {
+            label = sprintf("%.0fK TPS", throughput_num * 1000)
+        } else {
+            label = sprintf("%.3f TPS", throughput_num)
+        }
     }
     
     # Plot: column 2 (Value/latency) vs column 1 (Percentile)
