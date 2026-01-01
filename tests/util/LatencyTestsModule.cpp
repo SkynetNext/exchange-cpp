@@ -20,11 +20,14 @@
 #include <algorithm>
 #include <chrono>
 #include <climits>
+#include <cmath>
 #include <condition_variable>
 #include <ctime>
 #include <exchange/core/utils/FastNanoTime.h>
 #include <exchange/core/utils/Logger.h>
+#include <fstream>
 #include <iomanip>
+#include <limits>
 #include <map>
 #include <mutex>
 #include <sstream>
@@ -35,6 +38,123 @@ namespace exchange {
 namespace core {
 namespace tests {
 namespace util {
+
+// Match Java: private static final boolean WRITE_HDR_HISTOGRAMS = false;
+static constexpr bool WRITE_HDR_HISTOGRAMS = false;
+
+/**
+ * Output percentile distribution to file (match Java:
+ * histogram.outputPercentileDistribution(printStream, 1000.0))
+ *
+ * @param latencies - sorted latency values (in nanoseconds)
+ * @param filename - output filename
+ * @param outputValueUnitScalingRatio - scaling ratio (1000.0 = convert ns to
+ * µs)
+ */
+static void
+OutputPercentileDistribution(const std::vector<int64_t> &latencies,
+                             const std::string &filename,
+                             double outputValueUnitScalingRatio = 1000.0) {
+  if (latencies.empty()) {
+    return;
+  }
+
+  std::ofstream file(filename);
+  if (!file.is_open()) {
+    LOG_ERROR("Failed to open file for writing: {}", filename);
+    return;
+  }
+
+  // Match Java HDR Histogram .hgrm format header
+  file << "Value     Percentile TotalCount 1/(1-Percentile)\n";
+  file << "--------------------------------------------------\n";
+
+  const size_t totalCount = latencies.size();
+
+  // Output percentiles from 0.0 to 100.0 with appropriate granularity
+  // Match Java: outputPercentileDistribution uses logarithmic scale
+  std::vector<double> percentiles;
+
+  // Add key percentiles (0.0, 0.1,
+  // 0.5, 1.0, 2.5, 5.0, 10.0, 25.0, 50.0, 75.0, 90.0, 95.0, 99.0, 99.9, 99.99,
+  // 100.0)
+  percentiles.push_back(0.0);
+  percentiles.push_back(0.1);
+  percentiles.push_back(0.5);
+  percentiles.push_back(1.0);
+  percentiles.push_back(2.5);
+  percentiles.push_back(5.0);
+  percentiles.push_back(10.0);
+  percentiles.push_back(25.0);
+  percentiles.push_back(50.0);
+  percentiles.push_back(75.0);
+  percentiles.push_back(90.0);
+  percentiles.push_back(95.0);
+  percentiles.push_back(99.0);
+  percentiles.push_back(99.9);
+  percentiles.push_back(99.99);
+  percentiles.push_back(100.0);
+
+  // Add more granular percentiles between 0.0 and 1.0
+  for (double p = 0.01; p < 1.0; p += 0.01) {
+    percentiles.push_back(p);
+  }
+  // Add more granular percentiles between 1.0 and 10.0
+  for (double p = 1.1; p < 10.0; p += 0.1) {
+    percentiles.push_back(p);
+  }
+  // Add more granular percentiles between 10.0 and 100.0
+  for (double p = 10.5; p < 100.0; p += 0.5) {
+    percentiles.push_back(p);
+  }
+
+  // Sort and remove duplicates
+  std::sort(percentiles.begin(), percentiles.end());
+  percentiles.erase(std::unique(percentiles.begin(), percentiles.end()),
+                    percentiles.end());
+
+  // Helper function to get value at percentile
+  auto getValueAtPercentile = [&latencies](double percentile) -> int64_t {
+    if (latencies.empty()) {
+      return 0;
+    }
+    if (percentile >= 100.0) {
+      return latencies.back();
+    }
+    size_t index = static_cast<size_t>(
+        std::round((percentile / 100.0) * (latencies.size() - 1)));
+    return latencies[std::min(index, latencies.size() - 1)];
+  };
+
+  // Output each percentile
+  for (double percentile : percentiles) {
+    int64_t value = getValueAtPercentile(percentile);
+    // Apply scaling (convert nanoseconds to microseconds)
+    double scaledValue =
+        static_cast<double>(value) / outputValueUnitScalingRatio;
+
+    // Calculate 1/(1-Percentile) for display
+    double invOneMinusPercentile = (percentile >= 100.0)
+                                       ? std::numeric_limits<double>::infinity()
+                                       : (1.0 / (1.0 - percentile / 100.0));
+
+    // Match Java format: "Value     Percentile TotalCount 1/(1-Percentile)"
+    file << std::fixed << std::setprecision(2) << std::setw(10) << scaledValue
+         << " " << std::setprecision(12) << std::setw(18) << percentile / 100.0
+         << " " << std::setw(11) << totalCount << " " << std::setprecision(12)
+         << std::setw(18);
+
+    if (std::isinf(invOneMinusPercentile)) {
+      file << "inf";
+    } else {
+      file << invOneMinusPercentile;
+    }
+    file << "\n";
+  }
+
+  file.close();
+  LOG_DEBUG("Wrote HDR histogram to: {}", filename);
+}
 
 void LatencyTestsModule::LatencyTestImpl(
     const exchange::core::common::config::PerformanceConfiguration
@@ -227,6 +347,24 @@ void LatencyTestsModule::LatencyTestImpl(
     report << "W:" << LatencyTools::FormatNanos(maxLatency);
 
     LOG_INFO("{}", report.str());
+
+    // Match Java: if (WRITE_HDR_HISTOGRAMS) {
+    //     final PrintStream printStream = new PrintStream(new
+    //     File(System.currentTimeMillis() + "-" + perfMt + ".perc"));
+    //     histogram.outputPercentileDistribution(printStream, 1000.0);
+    // }
+    if constexpr (WRITE_HDR_HISTOGRAMS) {
+      // Match Java: System.currentTimeMillis() + "-" + perfMt + ".perc"
+      auto currentTimeMs = getCurrentTimeMillis();
+      std::ostringstream filenameStream;
+      filenameStream << currentTimeMs << "-" << std::fixed
+                     << std::setprecision(3) << perfMt << ".perc";
+      std::string filename = filenameStream.str();
+
+      // Match Java: histogram.outputPercentileDistribution(printStream,
+      // 1000.0);
+      OutputPercentileDistribution(latencies, filename, 1000.0);
+    }
 
     // Match Java: container.resetExchangeCore();
     container->ResetExchangeCore();

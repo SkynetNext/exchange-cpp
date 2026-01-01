@@ -129,16 +129,31 @@ common::cmd::CommandResultCode UserProfileService::SuspendUser(int64_t uid) {
     }
   }
 
-  profile->userStatus = common::UserStatus::SUSPENDED;
+  // Match Java: userProfiles.remove(uid) - actually delete the user profile
+  // This removes inactive clients profile from the core in order to increase
+  // performance
+  delete profile;
+  userProfiles.erase(uid);
   return common::cmd::CommandResultCode::SUCCESS;
 }
 
 common::cmd::CommandResultCode UserProfileService::ResumeUser(int64_t uid) {
   common::UserProfile *profile = GetUserProfile(uid);
   if (profile == nullptr) {
-    return common::cmd::CommandResultCode::USER_MGMT_USER_NOT_FOUND;
+    // Match Java: create new empty user profile if not exists
+    // account balance adjustments should be applied later
+    auto *newProfile = new common::UserProfile(uid, common::UserStatus::ACTIVE);
+    userProfiles[uid] = newProfile;
+    return common::cmd::CommandResultCode::SUCCESS;
   }
 
+  if (profile->userStatus != common::UserStatus::SUSPENDED) {
+    // Match Java: attempt to resume non-suspended account (or resume twice)
+    return common::cmd::CommandResultCode::USER_MGMT_USER_NOT_SUSPENDED;
+  }
+
+  // Match Java: resume existing suspended profile
+  // (can contain non empty positions or accounts)
   profile->userStatus = common::UserStatus::ACTIVE;
   return common::cmd::CommandResultCode::SUCCESS;
 }
