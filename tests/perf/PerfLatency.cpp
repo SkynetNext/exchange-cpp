@@ -124,7 +124,7 @@ void PerfLatency::TestLatencyMarginFixed8M() {
       perfCfg, testParams,
       exchange::core::common::config::InitialStateConfiguration::CleanTest(),
       exchange::core::common::config::SerializationConfiguration::Default(),
-      6'000'000, // Fixed 6M TPS
+      8'000'000, // Fixed 6M TPS
       16);       // 16 warmup cycles
 }
 
