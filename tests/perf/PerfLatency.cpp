@@ -110,6 +110,24 @@ void PerfLatency::TestLatencyMultiSymbolHuge() {
       exchange::core::common::config::SerializationConfiguration::Default(), 2);
 }
 
+void PerfLatency::TestLatencyMarginFixed6M() {
+  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
+      LatencyPerformanceBuilder();
+  perfCfg.ringBufferSize = 2 * 1024;
+  perfCfg.matchingEnginesNum = 1;
+  perfCfg.riskEnginesNum = 1;
+  perfCfg.msgsInGroupLimit = 256;
+
+  auto testParams = TestDataParameters::SinglePairMargin();
+
+  LatencyTestsModule::LatencyTestFixedTps(
+      perfCfg, testParams,
+      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+      exchange::core::common::config::SerializationConfiguration::Default(),
+      6'000'000, // Fixed 6M TPS
+      16);       // 16 warmup cycles
+}
+
 // Register tests
 TEST_F(PerfLatency, TestLatencyMargin) { TestLatencyMargin(); }
 TEST_F(PerfLatency, TestLatencyExchange) { TestLatencyExchange(); }
@@ -124,6 +142,9 @@ TEST_F(PerfLatency, TestLatencyMultiSymbolLarge) {
 TEST_F(PerfLatency, DISABLED_TestLatencyMultiSymbolHuge) {
   TestLatencyMultiSymbolHuge();
 }
+
+// Fixed TPS test for accurate flame graph analysis
+TEST_F(PerfLatency, TestLatencyMarginFixed6M) { TestLatencyMarginFixed6M(); }
 
 } // namespace perf
 } // namespace tests

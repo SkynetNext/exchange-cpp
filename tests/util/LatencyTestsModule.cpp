@@ -420,6 +420,216 @@ void LatencyTestsModule::LatencyTestImpl(
   }
 }
 
+void LatencyTestsModule::LatencyTestFixedTps(
+    const exchange::core::common::config::PerformanceConfiguration
+        &performanceCfg,
+    const TestDataParameters &testDataParameters,
+    const exchange::core::common::config::InitialStateConfiguration
+        &initialStateCfg,
+    const exchange::core::common::config::SerializationConfiguration
+        &serializationCfg,
+    int fixedTps,
+    int warmupCycles) {
+
+  auto testDataFutures =
+      ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, 1);
+
+  auto container = ExchangeTestContainer::Create(
+      performanceCfg, initialStateCfg, serializationCfg);
+
+  // Helper function to get absolute nanoseconds (matching Java
+  // System.nanoTime())
+  // Use optimized FastNanoTime for better performance (~10-30ns vs ~50-100ns)
+  utils::FastNanoTime::Initialize();
+  auto getNanoTime = []() -> int64_t { return utils::FastNanoTime::Now(); };
+
+  // Helper function to get current time in milliseconds (matching Java
+  // System.currentTimeMillis())
+  // Use FastNanoTime for better performance
+  auto getCurrentTimeMillis = []() -> int64_t {
+    return utils::FastNanoTime::NowMillis();
+  };
+
+  // Match Java: testIteration function
+  // BiFunction<Integer, Boolean, Boolean> testIteration = (tps, warmup) -> {
+  auto testIteration = [&](int tps, bool warmup) -> bool {
+    container->LoadSymbolsUsersAndPrefillOrdersNoLog(testDataFutures);
+
+    auto genResult = testDataFutures.genResult.get();
+    auto benchmarkCommandsFuture = genResult->GetApiCommandsBenchmark();
+    auto benchmarkCommands = benchmarkCommandsFuture.get();
+
+    // Simple latency tracking (match Java: using HDR histogram, but we use
+    // vector for now)
+    // Note: No lock needed - ResultsHandler is single-threaded (matches Java)
+    std::vector<int64_t> latencies;
+    latencies.reserve(benchmarkCommands.size());
+
+    // Match Java: CountDownLatch latchBenchmark = new
+    // CountDownLatch(genResult.getBenchmarkCommandsSize());
+    CountDownLatch latchBenchmark(
+        static_cast<int64_t>(benchmarkCommands.size()));
+
+    // Match Java: container.setConsumer((cmd, seq) -> {
+    //     final long latency = System.nanoTime() - cmd.timestamp;
+    //     hdrRecorder.recordValue(Math.min(latency, Integer.MAX_VALUE));
+    //     latchBenchmark.countDown();
+    // });
+    container->SetConsumer([&latencies, &latchBenchmark, getNanoTime](
+                               exchange::core::common::cmd::OrderCommand *cmd,
+                               int64_t seq) {
+      // Match Java: final long latency = System.nanoTime() - cmd.timestamp;
+      auto nowNs = getNanoTime();
+      auto latency = nowNs - cmd->timestamp;
+      // Match Java: hdrRecorder.recordValue(Math.min(latency,
+      // Integer.MAX_VALUE));
+      auto latencyClamped = std::min(latency, static_cast<int64_t>(INT_MAX));
+      // Note: No lock needed - ResultsHandler is single-threaded (matches Java)
+      latencies.push_back(latencyClamped);
+      // Match Java: latchBenchmark.countDown();
+      latchBenchmark.countDown();
+    });
+
+    // Match Java: final int nanosPerCmd = 1_000_000_000 / tps;
+    const int nanosPerCmd = 1'000'000'000 / tps;
+    // Match Java: final long startTimeMs = System.currentTimeMillis();
+    auto startTimeMs = getCurrentTimeMillis();
+
+    // Match Java: long plannedTimestamp = System.nanoTime();
+    int64_t plannedTimestamp = getNanoTime();
+
+    // Match Java: for (ApiCommand cmd :
+    // genResult.getApiCommandsBenchmark().join())
+    // Match Java: while (System.nanoTime() < plannedTimestamp) {
+    //     // spin until its time to send next command
+    // }
+    // Match Java: cmd.timestamp = plannedTimestamp;
+    // Match Java: api.submitCommand(cmd);
+    // Match Java: plannedTimestamp += nanosPerCmd;
+    for (auto *cmd : benchmarkCommands) {
+      // Match Java: while (System.nanoTime() < plannedTimestamp) {
+      //     // spin until its time to send next command
+      // }
+      while (getNanoTime() < plannedTimestamp) {
+        // spin until its time to send next command
+      }
+      // Match Java: cmd.timestamp = plannedTimestamp;
+      cmd->timestamp = plannedTimestamp;
+      // Match Java: api.submitCommand(cmd);
+      container->GetApi()->SubmitCommand(cmd);
+      // Match Java: plannedTimestamp += nanosPerCmd;
+      plannedTimestamp += nanosPerCmd;
+    }
+
+    // Match Java: latchBenchmark.await();
+    latchBenchmark.await();
+    // Match Java: container.setConsumer((cmd, seq) -> { });
+    container->SetConsumer(nullptr);
+
+    // Match Java: final long processingTimeMs = System.currentTimeMillis() -
+    // startTimeMs;
+    auto processingTimeMs = getCurrentTimeMillis() - startTimeMs;
+    // Match Java: final float perfMt = (float)
+    // genResult.getBenchmarkCommandsSize() / (float) processingTimeMs /
+    // 1000.0f;
+    float perfMt = (processingTimeMs > 0)
+                       ? (static_cast<float>(benchmarkCommands.size()) /
+                          static_cast<float>(processingTimeMs) / 1000.0f)
+                       : 0.0f;
+    // Match Java: String tag = String.format("%.3f MT/s", perfMt);
+    std::ostringstream tagStream;
+    tagStream << std::fixed << std::setprecision(3) << perfMt << " MT/s";
+
+    // Calculate latency statistics (match Java HDR histogram)
+    // Note: No lock needed - ResultsHandler is single-threaded (matches Java)
+
+    // Match Java: HDR histogram always has values (returns 0 if no records)
+    // Calculate percentiles (match Java HDR histogram percentiles)
+    auto getPercentile = [&latencies](double percentile) -> int64_t {
+      if (latencies.empty())
+        return 0; // Match Java: histogram.getValueAtPercentile returns 0 if no
+                  // records
+      size_t index = static_cast<size_t>(
+          std::round((percentile / 100.0) * (latencies.size() - 1)));
+      return latencies[std::min(index, latencies.size() - 1)];
+    };
+
+    // Always calculate percentiles (match Java: histogram always has values)
+    if (!latencies.empty()) {
+      std::sort(latencies.begin(), latencies.end());
+    }
+
+    int64_t p50 = getPercentile(50.0);
+    int64_t p90 = getPercentile(90.0);
+    int64_t p95 = getPercentile(95.0);
+    int64_t p99 = getPercentile(99.0);
+    int64_t p99_9 = getPercentile(99.9);
+    int64_t p99_99 = getPercentile(99.99);
+    int64_t maxLatency = latencies.empty() ? 0 : latencies.back();
+
+    // Match Java: log.info("{} {}", tag,
+    // LatencyTools.createLatencyReportFast(histogram));
+    std::ostringstream report;
+    report << tagStream.str() << " ";
+    report << "50%:" << LatencyTools::FormatNanos(p50) << " ";
+    report << "90%:" << LatencyTools::FormatNanos(p90) << " ";
+    report << "95%:" << LatencyTools::FormatNanos(p95) << " ";
+    report << "99%:" << LatencyTools::FormatNanos(p99) << " ";
+    report << "99.9%:" << LatencyTools::FormatNanos(p99_9) << " ";
+    report << "99.99%:" << LatencyTools::FormatNanos(p99_99) << " ";
+    report << "W:" << LatencyTools::FormatNanos(maxLatency);
+
+    LOG_INFO("{}", report.str());
+
+    // Match Java: if (WRITE_HDR_HISTOGRAMS) {
+    //     final PrintStream printStream = new PrintStream(new
+    //     File(System.currentTimeMillis() + "-" + perfMt + ".perc"));
+    //     histogram.outputPercentileDistribution(printStream, 1000.0);
+    // }
+    if constexpr (WRITE_HDR_HISTOGRAMS) {
+      // Match Java: System.currentTimeMillis() + "-" + perfMt + ".perc"
+      auto currentTimeMs = getCurrentTimeMillis();
+      std::ostringstream filenameStream;
+      filenameStream << currentTimeMs << "-" << std::fixed
+                     << std::setprecision(3) << perfMt << ".perc";
+      std::string filename = filenameStream.str();
+
+      // Match Java: histogram.outputPercentileDistribution(printStream,
+      // 1000.0);
+      OutputPercentileDistribution(latencies, filename, 1000.0);
+    }
+
+    // Match Java: container.resetExchangeCore();
+    container->ResetExchangeCore();
+
+    // Clean up ApiCommand objects to prevent memory leak
+    for (auto *cmd : benchmarkCommands) {
+      delete cmd;
+    }
+
+    // Match Java: System.gc();
+    // Note: C++ doesn't have direct equivalent, but we can hint the compiler
+    // Match Java: Thread.sleep(500);
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    // Match Java: return warmup || histogram.getValueAtPercentile(50.0) <
+    // 10_000_000;
+    // stop testing if median latency above 10 milliseconds (10,000,000
+    // nanoseconds)
+    return warmup || p50 < 10'000'000;
+  };
+
+  // Warmup: use same fixed TPS
+  LOG_DEBUG("Warming up {} cycles at {} TPS...", warmupCycles, fixedTps);
+  for (int i = 0; i < warmupCycles; i++) {
+    testIteration(fixedTps, true);
+  }
+  LOG_DEBUG("Warmup done, starting fixed TPS test at {} TPS", fixedTps);
+
+  // Test: run once with fixed TPS
+  testIteration(fixedTps, false);
+}
+
 void LatencyTestsModule::HiccupTestImpl(
     const exchange::core::common::config::PerformanceConfiguration
         &performanceCfg,

@@ -63,6 +63,26 @@ public:
                  const exchange::core::common::config::InitialStateConfiguration
                      &initialStateCfg,
                  int warmupCycles);
+
+  /**
+   * Run latency test with fixed TPS (for accurate flame graph analysis)
+   * @param performanceCfg - performance configuration
+   * @param testDataParameters - test data parameters
+   * @param initialStateCfg - initial state configuration
+   * @param serializationCfg - serialization configuration
+   * @param fixedTps - fixed TPS rate for both warmup and test (e.g., 4'000'000)
+   * @param warmupCycles - number of warmup cycles (using same fixed TPS)
+   */
+  static void LatencyTestFixedTps(
+      const exchange::core::common::config::PerformanceConfiguration
+          &performanceCfg,
+      const TestDataParameters &testDataParameters,
+      const exchange::core::common::config::InitialStateConfiguration
+          &initialStateCfg,
+      const exchange::core::common::config::SerializationConfiguration
+          &serializationCfg,
+      int fixedTps,
+      int warmupCycles);
 };
 
 } // namespace util

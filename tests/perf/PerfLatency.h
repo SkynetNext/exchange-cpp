@@ -77,6 +77,16 @@ public:
    * configuration.
    */
   void TestLatencyMultiSymbolHuge();
+
+  /**
+   * Fixed TPS latency test for accurate flame graph analysis
+   * - one symbol (margin mode)
+   * - ~1K active users (2K currency accounts)
+   * - 1K pending limit-orders (in one order book)
+   * - Fixed TPS rate (6M) for both warmup and test
+   * Useful for generating accurate flame graphs at specific TPS rates
+   */
+  void TestLatencyMarginFixed6M();
 };
 
 } // namespace perf
