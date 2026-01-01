@@ -40,7 +40,7 @@ namespace tests {
 namespace util {
 
 // Match Java: private static final boolean WRITE_HDR_HISTOGRAMS = false;
-static constexpr bool WRITE_HDR_HISTOGRAMS = false;
+static constexpr bool WRITE_HDR_HISTOGRAMS = true;
 
 /**
  * Output percentile distribution to file (match Java:
