@@ -87,12 +87,6 @@ public:
    * Useful for generating accurate flame graphs at specific TPS rates
    */
   void TestLatencyMarginFixed8M();
-
-  /**
-   * Set up CPU affinity for test thread (Linux only)
-   * Pins test thread to CPU 8 to avoid competition with system processes
-   */
-  void SetUp() override;
 };
 
 } // namespace perf

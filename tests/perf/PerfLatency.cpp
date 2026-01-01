@@ -21,11 +21,6 @@
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
 
-#ifdef __linux__
-#include <pthread.h>
-#include <sched.h>
-#endif
-
 using namespace exchange::core::tests::util;
 
 namespace exchange {
@@ -129,28 +124,8 @@ void PerfLatency::TestLatencyMarginFixed8M() {
       perfCfg, testParams,
       exchange::core::common::config::InitialStateConfiguration::CleanTest(),
       exchange::core::common::config::SerializationConfiguration::Default(),
-      8'000'000, // Fixed 8M TPS
+      8'000'000, // Fixed 6M TPS
       16);       // 16 warmup cycles
-}
-
-void PerfLatency::SetUp() {
-#ifdef __linux__
-  // Set main test thread CPU affinity to CPU 8
-  // Exchange Core uses CPU 8-15 (isolcpus=8-15)
-  // Test main thread binds to CPU 8 to avoid competition with system processes
-  // (CPU 0-7)
-  cpu_set_t cpuset;
-  CPU_ZERO(&cpuset);
-  CPU_SET(8, &cpuset); // Bind to CPU 8
-
-  pthread_t mainThread = pthread_self();
-  int ret = pthread_setaffinity_np(mainThread, sizeof(cpu_set_t), &cpuset);
-  if (ret != 0) {
-    // Log warning if setting fails, but don't stop test
-    // Note: May fail if CPU 8 is not available or permission denied
-  }
-#endif
-  // On non-Linux platforms, do nothing (no CPU affinity)
 }
 
 // Register tests
