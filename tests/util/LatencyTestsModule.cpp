@@ -458,12 +458,11 @@ void LatencyTestsModule::LatencyTestFixedTps(
     auto benchmarkCommandsFuture = genResult->GetApiCommandsBenchmark();
     auto benchmarkCommands = benchmarkCommandsFuture.get();
 
-    // Batch latency tracking: record latency only for every 10th command
-    // to reduce test framework overhead and better stress the system
-    constexpr int BATCH_SIZE = 10;
+    // Simple latency tracking (match Java: using HDR histogram, but we use
+    // vector for now)
     // Note: No lock needed - ResultsHandler is single-threaded (matches Java)
     std::vector<int64_t> latencies;
-    latencies.reserve(benchmarkCommands.size() / BATCH_SIZE + 1);
+    latencies.reserve(benchmarkCommands.size());
 
     // Match Java: CountDownLatch latchBenchmark = new
     // CountDownLatch(genResult.getBenchmarkCommandsSize());
@@ -475,23 +474,17 @@ void LatencyTestsModule::LatencyTestFixedTps(
     //     hdrRecorder.recordValue(Math.min(latency, Integer.MAX_VALUE));
     //     latchBenchmark.countDown();
     // });
-    // Modified: only record latency for sampled commands (timestamp != 0)
     container->SetConsumer([&latencies, &latchBenchmark, getNanoTime](
                                exchange::core::common::cmd::OrderCommand *cmd,
                                int64_t seq) {
-      // Only record latency for sampled commands (every 10th command)
-      // Sampled commands have non-zero timestamp, others have timestamp = 0
-      if (cmd->timestamp != 0) {
-        // Match Java: final long latency = System.nanoTime() - cmd.timestamp;
-        auto nowNs = getNanoTime();
-        auto latency = nowNs - cmd->timestamp;
-        // Match Java: hdrRecorder.recordValue(Math.min(latency,
-        // Integer.MAX_VALUE));
-        auto latencyClamped = std::min(latency, static_cast<int64_t>(INT_MAX));
-        // Note: No lock needed - ResultsHandler is single-threaded (matches
-        // Java)
-        latencies.push_back(latencyClamped);
-      }
+      // Match Java: final long latency = System.nanoTime() - cmd.timestamp;
+      auto nowNs = getNanoTime();
+      auto latency = nowNs - cmd->timestamp;
+      // Match Java: hdrRecorder.recordValue(Math.min(latency,
+      // Integer.MAX_VALUE));
+      auto latencyClamped = std::min(latency, static_cast<int64_t>(INT_MAX));
+      // Note: No lock needed - ResultsHandler is single-threaded (matches Java)
+      latencies.push_back(latencyClamped);
       // Match Java: latchBenchmark.countDown();
       latchBenchmark.countDown();
     });
@@ -504,10 +497,6 @@ void LatencyTestsModule::LatencyTestFixedTps(
     // Match Java: long plannedTimestamp = System.nanoTime();
     int64_t plannedTimestamp = getNanoTime();
 
-    // Batch sending: record timestamp only for every 10th command
-    // to reduce test framework overhead and better stress the system
-    // Use counter instead of modulo to avoid expensive % operation
-    int batchCounter = 0;
     // Match Java: for (ApiCommand cmd :
     // genResult.getApiCommandsBenchmark().join())
     // Match Java: while (System.nanoTime() < plannedTimestamp) {
@@ -523,25 +512,12 @@ void LatencyTestsModule::LatencyTestFixedTps(
       while (getNanoTime() < plannedTimestamp) {
         // spin until its time to send next command
       }
-      // Only record timestamp for sampled commands (every 10th command)
-      // Other commands get timestamp = 0 (will not be recorded in latency
-      // stats)
-      if (batchCounter == 0) {
-        // Match Java: cmd.timestamp = plannedTimestamp;
-        cmd->timestamp = plannedTimestamp;
-      } else {
-        // Non-sampled command: set timestamp to 0 (will be skipped in consumer)
-        cmd->timestamp = 0;
-      }
+      // Match Java: cmd.timestamp = plannedTimestamp;
+      cmd->timestamp = plannedTimestamp;
       // Match Java: api.submitCommand(cmd);
       container->GetApi()->SubmitCommand(cmd);
       // Match Java: plannedTimestamp += nanosPerCmd;
       plannedTimestamp += nanosPerCmd;
-      // Increment counter and reset when reaching BATCH_SIZE
-      batchCounter++;
-      if (batchCounter >= BATCH_SIZE) {
-        batchCounter = 0;
-      }
     }
 
     // Match Java: latchBenchmark.await();
