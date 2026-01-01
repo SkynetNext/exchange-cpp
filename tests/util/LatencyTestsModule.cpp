@@ -504,8 +504,8 @@ void LatencyTestsModule::LatencyTestFixedTps(
     // Match Java: long plannedTimestamp = System.nanoTime();
     int64_t plannedTimestamp = getNanoTime();
 
-    // Batch sending: record timestamp and check time only for every 10th
-    // command to reduce test framework overhead and better stress the system
+    // Batch sending: record timestamp only for every 10th command
+    // to reduce test framework overhead and better stress the system
     // Use counter instead of modulo to avoid expensive % operation
     int batchCounter = 0;
     // Match Java: for (ApiCommand cmd :
@@ -517,20 +517,20 @@ void LatencyTestsModule::LatencyTestFixedTps(
     // Match Java: api.submitCommand(cmd);
     // Match Java: plannedTimestamp += nanosPerCmd;
     for (auto *cmd : benchmarkCommands) {
-      // Only check time and limit rate for the first command in each batch
-      // This reduces time acquisition overhead from N to N/10
+      // Match Java: while (System.nanoTime() < plannedTimestamp) {
+      //     // spin until its time to send next command
+      // }
+      while (getNanoTime() < plannedTimestamp) {
+        // spin until its time to send next command
+      }
+      // Only record timestamp for sampled commands (every 10th command)
+      // Other commands get timestamp = 0 (will not be recorded in latency
+      // stats)
       if (batchCounter == 0) {
-        // Match Java: while (System.nanoTime() < plannedTimestamp) {
-        //     // spin until its time to send next command
-        // }
-        while (getNanoTime() < plannedTimestamp) {
-          // spin until its time to send next command
-        }
         // Match Java: cmd.timestamp = plannedTimestamp;
         cmd->timestamp = plannedTimestamp;
       } else {
         // Non-sampled command: set timestamp to 0 (will be skipped in consumer)
-        // No time check needed - send immediately to reduce overhead
         cmd->timestamp = 0;
       }
       // Match Java: api.submitCommand(cmd);
