@@ -428,8 +428,7 @@ void LatencyTestsModule::LatencyTestFixedTps(
         &initialStateCfg,
     const exchange::core::common::config::SerializationConfiguration
         &serializationCfg,
-    int fixedTps,
-    int warmupCycles) {
+    int fixedTps, int warmupCycles) {
 
   auto testDataFutures =
       ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, 1);

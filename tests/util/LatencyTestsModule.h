@@ -81,8 +81,7 @@ public:
           &initialStateCfg,
       const exchange::core::common::config::SerializationConfiguration
           &serializationCfg,
-      int fixedTps,
-      int warmupCycles);
+      int fixedTps, int warmupCycles);
 };
 
 } // namespace util

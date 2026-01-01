@@ -86,7 +86,7 @@ public:
    * - Fixed TPS rate (6M) for both warmup and test
    * Useful for generating accurate flame graphs at specific TPS rates
    */
-  void TestLatencyMarginFixed6M();
+  void TestLatencyMarginFixed8M();
 };
 
 } // namespace perf
