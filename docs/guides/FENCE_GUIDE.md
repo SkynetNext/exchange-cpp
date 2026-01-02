@@ -252,6 +252,59 @@ int y = my_flag.load(std::memory_order_seq_cst);  // ← seq_cst load
 
 这种方式更简洁，`seq_cst` 原子操作自带 StoreLoad 屏障语义。
 
+### 实际应用：SingleProducerSequencer 中的 `setVolatile`
+
+在 `SingleProducerSequencer::next()` 中，`setVolatile` 用于 wrap point 检查：
+
+```cpp
+int64_t nextValue = this->nextValue_;        // 当前已分配的最后一个 sequence
+int64_t nextSequence = nextValue + n;        // 要分配的下一个 sequence
+int64_t wrapPoint = nextSequence - this->bufferSize_;  // 计算 wrap point
+// bufferSize_ 是 RingBuffer 的构造函数参数，必须是 2 的幂次（如 64, 1024, 32768 等）
+
+if (wrapPoint > cachedGatingSequence || cachedGatingSequence > nextValue) {
+    cursor_.setVolatile(nextValue);  // ← StoreLoad 屏障
+    int64_t minSequence = minimumSequence(nextValue);  // Load 消费者的 sequence
+    while (wrapPoint > minSequence) {
+        // 等待消费者消费，避免覆盖未消费的数据
+        std::this_thread::yield();
+        minSequence = minimumSequence(nextValue);
+    }
+}
+```
+
+**为什么需要 StoreLoad 屏障？**
+
+**场景**：生产者需要检查是否有足够的容量（不会覆盖未消费的数据）
+- **Store**：更新 `cursor`（让消费者看到最新的 cursor 值，消费者才能更新自己的 sequence）
+- **Load**：读取所有消费者的最小 sequence（`minSequence`）
+- **判断**：如果 `wrapPoint > minSequence`，说明会覆盖未消费的数据，需要等待
+
+**如果没有 StoreLoad 屏障会发生什么？**
+
+```cpp
+// 错误示例：只有 release/acquire，没有 StoreLoad 屏障
+cursor_.set(nextValue);  // Release fence + relaxed store
+int64_t minSequence = minimumSequence(nextValue);  // Load 消费者的 sequence
+```
+
+**问题场景**（假设 `bufferSize = 64`，实际值由 RingBuffer 构造函数传入）：
+1. **初始状态**：`cursor = 100`，消费者 A 的 `sequence = 95`，消费者 B 的 `sequence = 98`
+2. **生产者计算**：`nextSequence = 110`，`wrapPoint = 110 - 64 = 46`
+3. **没有 StoreLoad 屏障时**：
+   - CPU/编译器可能重排：先 Load（读取消费者的 sequence），后 Store（写入 cursor）
+   - 生产者读取到 `minSequence = 95`（旧值）
+   - 生产者写入 `cursor = 100`（但消费者可能还没看到）
+   - 生产者判断：`wrapPoint (46) < minSequence (95)`，认为可以继续
+4. **实际情况**：
+   - 消费者 B 已经消费到 `sequence = 105`（但生产者读取到的是旧的 98）
+   - 生产者继续写入到 `sequence = 110`，覆盖了消费者 B 还没消费完的数据（105-110）！
+
+**StoreLoad 屏障的作用**：
+- 确保 `cursor` 的更新对全局可见后，才读取消费者的 sequence
+- 这样生产者能读取到消费者基于最新 `cursor` 更新后的 sequence 值
+- 避免基于过时信息做判断，防止覆盖未消费的数据
+
 ---
 
 ## 6. CAS（Compare-And-Swap）
