@@ -273,32 +273,104 @@ if (wrapPoint > cachedGatingSequence || cachedGatingSequence > nextValue) {
 }
 ```
 
+**关键变量说明**：
+
+| 变量 | 含义 | 说明 |
+|------|------|------|
+| `nextValue` | 当前已分配的最后一个 sequence | 已写入但可能还没发布（通过 `publish()`） |
+| `nextSequence` | 下一个要分配的 sequence | 还没写入，是 `nextValue + n` |
+| `cursor` | **已发布给消费者的最新 sequence** | 通过 `publish(sequence)` 正式更新，消费者通过检查 `cursor` 判断是否有新事件 |
+| `wrapPoint` | 回环检查点 | `wrapPoint = nextSequence - bufferSize`，表示要写入 `nextSequence` 时会覆盖的 sequence 位置 |
+
 **为什么需要 StoreLoad 屏障？**
 
 **场景**：生产者需要检查是否有足够的容量（不会覆盖未消费的数据）
-- **Store**：更新 `cursor`（让消费者看到最新的 cursor 值，消费者才能更新自己的 sequence）
+- **Store**：更新 `cursor`（临时设置为 `nextValue`，让消费者看到当前进度，消费者才能更新自己的 sequence）
 - **Load**：读取所有消费者的最小 sequence（`minSequence`）
 - **判断**：如果 `wrapPoint > minSequence`，说明会覆盖未消费的数据，需要等待
 
-**如果没有 StoreLoad 屏障会发生什么？**
+**注意**：`cursor_.setVolatile(nextValue)` 是临时设置，用于让消费者看到当前进度。正式的 `cursor` 更新是通过 `publish(sequence)` 完成的，表示已发布给消费者的最新 sequence。
 
-```cpp
-// 错误示例：只有 release/acquire，没有 StoreLoad 屏障
-cursor_.set(nextValue);  // Release fence + relaxed store
-int64_t minSequence = minimumSequence(nextValue);  // Load 消费者的 sequence
+**Ring Buffer 回环示意图**（假设 `bufferSize = 64`）：
+
+```
+Ring Buffer 物理数组（循环）：
+┌────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬────┐
+│ 46 │ 47 │ 48 │ ...│ 98 │ 99 │100 │101 │... │109 │110 │ ...│
+└────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┘
+  ↑                              ↑                    ↑
+wrapPoint                    cursor=100        nextSequence=110
+(sequence=46)        (已发布给消费者)          (要写入的位置)
+
+关键：sequence=110 和 sequence=46 映射到同一个物理位置（110 % 64 = 46）
 ```
 
-**问题场景**（假设 `bufferSize = 64`，实际值由 RingBuffer 构造函数传入）：
-1. **初始状态**：`cursor = 100`，消费者 A 的 `sequence = 95`，消费者 B 的 `sequence = 98`
-2. **生产者计算**：`nextSequence = 110`，`wrapPoint = 110 - 64 = 46`
-3. **没有 StoreLoad 屏障时**：
-   - CPU/编译器可能重排：先 Load（读取消费者的 sequence），后 Store（写入 cursor）
-   - 生产者读取到 `minSequence = 95`（旧值）
-   - 生产者写入 `cursor = 100`（但消费者可能还没看到）
-   - 生产者判断：`wrapPoint (46) < minSequence (95)`，认为可以继续
-4. **实际情况**：
-   - 消费者 B 已经消费到 `sequence = 105`（但生产者读取到的是旧的 98）
-   - 生产者继续写入到 `sequence = 110`，覆盖了消费者 B 还没消费完的数据（105-110）！
+**没有 StoreLoad 屏障的问题场景**：
+
+```
+时间线：生产者要写入 nextSequence=110，wrapPoint=46
+
+┌─────────────────────────────────────────────────────────────┐
+│ 生产者线程（没有 StoreLoad 屏障）                              │
+├─────────────────────────────────────────────────────────────┤
+│ T1: 计算 nextSequence=110, wrapPoint=46                  │
+│ T2: Load 读取消费者的 sequence → minSequence=95 (旧值)        │
+│ T3: Store 写入 cursor=100                                    │
+│ T4: 判断：wrapPoint(46) < minSequence(95) ✓ 可以继续          │
+│ T5: 写入 sequence=110 → 覆盖物理位置 46                      │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 消费者 B 线程（实际情况）                                      │
+├─────────────────────────────────────────────────────────────┤
+│ T1: 正在处理 sequence=105 的数据                             │
+│ T2: 还没看到 cursor=100 的更新（因为 Store 在 Load 之后）     │
+│ T3: sequence 还是 98（旧值）                                  │
+│ T4: 继续处理 105-110 的数据...                                │
+│ T5: ❌ 数据被覆盖！sequence=110 覆盖了正在处理的 sequence=46   │
+└─────────────────────────────────────────────────────────────┘
+
+问题：生产者基于过时的 minSequence(95) 判断，但消费者实际已到 105
+```
+
+**有 StoreLoad 屏障的正确场景**：
+
+```
+时间线：生产者要写入 nextSequence=110，wrapPoint=46
+
+┌─────────────────────────────────────────────────────────────┐
+│ 生产者线程（有 StoreLoad 屏障）                               │
+├─────────────────────────────────────────────────────────────┤
+│ T1: 计算 nextSequence=110, wrapPoint=46                     │
+│ T2: Store 写入 cursor=100                                    │
+│ T3: StoreLoad 屏障 → 确保 Store 对全局可见                   │
+│ T4: Load 读取消费者的 sequence → minSequence=105 (新值)      │
+│ T5: 判断：wrapPoint(46) < minSequence(105) ✓ 可以继续        │
+│ T6: 写入 sequence=110 → 安全，消费者已处理完 105              │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 消费者 B 线程（正确时序）                                      │
+├─────────────────────────────────────────────────────────────┤
+│ T1: 看到 cursor=100 的更新（StoreLoad 屏障保证可见性）       │
+│ T2: 处理 sequence=100-105 的数据                             │
+│ T3: 更新 sequence=105                                       │
+│ T4: 生产者读取到 minSequence=105（新值）                      │
+│ T5: ✅ 安全，不会覆盖未消费的数据                             │
+└─────────────────────────────────────────────────────────────┘
+
+正确：生产者基于最新的 minSequence(105) 判断，消费者已处理完
+```
+
+**关键对比**：
+
+| 方面 | 没有 StoreLoad 屏障 | 有 StoreLoad 屏障 |
+|------|-------------------|------------------|
+| **时序** | Load → Store（可能重排） | Store → Load（强制顺序） |
+| **读取到的值** | minSequence=95（旧值） | minSequence=105（新值） |
+| **判断结果** | wrapPoint(46) < 95 ✓ | wrapPoint(46) < 105 ✓ |
+| **实际情况** | 消费者还在处理 105 | 消费者已处理完 105 |
+| **结果** | ❌ 覆盖未消费的数据 | ✅ 安全，不会覆盖 |
 
 **StoreLoad 屏障的作用**：
 - 确保 `cursor` 的更新对全局可见后，才读取消费者的 sequence
