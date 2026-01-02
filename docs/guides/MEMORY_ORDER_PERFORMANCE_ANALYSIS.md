@@ -145,7 +145,7 @@ busy_spin_acquire(std::atomic<long>&, long):
         ret
 ```
 
-**结论**：ARM 上 `relaxed_fence` 使用 2 条指令（ldr + dmb），`acquire` 使用 1 条指令（ldar）。在 busy-spin 循环中，`acquire` 可能更快。设计选择 `relaxed_fence` 是为了匹配 Java 的 `VarHandle.acquireFence()` 语义。
+**结论**：ARM 上 `relaxed_fence` 使用 2 条指令（ldr + dmb），`acquire` 使用 1 条指令（ldar）。在 busy-spin 循环中，`acquire` 可能更快。
 
 ---
 
@@ -156,5 +156,4 @@ busy_spin_acquire(std::atomic<long>&, long):
 | **x86-64** | `mov` | `mov` | 无差异（相同代码） |
 | **ARM** | `ldr + dmb ishld` | `ldar` | 有差异（`acquire` 可能更快） |
 
-**设计目的**：匹配 Java 语义（`VarHandle.acquireFence()`），确保跨语言和跨架构的一致性，而不是在 x86-64 上的性能优化。
 
