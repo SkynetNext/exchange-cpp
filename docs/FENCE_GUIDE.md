@@ -151,7 +151,75 @@ while (true) {
 
 ---
 
-## 5. CAS（Compare-And-Swap）
+## 5. 进阶：为什么需要 `seq_cst` (StoreLoad 屏障)？
+
+在 Disruptor 的 `Sequence::setVolatile` 中，我们看到了这种写法：
+```cpp
+void setVolatile(int64_t v) {
+    std::atomic_thread_fence(std::memory_order_release);
+    value_.store(v, std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_seq_cst); // ← 全局全屏障
+}
+```
+
+### 为什么普通的 Release/Acquire 不够？
+
+先看典型代码：
+```cpp
+// 线程 A
+data = 42;                                      // Store 1（普通变量写入）
+std::atomic_thread_fence(std::memory_order_release);  // Release fence
+flag.store(1, std::memory_order_relaxed);       // Store 2（原子变量写入）
+int x = other_flag.load(std::memory_order_relaxed);   // Load 1（原子变量读取）
+std::atomic_thread_fence(std::memory_order_acquire);  // Acquire fence
+int y = other_data;                             // Load 2（普通变量读取）
+```
+
+**Release fence 的作用**：
+- 防止**本线程**之前的**所有内存写操作（Store）**（包括普通变量和原子变量）重排到 fence 之后
+- ✅ 保证：`data = 42` 不会重排到 `flag.store(1)` 之后
+
+**Acquire fence 的作用**：
+- 防止**本线程**后续的**所有内存操作（Load/Store）**（包括普通变量和原子变量）重排到 fence 之前
+- ✅ 保证：`int y = other_data` 不会重排到 `other_flag.load()` 之前
+
+**漏洞**：
+- ❌ Release fence **管不了** fence 之后的 `flag.store(1)`（Store）和 `other_flag.load()`（Load）之间的重排
+- ❌ Acquire fence **管不了** fence 之前的 `flag.store(1)`（Store）和 `other_flag.load()`（Load）之间的重排
+- **结果**：Store 2 和 Load 1 之间**没有任何屏障**，可以发生 **StoreLoad 重排**
+
+**注意**：Store/Load 不仅指原子变量操作，也包括普通变量的读写。
+
+### 场景：Dekker 算法（经典的 StoreLoad 重排问题）
+```cpp
+// 线程 A
+std::atomic_thread_fence(std::memory_order_release);
+my_flag.store(1, std::memory_order_relaxed);         // Store（内存写入）
+int x = your_flag.load(std::memory_order_relaxed);   // Load（内存读取）
+std::atomic_thread_fence(std::memory_order_acquire);
+
+// 线程 B（对称操作）
+std::atomic_thread_fence(std::memory_order_release);
+your_flag.store(1, std::memory_order_relaxed);       // Store（内存写入）
+int y = my_flag.load(std::memory_order_relaxed);     // Load（内存读取）
+std::atomic_thread_fence(std::memory_order_acquire);
+```
+
+在硬件层面（尤其是 x86 的 Store Buffer），CPU 可以让 Load（内存读取）先于 Store（内存写入）执行：
+- 线程 A：`Load(your_flag)` 先于 `Store(my_flag)` 生效 → 读到 0
+- 线程 B：`Load(my_flag)` 先于 `Store(your_flag)` 生效 → 读到 0
+- **后果**：两个线程都认为对方没有设置标志，同时进入临界区！
+
+**关键**：这里的 Store/Load 是指**内存层面的写入和读取操作**，不仅限于原子变量。
+
+### 解决方案：`seq_cst` 屏障
+只有 `memory_order_seq_cst` 屏障能强制刷新**本线程**的 Store Buffer，并阻止**本线程**的写操作与后续读操作发生重排。
+- **StoreLoad 屏障**：确保**本线程**之前的内存写操作对全局可见，且**本线程**后续的内存读操作必须在此之后执行。
+- 这是开销最大的屏障，因为它强制同步了**本线程**与内存系统。
+
+---
+
+## 6. CAS（Compare-And-Swap）
 
 ### 解决的问题
 CAS 将"读-判断-写"变成**不可分割的原子操作**，避免多线程竞争时的更新丢失。
@@ -232,7 +300,7 @@ compareAndSet(expected, desired) {
 
 ---
 
-## 6. 记忆要点
+## 7. 记忆要点
 
 | 概念 | 作用 | 范围 |
 |------|------|------|
@@ -242,3 +310,4 @@ compareAndSet(expected, desired) {
 | **方式 1** | 条件性同步（只有读取到新值时建立） | 适合 busy-spin |
 | **方式 2** | 更强同步（通常能读取到新值） | 一般场景 |
 | **CAS** | 原子化"读-判断-写"，失败时更新 expected 并重试 | 无锁并发 |
+| **Seq_Cst** | 防止 StoreLoad 重排（最强屏障） | 全局顺序一致性 |
