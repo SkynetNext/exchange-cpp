@@ -217,6 +217,41 @@ std::atomic_thread_fence(std::memory_order_acquire);
 - **StoreLoad 屏障**：确保**本线程**之前的内存写操作对全局可见，且**本线程**后续的内存读操作必须在此之后执行。
 - 这是开销最大的屏障，因为它强制同步了**本线程**与内存系统。
 
+**使用 `seq_cst` 修复 Dekker 算法**：
+```cpp
+// 线程 A
+std::atomic_thread_fence(std::memory_order_release);
+my_flag.store(1, std::memory_order_relaxed);         // Store（内存写入）
+std::atomic_thread_fence(std::memory_order_seq_cst);  // ← StoreLoad 屏障
+int x = your_flag.load(std::memory_order_relaxed);   // Load（内存读取）
+std::atomic_thread_fence(std::memory_order_acquire);
+
+// 线程 B（对称操作）
+std::atomic_thread_fence(std::memory_order_release);
+your_flag.store(1, std::memory_order_relaxed);       // Store（内存写入）
+std::atomic_thread_fence(std::memory_order_seq_cst);  // ← StoreLoad 屏障
+int y = my_flag.load(std::memory_order_relaxed);     // Load（内存读取）
+std::atomic_thread_fence(std::memory_order_acquire);
+```
+
+**关键改进**：
+- `seq_cst` 屏障插入在 Store 和 Load 之间，防止 StoreLoad 重排
+- 确保 `my_flag.store(1)` 对全局可见后，才执行 `your_flag.load()`
+- 两个线程不能同时读到 0，至少有一个线程会看到对方已设置标志
+
+**替代方案：使用 `seq_cst` 原子操作**
+```cpp
+// 线程 A
+my_flag.store(1, std::memory_order_seq_cst);  // ← seq_cst store（自带 StoreLoad 屏障）
+int x = your_flag.load(std::memory_order_seq_cst);  // ← seq_cst load
+
+// 线程 B
+your_flag.store(1, std::memory_order_seq_cst);  // ← seq_cst store（自带 StoreLoad 屏障）
+int y = my_flag.load(std::memory_order_seq_cst);  // ← seq_cst load
+```
+
+这种方式更简洁，`seq_cst` 原子操作自带 StoreLoad 屏障语义。
+
 ---
 
 ## 6. CAS（Compare-And-Swap）
