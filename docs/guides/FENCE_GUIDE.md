@@ -260,7 +260,6 @@ int y = my_flag.load(std::memory_order_seq_cst);  // ← seq_cst load
 int64_t nextValue = this->nextValue_;        // 当前已分配的最后一个 sequence
 int64_t nextSequence = nextValue + n;        // 要分配的下一个 sequence
 int64_t wrapPoint = nextSequence - this->bufferSize_;  // 计算 wrap point
-// bufferSize_ 是 RingBuffer 的构造函数参数，必须是 2 的幂次（如 64, 1024, 32768 等）
 
 if (wrapPoint > cachedGatingSequence || cachedGatingSequence > nextValue) {
     cursor_.setVolatile(nextValue);  // ← StoreLoad 屏障
@@ -268,7 +267,7 @@ if (wrapPoint > cachedGatingSequence || cachedGatingSequence > nextValue) {
     while (wrapPoint > minSequence) {
         // 等待消费者消费，避免覆盖未消费的数据
         std::this_thread::yield();
-        minSequence = minimumSequence(nextValue);
+        minSequence = minimumSequence(nextValue);  // 重新读取
     }
 }
 ```
@@ -277,105 +276,60 @@ if (wrapPoint > cachedGatingSequence || cachedGatingSequence > nextValue) {
 
 | 变量 | 含义 | 说明 |
 |------|------|------|
-| `nextValue` | 当前已分配的最后一个 sequence | 已写入但可能还没发布（通过 `publish()`） |
-| `nextSequence` | 下一个要分配的 sequence | 还没写入，是 `nextValue + n` |
-| `cursor` | **已发布给消费者的最新 sequence** | 通过 `publish(sequence)` 正式更新，消费者通过检查 `cursor` 判断是否有新事件 |
+| `cursor` | 已发布给消费者的最新 sequence | 消费者通过检查 `cursor` 判断是否有新事件 |
 | `wrapPoint` | 回环检查点 | `wrapPoint = nextSequence - bufferSize`，表示要写入 `nextSequence` 时会覆盖的 sequence 位置 |
+| `minSequence` | 所有消费者的最小 sequence | 表示消费者已处理到的最小位置 |
 
 **为什么需要 StoreLoad 屏障？**
 
-**场景**：生产者需要检查是否有足够的容量（不会覆盖未消费的数据）
-- **Store**：更新 `cursor`（临时设置为 `nextValue`，让消费者看到当前进度，消费者才能更新自己的 sequence）
-- **Load**：读取所有消费者的最小 sequence（`minSequence`）
-- **判断**：如果 `wrapPoint > minSequence`，说明会覆盖未消费的数据，需要等待
+存在一个**循环依赖**：
+- 生产者需要读取消费者的 sequence 来判断容量（`wrapPoint > minSequence`）
+- 但消费者需要看到生产者的 cursor 才能更新 sequence
+- 因此，**必须先发布 cursor，消费者才能更新 sequence，然后生产者才能读取到最新的 sequence**
 
-**注意**：`cursor_.setVolatile(nextValue)` 是临时设置，用于让消费者看到当前进度。正式的 `cursor` 更新是通过 `publish(sequence)` 完成的，表示已发布给消费者的最新 sequence。
+**性能优化，而非正确性必需**
 
-**Ring Buffer 回环示意图**（假设 `bufferSize = 64`）：
+关键点：代码中有 `while` 循环会不断重新读取 `minSequence`，因此即使第一次读取到过时的值，循环中也会不断重新读取，直到读取到正确的值。**理论上不会产生覆盖**，因为循环会一直等待直到条件满足。
 
-```
-Ring Buffer 物理数组（循环）：
-┌────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬────┐
-│ 46 │ 47 │ 48 │ ...│ 98 │ 99 │100 │101 │... │109 │110 │ ...│
-└────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┴────┘
-  ↑                              ↑                    ↑
-wrapPoint                    cursor=100        nextSequence=110
-(sequence=46)        (已发布给消费者)          (要写入的位置)
-
-关键：sequence=110 和 sequence=46 映射到同一个物理位置（110 % 64 = 46）
-```
-
-**没有 StoreLoad 屏障的问题场景**：
+**没有 StoreLoad 屏障（性能较差）**：
 
 ```
-时间线：生产者要写入 nextSequence=110，wrapPoint=46
-
-┌─────────────────────────────────────────────────────────────┐
-│ 生产者线程（没有 StoreLoad 屏障）                              │
-├─────────────────────────────────────────────────────────────┤
-│ T1: 计算 nextSequence=110, wrapPoint=46                  │
-│ T2: Load 读取消费者的 sequence → minSequence=95 (旧值)        │
-│ T3: Store 写入 cursor=100                                    │
-│ T4: 判断：wrapPoint(46) < minSequence(95) ✓ 可以继续          │
-│ T5: 写入 sequence=110 → 覆盖物理位置 46                      │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│ 消费者 B 线程（实际情况）                                      │
-├─────────────────────────────────────────────────────────────┤
-│ T1: 正在处理 sequence=105 的数据                             │
-│ T2: 还没看到 cursor=100 的更新（因为 Store 在 Load 之后）     │
-│ T3: sequence 还是 98（旧值）                                  │
-│ T4: 继续处理 105-110 的数据...                                │
-│ T5: ❌ 数据被覆盖！sequence=110 覆盖了正在处理的 sequence=46   │
-└─────────────────────────────────────────────────────────────┘
-
-问题：生产者基于过时的 minSequence(95) 判断，但消费者实际已到 105
+生产者线程执行顺序：
+┌─────────────────────────────────────────┐
+│ T1: Load 读取消费者sequence → 45 (旧值)   │ ← 此时cursor还是99，Load先执行
+│ T2: Store 写入 cursor=100                │ ← Store后执行，但Load已读取到旧值
+│ T3: 判断：wrapPoint(51) > minSequence(45) │
+│     51 > 45 为 true → 进入while循环等待   │
+│ T4: 循环中不断重新读取 minSequence         │
+│     第一次、第二次...可能还是45（过时值）  │ ← ⚠️ 需要多次循环
+│ T5: 最终读取到105，退出循环               │
+└─────────────────────────────────────────┘
 ```
 
-**有 StoreLoad 屏障的正确场景**：
+**问题**：由于第一次读取到过时的值，可能需要多次循环才能读取到正确的值，导致不必要的等待，影响性能。
+
+**有 StoreLoad 屏障（性能更好）**：
 
 ```
-时间线：生产者要写入 nextSequence=110，wrapPoint=46
-
-┌─────────────────────────────────────────────────────────────┐
-│ 生产者线程（有 StoreLoad 屏障）                               │
-├─────────────────────────────────────────────────────────────┤
-│ T1: 计算 nextSequence=110, wrapPoint=46                     │
-│ T2: Store 写入 cursor=100                                    │
-│ T3: StoreLoad 屏障 → 确保 Store 对全局可见                   │
-│ T4: Load 读取消费者的 sequence → minSequence=105 (新值)      │
-│ T5: 判断：wrapPoint(46) < minSequence(105) ✓ 可以继续        │
-│ T6: 写入 sequence=110 → 安全，消费者已处理完 105              │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│ 消费者 B 线程（正确时序）                                      │
-├─────────────────────────────────────────────────────────────┤
-│ T1: 看到 cursor=100 的更新（StoreLoad 屏障保证可见性）       │
-│ T2: 处理 sequence=100-105 的数据                             │
-│ T3: 更新 sequence=105                                       │
-│ T4: 生产者读取到 minSequence=105（新值）                      │
-│ T5: ✅ 安全，不会覆盖未消费的数据                             │
-└─────────────────────────────────────────────────────────────┘
-
-正确：生产者基于最新的 minSequence(105) 判断，消费者已处理完
+生产者线程执行顺序：
+┌─────────────────────────────────────────┐
+│ T1: Store 写入 cursor=100               │ ← 先发布cursor
+│ T2: StoreLoad 屏障 → 确保Store可见        │
+│ T3: Load 读取消费者sequence → 105 (新值) │ ← 更可能读取到最新值
+│ T4: 判断：wrapPoint(51) > minSequence(105)│
+│     51 > 105 为 false → 退出while循环    │ ← ✅ 可能一次就成功
+└─────────────────────────────────────────┘
 ```
 
-**关键对比**：
+**优势**：通过强制 Store → Load 顺序，确保第一次读取就更可能读取到最新的 sequence，减少循环次数，提高性能。
 
-| 方面 | 没有 StoreLoad 屏障 | 有 StoreLoad 屏障 |
-|------|-------------------|------------------|
-| **时序** | Load → Store（可能重排） | Store → Load（强制顺序） |
-| **读取到的值** | minSequence=95（旧值） | minSequence=105（新值） |
-| **判断结果** | wrapPoint(46) < 95 ✓ | wrapPoint(46) < 105 ✓ |
-| **实际情况** | 消费者还在处理 105 | 消费者已处理完 105 |
-| **结果** | ❌ 覆盖未消费的数据 | ✅ 安全，不会覆盖 |
+**总结**：
 
-**StoreLoad 屏障的作用**：
-- 确保 `cursor` 的更新对全局可见后，才读取消费者的 sequence
-- 这样生产者能读取到消费者基于最新 `cursor` 更新后的 sequence 值
-- 避免基于过时信息做判断，防止覆盖未消费的数据
+- `setVolatile` 主要是**性能优化**，不是正确性必需
+- 即使没有它，`while` 循环也会保证正确性（不会覆盖）
+- 但有了它，可以减少不必要的等待循环，提高吞吐量
+
+**注意**：`cursor_.setVolatile(nextValue)` 是临时设置，用于让消费者看到当前进度。正式的 `cursor` 更新是通过 `publish(sequence)` 完成的。
 
 ---
 
