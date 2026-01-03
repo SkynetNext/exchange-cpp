@@ -548,22 +548,28 @@ int64_t seq2 = cursor_.getAndAdd(1);  // 原子读取 101，写入 102，返回 
 
 ### Memory Fence（内存栅栏）
 
-| 概念 | 作用 | 范围 |
-|------|------|------|
-| **Release fence** | 防止所有在 fence 之前的读写操作重排到 fence 之后的所有后续存储操作之后 | 本线程的所有内存操作（包括非原子和 relaxed 原子） |
-| **Acquire fence** | 防止所有在 fence 之后的读写操作重排到 fence 之前的所有先前加载操作之前 | 本线程的所有内存操作（包括非原子和 relaxed 原子） |
-| **Acq_Rel fence** | 既是 release fence 也是 acquire fence，同时提供双向同步 | 本线程的所有内存操作（包括非原子和 relaxed 原子） |
-| **Seq_Cst fence** | 顺序一致性屏障：防止 StoreLoad 重排，参与全局总顺序 | 全局顺序一致性 |
+根据 [cppreference - atomic_thread_fence](https://en.cppreference.com/w/cpp/atomic/atomic_thread_fence)，根据 `order` 参数的值，调用效果如下：
+
+| 内存序 | 效果 |
+|--------|------|
+| `memory_order_relaxed` | 无效果 |
+| `memory_order_acquire` 或 `memory_order_consume` | 是 acquire fence |
+| `memory_order_release` | 是 release fence |
+| `memory_order_acq_rel` | 既是 release fence 也是 acquire fence |
+| `memory_order_seq_cst` | 是顺序一致性的 acquire fence 和 release fence |
 
 ### Atomic 操作（原子操作）
 
-| 概念 | 作用 | 范围 |
-|------|------|------|
-| **Release store** | 防止所有在 store 之前的读写操作重排到 store 之后，且 store 本身建立同步语义 | 本线程的所有内存操作 + 特定原子变量 |
-| **Acquire load** | 防止所有在 load 之后的读写操作重排到 load 之前，且 load 本身建立同步语义 | 本线程的所有内存操作 + 特定原子变量 |
-| **Acq_Rel RMW** | 用于读-改-写操作（fetch_add、CAS 等）：既是 acquire 也是 release，需要双向同步，保证原子性和可见性 | 本线程的所有内存操作 + 特定原子变量 |
-| **Seq_Cst store/load** | 顺序一致性操作：提供 acquire-release 语义，防止 StoreLoad 重排，参与全局总顺序 | 本线程的所有内存操作 + 特定原子变量 + 全局顺序一致性 |
-| **CAS** | 原子化"读-判断-写"，失败时更新 expected 并重试 | 特定原子变量 |
+根据 [cppreference - memory_order](https://en.cppreference.com/w/cpp/atomic/memory_order)：
+
+| 内存序 | 含义 |
+|--------|------|
+| `memory_order_relaxed` | 宽松操作：不对其他读写操作施加同步或排序约束，只保证此操作的原子性 |
+| `memory_order_consume` | 具有此内存序的加载操作对受影响的内存位置执行 consume 操作：当前线程中依赖于当前加载值的读写操作不能在此加载之前重排。在其他线程中释放同一原子变量的数据相关变量的写入在当前线程中可见（在大多数平台上，这仅影响编译器优化） |
+| `memory_order_acquire` | 具有此内存序的加载操作对受影响的内存位置执行 acquire 操作：当前线程中的读写操作不能在此加载之前重排。在其他线程中释放同一原子变量的所有写入在当前线程中可见 |
+| `memory_order_release` | 具有此内存序的存储操作执行 release 操作：当前线程中的读写操作不能在此存储之后重排。当前线程中的所有写入在其他线程中获取同一原子变量时可见，并且携带依赖关系进入原子变量的写入在其他线程中消费同一原子变量时可见 |
+| `memory_order_acq_rel` | 具有此内存序的读-改-写操作既是 acquire 操作也是 release 操作。当前线程中的内存读写操作不能在加载之前重排，也不能在存储之后重排。在其他线程中释放同一原子变量的所有写入在修改之前可见，并且修改在其他线程中获取同一原子变量时可见 |
+| `memory_order_seq_cst` | 具有此内存序的加载操作执行 acquire 操作，存储执行 release 操作，读-改-写执行 acquire 和 release 操作，此外存在单一的总顺序，其中所有线程以相同顺序观察所有修改 |
 
 ### 同步关系
 
