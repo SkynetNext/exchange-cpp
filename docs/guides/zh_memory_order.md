@@ -334,7 +334,7 @@ r3 = x.load(std::memory_order_seq_cst); // F
 
 ## 参见
 
-- [C documentation for memory order](../../c/atomic/memory_order.html) - C 语言的内存序文档
+- [C documentation for memory order](https://en.cppreference.com/w/c/atomic/memory_order.html) - C 语言的内存序文档
 
 ---
 
