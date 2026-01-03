@@ -460,14 +460,28 @@ compareAndSet(expected, desired) {
 
 ## 7. 记忆要点
 
+### Memory Fence（内存栅栏）
+
 | 概念 | 作用 | 范围 |
 |------|------|------|
 | **Release fence** | 防止所有在 fence 之前的读写操作重排到 fence 之后的所有后续存储操作之后 | 本线程的所有内存操作（包括非原子和 relaxed 原子） |
 | **Acquire fence** | 防止所有在 fence 之后的读写操作重排到 fence 之前的所有先前加载操作之前 | 本线程的所有内存操作（包括非原子和 relaxed 原子） |
+| **Seq_Cst fence** | 顺序一致性屏障：防止 StoreLoad 重排，参与全局总顺序 | 全局顺序一致性 |
+
+### Atomic 操作（原子操作）
+
+| 概念 | 作用 | 范围 |
+|------|------|------|
+| **Release store** | 防止所有在 store 之前的读写操作重排到 store 之后，且 store 本身建立同步语义 | 本线程的所有内存操作 + 特定原子变量 |
+| **Acquire load** | 防止所有在 load 之后的读写操作重排到 load 之前，且 load 本身建立同步语义 | 本线程的所有内存操作 + 特定原子变量 |
+| **CAS** | 原子化"读-判断-写"，失败时更新 expected 并重试 | 特定原子变量 |
+
+### 同步关系
+
+| 概念 | 作用 | 范围 |
+|------|------|------|
 | **同步关系** | 必须通过同一个原子变量的读写建立，满足 sequenced-before 和 happens-before 关系 | 跨线程 |
-| **方式 1** | Fence-Fence 同步：条件性同步（只有读取到新值时建立） | 适合 busy-spin |
-| **方式 2** | Atomic-Atomic 同步：更强同步（通常能读取到新值） | 一般场景 |
-| **CAS** | 原子化"读-判断-写"，失败时更新 expected 并重试 | 无锁并发 |
-| **Seq_Cst** | 顺序一致性屏障：防止 StoreLoad 重排，参与全局总顺序 | 全局顺序一致性 |
+| **Fence-Fence** | 条件性同步（只有读取到新值时建立） | 适合 busy-spin |
+| **Atomic-Atomic** | 更强同步（通常能读取到新值） | 一般场景 |
 
 **参考**：[cppreference - atomic_thread_fence](https://en.cppreference.com/w/cpp/atomic/atomic_thread_fence) | [cppreference - memory_order](https://en.cppreference.com/w/cpp/atomic/memory_order)
