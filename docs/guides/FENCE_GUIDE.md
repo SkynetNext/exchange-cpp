@@ -458,7 +458,93 @@ compareAndSet(expected, desired) {
 
 ---
 
-## 7. 记忆要点
+## 7. `acq_rel` 内存序
+
+### 核心定义
+
+根据 [cppreference](https://en.cppreference.com/w/cpp/atomic/memory_order)：
+- **`memory_order_acq_rel`** 用于读-改-写（RMW）操作，如 `fetch_add`、`compare_exchange` 等
+- 它**既是 acquire 操作也是 release 操作**，因为 RMW 操作既读又写，需要双向同步
+- **不仅仅是简单的组合**：它在单个原子操作中同时提供获取和释放语义
+
+### 为什么用于 RMW 操作？
+
+RMW 操作（Read-Modify-Write）的特点：
+- **既读又写**：原子地读取当前值，修改后写回
+- **需要双向同步**：
+  - **Release 语义**：本线程之前的写操作对其他线程可见（写入端）
+  - **Acquire 语义**：能看到其他线程之前的写操作（读取端）
+
+### 与单独的 release/acquire 的区别
+
+| 特性 | 单独的 release/acquire | `acq_rel` RMW 操作 |
+|------|----------------------|-------------------|
+| **读取保证** | ⚠️ 条件性（需要建立同步关系） | ✅ 原子性保证（总是读取到当前值） |
+| **可见性** | ⚠️ 需要配对使用 | ✅ RMW 操作本身保证原子性和可见性 |
+| **适用场景** | 纯读或纯写操作 | RMW 操作（fetch_add、CAS 等） |
+
+**关键区别**：
+- **`acq_rel` RMW 操作**：通过原子性保证总是读取到当前值，即使多个线程同时执行，每个线程都能获得唯一且正确的值
+- **配对的 release/acquire**：不保证一定读到新值，只有当 acquire load 读取到 release store 写入的值时，才建立同步关系；如果读取到旧值，不建立同步关系，可能看不到其他线程的写操作
+
+### 实际使用场景：MultiProducerSequencer
+
+```cpp
+// MultiProducerSequencer::next()
+int64_t current = this->cursor_.getAndAdd(n);  // ← acq_rel RMW
+int64_t nextSequence = current + n;
+// ...
+```
+
+**实现**：
+```cpp
+virtual int64_t getAndAdd(int64_t increment) {
+    return value_.fetch_add(increment, std::memory_order_acq_rel);
+}
+```
+
+**为什么使用 `acq_rel`？**
+
+1. **原子性保证**：
+   - `fetch_add` 是原子操作，保证每个线程都能获得唯一的 sequence 值
+   - 多个生产者同时调用时，不会丢失更新
+
+2. **可见性保证**：
+   - **Release 语义**：确保本线程之前的写操作对其他线程可见
+   - **Acquire 语义**：确保能看到其他线程之前的写操作
+   - 通过缓存一致性协议（如 MESI）保证可见性
+
+3. **多核环境**：
+   - 在多核处理器中，缓存一致性协议确保所有核心看到一致的数据
+   - 数据可能通过缓存之间直接同步，也可能需要刷到主内存（取决于架构）
+
+**执行示例**：
+```cpp
+// 初始：cursor = 100，线程 A 和 B 同时调用 next(1)
+
+// 线程 A（CPU Core A）
+int64_t seq1 = cursor_.getAndAdd(1);  // 原子读取 100，写入 101，返回 100
+// ✅ 保证：seq1 = 100，cursor = 101
+
+// 线程 B（CPU Core B，几乎同时）
+int64_t seq2 = cursor_.getAndAdd(1);  // 原子读取 101，写入 102，返回 101
+// ✅ 保证：seq2 = 101，cursor = 102
+
+// 最终：两个线程都获得唯一值，cursor = 102 ✅ 正确
+```
+
+### 关键要点
+
+- **`acq_rel` 用于 RMW 操作**：因为 RMW 操作既读又写，需要双向同步
+- **原子性 + 可见性**：`acq_rel` RMW 操作同时保证原子性和可见性
+- **缓存一致性协议**：通过缓存一致性协议（如 MESI）保证多核环境下的可见性
+- **不需要配对**：单个 `acq_rel` RMW 操作就能保证双向同步，比单独的 release/acquire 更强
+
+**参考**：[cppreference - memory_order](https://en.cppreference.com/w/cpp/atomic/memory_order)
+
+---
+
+## 8. 记忆要点
 
 ### Memory Fence（内存栅栏）
 
@@ -466,6 +552,7 @@ compareAndSet(expected, desired) {
 |------|------|------|
 | **Release fence** | 防止所有在 fence 之前的读写操作重排到 fence 之后的所有后续存储操作之后 | 本线程的所有内存操作（包括非原子和 relaxed 原子） |
 | **Acquire fence** | 防止所有在 fence 之后的读写操作重排到 fence 之前的所有先前加载操作之前 | 本线程的所有内存操作（包括非原子和 relaxed 原子） |
+| **Acq_Rel fence** | 既是 release fence 也是 acquire fence，同时提供双向同步 | 本线程的所有内存操作（包括非原子和 relaxed 原子） |
 | **Seq_Cst fence** | 顺序一致性屏障：防止 StoreLoad 重排，参与全局总顺序 | 全局顺序一致性 |
 
 ### Atomic 操作（原子操作）
@@ -474,6 +561,7 @@ compareAndSet(expected, desired) {
 |------|------|------|
 | **Release store** | 防止所有在 store 之前的读写操作重排到 store 之后，且 store 本身建立同步语义 | 本线程的所有内存操作 + 特定原子变量 |
 | **Acquire load** | 防止所有在 load 之后的读写操作重排到 load 之前，且 load 本身建立同步语义 | 本线程的所有内存操作 + 特定原子变量 |
+| **Acq_Rel RMW** | 用于读-改-写操作（fetch_add、CAS 等）：既是 acquire 也是 release，需要双向同步，保证原子性和可见性 | 本线程的所有内存操作 + 特定原子变量 |
 | **Seq_Cst store/load** | 顺序一致性操作：提供 acquire-release 语义，防止 StoreLoad 重排，参与全局总顺序 | 本线程的所有内存操作 + 特定原子变量 + 全局顺序一致性 |
 | **CAS** | 原子化"读-判断-写"，失败时更新 expected 并重试 | 特定原子变量 |
 
