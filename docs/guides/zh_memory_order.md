@@ -6,7 +6,7 @@
 
 ## 概述
 
-`std::memory_order` 指定内存访问，包括常规的非原子内存访问，如何围绕原子操作排序。在没有任何约束的多处理器系统上，多个线程同时读取或写入多个变量时，一个线程能观察到的值的变化顺序可能与另一个线程写入它们的顺序不同。实际上，甚至对于多个线程读取的单个变量的更改，如果没有显式的同步，更改的顺序也可能因观察者而异。
+`std::memory_order` 指定内存访问，包括常规的非原子内存访问，如何围绕原子操作进行排序。在没有任何约束的多处理器系统上，多个线程同时读取或写入多个变量时，一个线程能观察到的值的变化顺序可能与另一个线程写入它们的顺序不同。实际上，甚至对于多个线程读取的单个变量的更改，如果没有显式的同步，更改的顺序也可能因观察者而异。
 
 所有原子操作的默认行为是**Sequential Consistency 排序**（见下文）。该默认值可能会损害性能，但可以给库的原子操作添加 `std::memory_order` 参数，以指定除 `seq_cst` 之外的确切约束。
 
@@ -19,9 +19,9 @@
 | 名称 | 含义 |
 |------|------|
 | `memory_order_relaxed` | 宽松操作：不对其他读写操作施加同步或排序约束，只保证此操作的原子性（见下方 Relaxed 排序） |
-| `memory_order_consume`<br/>(C++26 中弃用) | 具有此内存序的加载操作对受影响的内存位置执行 consume 操作：当前线程中依赖于当前加载值的读写操作不能在此加载之前重排。在其他线程中 release 同一原子变量的数据依赖的写入在当前线程中可见。在大多数平台上，这仅影响编译器优化（见下方 Release-Consume 排序） |
+| `memory_order_consume`<br/>(C++26 中弃用) | 具有此内存序的加载操作对受影响的内存位置执行 consume 操作：当前线程中依赖于当前加载值的读写操作不能在此加载之前重排。在其他线程中 release 同一原子变量的数据依赖写入在当前线程中可见。在大多数平台上，这仅影响编译器优化（见下方 Release-Consume 排序） |
 | `memory_order_acquire` | 具有此内存序的加载操作对受影响的内存位置执行 acquire 操作：当前线程中的读写操作不能在此加载之前重排。在其他线程中 release 同一原子变量的所有写入在当前线程中可见（见下方 Release-Acquire 排序） |
-| `memory_order_release` | 具有此内存序的存储操作执行 release 操作：当前线程中的读写操作不能在此存储之后重排。当前线程中的所有写入在其他线程中 acquire 同一原子变量时可见，并且携带依赖关系进入原子变量的写入在其他线程中 consume 同一原子变量时可见（见下方 Release-Acquire 排序和 Release-Consume 排序） |
+| `memory_order_release` | 具有此内存序的存储操作执行 release 操作：当前线程中的读写操作不能在此存储之后重排。当前线程中的所有写入在其他线程中 acquire 同一原子变量时可见，并且携带依赖进入原子变量的写入在其他线程中 consume 同一原子变量时可见（见下方 Release-Acquire 排序和 Release-Consume 排序） |
 | `memory_order_acq_rel` | 具有此内存序的 Read-Modify-Write 操作既是 acquire 操作也是 release 操作。当前线程中的内存读写操作不能在加载之前重排，也不能在存储之后重排。在其他线程中 release 同一原子变量的所有写入在修改之前可见，并且修改在其他线程中 acquire 同一原子变量时可见 |
 | `memory_order_seq_cst` | 具有此内存序的加载操作执行 acquire 操作，存储执行 release 操作，Read-Modify-Write 执行 acquire 和 release 操作，此外存在单一的总顺序，其中所有线程以相同顺序观察所有修改（见下方 Sequential Consistency 排序） |
 
@@ -70,7 +70,7 @@
 
 如果线程 A 中的原子 store 操作标记为 `memory_order_release`，线程 B 中从同一变量的原子 load 操作标记为 `memory_order_acquire`，并且线程 B 中的 load 读取由线程 A 中的 store 写入的值，则线程 A 中的 store 与线程 B 中的 load 同步（synchronizes-with）。这建立了 release-acquire 同步关系。
 
-从线程 A 的角度来看，所有在原子 store 之前发生的内存写入（包括非原子和 relaxed 原子写入），都会在线程 B 中成为可见的附带作用（side effect）。也就是说，一旦原子 load 完成，线程 B 保证能看到线程 A 写入内存的所有内容。此承诺仅在 B 实际返回 A store 的值，或返回 release sequence 中较晚的值时才成立。
+从线程 A 的角度来看，所有在原子 store 之前发生的内存写入（包括非原子和 relaxed 原子写入），都会在线程 B 中可见（作为副作用）。也就是说，一旦原子 load 完成，线程 B 保证能看到线程 A 写入内存的所有内容。此承诺仅在 B 实际返回 A store 的值，或返回 release sequence 中较晚的值时才成立。
 
 同步仅在 release 和 acquire 同一原子变量的线程之间建立。其他线程可能看到与任一或两个同步线程不同的内存访问顺序。
 
@@ -101,8 +101,8 @@ void consumer()
     std::string* p2;
     while (!(p2 = ptr.load(std::memory_order_acquire)))
         ;
-    assert(*p2 == "Hello"); // 永远不会触发
-    assert(data == 42);     // 永远不会触发
+    assert(*p2 == "Hello"); // 永远不会失败
+    assert(data == 42);     // 永远不会失败
 }
 
 int main()
@@ -171,7 +171,7 @@ int main()
     b.join();
     c.join();
     d.join();
-    assert(z.load() != 0); // 永远不会发生
+    assert(z.load() != 0); // 永远不会失败
 }
 ```
 
@@ -181,7 +181,7 @@ int main()
 
 如果线程 A 中的原子 store 操作标记为 `memory_order_release`，线程 B 中从同一变量的原子 load 操作标记为 `memory_order_consume`，并且线程 B 中的 load 读取由线程 A 中的 store 写入的值，则线程 A 中的 store 与线程 B 中的 load 同步（synchronizes-with）。这建立了 release-consume 同步关系。
 
-从线程 A 的角度来看，所有在原子 store 之前发生的内存写入（包括非原子和 relaxed 原子写入），都会在线程 B 中成为可见的附带作用（side effect），但仅限于那些在 B 中依赖于原子 load 值的操作。也就是说，一旦原子 load 完成，线程 B 保证能看到线程 A 写入内存的内容，但仅限于那些依赖于 load 值的操作。
+从线程 A 的角度来看，所有在原子 store 之前发生的内存写入（包括非原子和 relaxed 原子写入），都会在线程 B 中可见（作为副作用），但仅限于线程 B 中依赖于该原子 load 值的操作。也就是说，一旦原子 load 完成，线程 B 保证能看到线程 A 写入内存的内容，但仅限于那些依赖于 load 值的操作。
 
 此承诺仅在 B 实际返回 A 存储的值，或返回 release sequence 中较晚的值时才成立。
 
@@ -205,7 +205,7 @@ r2 = x.load(std::memory_order_relaxed); // C
 y.store(42, std::memory_order_relaxed); // D
 ```
 
-允许产生 `r1 == 42 && r2 == 42`。即使线程 1 中的 A sequenced-before B，线程 2 中的 C sequenced-before D，但没有任何约束阻止 D 在 A 之前出现（从修改顺序（modification order）的角度），而 B 在 C 之前出现，结果可能是 `y == 42 && x == 42`。
+允许产生 `r1 == 42 && r2 == 42`。即使线程 1 中的 A sequenced-before B，线程 2 中的 C sequenced-before D，但没有任何约束阻止 D 在 A 之前出现（从修改顺序（modification order）的角度），而 B 在 C 之前出现，因此最终结果可能是 `y == 42 && x == 42`。
 
 Relaxed 内存排序的典型用途是增加计数器，例如 `std::shared_ptr` 的引用计数器，因为这只需要原子性，而不需要排序或同步（注意 `std::shared_ptr` 计数器的递减需要与析构函数进行 acquire-release 同步，但增量只需要 relaxed）。
 
@@ -294,7 +294,7 @@ Relaxed 内存排序的典型用途是增加计数器，例如 `std::shared_ptr`
 
 形式化定义确保：
 1. 单一总顺序与任何原子对象的修改顺序（modification order）一致
-2. `memory_order_seq_cst` 加载从其值要么来自最后一个 `memory_order_seq_cst` 修改，要么来自某个不 happens-before 前面的 `memory_order_seq_cst` 修改的非 `memory_order_seq_cst` 修改
+2. `memory_order_seq_cst` 加载从其值要么来自最后一个 `memory_order_seq_cst` 修改，要么来自某个非 `memory_order_seq_cst` 修改，且该修改不 happens-before 前面的 `memory_order_seq_cst` 修改
 
 单一总顺序可能与 happens-before 不一致。这允许在某些 CPU 上更高效地实现 `memory_order_acquire` 和 `memory_order_release`。当 `memory_order_acquire` 和 `memory_order_release` 与 `memory_order_seq_cst` 混合使用时，可能产生令人惊讶的结果。
 
@@ -317,7 +317,7 @@ r3 = x.load(std::memory_order_seq_cst); // F
 允许产生 `r1 == 1 && r2 == 3 && r3 == 0`，其中 A happens-before C，但 C 在 `memory_order_seq_cst` 的单一总顺序 C-E-F-A 中位于 A 之前（见 [Lahav et al](https://plv.mpi-sws.org/scfix/paper.pdf)）。
 
 注意：
-1. 一旦非 `memory_order_seq_cst` 标记的原子操作进入画面，程序的 Sequential Consistency 保证就会丢失
+1. 一旦非 `memory_order_seq_cst` 标记的原子操作参与进来，程序的 Sequential Consistency 保证就会丢失
 2. 在许多情况下，`memory_order_seq_cst` 原子操作相对于同一线程执行的其他原子操作是可重排的
 
 ---
