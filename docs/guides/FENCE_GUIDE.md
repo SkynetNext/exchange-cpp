@@ -474,6 +474,7 @@ compareAndSet(expected, desired) {
 |------|------|------|
 | **Release store** | 防止所有在 store 之前的读写操作重排到 store 之后，且 store 本身建立同步语义 | 本线程的所有内存操作 + 特定原子变量 |
 | **Acquire load** | 防止所有在 load 之后的读写操作重排到 load 之前，且 load 本身建立同步语义 | 本线程的所有内存操作 + 特定原子变量 |
+| **Seq_Cst store/load** | 顺序一致性操作：提供 acquire-release 语义，防止 StoreLoad 重排，参与全局总顺序 | 本线程的所有内存操作 + 特定原子变量 + 全局顺序一致性 |
 | **CAS** | 原子化"读-判断-写"，失败时更新 expected 并重试 | 特定原子变量 |
 
 ### 同步关系
