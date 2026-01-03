@@ -1,27 +1,55 @@
 # Fence 理解指南
 
+## 参考来源
+
+本文档基于 C++ 标准库官方文档，主要参考：
+- [std::atomic_thread_fence](https://en.cppreference.com/w/cpp/atomic/atomic_thread_fence)
+- [std::memory_order](https://en.cppreference.com/w/cpp/atomic/memory_order)
+
+---
+
 ## 1. 核心定义
 
 ### Release Fence（释放栅栏）
 ```cpp
 std::atomic_thread_fence(std::memory_order_release);
 ```
-- **作用**：本线程之前的所有内存写操作（store）不能重排到 fence 之后
-- **范围**：影响本线程的所有内存写操作（不限定变量）
+
+根据 [cppreference](https://en.cppreference.com/w/cpp/atomic/atomic_thread_fence)：
+- **作用**：防止所有在 fence **之前**的读写操作重排到 fence **之后**的所有后续**存储操作**之后
+- **范围**：影响本线程的所有内存操作（包括非原子和 relaxed 原子操作）
+- **关键**：Release fence 比 release store 更强，它防止所有先前的读写操作重排到**所有后续存储操作**之后
 
 ### Acquire Fence（获取栅栏）
 ```cpp
 std::atomic_thread_fence(std::memory_order_acquire);
 ```
-- **作用**：本线程后续的所有内存操作（load/store）不能重排到 fence 之前
-- **范围**：影响本线程的所有内存操作（不限定变量）
+
+根据 [cppreference](https://en.cppreference.com/w/cpp/atomic/atomic_thread_fence)：
+- **作用**：防止所有在 fence **之后**的读写操作重排到 fence **之前**的所有先前**加载操作**之前
+- **范围**：影响本线程的所有内存操作（包括非原子和 relaxed 原子操作）
+- **关键**：Acquire fence 比 acquire load 更强，它防止所有后续的读写操作重排到**所有先前加载操作**之前
 
 ### 同步关系（Synchronizes-With）
-- **条件**：必须通过**同一个原子变量**的读写来建立
-- **建立方式**：
-  1. 线程 A：release fence → relaxed store 到变量 X
-  2. 线程 B：relaxed load 从变量 X → acquire fence
-  3. **关键**：只有当线程 B 读取到线程 A 写入的值时，才建立同步关系
+
+根据 [cppreference](https://en.cppreference.com/w/cpp/atomic/atomic_thread_fence)，同步关系的建立需要满足以下条件：
+
+#### Fence-Fence 同步
+一个 release fence `FA` 在线程 A 中 synchronizes-with 一个 acquire fence `FB` 在线程 B 中，如果：
+1. 存在一个原子对象 `M`
+2. 存在一个原子写操作 `X`（任意内存序）在线程 A 中修改 `M`
+3. `FA` 在线程 A 中 sequenced-before `X`
+4. 存在一个原子读操作 `Y`（任意内存序）在线程 B 中
+5. `Y` 读取到 `X` 写入的值（或 release sequence 中的值）
+6. `Y` 在线程 B 中 sequenced-before `FB`
+
+在这种情况下，所有在线程 A 中 `FA` 之前 sequenced-before 的非原子和 relaxed 原子存储操作，都会 happen-before 所有在线程 B 中 `FB` 之后从相同位置进行的非原子和 relaxed 原子加载操作。
+
+#### 关键要点
+- **必须通过同一个原子变量**的读写来建立同步关系
+- **sequenced-before** 关系：在同一线程内的执行顺序
+- **happens-before** 关系：跨线程的可见性保证
+- 只有当读取到写入的值时，才建立同步关系
 
 ---
 
@@ -44,12 +72,12 @@ int64_t get() const {
 }
 ```
 
-**语义**：
-1. **Release fence**：本线程之前的所有内存写操作不能重排到 fence 之后
-2. **Relaxed store**：写入 `value_`，无同步语义
+**语义**（基于 [cppreference](https://en.cppreference.com/w/cpp/atomic/atomic_thread_fence)）：
+1. **Release fence**：防止所有在 fence 之前的读写操作重排到 fence 之后的所有后续存储操作之后
+2. **Relaxed store**：写入 `value_`，无同步语义（不建立 synchronizes-with 关系）
 3. **Relaxed load**：读取 `value_`，可能从缓存读取（可能读到旧值）
-4. **Acquire fence**：本线程后续的所有内存操作不能重排到 fence 之前
-5. **同步关系**：只有当 relaxed load 读取到新值时，才建立 synchronizes-with
+4. **Acquire fence**：防止所有在 fence 之后的读写操作重排到 fence 之前的所有先前加载操作之前
+5. **同步关系**：只有当 relaxed load 读取到新值时，才建立 synchronizes-with 关系，此时所有在 release fence 之前 sequenced-before 的写操作都会 happen-before 所有在 acquire fence 之后进行的读操作
 
 **特点**：
 - ⚠️ relaxed load 可能读取到旧值（如 99），此时**不建立同步关系**
@@ -70,10 +98,10 @@ int64_t get() const {
 }
 ```
 
-**语义**：
-1. **Release store**：本线程之前的所有内存写操作不能重排到 store 之后，且 store 本身带同步语义
-2. **Acquire load**：本线程后续的所有内存操作不能重排到 load 之前，且 load 本身带同步语义
-3. **同步关系**：acquire load 通常能读取到最新值，更容易建立 synchronizes-with
+**语义**（基于 [cppreference](https://en.cppreference.com/w/cpp/atomic/memory_order)）：
+1. **Release store**：防止所有在 store 之前的读写操作重排到 store 之后，且 store 本身建立同步语义（如果被 acquire load 读取到）
+2. **Acquire load**：防止所有在 load 之后的读写操作重排到 load 之前，且 load 本身建立同步语义（如果读取到 release store 的值）
+3. **同步关系**：当 acquire load 读取到 release store 写入的值时，建立 synchronizes-with 关系，此时所有在 release store 之前 sequenced-before 的写操作都会 happen-before 所有在 acquire load 之后进行的读操作
 
 **特点**：
 - ✅ acquire load 强制缓存一致性检查，通常能读取到最新值
@@ -135,15 +163,25 @@ while (true) {
 ## 4. 关键理解
 
 ### Fence 的作用（线程内）
-- **Release fence**：防止本线程之前的写操作重排到 fence 之后
-- **Acquire fence**：防止本线程后续的操作重排到 fence 之前
-- **范围**：影响本线程的所有内存操作（不限定变量）
+
+根据 [cppreference](https://en.cppreference.com/w/cpp/atomic/atomic_thread_fence)：
+
+- **Release fence**：防止所有在 fence 之前的读写操作重排到 fence 之后的所有后续存储操作之后
+- **Acquire fence**：防止所有在 fence 之后的读写操作重排到 fence 之前的所有先前加载操作之前
+- **范围**：影响本线程的所有内存操作（包括非原子和 relaxed 原子操作）
+- **关键**：Fence 比原子操作更强，它影响所有后续/先前的操作，而不仅仅是特定的原子变量
 
 ### 同步关系的建立（线程间）
-- **必须条件**：通过同一个原子变量的读写
-- **方式 1**：release fence → relaxed store，relaxed load → acquire fence
-- **方式 2**：release store，acquire load
-- **关键区别**：方式 1 的 relaxed load 可能读到旧值，不建立同步关系
+
+根据 [cppreference](https://en.cppreference.com/w/cpp/atomic/atomic_thread_fence)：
+
+- **必须条件**：通过同一个原子变量的读写，且满足 sequenced-before 和 happens-before 关系
+- **方式 1**：release fence → relaxed store，relaxed load → acquire fence（Fence-Fence 同步）
+- **方式 2**：release store，acquire load（Atomic-Atomic 同步）
+- **关键区别**：
+  - 方式 1 的 relaxed load 可能读到旧值，此时不建立同步关系
+  - 方式 2 的 acquire load 更容易读取到最新值，更容易建立同步关系
+- **可见性保证**：一旦建立 synchronizes-with 关系，所有在 release 操作之前 sequenced-before 的写操作都会 happen-before 所有在 acquire 操作之后进行的读操作
 
 ### 原子性
 - **必须用 `std::atomic`**：保证读写的原子性（不会读到部分写入的值）
@@ -175,20 +213,22 @@ std::atomic_thread_fence(std::memory_order_acquire);  // Acquire fence
 int y = other_data;                             // Load 2（普通变量读取）
 ```
 
-**Release fence 的作用**：
-- 防止**本线程**之前的**所有内存写操作（Store）**（包括普通变量和原子变量）重排到 fence 之后
+**Release fence 的作用**（基于 [cppreference](https://en.cppreference.com/w/cpp/atomic/atomic_thread_fence)）：
+- 防止所有在 fence **之前**的读写操作（包括非原子和 relaxed 原子）重排到 fence **之后**的所有后续**存储操作**之后
 - ✅ 保证：`data = 42` 不会重排到 `flag.store(1)` 之后
+- ⚠️ 但 Release fence **不能防止** fence 之后的 Store 和 Load 之间的重排
 
-**Acquire fence 的作用**：
-- 防止**本线程**后续的**所有内存操作（Load/Store）**（包括普通变量和原子变量）重排到 fence 之前
+**Acquire fence 的作用**（基于 [cppreference](https://en.cppreference.com/w/cpp/atomic/atomic_thread_fence)）：
+- 防止所有在 fence **之后**的读写操作（包括非原子和 relaxed 原子）重排到 fence **之前**的所有先前**加载操作**之前
 - ✅ 保证：`int y = other_data` 不会重排到 `other_flag.load()` 之前
+- ⚠️ 但 Acquire fence **不能防止** fence 之前的 Store 和 Load 之间的重排
 
 **漏洞**：
 - ❌ Release fence **管不了** fence 之后的 `flag.store(1)`（Store）和 `other_flag.load()`（Load）之间的重排
 - ❌ Acquire fence **管不了** fence 之前的 `flag.store(1)`（Store）和 `other_flag.load()`（Load）之间的重排
 - **结果**：Store 2 和 Load 1 之间**没有任何屏障**，可以发生 **StoreLoad 重排**
 
-**注意**：Store/Load 不仅指原子变量操作，也包括普通变量的读写。
+**注意**：Store/Load 不仅指原子变量操作，也包括普通变量的读写。根据 [cppreference](https://en.cppreference.com/w/cpp/atomic/memory_order)，只有 `memory_order_seq_cst` 能防止 StoreLoad 重排。
 
 ### 场景：Dekker 算法（经典的 StoreLoad 重排问题）
 ```cpp
@@ -213,9 +253,13 @@ std::atomic_thread_fence(std::memory_order_acquire);
 **关键**：这里的 Store/Load 是指**内存层面的写入和读取操作**，不仅限于原子变量。
 
 ### 解决方案：`seq_cst` 屏障
-只有 `memory_order_seq_cst` 屏障能强制刷新**本线程**的 Store Buffer，并阻止**本线程**的写操作与后续读操作发生重排。
-- **StoreLoad 屏障**：确保**本线程**之前的内存写操作对全局可见，且**本线程**后续的内存读操作必须在此之后执行。
-- 这是开销最大的屏障，因为它强制同步了**本线程**与内存系统。
+
+根据 [cppreference](https://en.cppreference.com/w/cpp/atomic/memory_order)：
+- **`memory_order_seq_cst`** 是顺序一致性（Sequentially Consistent）内存序
+- 它提供 acquire-release 语义，并且所有 seq_cst 操作形成一个单一的全局总顺序
+- **`std::atomic_thread_fence(std::memory_order_seq_cst)`** 是一个顺序一致性的 acquire-release fence
+- **StoreLoad 屏障**：确保所有在 fence 之前的内存写操作对全局可见，且所有在 fence 之后的内存读操作必须在此之后执行
+- 这是开销最大的屏障，因为它强制同步了**本线程**与内存系统，并参与全局顺序一致性
 
 **使用 `seq_cst` 修复 Dekker 算法**：
 ```cpp
@@ -418,10 +462,12 @@ compareAndSet(expected, desired) {
 
 | 概念 | 作用 | 范围 |
 |------|------|------|
-| **Release fence** | 本线程之前的所有内存写操作不能重排到 fence 之后 | 本线程的所有内存写操作 |
-| **Acquire fence** | 本线程后续的所有内存操作不能重排到 fence 之前 | 本线程的所有内存操作 |
-| **同步关系** | 必须通过同一个原子变量的读写建立 | 跨线程 |
-| **方式 1** | 条件性同步（只有读取到新值时建立） | 适合 busy-spin |
-| **方式 2** | 更强同步（通常能读取到新值） | 一般场景 |
+| **Release fence** | 防止所有在 fence 之前的读写操作重排到 fence 之后的所有后续存储操作之后 | 本线程的所有内存操作（包括非原子和 relaxed 原子） |
+| **Acquire fence** | 防止所有在 fence 之后的读写操作重排到 fence 之前的所有先前加载操作之前 | 本线程的所有内存操作（包括非原子和 relaxed 原子） |
+| **同步关系** | 必须通过同一个原子变量的读写建立，满足 sequenced-before 和 happens-before 关系 | 跨线程 |
+| **方式 1** | Fence-Fence 同步：条件性同步（只有读取到新值时建立） | 适合 busy-spin |
+| **方式 2** | Atomic-Atomic 同步：更强同步（通常能读取到新值） | 一般场景 |
 | **CAS** | 原子化"读-判断-写"，失败时更新 expected 并重试 | 无锁并发 |
-| **Seq_Cst** | 防止 StoreLoad 重排（最强屏障） | 全局顺序一致性 |
+| **Seq_Cst** | 顺序一致性屏障：防止 StoreLoad 重排，参与全局总顺序 | 全局顺序一致性 |
+
+**参考**：[cppreference - atomic_thread_fence](https://en.cppreference.com/w/cpp/atomic/atomic_thread_fence) | [cppreference - memory_order](https://en.cppreference.com/w/cpp/atomic/memory_order)
