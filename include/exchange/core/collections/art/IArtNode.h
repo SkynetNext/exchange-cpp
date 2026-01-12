@@ -131,6 +131,25 @@ public:
    * @return ObjectsPool instance
    */
   virtual objpool::ObjectsPool *GetObjectsPool() = 0;
+
+  /**
+   * Get node type for object pool recycling
+   * @return Node type constant (ObjectsPool::ART_NODE_4/16/48/256)
+   * Non-virtual for performance - returns stored nodeType_ member
+   */
+  int GetNodeType() const { return nodeType_; }
+
+protected:
+  /**
+   * Node type for object pool recycling
+   * Set by derived classes in their constructors
+   */
+  int nodeType_;
+
+  /**
+   * Protected constructor - derived classes must set nodeType_
+   */
+  explicit IArtNode(int nodeType) : nodeType_(nodeType) {}
 };
 
 } // namespace art

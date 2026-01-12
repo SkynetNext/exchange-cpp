@@ -49,7 +49,8 @@ public:
 
   explicit ArtNode256(
       ::exchange::core::collections::objpool::ObjectsPool *objectsPool)
-      : objectsPool_(objectsPool), nodeKey_(0), nodeLevel_(0), numChildren_(0) {
+      : IArtNode<V>(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_256),
+        objectsPool_(objectsPool), nodeKey_(0), nodeLevel_(0), numChildren_(0) {
     std::memset(nodes_, 0, sizeof(nodes_));
   }
 

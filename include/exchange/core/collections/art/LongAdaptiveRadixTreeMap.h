@@ -168,19 +168,8 @@ template <typename V> void RecycleNodeToPool(IArtNode<V> *oldNode) {
   auto *pool = oldNode->GetObjectsPool();
   if (pool == nullptr)
     return;
-  if (dynamic_cast<ArtNode4<V> *>(oldNode)) {
-    pool->Put(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4,
-              oldNode);
-  } else if (dynamic_cast<ArtNode16<V> *>(oldNode)) {
-    pool->Put(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_16,
-              oldNode);
-  } else if (dynamic_cast<ArtNode48<V> *>(oldNode)) {
-    pool->Put(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_48,
-              oldNode);
-  } else if (dynamic_cast<ArtNode256<V> *>(oldNode)) {
-    pool->Put(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_256,
-              oldNode);
-  }
+  // Use GetNodeType() instead of dynamic_cast for better performance
+  pool->Put(oldNode->GetNodeType(), oldNode);
 }
 
 // --- LongAdaptiveRadixTreeMap Implementation ---

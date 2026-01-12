@@ -50,7 +50,8 @@ public:
 
   explicit ArtNode48(
       ::exchange::core::collections::objpool::ObjectsPool *objectsPool)
-      : objectsPool_(objectsPool), nodeKey_(0), nodeLevel_(0), numChildren_(0),
+      : IArtNode<V>(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_48),
+        objectsPool_(objectsPool), nodeKey_(0), nodeLevel_(0), numChildren_(0),
         freeBitMask_(0) {
     std::memset(indexes_, -1, sizeof(indexes_));
     std::memset(nodes_, 0, sizeof(nodes_));
