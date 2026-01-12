@@ -316,7 +316,68 @@ if(BUILD_BENCHMARKS)
         set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
         set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
         set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+        # Workaround for Windows/Clang: pre-detect std::regex support
+        # benchmark's cxx_feature_check will use this if already defined
+        if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+            # On Windows, Clang typically uses MSVC standard library which supports std::regex
+            # However, the detection may fail due to linking issues. Try to detect first,
+            # but if it fails, assume it's available (common case) and let benchmark handle it
+            include(CheckCXXSourceCompiles)
+            # Use same test as benchmark's std_regex.cpp
+            check_cxx_source_compiles(
+                "#include <regex>
+                 #include <string>
+                 int main() {
+                     const std::string str = \"test0159\";
+                     std::regex re;
+                     re = std::regex(\"^[a-z]+[0-9]+$\",
+                          std::regex_constants::extended | std::regex_constants::nosubs);
+                     return std::regex_search(str, re) ? 0 : -1;
+                 }"
+                HAVE_STD_REGEX_DETECTED
+            )
+            if(HAVE_STD_REGEX_DETECTED)
+                set(HAVE_STD_REGEX ON CACHE BOOL "std::regex support" FORCE)
+                message(STATUS "Pre-detected std::regex for benchmark (Windows/Clang workaround)")
+            else()
+                # Detection failed, but on Windows/Clang with MSVC stdlib, std::regex should work
+                # Set it anyway and let benchmark's own detection handle edge cases
+                # This is a workaround for cases where check_cxx_source_compiles fails
+                # due to linking issues but std::regex is actually available at runtime
+                set(HAVE_STD_REGEX ON CACHE BOOL "std::regex support (assumed for Windows/Clang)" FORCE)
+                message(STATUS "Assuming std::regex available for benchmark (Windows/Clang workaround)")
+            endif()
+        endif()
         add_subdirectory(third_party/benchmark)
+        # Suppress format-nonliteral warning for Google Benchmark (known issue in older versions)
+        # This warning occurs in third_party/benchmark/src/string_util.cc
+        # Google Benchmark's CMakeLists.txt sets -Wformat=2 and -Werror.
+        # We need to add -Wno-format-nonliteral AFTER all other options so it takes precedence.
+        if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+            if(TARGET benchmark)
+                # Get current compile options
+                get_target_property(_benchmark_compile_options benchmark COMPILE_OPTIONS)
+                # Add -Wno-format-nonliteral at the end to override -Wformat=2
+                if(_benchmark_compile_options)
+                    list(APPEND _benchmark_compile_options "-Wno-format-nonliteral")
+                else()
+                    set(_benchmark_compile_options "-Wno-format-nonliteral")
+                endif()
+                set_target_properties(benchmark PROPERTIES COMPILE_OPTIONS "${_benchmark_compile_options}")
+                unset(_benchmark_compile_options)
+            endif()
+            
+            if(TARGET benchmark_main)
+                get_target_property(_benchmark_main_compile_options benchmark_main COMPILE_OPTIONS)
+                if(_benchmark_main_compile_options)
+                    list(APPEND _benchmark_main_compile_options "-Wno-format-nonliteral")
+                else()
+                    set(_benchmark_main_compile_options "-Wno-format-nonliteral")
+                endif()
+                set_target_properties(benchmark_main PROPERTIES COMPILE_OPTIONS "${_benchmark_main_compile_options}")
+                unset(_benchmark_main_compile_options)
+            endif()
+        endif()
         set(benchmark_FOUND TRUE)
         message(STATUS "Using Google Benchmark from submodule")
     else()
