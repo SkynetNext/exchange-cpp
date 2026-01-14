@@ -79,7 +79,7 @@ ObjectsPool::~ObjectsPool() {
   }
 }
 
-void ObjectsPool::Put(int type, void *object) {
+void ObjectsPool::PutRaw(int type, void *object) {
   if (type >= 0 && type < static_cast<int>(pools_.size()) &&
       pools_[type] != nullptr) {
     pools_[type]->Add(object);

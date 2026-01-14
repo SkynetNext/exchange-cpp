@@ -18,6 +18,8 @@
 
 #include <unordered_map>
 #include <vector>
+#include <type_traits>
+#include <new>
 
 namespace exchange {
 namespace core {
@@ -82,12 +84,28 @@ public:
    * @param type Pool type
    * @param supplier Function to create new object if pool is empty
    * @return Object from pool or newly created
+   * 
+   * If object is retrieved from pool and type has default constructor,
+   * placement new is used to reconstruct it. This ensures object state is clean.
+   * 
+   * For types without default constructor (e.g., ArtNode4), they should use
+   * Init methods to reset state after retrieval (e.g., InitFirstKey).
+   * 
+   * Example:
+   *   auto *obj = pool->Get<DirectOrder>(DIRECT_ORDER,
+   *       []() { return new DirectOrder(); });
    */
-  template <typename T, typename Supplier> T *Get(int type, Supplier supplier) {
+  template <typename T, typename Supplier>
+  T *Get(int type, Supplier supplier) {
     T *obj = static_cast<T *>(Pop(type));
     if (obj == nullptr) {
       return supplier();
     }
+    // Use placement new only if type has default constructor
+    if constexpr (std::is_default_constructible_v<T>) {
+      new (obj) T();
+    }
+    // For types without default constructor (e.g., ArtNode4), rely on Init methods
     return obj;
   }
 
@@ -95,8 +113,22 @@ public:
    * Put object back to pool
    * @param type Pool type
    * @param object Object to return
+   * 
+   * Destructor is called before putting object back to pool.
    */
-  void Put(int type, void *object);
+  template <typename T> void Put(int type, T *object) {
+    if (object != nullptr) {
+      // Call destructor before returning to pool
+      object->~T();
+      PutRaw(type, static_cast<void *>(object));
+    }
+  }
+
+  /**
+   * Put raw pointer back to pool (without calling destructor)
+   * Use this only if you've already called destructor manually
+   */
+  void PutRaw(int type, void *object);
 
 private:
   class ArrayStack {
