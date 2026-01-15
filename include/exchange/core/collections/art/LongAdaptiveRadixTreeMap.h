@@ -169,7 +169,10 @@ template <typename V> void RecycleNodeToPool(IArtNode<V> *oldNode) {
   if (pool == nullptr)
     return;
   // Use GetNodeType() instead of dynamic_cast for better performance
-  pool->Put(oldNode->GetNodeType(), oldNode);
+  // Note: Don't call destructor for ART nodes - they are POD types and may
+  // still be in use (e.g., during GetFloorValue recursive calls).
+  // State will be reset by Init methods when retrieved from pool.
+  pool->PutRaw(oldNode->GetNodeType(), oldNode);
 }
 
 // --- LongAdaptiveRadixTreeMap Implementation ---
