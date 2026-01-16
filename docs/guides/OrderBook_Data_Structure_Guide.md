@@ -4,35 +4,99 @@
 
 ## 整体架构
 
-订单簿采用 **ART (自适应基数树) + 侵入式链表** 的混合数据结构，支持**价格-时间优先**撮合：
+订单簿采用 **ART (自适应基数树) + 侵入式链表** 的混合数据结构，支持**价格-时间优先**撮合。
+
+### 架构图（价格不连续的实际场景）
 
 ```
-           bestAskOrder_ ──────────────────────────────────┐
-                                                           ↓
-   ┌──────────────────────────────────────────────────────────────────────┐
-   │  价格 100 (best)         价格 101              价格 102 (worst)       │
-   │  ┌───────┐              ┌───────┐              ┌───────┐             │
-   │  │Order1 │◄────────────►│Order3 │◄────────────►│Order5 │             │
-   │  │ t=1   │   next/prev  │ t=3   │   next/prev  │ t=5   │             │
-   │  └───────┘              └───────┘              └───────┘             │
-   │      ↑                      ↑                      ↑                 │
-   │      │                      │                      │                 │
-   │  ┌───────┐              ┌───────┐              ┌───────┐             │
-   │  │Order2 │              │Order4 │              │Order6 │             │
-   │  │ t=2   │              │ t=4   │              │ t=6   │  ◄── lastOrder
-   │  └───────┘              └───────┘              └───────┘             │
-   │                                                                      │
-   │                           ART Tree                                   │
-   │  askPriceBuckets_:  100 → Bucket1,  101 → Bucket2,  102 → Bucket3    │
-   └──────────────────────────────────────────────────────────────────────┘
+                        bestAskOrder_
+                             │
+                             ▼
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │                                                                             │
+   │   价格 100.5 (卖一)      价格 102.0           价格 105.5 (最差)              │
+   │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐              │
+   │   │ Order1 (t=1)  │◄──►│ Order3 (t=5)  │◄──►│ Order5 (t=8)  │              │
+   │   │ 100 shares    │    │ 200 shares    │    │ 50 shares     │              │
+   │   └───────────────┘    └───────────────┘    └───────────────┘              │
+   │          ▲                    ▲                    ▲                       │
+   │          │ prev               │ prev               │ prev                  │
+   │   ┌───────────────┐    ┌───────────────┐    ┌───────────────┐              │
+   │   │ Order2 (t=3)  │    │ Order4 (t=6)  │    │ Order6 (t=9)  │ ◄─ lastOrder │
+   │   │ 150 shares    │    │ 80 shares     │    │ 120 shares    │              │
+   │   └───────────────┘    └───────────────┘    └───────────────┘              │
+   │                                                                             │
+   │   注意：价格 100.5 → 102.0 → 105.5 是不连续的！                              │
+   │   中间可能有很多空档位（如 101.0, 101.5, 103.0 等都没有订单）                │
+   │                                                                             │
+   └─────────────────────────────────────────────────────────────────────────────┘
 
-图例：
-- 横向 (next/prev): 不同价格级别之间的链接，以及同价格级别内按时间排序的订单链
-- 纵向: 同一价格级别内的订单（时间优先，先到先得）
-- ART Tree: 价格 → Bucket 的映射索引，O(k) 查找复杂度
-- bestAskOrder_: 指向最优卖价的第一个订单（最早到达的）
-- lastOrder: 指向该价格级别的最后一个订单（最晚到达的）
+   askPriceBuckets_ (ART 树):
+   ┌────────────────────────────────────────────────────────────────┐
+   │  100.5 → Bucket{lastOrder=Order2, volume=250, count=2}         │
+   │  102.0 → Bucket{lastOrder=Order4, volume=280, count=2}         │
+   │  105.5 → Bucket{lastOrder=Order6, volume=170, count=2}         │
+   │                                                                │
+   │  支持: Get(price), Put(price), Remove(price)                   │
+   │        GetLowerValue(price), GetHigherValue(price) ← 关键！    │
+   └────────────────────────────────────────────────────────────────┘
 ```
+
+### 为什么不能用 Hash Map？
+
+**关键问题：插入新价格档位时需要有序操作**
+
+当一个订单的价格是**新价格档位**（之前没有这个价格的订单）时，需要将其插入到链表的正确位置：
+
+```cpp
+// insertOrder() 中的关键代码
+Bucket *lowerBucket = isAsk ? buckets.GetLowerValue(order->price)   // 找更低价格
+                            : buckets.GetHigherValue(order->price); // 找更高价格
+```
+
+| 数据结构 | Get/Put/Remove | GetLowerValue/GetHigherValue | 适用性 |
+|----------|----------------|------------------------------|--------|
+| **Hash Map** | ✅ O(1) | ❌ 不支持 | ❌ 无法用于 priceBuckets |
+| **std::map** | ✅ O(log n) | ✅ O(log n) | ✅ 可用但慢 |
+| **ART** | ✅ O(k) | ✅ O(k) | ✅ **最佳选择** |
+
+**只要有一个操作需要有序查询，就必须用有序数据结构。**
+
+### 操作与有序需求对照表
+
+| 操作 | 需要有序操作 | 频率 | 说明 |
+|------|-------------|------|------|
+| 插入订单（已有价格） | ❌ 否 | 高 | `Get(price)` 获取 Bucket，链表操作 |
+| **插入订单（新价格）** | **✅ 是** | 中 | `GetLowerValue`/`GetHigherValue` 找链表位置 |
+| 删除订单 | ❌ 否 | 高 | 纯链表指针操作 |
+| 撮合遍历 | ❌ 否 | 很高 | 从 bestOrder 沿 prev 指针遍历 |
+| L2 行情快照 | ✅ 是 | 低 | `ForEach`/`ForEachDesc` 有序遍历 |
+
+## 数据结构选择
+
+### 当前实现
+
+```cpp
+class OrderBookDirectImpl {
+    // 价格 → Bucket（必须有序，用 ART）
+    LongAdaptiveRadixTreeMap<Bucket> askPriceBuckets_;
+    LongAdaptiveRadixTreeMap<Bucket> bidPriceBuckets_;
+    
+    // 订单ID → DirectOrder（纯 KV，用高性能 Hash Map）
+    ankerl::unordered_dense::map<int64_t, DirectOrder*> orderIdIndex_;
+    
+    // 最优订单指针（O(1) 访问）
+    DirectOrder *bestAskOrder_;  // 卖一（最低卖价的第一个订单）
+    DirectOrder *bestBidOrder_;  // 买一（最高买价的第一个订单）
+};
+```
+
+### 选择理由
+
+| 组件 | 数据结构 | 理由 |
+|------|----------|------|
+| **priceBuckets_** | ART | 需要 `GetLowerValue`/`GetHigherValue` |
+| **orderIdIndex_** | unordered_dense | 纯 KV 操作，无需有序，Hash 更快 |
 
 ## 核心数据结构
 
@@ -43,16 +107,16 @@ struct DirectOrder {
     // 订单基本信息
     int64_t orderId = 0;
     int64_t price = 0;
-    int64_t size = 0;
-    int64_t filled = 0;
+    int64_t size = 0;           // 原始数量
+    int64_t filled = 0;         // 已成交数量
     int64_t reserveBidPrice = 0;
     int64_t uid = 0;
     OrderAction action = OrderAction::ASK;
     int64_t timestamp = 0;
 
     // 侵入式链表指针 (Intrusive List)
-    DirectOrder *next = nullptr;  // 指向更优价格方向，或同价格内更早的订单
-    DirectOrder *prev = nullptr;  // 指向更差价格方向，或同价格内更晚的订单
+    DirectOrder *next = nullptr;  // 指向更优价格方向的订单
+    DirectOrder *prev = nullptr;  // 指向更差价格方向的订单
     
     // 所属价格桶
     Bucket *bucket = nullptr;
@@ -63,27 +127,10 @@ struct DirectOrder {
 
 ```cpp
 struct Bucket {
-    int64_t price = 0;           // 价格级别
-    DirectOrder *lastOrder = nullptr;  // 该价格的尾订单（最晚到达）
-    int64_t totalVolume = 0;     // 该价格的总挂单量
-    int32_t numOrders = 0;       // 该价格的订单数量
-};
-```
-
-### OrderBookDirectImpl 主要成员
-
-```cpp
-class OrderBookDirectImpl {
-    // ART 树索引：价格 → Bucket
-    LongAdaptiveRadixTreeMap<Bucket> askPriceBuckets_;
-    LongAdaptiveRadixTreeMap<Bucket> bidPriceBuckets_;
-    
-    // ART 树索引：订单ID → DirectOrder
-    LongAdaptiveRadixTreeMap<DirectOrder> orderIdIndex_;
-    
-    // 最优订单指针
-    DirectOrder *bestAskOrder_;  // 最低卖价的第一个订单
-    DirectOrder *bestBidOrder_;  // 最高买价的第一个订单
+    int64_t price = 0;               // 价格级别
+    DirectOrder *lastOrder = nullptr; // 该价格的尾订单（最晚到达）
+    int64_t totalVolume = 0;         // 该价格的剩余挂单量
+    int32_t numOrders = 0;           // 该价格的订单数量
 };
 ```
 
@@ -101,13 +148,12 @@ class OrderBookDirectImpl {
 | 缓存局部性 | 节点和数据分离，缓存不友好 | 数据和指针在一起，缓存友好 |
 | 删除操作 | 需要先查找节点位置 O(n) | 直接操作指针 O(1) |
 | 内存碎片 | 更多碎片 | 更少碎片 |
-| 一个对象多个链表 | 容易（多次插入不同容器） | 需要多组指针 |
 
 ### 为什么选择侵入式链表？
 
 在高频交易撮合引擎中，订单的**取消**和**修改**是高频操作：
 
-1. **O(1) 删除**：通过 `orderIdIndex_` 查到订单后，直接操作 `next/prev` 指针删除，无需遍历链表
+1. **O(1) 删除**：通过 `orderIdIndex_` 查到订单后，直接操作 `next/prev` 指针删除
 2. **零拷贝**：订单对象本身就是链表节点，无需额外的节点分配
 3. **缓存友好**：订单数据和链接指针在同一缓存行，减少 cache miss
 
@@ -115,43 +161,37 @@ class OrderBookDirectImpl {
 
 ### 1. 插入订单 (insertOrder)
 
-#### 情况 A：价格级别已存在
+#### 情况 A：价格级别已存在（无需有序操作）
 
 新订单插入到该价格级别的尾部（时间优先）：
 
-```
-插入前 (价格 100):
-  [Order1] <--> [Order2] <--> [Order3(tail)]
-                               ↑
-                            lastOrder
-
-插入 Order4 后:
-  [Order1] <--> [Order2] <--> [Order4(新tail)] <--> [Order3]
-                               ↑
-                            lastOrder
-```
-
-核心代码：
 ```cpp
-DirectOrder *oldTail = toBucket->lastOrder;
-DirectOrder *prevOrder = oldTail->prev;
-
-toBucket->lastOrder = order;      // 更新 tail 指针
-oldTail->prev = order;            // Order3.prev = Order4
-order->next = oldTail;            // Order4.next = Order3
-order->prev = prevOrder;          // Order4.prev = Order2
-if (prevOrder)
-    prevOrder->next = order;      // Order2.next = Order4
-order->bucket = toBucket;
+Bucket *toBucket = buckets.Get(order->price);  // 简单 KV 查询
+if (toBucket != nullptr) {
+    DirectOrder *oldTail = toBucket->lastOrder;
+    DirectOrder *prevOrder = oldTail->prev;
+    
+    toBucket->lastOrder = order;      // 更新 tail 指针
+    oldTail->prev = order;            // 链接新订单
+    order->next = oldTail;
+    order->prev = prevOrder;
+    if (prevOrder) prevOrder->next = order;
+    order->bucket = toBucket;
+}
 ```
 
-#### 情况 B：新价格级别
+#### 情况 B：新价格级别（需要有序操作！）
 
-创建新 Bucket，通过 ART 树的 `GetLowerValue`/`GetHigherValue` 找到相邻价格级别，插入到全局链表中：
+必须通过 ART 的 `GetLowerValue`/`GetHigherValue` 找到相邻价格级别：
 
 ```cpp
+// 创建新 Bucket
+buckets.Put(order->price, newBucket);
+
+// ⚠️ 这里需要有序操作！Hash Map 无法实现！
 Bucket *lowerBucket = isAsk ? buckets.GetLowerValue(order->price)
                             : buckets.GetHigherValue(order->price);
+
 if (lowerBucket != nullptr) {
     // 插入到相邻价格级别之间
     DirectOrder *lowerTail = lowerBucket->lastOrder;
@@ -161,7 +201,7 @@ if (lowerBucket != nullptr) {
     order->next = lowerTail;
     order->prev = prevOrder;
 } else {
-    // 成为新的最优价格
+    // 成为新的最优价格（卖一/买一）
     DirectOrder *oldBestOrder = isAsk ? bestAskOrder_ : bestBidOrder_;
     if (oldBestOrder) oldBestOrder->next = order;
     if (isAsk) bestAskOrder_ = order;
@@ -171,19 +211,17 @@ if (lowerBucket != nullptr) {
 }
 ```
 
+**为什么不能用链表遍历找插入位置？**
+
+| 方法 | 复杂度 | 1000 个价格档的耗时 |
+|------|--------|---------------------|
+| 从 bestOrder 遍历链表 | O(n) | 慢 |
+| ART GetLowerValue | O(k) ≈ O(1) | 快 |
+
 ### 2. 删除订单 (RemoveOrder)
 
-经典双向链表删除，**O(1) 复杂度**：
+**完全不需要有序操作**，纯链表指针操作，O(1) 复杂度：
 
-```
-删除前:
-  [prev] <--> [order] <--> [next]
-
-删除后:
-  [prev] <-----------> [next]
-```
-
-核心代码：
 ```cpp
 // 更新相邻节点的指针
 if (order->next != nullptr)
@@ -197,21 +235,18 @@ if (order == bestAskOrder_)
 else if (order == bestBidOrder_)
     bestBidOrder_ = order->prev;
 
-// 如果是该价格的尾订单，更新 lastOrder 或删除 Bucket
-if (bucket->lastOrder == order) {
-    if (order->next == nullptr || order->next->bucket != bucket) {
-        buckets.Remove(order->price);  // 删除空 Bucket
-    } else {
-        bucket->lastOrder = order->next;
-    }
+// 如果该价格档位空了，从 ART 中删除
+if (bucket->numOrders == 0) {
+    buckets.Remove(order->price);  // 简单 KV 删除
 }
 ```
 
 ### 3. 撮合遍历 (tryMatchInstantly)
 
-从最优价格开始，沿着 `prev` 指针遍历，按**价格-时间优先**顺序撮合：
+**完全不需要有序操作**，从最优价格开始，沿着 `prev` 指针遍历：
 
 ```cpp
+// 直接获取最优订单，O(1)
 DirectOrder *makerOrder = isBidAction ? bestAskOrder_ : bestBidOrder_;
 
 do {
@@ -221,34 +256,32 @@ do {
     remainingSize -= tradeSize;
     
     if (makerOrder->size == makerOrder->filled) {
-        // 订单完全成交，从链表中移除
-        orderIdIndex_.Remove(makerOrder->orderId);
-        // ... 释放订单 ...
+        // 订单完全成交
+        orderIdIndex_.erase(makerOrder->orderId);  // Hash O(1)
+        if (makerOrder == priceBucketTail) {
+            buckets.Remove(makerOrder->price);      // ART 删除
+        }
     }
     
-    // 沿 prev 方向遍历下一个订单
+    // 沿 prev 方向遍历下一个订单，O(1)
     makerOrder = makerOrder->prev;
     
 } while (makerOrder != nullptr && remainingSize > 0 && 价格满足条件);
 ```
 
-遍历顺序示例（Ask 侧）：
-```
-bestAskOrder_ → Order1(价格100,t=1) → Order2(价格100,t=2) → Order3(价格101,t=3) → ...
-                     ↑                      ↑                      ↑
-                 最优价格+最早          同价格+次早            次优价格+最早
-```
+**撮合热路径是纯指针遍历，零 ART 树操作！**
 
 ## 复杂度分析
 
-| 操作 | 复杂度 | 说明 |
-|------|--------|------|
-| 新增订单 | O(k) | k 为 ART 树键长（固定 8 字节），实际 O(1) |
-| 取消订单 | O(k) | 通过 orderIdIndex_ 查找 + O(1) 链表删除 |
-| 修改订单 | O(k) | 删除 + 插入 |
-| 按价格查找 | O(k) | ART 树查找 |
-| 撮合遍历 | O(n) | n 为成交订单数，每个订单 O(1) 处理 |
-| 获取最优价格 | O(1) | 直接访问 bestAskOrder_/bestBidOrder_ |
+| 操作 | 复杂度 | ART 操作 | 链表操作 |
+|------|--------|----------|----------|
+| 新增订单（已有价格） | O(k) | Get | O(1) 链表插入 |
+| 新增订单（新价格） | O(k) | Get, Put, GetLower/Higher | O(1) 链表插入 |
+| 取消订单 | O(1) + O(k) | Remove（仅空档位） | O(1) 链表删除 |
+| 撮合单笔 | O(1) | 无 | O(1) 指针遍历 |
+| 获取最优价格 | O(1) | 无 | 直接访问 bestOrder |
+
+> 其中 k = 8（int64_t 键长度），实际接近 O(1)
 
 ## 内存布局优化
 
@@ -265,9 +298,19 @@ DirectOrder *order = objectsPool_->Get<DirectOrder>(
 objectsPool_->Put(ObjectsPool::DIRECT_ORDER, order);
 ```
 
-### 缓存行对齐
+### 内存分配器
 
-`DirectOrder` 结构体的关键字段（orderId, price, size, filled）在内存中连续存放，提高缓存命中率。
+使用 **mimalloc** 高性能内存分配器，对小对象分配（DirectOrder, Bucket）有显著优化。
+
+## 性能基准
+
+基于 5M 订单的基准测试（详见 [ART_Performance_Baseline.md](../ART_Performance_Baseline.md)）：
+
+| 操作 | ART | std::map | ART 优势 |
+|------|-----|----------|----------|
+| Higher/Lower | 578-590 ms | 1819-1959 ms | **3.1-3.4x 更快** |
+| Get (Hit) | 301 ms | 1349 ms | **4.5x 更快** |
+| Put | 276 ms | 1099 ms | **4.0x 更快** |
 
 ## 相关文件
 
@@ -278,5 +321,5 @@ objectsPool_->Put(ObjectsPool::DIRECT_ORDER, order);
 
 ## 参考资料
 
-- [ART Tree Deep Dive Tutorial](./ART_Tree_Deep_Dive_Tutorial.md)
-- [Custom Data Structures Selection](../CUSTOM_DATA_STRUCTURES.md)
+- [ART Performance Baseline](../ART_Performance_Baseline.md) - ART 树性能基准测试
+- [ART Tree Deep Dive Tutorial](./ART_Tree_Deep_Dive_Tutorial.md) - ART 树原理详解
