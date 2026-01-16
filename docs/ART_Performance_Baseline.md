@@ -6,174 +6,99 @@ This document records the initial performance baseline for the C++ port of the A
 
 ## Test Environment
 
-**Date**: 2023-12-23  
+**Date**: 2026-01-16  
 **Platform**: Windows  
-**CPU**: 4 cores @ 3600 MHz  
+**CPU**: 16 cores @ 3792 MHz  
 **CPU Caches**:
-- L1 Data: 32 KiB (x4)
-- L1 Instruction: 32 KiB (x4)
-- L2 Unified: 256 KiB (x4)
-- L3 Unified: 8192 KiB (x1)
+- L1 Data: 32 KiB (x8)
+- L1 Instruction: 32 KiB (x8)
+- L2 Unified: 256 KiB (x8)
+- L3 Unified: 16384 KiB (x1)
 
 ## Test Configuration
 
 - **Data Size**: 5,000,000 (5 million) key-value pairs
-- **Iterations**: 10 iterations per benchmark
-- **Test Cases**: 7 benchmark scenarios
-- **Comparison**: ART Tree vs `std::map<int64_t, int64_t>`
+- **Iterations**: 3 iterations per benchmark
+- **Test Cases**: 8 benchmark scenarios (including GetMiss)
+- **Comparison**: ART vs `std::map` vs `ankerl::unordered_dense` vs `std::unordered_map`
+- **Memory Allocator**: mimalloc
 
 ## Performance Results
 
-### 1. PUT (Insertion)
+### Core Operations
 
-| Metric | Value |
-|--------|-------|
-| Total Time | 15.673 seconds |
-| CPU Time | 10.619 seconds |
-| ART Time | 365.375 ms (avg) |
-| BST Time | 741.155 ms (avg) |
-| **Improvement** | **+102.8%** |
+| Operation | ART | std::map | unordered_dense | std::unordered_map | ART vs BST | ART vs Dense | ART vs Unordered |
+|-----------|-----|----------|-----------------|-------------------|------------|--------------|------------------|
+| **Put** | 319.2 ms | 1341.4 ms | 57.2 ms | 166.1 ms | **+320%** (4.2x) | -82% | -48% |
+| **GetHit** | 308.4 ms | 1548.1 ms | 58.5 ms | 138.1 ms | **+402%** (5.0x) | -81% | -55% |
+| **GetMiss** | 7.7 ms | 103.0 ms | 35.4 ms | 105.6 ms | **+1231%** (13.3x) ⭐ | **+357%** (4.6x) ⭐ | **+1265%** (13.7x) ⭐ |
+| **Remove** | 548.5 ms | 2061.8 ms | 281.4 ms | 414.4 ms | **+276%** (3.8x) | -49% | -24% |
 
-**Analysis**: ART tree shows significant improvement in insertion performance. The adaptive node structure provides better cache locality compared to `std::map`'s red-black tree. ART is **2.0x faster** than `std::map` for insertions.
+### Iteration Operations
 
----
+| Operation | ART | std::map | unordered_dense | std::unordered_map | ART vs BST | ART vs Dense | ART vs Unordered |
+|-----------|-----|----------|-----------------|-------------------|------------|--------------|------------------|
+| **ForEach** | 24.3 μs | 53.4 μs | 6.9 μs | 52.6 μs | **+119%** (2.2x) | -72% | **+116%** (2.2x) |
+| **ForEachDesc** | 70.8 μs | 101.6 μs | 16.4 μs | 70.8 μs | **+44%** (1.4x) | -77% | ±0% |
 
-### 2. GET_HIT (Lookup)
+### Range Queries (Ordered Containers Only)
 
-| Metric | Value |
-|--------|-------|
-| Total Time | 8.273 seconds |
-| CPU Time | 6.867 seconds |
-| ART Time | 123.465 ms (avg) |
-| BST Time | 680.536 ms (avg) |
-| **Improvement** | **+451.0%** |
-
-**Analysis**: This is the most significant performance gain. ART tree's cache-friendly design and path compression make lookups significantly faster than `std::map`. The 451% improvement means ART is **5.5x faster** than `std::map` for lookups, demonstrating the exceptional effectiveness of ART's memory layout optimization.
-
-**Validation**: `art_sum=bst_sum=3.40675P` ✓ (Results match)
+| Operation | ART | std::map | ART vs BST | Note |
+|-----------|-----|----------|------------|------|
+| **Higher** | 608.1 ms | 1770.1 ms | **+191%** (2.9x) | Hash maps do not support `upper_bound` |
+| **Lower** | 589.5 ms | 1384.6 ms | **+135%** (2.3x) | Hash maps do not support `lower_bound` |
 
 ---
-
-### 3. REMOVE (Deletion)
-
-| Metric | Value |
-|--------|-------|
-| Total Time | 27.94 seconds |
-| CPU Time | 22.758 seconds |
-| ART Time | 274.092 ms (avg) |
-| BST Time | 1045.85 ms (avg) |
-| **Improvement** | **+281.5%** |
-
-**Analysis**: ART tree's node recycling mechanism and efficient deletion algorithm provide substantial performance benefits. The 281.5% improvement means ART is **3.8x faster** than `std::map` for deletions, which is highly significant for high-frequency trading systems where order cancellation is common.
-
----
-
-### 4. FOREACH (Forward Iteration)
-
-| Metric | Value |
-|--------|-------|
-| Total Time | 1.083 ms |
-| CPU Time | 1.562 ms |
-| ART Time | 29.26 μs (avg) |
-| BST Time | 19.61 μs (avg) |
-| Elements Iterated | 5000 |
-| **Improvement** | **-33.0%** |
-
-**Analysis**: ART tree shows a performance penalty for forward iteration. This is expected due to the tree structure traversal overhead compared to `std::map`'s contiguous memory layout. However, the absolute difference is minimal (microseconds) and negligible in practice, as iteration is not a primary operation in trading systems.
-
----
-
-### 5. FOREACH_DESC (Reverse Iteration)
-
-| Metric | Value |
-|--------|-------|
-| Total Time | 3.138 ms |
-| CPU Time | 3.125 ms |
-| ART Time | 123.54 μs (avg) |
-| BST Time | 60.55 μs (avg) |
-| Elements Iterated | 5000 |
-| **Improvement** | **-51.0%** |
-
-**Analysis**: Similar to forward iteration, reverse iteration shows a performance penalty. The path backtracking in ART tree adds overhead compared to `std::map`'s reverse iterator. However, the absolute difference is minimal (microseconds) and negligible in practice, as iteration is not a primary operation in trading systems.
-
----
-
-### 6. HIGHER (Upper Bound Lookup)
-
-| Metric | Value |
-|--------|-------|
-| Total Time | 11.864 seconds |
-| CPU Time | 8.461 seconds |
-| ART Time | 343.818 ms (avg) |
-| BST Time | 934.49 ms (avg) |
-| **Improvement** | **+171.8%** |
-
-**Analysis**: ART tree's ordered structure enables efficient range queries. The 171.8% improvement means ART is **2.7x faster** than `std::map` for upper bound lookups, which is highly valuable for trading systems that frequently query price ranges.
-
-**Validation**: `art_sum=bst_sum=3.40675P` ✓ (Results match)
-
----
-
-### 7. LOWER (Lower Bound Lookup)
-
-| Metric | Value |
-|--------|-------|
-| Total Time | 9.735 seconds |
-| CPU Time | 8.369 seconds |
-| ART Time | 296.755 ms (avg) |
-| BST Time | 665.687 ms (avg) |
-| **Improvement** | **+124.3%** |
-
-**Analysis**: Similar to higher bound lookup, ART tree provides better performance for lower bound queries. The 124.3% improvement means ART is **2.2x faster** than `std::map` for lower bound lookups, which are common in order book operations.
-
-**Validation**: `art_sum=bst_sum=3.40675P` ✓ (Results match)
-
----
-
-## Performance Summary
-
-| Operation | ART Advantage | Speedup | Use Case |
-|-----------|---------------|---------|----------|
-| **Lookup (Get)** | **+451.0%** | **5.5x faster** | Order queries, price lookups |
-| **Deletion (Remove)** | **+281.5%** | **3.8x faster** | Order cancellation, cleanup |
-| **Upper Bound (Higher)** | **+171.8%** | **2.7x faster** | Price range queries |
-| **Lower Bound (Lower)** | **+124.3%** | **2.2x faster** | Price range queries |
-| **Insertion (Put)** | **+102.8%** | **2.0x faster** | New order placement |
-| **Forward Iteration** | -33.0% | Slower | Batch processing (negligible) |
-| **Reverse Iteration** | -51.0% | Slower | Batch processing (negligible) |
-
-**Note**: Improvement values are calculated using the Java formula: `100 * (bstTime / artTime - 1)`, based on averaged time values from 10 iterations.
 
 ## Key Findings
 
-### Strengths
+### GetMiss Performance is Exceptional
 
-1. **Lookup Performance**: The 451% improvement (5.5x speedup) in lookup operations is the most significant advantage. This is critical for trading systems where order queries are frequent.
+ART outperforms all containers for failed lookups:
+- **13.3x faster** than `std::map` 
+- **4.6x faster** than `ankerl::unordered_dense`
+- **13.7x faster** than `std::unordered_map`
 
-2. **Deletion Performance**: The 281.5% improvement (3.8x speedup) in deletion operations is exceptional for high-frequency trading where order cancellation is common.
+This is due to ART's ability to terminate early when key prefix doesn't match:
 
-3. **Range Queries**: Both upper and lower bound lookups show substantial improvements (124-172%, 2.2-2.7x speedup), which are essential for order book operations.
+```cpp
+// ART can terminate early when key prefix doesn't match
+// For keys with 1 trillion offset, mismatch detected at root node
 
-4. **Insertion Performance**: The 102.8% improvement (2.0x speedup) demonstrates ART's efficiency even for write operations.
+// Hash map must:
+// 1. Compute full hash of the key
+// 2. Probe bucket(s)
+// 3. Compare key equality
+// No early termination possible
+```
 
-5. **Cache Efficiency**: ART tree's cache-friendly design provides consistent performance benefits across most operations.
+### ART vs std::map
 
-### Weaknesses
+ART wins all operations (1.4x - 13.3x faster). `std::map` is not recommended.
 
-1. **Iteration Overhead**: Performance penalty (-33% to -51%) for iteration operations, but the absolute impact is minimal (microseconds) and negligible in practice, as iteration is not a primary operation in trading systems.
+### ART vs Hash Maps
+
+- ART is slower for Hit operations (hash O(1) advantage)
+- ART is significantly faster for Miss operations (early termination)
+- ART provides ordered operations that hash maps cannot support
+
+### Best Use Cases
+
+| Container | Best For |
+|-----------|----------|
+| **ART** | Range queries, Miss-heavy workloads, ordered iteration |
+| **unordered_dense** | Pure KV store with high hit rate |
+| **std::map** | Not recommended (outperformed by ART in all cases) |
+| **std::unordered_map** | Not recommended (outperformed by unordered_dense) |
 
 ## Conclusion
 
-The C++ port of the ART tree demonstrates **exceptional performance advantages** in core trading system operations:
+The C++ ART tree is the optimal choice for trading systems where:
+- Range queries (Higher/Lower) are required
+- Miss queries are common (order lookup before cancellation)
+- Ordered iteration is needed (price level traversal)
 
-- ✅ **5.5x faster lookups** (451% improvement) - Critical for order queries
-- ✅ **3.8x faster deletions** (281.5% improvement) - Important for order cancellation
-- ✅ **2.2-2.7x faster range queries** (124-172% improvement) - Essential for price range operations
-- ✅ **2.0x faster insertions** (102.8% improvement) - Beneficial for new order placement
-
-The performance penalties in iteration operations (-33% to -51%) are negligible in absolute terms (microseconds) and do not impact the overall performance profile, as iteration is not a primary operation in trading systems.
-
-**Overall Assessment**: The C++ ART tree implementation is **exceptionally well-suited** for trading system applications, providing dramatic performance improvements (2-5.5x speedup) in the most critical operations. These results significantly exceed initial expectations and demonstrate the effectiveness of the ART tree design for high-performance trading systems.
+For pure KV workloads with high hit rates and no ordering requirements, `ankerl::unordered_dense` remains faster.
 
 ## Java vs C++ Performance Comparison
 
@@ -315,4 +240,3 @@ The gap is larger for GET_HIT (17.84x) because lookup operations benefit more fr
 - **Reduced Fragmentation**: Lower memory fragmentation means nodes are more likely to be allocated in contiguous regions, improving spatial locality.
 
 **Conclusion**: The integration of `mimalloc` elevates the C++ ART implementation from "excellent" to "exceptional", with particularly dramatic improvements in write operations and iteration. The performance gap with Java has widened to **20-25x**, making this implementation highly competitive for high-frequency trading systems.
-
