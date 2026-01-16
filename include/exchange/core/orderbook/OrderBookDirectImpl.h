@@ -22,6 +22,7 @@
 #include "../common/config/LoggingConfiguration.h"
 #include "IOrderBook.h"
 #include "OrderBookEventsHelper.h"
+#include <ankerl/unordered_dense.h>
 #include <cstdint>
 #include <vector>
 
@@ -159,9 +160,8 @@ private:
   const common::CoreSymbolSpecification *symbolSpec_;
   ::exchange::core::collections::objpool::ObjectsPool *objectsPool_;
 
-  // Order ID index using ART tree for consistency and performance
-  ::exchange::core::collections::art::LongAdaptiveRadixTreeMap<DirectOrder>
-      orderIdIndex_;
+  // Order ID index using hash map for O(1) lookup performance
+  ankerl::unordered_dense::map<int64_t, DirectOrder *> orderIdIndex_;
 
   // Best orders
   DirectOrder *bestAskOrder_;

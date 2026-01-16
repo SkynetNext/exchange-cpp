@@ -7,13 +7,13 @@ This document records the initial performance baseline for the C++ port of the A
 ## Test Environment
 
 **Date**: 2026-01-16  
-**Platform**: Windows  
-**CPU**: 16 cores @ 3792 MHz  
+**Platform**: Linux  
+**CPU**: 16 cores @ 2600 MHz  
 **CPU Caches**:
 - L1 Data: 32 KiB (x8)
 - L1 Instruction: 32 KiB (x8)
-- L2 Unified: 256 KiB (x8)
-- L3 Unified: 16384 KiB (x1)
+- L2 Unified: 1024 KiB (x8)
+- L3 Unified: 32768 KiB (x1)
 
 ## Test Configuration
 
@@ -22,6 +22,7 @@ This document records the initial performance baseline for the C++ port of the A
 - **Test Cases**: 8 benchmark scenarios (including GetMiss)
 - **Comparison**: ART vs `std::map` vs `ankerl::unordered_dense` vs `std::unordered_map`
 - **Memory Allocator**: mimalloc
+- **Compiler**: GCC with LTO enabled
 
 ## Performance Results
 
@@ -29,24 +30,24 @@ This document records the initial performance baseline for the C++ port of the A
 
 | Operation | ART | std::map | unordered_dense | std::unordered_map | ART vs BST | ART vs Dense | ART vs Unordered |
 |-----------|-----|----------|-----------------|-------------------|------------|--------------|------------------|
-| **Put** | 319.2 ms | 1341.4 ms | 57.2 ms | 166.1 ms | **+320%** (4.2x) | -82% | -48% |
-| **GetHit** | 308.4 ms | 1548.1 ms | 58.5 ms | 138.1 ms | **+402%** (5.0x) | -81% | -55% |
-| **GetMiss** | 7.7 ms | 103.0 ms | 35.4 ms | 105.6 ms | **+1231%** (13.3x) ⭐ | **+357%** (4.6x) ⭐ | **+1265%** (13.7x) ⭐ |
-| **Remove** | 548.5 ms | 2061.8 ms | 281.4 ms | 414.4 ms | **+276%** (3.8x) | -49% | -24% |
+| **Put** | 280.4 ms | 1102.7 ms | 55.4 ms | 126.3 ms | **+293%** (3.9x) | -80% | -55% |
+| **GetHit** | 301.0 ms | 1390.9 ms | 48.6 ms | 77.8 ms | **+362%** (4.6x) | -84% | -74% |
+| **GetMiss** | 7.0 ms | 26.5 ms | 30.2 ms | 85.9 ms | **+278%** (3.8x) | **+332%** (4.3x) ⭐ | **+1128%** (12.3x) ⭐ |
+| **Remove** | 491.8 ms | 1506.7 ms | 87.4 ms | 202.4 ms | **+206%** (3.1x) | -82% | -59% |
 
 ### Iteration Operations
 
 | Operation | ART | std::map | unordered_dense | std::unordered_map | ART vs BST | ART vs Dense | ART vs Unordered |
 |-----------|-----|----------|-----------------|-------------------|------------|--------------|------------------|
-| **ForEach** | 24.3 μs | 53.4 μs | 6.9 μs | 52.6 μs | **+119%** (2.2x) | -72% | **+116%** (2.2x) |
-| **ForEachDesc** | 70.8 μs | 101.6 μs | 16.4 μs | 70.8 μs | **+44%** (1.4x) | -77% | ±0% |
+| **ForEach** | 17.0 μs | 69.4 μs | 1.9 μs | 4.2 μs | **+309%** (4.1x) | -89% | -75% |
+| **ForEachDesc** | 78.9 μs | 99.1 μs | 2.0 μs | 4.5 μs | **+26%** (1.3x) | -97% | -94% |
 
 ### Range Queries (Ordered Containers Only)
 
 | Operation | ART | std::map | ART vs BST | Note |
 |-----------|-----|----------|------------|------|
-| **Higher** | 608.1 ms | 1770.1 ms | **+191%** (2.9x) | Hash maps do not support `upper_bound` |
-| **Lower** | 589.5 ms | 1384.6 ms | **+135%** (2.3x) | Hash maps do not support `lower_bound` |
+| **Higher** | 587.4 ms | 1548.4 ms | **+164%** (2.6x) | Hash maps do not support `upper_bound` |
+| **Lower** | 578.6 ms | 1546.8 ms | **+167%** (2.7x) | Hash maps do not support `lower_bound` |
 
 ---
 
@@ -55,9 +56,9 @@ This document records the initial performance baseline for the C++ port of the A
 ### GetMiss Performance is Exceptional
 
 ART outperforms all containers for failed lookups:
-- **13.3x faster** than `std::map` 
-- **4.6x faster** than `ankerl::unordered_dense`
-- **13.7x faster** than `std::unordered_map`
+- **3.8x faster** than `std::map` 
+- **4.3x faster** than `ankerl::unordered_dense`
+- **12.3x faster** than `std::unordered_map`
 
 This is due to ART's ability to terminate early when key prefix doesn't match:
 
@@ -74,7 +75,7 @@ This is due to ART's ability to terminate early when key prefix doesn't match:
 
 ### ART vs std::map
 
-ART wins all operations (1.4x - 13.3x faster). `std::map` is not recommended.
+ART wins all operations (1.3x - 4.6x faster). `std::map` is not recommended.
 
 ### ART vs Hash Maps
 
