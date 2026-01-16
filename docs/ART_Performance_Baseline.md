@@ -100,6 +100,90 @@ The C++ ART tree is the optimal choice for trading systems where:
 
 For pure KV workloads with high hit rates and no ordering requirements, `ankerl::unordered_dense` remains faster.
 
+---
+
+## Future Optimization: OrderBook Data Structure Selection
+
+### Current Implementation (OrderBookDirectImpl)
+
+```cpp
+// Price -> Bucket (must be ordered)
+LongAdaptiveRadixTreeMap<Bucket> askPriceBuckets_;
+LongAdaptiveRadixTreeMap<Bucket> bidPriceBuckets_;
+
+// OrderId -> Order (pure KV, no ordering required)
+LongAdaptiveRadixTreeMap<DirectOrder> orderIdIndex_;
+```
+
+### Operation Requirements Analysis
+
+#### Price Buckets (askPriceBuckets_ / bidPriceBuckets_)
+
+| Operation | Frequency | Description |
+|-----------|-----------|-------------|
+| GetBucket(price) | Very High | Lookup price level |
+| CreateBucket(price) | High | New price level |
+| RemoveBucket(price) | Medium | Remove when empty |
+| GetBestPrice() | Very High | Find best price (Ask min / Bid max) |
+| GetNextPrice() | High | Find next level during matching (Higher/Lower) |
+| IterateInOrder() | Low | L2 market data snapshot |
+
+**Key Requirement**: ⚠️ **Must be ordered** - requires Higher/Lower operations
+
+#### Order Index (orderIdIndex_)
+
+| Operation | Frequency | Description |
+|-----------|-----------|-------------|
+| Get(orderId) | Very High | Find order (cancel, modify) |
+| Put(orderId, order) | High | New order placement |
+| Remove(orderId) | High | Order filled/cancelled |
+| Higher/Lower | ❌ None | No range queries by orderId |
+| Iterate | ❌ Rare | Only FindUserOrders |
+
+**Key Requirement**: ✅ **Pure KV operations** - no ordering needed
+
+### Recommendation
+
+| Component | Current | Recommendation | Reason |
+|-----------|---------|----------------|--------|
+| **askPriceBuckets_** | ART | ✅ Keep ART | Requires Higher for next level |
+| **bidPriceBuckets_** | ART | ✅ Keep ART | Requires Lower for next level |
+| **orderIdIndex_** | ART | ⚠️ Consider unordered_dense | Pure KV, no ordering needed |
+
+### Expected Performance Improvement for orderIdIndex_
+
+Based on benchmark data (5M operations):
+
+| Operation | ART | unordered_dense | Expected Speedup |
+|-----------|-----|-----------------|------------------|
+| **Get(orderId)** | 308 ms | 58 ms | **5.3x faster** |
+| **Put** | 319 ms | 57 ms | **5.6x faster** |
+| **Remove** | 548 ms | 281 ms | **1.9x faster** |
+
+### Consideration: Hit vs Miss Ratio
+
+| Scenario | ART | unordered_dense | Winner |
+|----------|-----|-----------------|--------|
+| Order Exists (Hit) | 308 ms | 58 ms | Dense 5x faster |
+| Order Not Found (Miss) | 7.7 ms | 35 ms | **ART 4.5x faster** |
+
+**Decision Factor**: If most queries are hits (normal cancel/modify), use Dense. If miss queries are frequent (invalid order checks), keep ART.
+
+### Implementation Change (TODO)
+
+```cpp
+// Current
+LongAdaptiveRadixTreeMap<DirectOrder> orderIdIndex_;
+
+// Proposed
+#include <ankerl/unordered_dense.h>
+ankerl::unordered_dense::map<int64_t, DirectOrder*> orderIdIndex_;
+```
+
+**Expected overall matching performance improvement: 30-50%** (depends on operation distribution)
+
+---
+
 ## Java vs C++ Performance Comparison
 
 ### Test Configuration
