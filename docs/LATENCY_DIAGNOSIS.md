@@ -606,6 +606,53 @@ fi
 - **8.7M TPS**：批次大小 P50=256，延迟 P99=105µs-24.8ms（性能崩溃）
 
 
+## orderIdIndex_ 数据结构优化（2026-01-16）
+
+### 优化背景
+
+`OrderBookDirectImpl` 中的 `orderIdIndex_` 用于通过订单ID快速查找订单，是一个纯 Key-Value 查询场景，不需要有序遍历或范围查询。
+
+**原实现**：`LongAdaptiveRadixTreeMap<DirectOrder>` (ART)
+**新实现**：`ankerl::unordered_dense::map<int64_t, DirectOrder*>`
+
+### 优化依据
+
+根据 `perf_long_adaptive_radix_tree_map` 基准测试结果：
+- `ankerl::unordered_dense` 在点查询（GetHit）比 ART 快 **5-6x**
+- `ankerl::unordered_dense` 在插入（Put）比 ART 快 **5x**
+- 对于纯 KV 查询场景，hash map 性能优于 ART
+
+### 性能对比（TestLatencyMargin）
+
+| TPS | Before (ART) P50 | After (dense) P50 | P50变化 | Before P99 | After P99 | P99变化 |
+|-----|------------------|-------------------|---------|------------|-----------|---------|
+| 1.0M | 0.51µs | 0.50µs | -2% | 0.78µs | 0.73µs | **-6%** |
+| 2.0M | 0.51µs | 0.49µs | -4% | 0.82µs | 0.73µs | **-11%** |
+| 3.0M | 0.53µs | 0.51µs | -4% | 1.17µs | 0.99µs | **-15%** |
+| 4.0M | 0.90µs | 0.82µs | **-9%** | 1.74µs | 1.6µs | **-8%** |
+| 5.0M | 1.11µs | 1.02µs | **-8%** | 2.57µs | 2.03µs | **-21%** |
+| 6.0M | 1.56µs | 1.25µs | **-20%** | 7.2µs | 4.6µs | **-36%** |
+| 7.0M | 3.4µs | 2.02µs | **-41%** | 11.4µs | 9µs | **-21%** |
+| 8.0M | 7.9µs | 3.8µs | **-52%** | 53µs | 15.2µs | **-71%** |
+
+### 关键发现
+
+1. **低负载 (1-3M TPS)**: 小幅改善，P99 改善 6-15%
+2. **中负载 (4-5M TPS)**: 稳定改善，P99 改善 8-21%
+3. **高负载 (6-8M TPS)**: 显著改善
+   - 6M TPS: P50 快 20%，P99 快 36%
+   - 7M TPS: P50 快 41%，P99 快 21%
+   - 8M TPS: P50 快 52%，**P99 快 71%** (53µs → 15.2µs)
+
+4. **极限负载 (>9M TPS)**: 两者性能相近，表明瓶颈在其他地方（如 `priceBuckets_` 的有序结构）
+
+### 结论
+
+- ✅ 将 `orderIdIndex_` 从 ART 改为 `ankerl::unordered_dense::map` 带来了显著的延迟改善
+- ✅ 高负载时效果尤为明显（8M TPS 时 P99 延迟降低 71%）
+- ✅ 验证了对于纯 KV 查询场景，hash map 优于 ART 的架构决策
+- ⚠️ `priceBuckets_` 仍使用 ART，因为撮合逻辑需要有序遍历和范围查询
+
 ## 火焰图生成（FlameGraph）
 
 ### 编译参数（必须）
