@@ -15,6 +15,7 @@
  */
 
 #include <algorithm>
+#include <ankerl/unordered_dense.h>
 #include <benchmark/benchmark.h>
 #include <chrono>
 #include <cstdint>
@@ -29,13 +30,25 @@
 #include <mimalloc-new-delete.h>
 #endif
 #include <random>
+#include <unordered_map>
 #include <vector>
+
+// Cross-platform leading zero count
+#ifdef _MSC_VER
+#include <intrin.h>
+inline int CountLeadingZeros64(uint64_t x) {
+  unsigned long index;
+  return _BitScanReverse64(&index, x) ? (63 - static_cast<int>(index)) : 64;
+}
+#else
+inline int CountLeadingZeros64(uint64_t x) { return __builtin_clzll(x); }
+#endif
 
 using namespace exchange::core::collections::art;
 using namespace exchange::core::collections::objpool;
 
 // Default iterations for benchmarks
-constexpr int kNumIterations = 10;
+constexpr int kNumIterations = 3;
 
 // Helper class to collect key-value pairs for int64_t
 class TestConsumerInt64 : public LongObjConsumer<int64_t> {
@@ -65,7 +78,8 @@ public:
   // Step function: 1 + rand.nextInt((int) Math.min(Integer.MAX_VALUE, 1L +
   // (Long.highestOneBit(i) >> 8)))
   int StepFunction(int i) {
-    int64_t highestBit = i == 0 ? 0 : (1LL << (63 - __builtin_clzll(i)));
+    int64_t highestBit =
+        i == 0 ? 0 : (1LL << (63 - CountLeadingZeros64(static_cast<uint64_t>(i))));
     int maxStep = static_cast<int>(
         std::min(static_cast<int64_t>(INT_MAX),
                  static_cast<int64_t>(1LL + (highestBit >> 8))));
@@ -96,6 +110,8 @@ public:
     objectsPool_ = ObjectsPool::CreateDefaultTestPool();
     art_ = new LongAdaptiveRadixTreeMap<int64_t>(objectsPool_);
     bst_ = new std::map<int64_t, int64_t>();
+    dense_map_ = new ankerl::unordered_dense::map<int64_t, int64_t>();
+    unordered_map_ = new std::unordered_map<int64_t, int64_t>();
 
     // Generate test data
     DataGenerator gen(1);
@@ -118,12 +134,16 @@ public:
 
     delete art_;
     delete bst_;
+    delete dense_map_;
+    delete unordered_map_;
     delete objectsPool_;
   }
 
   ObjectsPool *objectsPool_;
   LongAdaptiveRadixTreeMap<int64_t> *art_;
   std::map<int64_t, int64_t> *bst_;
+  ankerl::unordered_dense::map<int64_t, int64_t> *dense_map_;
+  std::unordered_map<int64_t, int64_t> *unordered_map_;
   std::vector<int64_t> data_;
   std::vector<int64_t *> values_;
 };
@@ -164,6 +184,8 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Put)(benchmark::State &state) {
     // Clear
     art_->Clear();
     bst_->clear();
+    dense_map_->clear();
+    unordered_map_->clear();
 
     // Shuffle data
     std::vector<int64_t> shuffled = data_;
@@ -189,14 +211,44 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Put)(benchmark::State &state) {
         std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
             .count();
 
+    // Measure ankerl::unordered_dense
+    start = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < shuffled.size(); ++i) {
+      (*dense_map_)[shuffled[i]] = shuffled[i];
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto denseTime =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
+
+    // Measure std::unordered_map
+    start = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < shuffled.size(); ++i) {
+      (*unordered_map_)[shuffled[i]] = shuffled[i];
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto unorderedTime =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
+
     state.counters["art_ns"] =
         benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["bst_ns"] =
         benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
+    state.counters["dense_ns"] =
+        benchmark::Counter(denseTime, benchmark::Counter::kAvgIterations);
+    state.counters["unordered_ns"] =
+        benchmark::Counter(unorderedTime, benchmark::Counter::kAvgIterations);
     // improvement: kAvgIterations will divide by kNumIterations, so multiply by
     // it to compensate
-    state.counters["improvement"] = benchmark::Counter(
+    state.counters["improvement_vs_bst"] = benchmark::Counter(
         PercentImprovement(bstTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
+    state.counters["improvement_vs_dense"] = benchmark::Counter(
+        PercentImprovement(denseTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
+    state.counters["improvement_vs_unordered"] = benchmark::Counter(
+        PercentImprovement(unorderedTime, artTime) * kNumIterations,
         benchmark::Counter::kAvgIterations);
   }
 }
@@ -208,6 +260,8 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, GetHit)(benchmark::State &state) {
   for (size_t i = 0; i < data_.size(); ++i) {
     art_->Put(data_[i], values_[i]);
     (*bst_)[data_[i]] = data_[i];
+    (*dense_map_)[data_[i]] = data_[i];
+    (*unordered_map_)[data_[i]] = data_[i];
   }
 
   std::mt19937 rng(1);
@@ -243,22 +297,172 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, GetHit)(benchmark::State &state) {
         std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
             .count();
 
+    // Measure ankerl::unordered_dense
+    int64_t denseSum = 0;
+    start = std::chrono::high_resolution_clock::now();
+    for (int64_t key : shuffled) {
+      auto it = dense_map_->find(key);
+      if (it != dense_map_->end())
+        denseSum += it->second;
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto denseTime =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
+
+    // Measure std::unordered_map
+    int64_t unorderedSum = 0;
+    start = std::chrono::high_resolution_clock::now();
+    for (int64_t key : shuffled) {
+      auto it = unordered_map_->find(key);
+      if (it != unordered_map_->end())
+        unorderedSum += it->second;
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto unorderedTime =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
+
     state.counters["art_ns"] =
         benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["bst_ns"] =
         benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
+    state.counters["dense_ns"] =
+        benchmark::Counter(denseTime, benchmark::Counter::kAvgIterations);
+    state.counters["unordered_ns"] =
+        benchmark::Counter(unorderedTime, benchmark::Counter::kAvgIterations);
     // improvement: kAvgIterations will divide by kNumIterations, so multiply by
     // it to compensate
-    state.counters["improvement"] = benchmark::Counter(
+    state.counters["improvement_vs_bst"] = benchmark::Counter(
         PercentImprovement(bstTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
+    state.counters["improvement_vs_dense"] = benchmark::Counter(
+        PercentImprovement(denseTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
+    state.counters["improvement_vs_unordered"] = benchmark::Counter(
+        PercentImprovement(unorderedTime, artTime) * kNumIterations,
         benchmark::Counter::kAvgIterations);
     state.counters["art_sum"] =
         benchmark::Counter(artSum, benchmark::Counter::kAvgIterations);
     state.counters["bst_sum"] =
         benchmark::Counter(bstSum, benchmark::Counter::kAvgIterations);
+    state.counters["dense_sum"] =
+        benchmark::Counter(denseSum, benchmark::Counter::kAvgIterations);
+    state.counters["unordered_sum"] =
+        benchmark::Counter(unorderedSum, benchmark::Counter::kAvgIterations);
   }
 }
 BENCHMARK_REGISTER_F(ArtTreeBenchmark, GetHit)->Iterations(kNumIterations);
+
+// Benchmark: GET_MISS (query non-existent keys)
+// This tests the performance of failed lookups, which is important for
+// evaluating early termination and boundary handling in tree structures.
+BENCHMARK_DEFINE_F(ArtTreeBenchmark, GetMiss)(benchmark::State &state) {
+  // Pre-populate with existing data
+  for (size_t i = 0; i < data_.size(); ++i) {
+    art_->Put(data_[i], values_[i]);
+    (*bst_)[data_[i]] = data_[i];
+    (*dense_map_)[data_[i]] = data_[i];
+    (*unordered_map_)[data_[i]] = data_[i];
+  }
+
+  // Generate non-existent keys by adding a large offset to existing keys
+  // This ensures keys that definitely don't exist in the containers
+  std::vector<int64_t> missKeys;
+  missKeys.reserve(data_.size());
+  constexpr int64_t kMissOffset = 1'000'000'000'000LL; // 1 trillion offset
+  for (int64_t key : data_) {
+    missKeys.push_back(key + kMissOffset);
+  }
+
+  std::mt19937 rng(1);
+
+  for (auto _ : state) {
+    // Shuffle miss keys
+    std::vector<int64_t> shuffled = missKeys;
+    std::shuffle(shuffled.begin(), shuffled.end(), rng);
+
+    // Measure ART
+    int64_t artMissCount = 0;
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int64_t key : shuffled) {
+      int64_t *v = art_->Get(key);
+      if (!v)
+        artMissCount++;
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    auto artTime =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
+
+    // Measure BST
+    int64_t bstMissCount = 0;
+    start = std::chrono::high_resolution_clock::now();
+    for (int64_t key : shuffled) {
+      auto it = bst_->find(key);
+      if (it == bst_->end())
+        bstMissCount++;
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto bstTime =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
+
+    // Measure ankerl::unordered_dense
+    int64_t denseMissCount = 0;
+    start = std::chrono::high_resolution_clock::now();
+    for (int64_t key : shuffled) {
+      auto it = dense_map_->find(key);
+      if (it == dense_map_->end())
+        denseMissCount++;
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto denseTime =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
+
+    // Measure std::unordered_map
+    int64_t unorderedMissCount = 0;
+    start = std::chrono::high_resolution_clock::now();
+    for (int64_t key : shuffled) {
+      auto it = unordered_map_->find(key);
+      if (it == unordered_map_->end())
+        unorderedMissCount++;
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto unorderedTime =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
+
+    state.counters["art_ns"] =
+        benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
+    state.counters["bst_ns"] =
+        benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
+    state.counters["dense_ns"] =
+        benchmark::Counter(denseTime, benchmark::Counter::kAvgIterations);
+    state.counters["unordered_ns"] =
+        benchmark::Counter(unorderedTime, benchmark::Counter::kAvgIterations);
+    state.counters["improvement_vs_bst"] = benchmark::Counter(
+        PercentImprovement(bstTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
+    state.counters["improvement_vs_dense"] = benchmark::Counter(
+        PercentImprovement(denseTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
+    state.counters["improvement_vs_unordered"] = benchmark::Counter(
+        PercentImprovement(unorderedTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
+    // Verify all queries missed (should equal data size)
+    state.counters["art_miss"] =
+        benchmark::Counter(artMissCount, benchmark::Counter::kAvgIterations);
+    state.counters["bst_miss"] =
+        benchmark::Counter(bstMissCount, benchmark::Counter::kAvgIterations);
+    state.counters["dense_miss"] =
+        benchmark::Counter(denseMissCount, benchmark::Counter::kAvgIterations);
+    state.counters["unordered_miss"] = benchmark::Counter(
+        unorderedMissCount, benchmark::Counter::kAvgIterations);
+  }
+}
+BENCHMARK_REGISTER_F(ArtTreeBenchmark, GetMiss)->Iterations(kNumIterations);
 
 // Benchmark: REMOVE
 BENCHMARK_DEFINE_F(ArtTreeBenchmark, Remove)(benchmark::State &state) {
@@ -268,9 +472,13 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Remove)(benchmark::State &state) {
     // Pre-populate
     art_->Clear();
     bst_->clear();
+    dense_map_->clear();
+    unordered_map_->clear();
     for (size_t i = 0; i < data_.size(); ++i) {
       art_->Put(data_[i], values_[i]);
       (*bst_)[data_[i]] = data_[i];
+      (*dense_map_)[data_[i]] = data_[i];
+      (*unordered_map_)[data_[i]] = data_[i];
     }
 
     // Shuffle data
@@ -297,14 +505,44 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Remove)(benchmark::State &state) {
         std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
             .count();
 
+    // Measure ankerl::unordered_dense
+    start = std::chrono::high_resolution_clock::now();
+    for (int64_t key : shuffled) {
+      dense_map_->erase(key);
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto denseTime =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
+
+    // Measure std::unordered_map
+    start = std::chrono::high_resolution_clock::now();
+    for (int64_t key : shuffled) {
+      unordered_map_->erase(key);
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto unorderedTime =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
+
     state.counters["art_ns"] =
         benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["bst_ns"] =
         benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
+    state.counters["dense_ns"] =
+        benchmark::Counter(denseTime, benchmark::Counter::kAvgIterations);
+    state.counters["unordered_ns"] =
+        benchmark::Counter(unorderedTime, benchmark::Counter::kAvgIterations);
     // improvement: kAvgIterations will divide by kNumIterations, so multiply by
     // it to compensate
-    state.counters["improvement"] = benchmark::Counter(
+    state.counters["improvement_vs_bst"] = benchmark::Counter(
         PercentImprovement(bstTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
+    state.counters["improvement_vs_dense"] = benchmark::Counter(
+        PercentImprovement(denseTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
+    state.counters["improvement_vs_unordered"] = benchmark::Counter(
+        PercentImprovement(unorderedTime, artTime) * kNumIterations,
         benchmark::Counter::kAvgIterations);
   }
 }
@@ -318,6 +556,8 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, ForEach)(benchmark::State &state) {
   for (size_t i = 0; i < data_.size(); ++i) {
     art_->Put(data_[i], values_[i]);
     (*bst_)[data_[i]] = data_[i];
+    (*dense_map_)[data_[i]] = data_[i];
+    (*unordered_map_)[data_[i]] = data_[i];
   }
 
   for (auto _ : state) {
@@ -349,19 +589,71 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, ForEach)(benchmark::State &state) {
         std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
             .count();
 
+    // Measure ankerl::unordered_dense (unordered iteration)
+    std::vector<int64_t> denseKeys;
+    std::vector<int64_t> denseValues;
+    denseKeys.reserve(forEachSize);
+    denseValues.reserve(forEachSize);
+    start = std::chrono::high_resolution_clock::now();
+    count = 0;
+    for (const auto &pair : *dense_map_) {
+      if (count >= forEachSize)
+        break;
+      denseKeys.push_back(pair.first);
+      denseValues.push_back(pair.second);
+      count++;
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto denseTime =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
+
+    // Measure std::unordered_map (unordered iteration)
+    std::vector<int64_t> unorderedKeys;
+    std::vector<int64_t> unorderedValues;
+    unorderedKeys.reserve(forEachSize);
+    unorderedValues.reserve(forEachSize);
+    start = std::chrono::high_resolution_clock::now();
+    count = 0;
+    for (const auto &pair : *unordered_map_) {
+      if (count >= forEachSize)
+        break;
+      unorderedKeys.push_back(pair.first);
+      unorderedValues.push_back(pair.second);
+      count++;
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto unorderedTime =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
+
     state.counters["art_ns"] =
         benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["bst_ns"] =
         benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
+    state.counters["dense_ns"] =
+        benchmark::Counter(denseTime, benchmark::Counter::kAvgIterations);
+    state.counters["unordered_ns"] =
+        benchmark::Counter(unorderedTime, benchmark::Counter::kAvgIterations);
     // improvement: kAvgIterations will divide by kNumIterations, so multiply by
     // it to compensate
-    state.counters["improvement"] = benchmark::Counter(
+    state.counters["improvement_vs_bst"] = benchmark::Counter(
         PercentImprovement(bstTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
+    state.counters["improvement_vs_dense"] = benchmark::Counter(
+        PercentImprovement(denseTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
+    state.counters["improvement_vs_unordered"] = benchmark::Counter(
+        PercentImprovement(unorderedTime, artTime) * kNumIterations,
         benchmark::Counter::kAvgIterations);
     state.counters["art_count"] = benchmark::Counter(
         artConsumer.keys.size(), benchmark::Counter::kAvgIterations);
     state.counters["bst_count"] =
         benchmark::Counter(bstKeys.size(), benchmark::Counter::kAvgIterations);
+    state.counters["dense_count"] =
+        benchmark::Counter(denseKeys.size(), benchmark::Counter::kAvgIterations);
+    state.counters["unordered_count"] =
+        benchmark::Counter(unorderedKeys.size(), benchmark::Counter::kAvgIterations);
   }
 }
 BENCHMARK_REGISTER_F(ArtTreeBenchmark, ForEach)->Iterations(kNumIterations);
@@ -374,6 +666,8 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, ForEachDesc)(benchmark::State &state) {
   for (size_t i = 0; i < data_.size(); ++i) {
     art_->Put(data_[i], values_[i]);
     (*bst_)[data_[i]] = data_[i];
+    (*dense_map_)[data_[i]] = data_[i];
+    (*unordered_map_)[data_[i]] = data_[i];
   }
 
   for (auto _ : state) {
@@ -404,22 +698,76 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, ForEachDesc)(benchmark::State &state) {
         std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
             .count();
 
+    // Note: Hash maps don't support ordered descending iteration
+    // We'll still measure unordered iteration for comparison
+    std::vector<int64_t> denseKeys;
+    std::vector<int64_t> denseValues;
+    denseKeys.reserve(forEachSize);
+    denseValues.reserve(forEachSize);
+    start = std::chrono::high_resolution_clock::now();
+    count = 0;
+    for (const auto &pair : *dense_map_) {
+      if (count >= forEachSize)
+        break;
+      denseKeys.push_back(pair.first);
+      denseValues.push_back(pair.second);
+      count++;
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto denseTime =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
+
+    std::vector<int64_t> unorderedKeys;
+    std::vector<int64_t> unorderedValues;
+    unorderedKeys.reserve(forEachSize);
+    unorderedValues.reserve(forEachSize);
+    start = std::chrono::high_resolution_clock::now();
+    count = 0;
+    for (const auto &pair : *unordered_map_) {
+      if (count >= forEachSize)
+        break;
+      unorderedKeys.push_back(pair.first);
+      unorderedValues.push_back(pair.second);
+      count++;
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto unorderedTime =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+            .count();
+
     state.counters["art_ns"] =
         benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["bst_ns"] =
         benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
+    state.counters["dense_ns"] =
+        benchmark::Counter(denseTime, benchmark::Counter::kAvgIterations);
+    state.counters["unordered_ns"] =
+        benchmark::Counter(unorderedTime, benchmark::Counter::kAvgIterations);
     // improvement: kAvgIterations will divide by kNumIterations, so multiply by
     // it to compensate
-    state.counters["improvement"] = benchmark::Counter(
+    state.counters["improvement_vs_bst"] = benchmark::Counter(
         PercentImprovement(bstTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
+    state.counters["improvement_vs_dense"] = benchmark::Counter(
+        PercentImprovement(denseTime, artTime) * kNumIterations,
+        benchmark::Counter::kAvgIterations);
+    state.counters["improvement_vs_unordered"] = benchmark::Counter(
+        PercentImprovement(unorderedTime, artTime) * kNumIterations,
         benchmark::Counter::kAvgIterations);
   }
 }
 BENCHMARK_REGISTER_F(ArtTreeBenchmark, ForEachDesc)->Iterations(kNumIterations);
 
-// Benchmark: HIGHER
+// Benchmark: HIGHER (upper_bound - find first key strictly greater than given)
+// NOTE: Hash maps (unordered_map, unordered_dense) are NOT included in this
+// benchmark because they do not support ordered operations. Hash tables have
+// O(n) complexity for finding the next greater key (would require sorting all
+// keys first), whereas ordered structures like ART and std::map provide O(log n)
+// or better performance. This is a key advantage of ordered containers for
+// use cases like order books where range queries are common.
 BENCHMARK_DEFINE_F(ArtTreeBenchmark, Higher)(benchmark::State &state) {
-  // Pre-populate
+  // Pre-populate (only ART and BST, hash maps don't support this operation)
   for (size_t i = 0; i < data_.size(); ++i) {
     art_->Put(data_[i], values_[i]);
     (*bst_)[data_[i]] = data_[i];
@@ -475,9 +823,14 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Higher)(benchmark::State &state) {
 }
 BENCHMARK_REGISTER_F(ArtTreeBenchmark, Higher)->Iterations(kNumIterations);
 
-// Benchmark: LOWER
+// Benchmark: LOWER (find first key strictly less than given)
+// NOTE: Hash maps (unordered_map, unordered_dense) are NOT included in this
+// benchmark because they do not support ordered operations. Finding the
+// previous smaller key in a hash table requires O(n) traversal, making it
+// impractical for performance-critical applications. Ordered structures like
+// ART and std::map maintain key ordering, enabling efficient O(log n) lookups.
 BENCHMARK_DEFINE_F(ArtTreeBenchmark, Lower)(benchmark::State &state) {
-  // Pre-populate
+  // Pre-populate (only ART and BST, hash maps don't support this operation)
   for (size_t i = 0; i < data_.size(); ++i) {
     art_->Put(data_[i], values_[i]);
     (*bst_)[data_[i]] = data_[i];
