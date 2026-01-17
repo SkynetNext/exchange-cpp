@@ -15,6 +15,7 @@
  */
 
 #include <algorithm>
+#include <cassert>
 #include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <unordered_map>
 
@@ -105,6 +106,12 @@ ObjectsPool::ArrayStack::ArrayStack(int fixedSize)
 ObjectsPool::ArrayStack::~ArrayStack() { delete[] objects_; }
 
 void ObjectsPool::ArrayStack::Add(void *element) {
+#ifndef NDEBUG
+  // 调试模式下断言，帮助发现池容量不足的问题
+  if (count_ == capacity_) {
+    assert(false && "ObjectsPool: Pool is full, consider increasing capacity!");
+  }
+#endif
   if (count_ != capacity_) {
     objects_[count_] = element;
     count_++;
