@@ -38,6 +38,69 @@
 
 ---
 
+## Aeron Cluster 状态复制
+
+### Follower 工作机制
+
+Follower 采用 **状态机复制**，不只是存储日志，而是实时执行：
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  启动恢复阶段                                                        │
+│                                                                      │
+│  1. 加载 Snapshot（最新快照）                                        │
+│     → onStart(cluster, snapshotImage)                               │
+│     → loadSnapshot() 恢复订单簿状态                                  │
+│                                                                      │
+│  2. Replay 日志（从 snapshot 位置到日志末尾）                        │
+│     → FOLLOWER_REPLAY 状态                                          │
+│     → 逐条执行 onSessionMessage()，重建完整状态                      │
+│                                                                      │
+│  3. Catchup（如果落后于 Leader）                                    │
+│     → 从 Leader 拉取缺失日志并执行                                   │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  运行时同步阶段                                                      │
+│                                                                      │
+│  Leader 接收订单 → 写入日志 → 复制到 Follower                        │
+│                                    │                                │
+│                                    ▼                                │
+│  Follower 接收日志 → BoundedLogAdapter → onSessionMessage()         │
+│                                    │                                │
+│                                    ▼                                │
+│  立即执行撮合逻辑（与 Leader 相同）                                   │
+│                                    │                                │
+│                                    ▼                                │
+│  订单簿状态与 Leader 保持同步                                        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 关键代码路径
+
+```java
+// Follower 读取日志时（BoundedLogAdapter.java）
+agent.onSessionMessage(position, sessionId, timestamp, buffer, offset, length, header);
+
+// 转发到业务服务（ClusteredServiceAgent.java）
+service.onSessionMessage(clientSession, timestamp, buffer, offset, length, header);
+
+// 业务服务执行（如撮合引擎）
+matchingEngine.processOrder(order);  // Leader 和 Follower 执行相同逻辑
+```
+
+### 对撮合系统的意义
+
+| 特性 | 说明 |
+|------|------|
+| **热备状态** | Follower 订单簿与 Leader 同步，可立即接管 |
+| **快速切换** | 无需重建状态，故障切换 < 500ms |
+| **确定性** | Leader/Follower 执行相同逻辑，结果一致 |
+| **Snapshot 加速** | 定期快照减少启动时日志回放量 |
+
+---
+
 ## 核心设计原则
 
 | 原则 | 说明 |
