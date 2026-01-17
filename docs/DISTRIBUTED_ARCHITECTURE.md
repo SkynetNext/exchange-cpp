@@ -7,7 +7,7 @@
 │                              Client                                      │
 │   • 查询 Coordinator 获取分区映射（币对 → 集群节点列表）                  │
 │   • 连接任意节点，Follower 返回 REDIRECT 指向 Leader                     │
-│   • Leader 变更时收到 NewLeaderEvent，自动切换                           │
+│   • Leader 变更时通过 REDIRECT 发现新 Leader                             │
 └───────────┬─────────────────────────────────────────────────────────────┘
             │ ① 查询分区映射                   ② 订单请求
             ▼                                  │
@@ -27,14 +27,14 @@
 │  │  Gateway + 撮合      │      │  Gateway + 撮合      │                   │
 │  │  (Leader)           │◄────►│  (Follower)         │                   │
 │  │  • 处理订单          │ Raft │  • 返回 REDIRECT     │                   │
-│  │  • 推送 NewLeaderEvent│     │  • 实时复制          │                   │
+│  │  • 复制日志          │      │  • 实时执行日志       │                   │
 │  └─────────────────────┘      └─────────────────────┘                   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 **职责分离**：
 - **Coordinator**：分区映射（币对/交易类型 → 集群），避免盲目 REDIRECT
-- **集群自身**：Leader 发现和切换（REDIRECT + NewLeaderEvent）
+- **集群自身**：Leader 发现（REDIRECT）、状态复制（Raft 日志）
 
 ---
 
@@ -115,17 +115,22 @@ matchingEngine.processOrder(order);  // Leader 和 Follower 执行相同逻辑
 
 ## Leader 变更感知
 
-### 正常切换（NewLeaderEvent 推送）
-
-```
-旧 Leader 宕机 → Raft 选举 → 新 Leader 推送 NewLeaderEvent → Client 切换
-```
-
-### 异常切换（被动发现）
+### 核心机制：REDIRECT（被动发现）
 
 ```
 Client → 旧 Leader（已宕机）→ 连接失败 → 重连任意节点 → REDIRECT → 新 Leader
 ```
+
+这是故障切换的核心路径，适用于所有场景。
+
+### 可选优化：NewLeaderEvent（主动推送）
+
+```
+Graceful 让位 → Raft 选举 → 新 Leader 推送 NewLeaderEvent → Client 切换
+```
+
+**注意**：NewLeaderEvent 仅在 Graceful 让位（旧 Leader 主动下线）时有效。
+Leader 宕机时连接已断，无法推送。
 
 ---
 
