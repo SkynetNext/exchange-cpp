@@ -2,7 +2,7 @@
 
 A high-performance, low-latency cryptocurrency exchange matching engine written in C++, 1:1 ported from [exchange-core](https://github.com/exchange-core/exchange-core).
 
-**Key Performance**: P50: 0.51µs, P99: 0.77µs @ 1M TPS | Up to 8.9M TPS | P90/P99 latency 1.09x-6.10x better than Java
+**Key Performance**: P50: 0.50µs, P99: 0.73µs @ 1M TPS | Up to 9M TPS | P99 latency 2.5x-6.4x better than Java
 
 ## Performance
 
@@ -18,21 +18,19 @@ Our test configuration matches the original Java `exchange-core` reference imple
 
 **Key Performance Highlights**:
 
-While both implementations achieve similar P50 (median) latency, the C++ version shows **significantly better P90/P99 tail latency**, especially at higher throughput:
+| Metric | C++ | Java | Winner |
+|--------|-----|------|--------|
+| **Max Stable TPS** | 9M TPS | 6M TPS | ✅ C++ (1.50x) |
+| **P50 @ 1M TPS** | 0.50µs | 0.51µs | ✅ C++ (1.02x) |
+| **P99 @ 1M TPS** | 0.73µs | 4.7µs | ✅ C++ (6.4x) |
+| **P50 @ 4M TPS** | 0.82µs | 0.6µs | ✅ Java (1.37x) |
+| **P99 @ 4M TPS** | 1.6µs | 8.0µs | ✅ C++ (5.0x) |
+| **P50 @ 6M TPS** | 1.25µs | 1.37µs | ✅ C++ (1.10x) |
+| **P99 @ 6M TPS** | 4.6µs | 11.5µs | ✅ C++ (2.50x) |
+| **P50 @ 8M TPS** | 3.8µs | N/A | ✅ C++ |
+| **P99 @ 8M TPS** | 15.2µs | N/A | ✅ C++ |
 
-| TPS | Metric | C++ | Java | Improvement |
-|-----|--------|-----|------|-------------|
-| 1M | P50 | 0.51µs | 0.51µs | Tie |
-| | P90 | 0.58µs | 0.63µs | **1.09x better** |
-| | P99 | 0.77µs | 4.7µs | **6.10x better** |
-| 4M | P50 | 0.92µs | 0.6µs | 1.53x worse |
-| | P90 | 1.18µs | 3.5µs | **2.97x better** |
-| | P99 | 1.84µs | 8.0µs | **4.35x better** |
-| 6M | P50 | 1.66µs | 1.37µs | 1.21x worse |
-| | P90 | 2.38µs | 6.9µs | **2.90x better** |
-| | P99 | 7.2µs | 11.5µs | **1.60x better** |
-
-**Summary**: The Java version shows slightly better P50 latency at high TPS (4M+), but C++ maintains **superior P90/P99 performance across all throughput levels** (1.09x-6.10x better). C++ also achieves **48% higher maximum stable throughput** (8.9M vs 6M TPS).
+**Summary**: C++ shows dramatically better P99 latency (tail latency) across all TPS rates, with improvements of 2.5-6.4x. After optimizing `orderIdIndex_` from ART to `ankerl::unordered_dense::map` (2026-01-16), C++ now achieves better P50 at 6M TPS and maintains stable performance up to 9M TPS. Maximum stable throughput improved from 8M to 9M TPS.
 
 For detailed performance data, see [PERFORMANCE_BENCHMARK_COMPARISON.md](docs/PERFORMANCE_BENCHMARK_COMPARISON.md) and [LOW_LATENCY_CORE.md](docs/LOW_LATENCY_CORE.md).
 
