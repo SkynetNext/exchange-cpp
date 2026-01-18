@@ -37,3 +37,6 @@
 [submodule "reference/exchange-cluster"]
 	path = reference/exchange-cluster
 	url = https://github.com/exchange-core/exchange-cluster.git
+[submodule "reference/low-latency-handbook"]
+	path = reference/low-latency-handbook
+	url = https://github.com/SkynetNext/low-latency-handbook.git
