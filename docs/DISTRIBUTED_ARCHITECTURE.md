@@ -150,6 +150,31 @@ matchingEngine.processOrder(order);  // Leader 和 Follower 执行相同逻辑
 
 ---
 
+## 行情推送
+
+### 数据流
+
+```
+撮合引擎 ──► EventsRouter ──► WebSocket/TCP ──► 订阅者
+                │
+                └──► REST（按需查询）
+```
+
+### 推送方式
+
+| 协议 | 延迟 | 说明 |
+|------|------|------|
+| **WebSocket / TCP** | ~1-10ms | 长连接，主动推送 |
+| **REST** | 按需 | Pull 模式，低频查询 |
+
+### 实现方式
+
+- **订阅**：用户打开页面时订阅 `/topic/market/trade/{symbol}`
+- **推送**：撮合批次完成后，遍历订阅者发送
+- **简单直接**：无 Kafka 等中间件
+
+---
+
 ## 核心设计原则
 
 | 原则 | 说明 |
@@ -160,7 +185,7 @@ matchingEngine.processOrder(order);  // Leader 和 Follower 执行相同逻辑
 | **Raft 共识** | 强一致性，自动选主 |
 | **热备秒切** | 故障切换 < 1秒 |
 | **Token 本地验签** | 无 Session 同步，完全解耦 |
-| **账户 LRU 缓存** | 热点用户纳秒级访问 |
+| **WebSocket 推送** | 订阅模式，撮合后直接推送 |
 
 ---
 
