@@ -101,6 +101,55 @@ matchingEngine.processOrder(order);  // Leader 和 Follower 执行相同逻辑
 
 ---
 
+## 登录认证
+
+### 双 Token 机制（Access + Refresh）
+
+```
+┌─────────┐                              ┌──────────────┐
+│ Client  │                              │ Auth Service │
+└────┬────┘                              └──────┬───────┘
+     │                                          │
+     │◄── 1. Login: Access Token (15min) ───────│
+     │             + Refresh Token (7d)         │
+     │                                          │
+     │  2. 直连撮合 Gateway（带 Access Token）   │
+     ▼                                          │
+┌─────────────────────────────────────┐         │
+│  撮合集群（Gateway + 撮合）          │         │
+│                                     │         │
+│  本地验签（Ed25519），~100ns        │         │
+│  • 启动时加载公钥                    │         │
+│  • 无需查外部服务                    │         │
+└─────────────────────────────────────┘         │
+     │                                          │
+     │  3. Access Token 过期                    │
+     │                                          │
+     │── 4. Refresh Token ─────────────────────►│
+     │                                          │
+     │◄── 5. 新 Access Token ───────────────────│
+```
+
+### Token 设计
+
+| Token | 有效期 | 用途 |
+|-------|--------|------|
+| **Access Token** | 15-30 min | 每次请求携带，撮合集群本地验签 |
+| **Refresh Token** | 7-30 d | 仅用于换取新 Access Token，不发给撮合集群 |
+
+**Access Token Payload**:
+```
+{ uid, perms, exp, jti, signature }
+```
+
+### 吊销机制
+
+- Auth Service 维护 Revoke List（仅被吊销的 `jti`）
+- 定期推送到撮合集群（增量，通常 < 1000 条）
+- Access Token 短期有效，即使泄露影响有限
+
+---
+
 ## 核心设计原则
 
 | 原则 | 说明 |
@@ -110,6 +159,8 @@ matchingEngine.processOrder(order);  // Leader 和 Follower 执行相同逻辑
 | **Gateway 同机** | 省一跳网络 |
 | **Raft 共识** | 强一致性，自动选主 |
 | **热备秒切** | 故障切换 < 1秒 |
+| **Token 本地验签** | 无 Session 同步，完全解耦 |
+| **账户 LRU 缓存** | 热点用户纳秒级访问 |
 
 ---
 
