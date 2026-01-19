@@ -101,52 +101,66 @@ matchingEngine.processOrder(order);  // Leader 和 Follower 执行相同逻辑
 
 ---
 
-## 登录认证
+## API 认证
 
-### 双 Token 机制（Access + Refresh）
+### HMAC-SHA256 签名（业界标准）
+
+Binance、Coinbase、OKX 等主流交易所均采用 HMAC-SHA256，延迟 ~1μs，支持每次请求验签。
 
 ```
 ┌─────────┐                              ┌──────────────┐
 │ Client  │                              │ Auth Service │
 └────┬────┘                              └──────┬───────┘
      │                                          │
-     │◄── 1. Login: Access Token (15min) ───────│
-     │             + Refresh Token (7d)         │
+     │◄── 1. 注册/登录: API Key + Secret ───────│
      │                                          │
-     │  2. 直连撮合 Gateway（带 Access Token）   │
+     │  2. 每次请求签名                          │
+     │  signature = HMAC(secret, payload)       │
      ▼                                          │
 ┌─────────────────────────────────────┐         │
 │  撮合集群（Gateway + 撮合）          │         │
 │                                     │         │
-│  本地验签（Ed25519），~100ns        │         │
-│  • 启动时加载公钥                    │         │
-│  • 无需查外部服务                    │         │
+│  HMAC 验签 ~1μs                     │         │
+│  • 内存存储 apiKey → secret 映射    │         │
+│  • 每次请求验签，性能可接受          │         │
 └─────────────────────────────────────┘         │
-     │                                          │
-     │  3. Access Token 过期                    │
-     │                                          │
-     │── 4. Refresh Token ─────────────────────►│
-     │                                          │
-     │◄── 5. 新 Access Token ───────────────────│
 ```
 
-### Token 设计
+### 请求签名示例（Binance 风格）
 
-| Token | 有效期 | 用途 |
-|-------|--------|------|
-| **Access Token** | 15-30 min | 每次请求携带，撮合集群本地验签 |
-| **Refresh Token** | 7-30 d | 仅用于换取新 Access Token，不发给撮合集群 |
+```cpp
+// Client 端
+string payload = "symbol=BTCUSDT&side=BUY&timestamp=1737200000";
+string signature = hmac_sha256(api_secret, payload);
+// 发送: payload + "&signature=" + signature + "&apiKey=" + api_key
 
-**Access Token Payload**:
+// Gateway 端验签
+string stored_secret = secrets[api_key];
+string expected = hmac_sha256(stored_secret, payload);
+if (signature == expected) { /* 通过 */ }
 ```
-{ uid, perms, exp, jti, signature }
-```
 
-### 吊销机制
+### 验签性能对比
 
-- Auth Service 维护 Revoke List（仅被吊销的 `jti`）
-- 定期推送到撮合集群（增量，通常 < 1000 条）
-- Access Token 短期有效，即使泄露影响有限
+| 算法 | 延迟 | 适用场景 |
+|------|------|----------|
+| **HMAC-SHA256** | ~1μs | API 请求签名（每次验签） |
+| **Ed25519** | ~28μs | Token 签发（一次性） |
+
+数据来源：[lib25519 speed benchmark](https://lib25519.cr.yp.to/speed.html)
+
+### 密钥管理
+
+| 密钥 | 存储位置 | 说明 |
+|------|----------|------|
+| **API Key** | Client + Gateway | 公开标识符 |
+| **API Secret** | Client + Gateway | 共享密钥，用于签名/验签 |
+
+### 安全机制
+
+- **时间戳**：请求携带 timestamp，Gateway 拒绝过期请求（±5s）
+- **Nonce**：可选，防重放攻击
+- **IP 白名单**：可选，限制 API Key 使用范围
 
 ---
 
