@@ -101,66 +101,74 @@ matchingEngine.processOrder(order);  // Leader 和 Follower 执行相同逻辑
 
 ---
 
-## API 认证
-
-### HMAC-SHA256 签名（业界标准）
-
-Binance、Coinbase、OKX 等主流交易所均采用 HMAC-SHA256，延迟 ~1μs，支持每次请求验签。
+## 用户认证（Token 缓存模式）
 
 ```
-┌─────────┐                              ┌──────────────┐
-│ Client  │                              │ Auth Service │
-└────┬────┘                              └──────┬───────┘
-     │                                          │
-     │◄── 1. 注册/登录: API Key + Secret ───────│
-     │                                          │
-     │  2. 每次请求签名                          │
-     │  signature = HMAC(secret, payload)       │
-     ▼                                          │
-┌─────────────────────────────────────┐         │
-│  撮合集群（Gateway + 撮合）          │         │
-│                                     │         │
-│  HMAC 验签 ~1μs                     │         │
-│  • 内存存储 apiKey → secret 映射    │         │
-│  • 每次请求验签，性能可接受          │         │
-└─────────────────────────────────────┘         │
+┌─────────┐  账号 + 密码 + 2FA      ┌──────────────┐
+│ Client  │────────────────────────►│ Auth Service │
+└────┬────┘                         └──────┬───────┘
+     │                                     │
+     │◄─── Access Token + Refresh Token ───┤
+     │                                     │
+     │                               写入 Redis
+     │                               token → {uid, perms, exp}
+     │
+     │  Authorization: Bearer {token}
+     ▼
+┌─────────────────────────────────────────────────┐
+│  撮合 Gateway                                    │
+│                                                 │
+│  ┌─────────────────┐      ┌─────────────────┐  │
+│  │ 本地 LRU 缓存    │ 未命中│     Redis       │  │
+│  │ token → uid     │─────►│ token → {uid,   │  │
+│  │ TTL: 10s        │◄─────│   perms, exp}   │  │
+│  └─────────────────┘ 回填  └─────────────────┘  │
+│                                                 │
+└─────────────────────────────────────────────────┘
+     │
+     ▼
+┌───────────────┐
+│ Matching      │
+│ Engine        │
+└───────────────┘
 ```
 
-### 请求签名示例（Binance 风格）
+### 流程说明
 
-```cpp
-// Client 端
-string payload = "symbol=BTCUSDT&side=BUY&timestamp=1737200000";
-string signature = hmac_sha256(api_secret, payload);
-// 发送: payload + "&signature=" + signature + "&apiKey=" + api_key
+1. **登录**：用户通过 Auth Service 认证，获得 Token
+2. **写 Redis**：Auth Service 将 token → {uid, perms, exp} 写入 Redis
+3. **请求**：Client 携带 `Authorization: Bearer {token}`
+4. **Gateway 验证**：
+   - 先查本地 LRU 缓存（~100ns）
+   - 未命中 → 直连 Redis 查询（~100μs）
+   - 回填本地缓存（TTL 较短，如 10s）
+5. **续期**：Token 过期前用 Refresh Token 换新
 
-// Gateway 端验签
-string stored_secret = secrets[api_key];
-string expected = hmac_sha256(stored_secret, payload);
-if (signature == expected) { /* 通过 */ }
-```
+### 认证延迟
 
-### 验签性能对比
+| 操作 | 延迟 |
+|------|------|
+| **本地 LRU 命中** | ~100ns |
+| **Redis 查询** | ~100μs-1ms |
 
-| 算法 | 延迟 | 适用场景 |
-|------|------|----------|
-| **HMAC-SHA256** | ~1μs | API 请求签名（每次验签） |
-| **Ed25519** | ~28μs | Token 签发（一次性） |
+### 设计要点
 
-数据来源：[lib25519 speed benchmark](https://lib25519.cr.yp.to/speed.html)
-
-### 密钥管理
-
-| 密钥 | 存储位置 | 说明 |
-|------|----------|------|
-| **API Key** | Client + Gateway | 公开标识符 |
-| **API Secret** | Client + Gateway | 共享密钥，用于签名/验签 |
+| 要点 | 说明 |
+|------|------|
+| **Gateway 直连 Redis** | 无需经过 Auth Service，延迟最低 |
+| **本地 LRU 缓存** | 热点用户命中率高，减少 Redis 压力 |
+| **短 TTL（10s）** | 平衡性能与撤销时效 |
+| **Redis 集群** | 水平扩展，高可用 |
 
 ### 安全机制
 
-- **时间戳**：请求携带 timestamp，Gateway 拒绝过期请求（±5s）
-- **Nonce**：可选，防重放攻击
-- **IP 白名单**：可选，限制 API Key 使用范围
+| 机制 | 说明 |
+|------|------|
+| **2FA** | 登录时强制验证 |
+| **Token 短期有效** | Access Token 15-30 分钟过期 |
+| **即时撤销** | 登出/改密时删除 Redis，最多 10s 延迟 |
+| **Refresh Token** | 长期有效，用于续期 |
+| **权限分离** | READ / TRADE / WITHDRAW |
 
 ---
 
