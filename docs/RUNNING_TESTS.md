@@ -6,7 +6,7 @@
 # 在项目根目录
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
-cmake --build .
+cmake --build . -j$(nproc)
 ```
 
 ## 运行测试的方法
@@ -162,7 +162,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON \
   -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" \
   -DCMAKE_C_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" \
   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
-cmake --build .
+cmake --build . -j$(nproc)
 
 # 运行测试（ASAN会自动检测内存错误）
 ./tests/test_integration_multi_operation --gtest_filter=ITMultiOperation.*
@@ -178,7 +178,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON \
   -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -g" \
   -DCMAKE_C_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -g" \
   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
-cmake --build .
+cmake --build . -j$(nproc)
 
 # 运行测试（TSAN会自动检测数据竞争）
 ./tests/test_integration_multi_operation --gtest_filter=ITMultiOperation.*
@@ -214,7 +214,7 @@ valgrind --leak-check=full --show-leak-kinds=all \
 ```bash
 # 确保已构建测试
 cd build
-cmake --build . --target test_perf_journaling
+cmake --build . -j$(nproc) --target test_perf_journaling
 ```
 
 ### 查看测试详细输出
@@ -230,5 +230,5 @@ ctest -V -R PerfJournaling
 cd build
 rm -rf *
 cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
-cmake --build .
+cmake --build . -j$(nproc)
 ```

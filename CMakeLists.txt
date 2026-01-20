@@ -151,6 +151,8 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tbb/CMakeLists.txt)
     endif()
     # Disable TBB tests to avoid ctest conflicts
     set(TBB_TEST OFF CACHE BOOL "Enable testing" FORCE)
+    # Disable TBB warnings as errors (TSAN compatibility issue with atomic_thread_fence)
+    set(TBB_STRICT OFF CACHE BOOL "Treat compiler warnings as errors" FORCE)
     # Build TBB as static library to avoid DLL dependency issues at runtime
     # Note: TBB warns about static library, but for HFT systems, static linking
     # is preferred (no DLL dependencies, better performance, easier deployment)
