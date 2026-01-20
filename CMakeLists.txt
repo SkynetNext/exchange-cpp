@@ -12,7 +12,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     # -flto=auto: Use all available CPU cores for LTO optimization
     # This reduces the "serial compilation" warnings and speeds up linking
     set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native -mtune=native -flto=auto")
-    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -DDEBUG -fsanitize=address")
+    set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3 -DDEBUG")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     set(CMAKE_CXX_FLAGS_RELEASE "/O2 /DNDEBUG")
     set(CMAKE_CXX_FLAGS_DEBUG "/Od /Zi /DDEBUG")

@@ -1,0 +1,12 @@
+CompileFlags:
+  CompilationDatabase: build
+  Add:
+    - -std=c++26
+    - -ferror-limit=0
+  Remove: [-W*]
+
+Index:
+  Background: Build
+
+InlayHints:
+  Enabled: false

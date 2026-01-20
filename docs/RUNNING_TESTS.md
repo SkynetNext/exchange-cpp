@@ -150,6 +150,63 @@ ctest --output-on-failure
 - **PerfThroughput**: 吞吐量测试，可能需要较长时间
 - **DISABLED测试**: 需要大量资源（12+线程CPU，32GB RAM），运行时间可能数小时
 
+## GCC Sanitizer 调试
+
+### AddressSanitizer (ASAN) - 内存错误检测
+
+```bash
+# 清理并重新构建
+cd build
+rm -rf *
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON \
+  -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" \
+  -DCMAKE_C_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" \
+  -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
+cmake --build .
+
+# 运行测试（ASAN会自动检测内存错误）
+./tests/test_integration_multi_operation --gtest_filter=ITMultiOperation.*
+```
+
+### ThreadSanitizer (TSAN) - 线程竞争检测
+
+```bash
+# 清理并重新构建
+cd build
+rm -rf *
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON \
+  -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -g" \
+  -DCMAKE_C_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -g" \
+  -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+cmake --build .
+
+# 运行测试（TSAN会自动检测数据竞争）
+./tests/test_integration_multi_operation --gtest_filter=ITMultiOperation.*
+```
+
+### 运行 ITMultiOperation 测试定位问题
+
+```bash
+cd build
+
+# 运行所有 ITMultiOperation 测试
+./tests/test_integration_multi_operation
+
+# 运行特定测试用例
+./tests/test_integration_multi_operation --gtest_filter=ITMultiOperation.ShouldPerformMarginOperations
+./tests/test_integration_multi_operation --gtest_filter=ITMultiOperation.ShouldPerformExchangeOperations
+./tests/test_integration_multi_operation --gtest_filter=ITMultiOperation.ShouldPerformSharded
+
+# 使用 GDB 调试定位问题
+gdb --args ./tests/test_integration_multi_operation --gtest_filter=ITMultiOperation.ShouldPerformMarginOperations
+# (gdb) run
+# (gdb) bt  # 查看堆栈
+
+# 使用 Valgrind 检测内存问题
+valgrind --leak-check=full --show-leak-kinds=all \
+  ./tests/test_integration_multi_operation --gtest_filter=ITMultiOperation.ShouldPerformMarginOperations
+```
+
 ## 故障排除
 
 ### 测试找不到可执行文件
@@ -175,4 +232,3 @@ rm -rf *
 cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
 cmake --build .
 ```
-
