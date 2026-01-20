@@ -15,7 +15,7 @@
 
 #### Lock-Free 架构
 - **Disruptor 模式**: 单 Ring Buffer + Sequence Barrier 实现无锁流水线
-- **避免互斥锁**: 全程使用 CAS + Memory Barrier，消除锁竞争
+- **避免互斥锁**: MPSC 使用 `fetch_add` + `acq_rel` (x86: `lock xadd`) 原子获取 sequence，消除锁竞争
 - **多生产者支持**: `MultiProducerRingBuffer` 处理多 Gateway 线程并发写入
 
 #### 零分配热路径
