@@ -18,7 +18,6 @@
 #include <exchange/core/utils/UnsafeUtils.h>
 #include <atomic>
 
-
 namespace exchange {
 namespace core {
 namespace utils {
@@ -29,13 +28,12 @@ void UnsafeUtils::SetResultVolatile(common::cmd::OrderCommand* cmd,
                                     common::cmd::CommandResultCode failureCode) {
     common::cmd::CommandResultCode codeToSet = result ? successCode : failureCode;
 
-    // Use atomic compare-and-swap
-    // Initial load must also be atomic to avoid data race with concurrent CAS
-    auto* atomicPtr =
-        reinterpret_cast<std::atomic<common::cmd::CommandResultCode>*>(&cmd->resultCode);
-    common::cmd::CommandResultCode expected = atomicPtr->load(std::memory_order_relaxed);
+    // Use atomic_ref (C++20) for safer atomic operations on non-atomic fields
+    // This avoids reinterpret_cast and is guaranteed to work correctly
+    std::atomic_ref<common::cmd::CommandResultCode> atomicRef(cmd->resultCode);
+    common::cmd::CommandResultCode expected = atomicRef.load(std::memory_order_relaxed);
     while (expected != codeToSet && expected != failureCode) {
-        if (atomicPtr->compare_exchange_weak(
+        if (atomicRef.compare_exchange_weak(
                 expected, codeToSet, std::memory_order_release, std::memory_order_relaxed)) {
             break;
         }
@@ -50,14 +48,13 @@ void UnsafeUtils::AppendEventsVolatile(common::cmd::OrderCommand* cmd,
 
     common::MatcherTradeEvent* tail = eventHead->FindTail();
 
-    // Use atomic compare-and-swap to append events
-    // Initial load must also be atomic to avoid data race with concurrent CAS
-    auto* atomicPtr =
-        reinterpret_cast<std::atomic<common::MatcherTradeEvent*>*>(&cmd->matcherEvent);
-    common::MatcherTradeEvent* expected = atomicPtr->load(std::memory_order_relaxed);
+    // Use atomic_ref (C++20) for safer atomic operations on non-atomic fields
+    // This avoids reinterpret_cast and is guaranteed to work correctly
+    std::atomic_ref<common::MatcherTradeEvent*> atomicRef(cmd->matcherEvent);
+    common::MatcherTradeEvent* expected = atomicRef.load(std::memory_order_relaxed);
     do {
         tail->nextEvent = expected;
-    } while (!atomicPtr->compare_exchange_weak(
+    } while (!atomicRef.compare_exchange_weak(
         expected, eventHead, std::memory_order_release, std::memory_order_relaxed));
 }
 
