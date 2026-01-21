@@ -234,6 +234,67 @@ void onOrderResult(OrderCommand* cmd) {
 | **吞吐量** | 100K+ TPS | 单机 |
 | **内存** | <1GB | 空闲状态 |
 
+## 6.1 百万级连接支持
+
+### 内存估算
+
+单连接内存开销（WebSocket 空闲状态）：
+- uWebSockets 连接对象：~200-400 bytes
+- 用户数据（UserData）：~100-200 bytes
+- TCP 缓冲区：~8-16 KB（系统默认）
+- **总计：~10-20 KB/连接**
+
+百万连接内存需求：**20-30 GB**
+
+### 系统配置
+
+#### 文件描述符限制
+
+```bash
+# /etc/security/limits.conf
+* soft nofile 1048576
+* hard nofile 1048576
+
+# /etc/sysctl.conf
+fs.file-max = 2097152
+```
+
+#### TCP 参数优化
+
+```bash
+# /etc/sysctl.conf
+net.core.somaxconn = 65535
+net.ipv4.tcp_max_syn_backlog = 65535
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 30
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+```
+
+#### 进程内存限制
+
+```bash
+# /etc/security/limits.conf
+* soft memlock unlimited
+* hard memlock unlimited
+```
+
+### 单机架构
+
+```
+┌─────────────────────────────────┐
+│  Gateway 进程                    │
+│  - uWebSockets (libuv)           │
+│  - 1M WebSocket 连接            │
+│  - 内存：20-30 GB                │
+└─────────────────────────────────┘
+```
+
+**性能参考**：
+- 100K 连接：~2 GB 内存，10-20% CPU
+- 500K 连接：~10 GB 内存，30-50% CPU
+- 1M 连接：~20 GB 内存，50-70% CPU
+
 ## 7. 与 ExchangeCore 集成
 
 ### 7.1 直接调用
