@@ -93,6 +93,8 @@ jobs:
             -DBUILD_TESTING=ON
             -DBUILD_BENCHMARKS=OFF
             -DBUILD_EXAMPLES=ON
+            # Disable LTO in CI to reduce build time
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
           )
           if [ "${{ matrix.compiler }}" == "gcc" ]; then
             CMAKE_ARGS+=(-DCMAKE_C_COMPILER=gcc)
