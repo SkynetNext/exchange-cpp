@@ -20,30 +20,27 @@
 #include "../common/cmd/CommandResultCode.h"
 #include "../common/cmd/OrderCommand.h"
 
-namespace exchange {
-namespace core {
-namespace utils {
+namespace exchange::core::utils {
 
 /**
  * UnsafeUtils - atomic operations utilities
  * Uses std::atomic for thread-safe operations
  */
 class UnsafeUtils {
-public:
-  /**
-   * Set result code atomically with CAS
-   */
-  static void SetResultVolatile(common::cmd::OrderCommand *cmd, bool result,
-                                common::cmd::CommandResultCode successCode,
-                                common::cmd::CommandResultCode failureCode);
+ public:
+    /**
+     * Set result code atomically with CAS
+     */
+    static void SetResultVolatile(common::cmd::OrderCommand* cmd,
+                                  bool result,
+                                  common::cmd::CommandResultCode successCode,
+                                  common::cmd::CommandResultCode failureCode);
 
-  /**
-   * Append events atomically with CAS
-   */
-  static void AppendEventsVolatile(common::cmd::OrderCommand *cmd,
-                                   common::MatcherTradeEvent *eventHead);
+    /**
+     * Append events atomically with CAS
+     */
+    static void AppendEventsVolatile(common::cmd::OrderCommand* cmd,
+                                     common::MatcherTradeEvent* eventHead);
 };
 
-} // namespace utils
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::utils

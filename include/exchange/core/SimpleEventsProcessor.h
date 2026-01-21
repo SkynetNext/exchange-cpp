@@ -16,38 +16,35 @@
 
 #pragma once
 
-#include "IEventsHandler.h"
-#include "common/cmd/OrderCommand.h"
 #include <cstdint>
 #include <functional>
+#include "IEventsHandler.h"
+#include "common/cmd/OrderCommand.h"
 
-namespace exchange {
-namespace core {
+namespace exchange::core {
 
 /**
  * SimpleEventsProcessor - processes events and calls IEventsHandler
  */
 class SimpleEventsProcessor {
-public:
-  using ResultsConsumer =
-      std::function<void(common::cmd::OrderCommand *, int64_t)>;
+ public:
+    using ResultsConsumer = std::function<void(common::cmd::OrderCommand*, int64_t)>;
 
-  explicit SimpleEventsProcessor(IEventsHandler *eventsHandler)
-      : eventsHandler_(eventsHandler) {}
+    explicit SimpleEventsProcessor(IEventsHandler* eventsHandler) : eventsHandler_(eventsHandler) {}
 
-  void Accept(common::cmd::OrderCommand *cmd, int64_t seq);
+    void Accept(common::cmd::OrderCommand* cmd, int64_t seq);
 
-private:
-  IEventsHandler *eventsHandler_;
+ private:
+    IEventsHandler* eventsHandler_;
 
-  void SendCommandResult(common::cmd::OrderCommand *cmd, int64_t seq);
-  void SendTradeEvents(common::cmd::OrderCommand *cmd);
-  void SendMarketData(common::cmd::OrderCommand *cmd);
-  void SendTradeEvent(common::cmd::OrderCommand *cmd);
-  void SendApiCommandResult(common::api::ApiCommand *cmd,
-                            common::cmd::CommandResultCode resultCode,
-                            int64_t timestamp, int64_t seq);
+    void SendCommandResult(common::cmd::OrderCommand* cmd, int64_t seq);
+    void SendTradeEvents(common::cmd::OrderCommand* cmd);
+    void SendMarketData(common::cmd::OrderCommand* cmd);
+    void SendTradeEvent(common::cmd::OrderCommand* cmd);
+    void SendApiCommandResult(common::api::ApiCommand* cmd,
+                              common::cmd::CommandResultCode resultCode,
+                              int64_t timestamp,
+                              int64_t seq);
 };
 
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core

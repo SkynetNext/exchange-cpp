@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <climits>
 #include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <exchange/core/common/BytesIn.h>
 #include <exchange/core/common/config/LoggingConfiguration.h>
@@ -22,66 +21,60 @@
 #include <exchange/core/orderbook/OrderBookDirectImpl.h>
 #include <exchange/core/orderbook/OrderBookEventsHelper.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
+#include <climits>
 #include <stdexcept>
 
-namespace exchange {
-namespace core {
-namespace orderbook {
+namespace exchange::core::orderbook {
 
-common::cmd::CommandResultCode
-IOrderBook::ProcessCommand(IOrderBook *orderBook,
-                           common::cmd::OrderCommand *cmd) {
-  common::cmd::OrderCommandType commandType = cmd->command;
+common::cmd::CommandResultCode IOrderBook::ProcessCommand(IOrderBook* orderBook,
+                                                          common::cmd::OrderCommand* cmd) {
+    common::cmd::OrderCommandType commandType = cmd->command;
 
-  if (commandType == common::cmd::OrderCommandType::MOVE_ORDER) {
-    return orderBook->MoveOrder(cmd);
-  } else if (commandType == common::cmd::OrderCommandType::CANCEL_ORDER) {
-    return orderBook->CancelOrder(cmd);
-  } else if (commandType == common::cmd::OrderCommandType::REDUCE_ORDER) {
-    return orderBook->ReduceOrder(cmd);
-  } else if (commandType == common::cmd::OrderCommandType::PLACE_ORDER) {
-    if (cmd->resultCode ==
-        common::cmd::CommandResultCode::VALID_FOR_MATCHING_ENGINE) {
-      orderBook->NewOrder(cmd);
-      return common::cmd::CommandResultCode::SUCCESS;
+    if (commandType == common::cmd::OrderCommandType::MOVE_ORDER) {
+        return orderBook->MoveOrder(cmd);
+    } else if (commandType == common::cmd::OrderCommandType::CANCEL_ORDER) {
+        return orderBook->CancelOrder(cmd);
+    } else if (commandType == common::cmd::OrderCommandType::REDUCE_ORDER) {
+        return orderBook->ReduceOrder(cmd);
+    } else if (commandType == common::cmd::OrderCommandType::PLACE_ORDER) {
+        if (cmd->resultCode == common::cmd::CommandResultCode::VALID_FOR_MATCHING_ENGINE) {
+            orderBook->NewOrder(cmd);
+            return common::cmd::CommandResultCode::SUCCESS;
+        } else {
+            return cmd->resultCode;  // no change
+        }
+    } else if (commandType == common::cmd::OrderCommandType::ORDER_BOOK_REQUEST) {
+        int32_t size = static_cast<int32_t>(cmd->size);
+        cmd->marketData = orderBook->GetL2MarketDataSnapshot(size >= 0 ? size : INT_MAX);
+        return common::cmd::CommandResultCode::SUCCESS;
     } else {
-      return cmd->resultCode; // no change
+        return common::cmd::CommandResultCode::MATCHING_UNSUPPORTED_COMMAND;
     }
-  } else if (commandType == common::cmd::OrderCommandType::ORDER_BOOK_REQUEST) {
-    int32_t size = static_cast<int32_t>(cmd->size);
-    cmd->marketData =
-        orderBook->GetL2MarketDataSnapshot(size >= 0 ? size : INT_MAX);
-    return common::cmd::CommandResultCode::SUCCESS;
-  } else {
-    return common::cmd::CommandResultCode::MATCHING_UNSUPPORTED_COMMAND;
-  }
 }
 
 std::unique_ptr<IOrderBook> IOrderBook::Create(
-    common::BytesIn *bytes,
-    ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
-    OrderBookEventsHelper *eventsHelper,
-    const common::config::LoggingConfiguration *loggingCfg) {
-  if (bytes == nullptr) {
-    throw std::invalid_argument("BytesIn cannot be nullptr");
-  }
+    common::BytesIn* bytes,
+    ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
+    OrderBookEventsHelper* eventsHelper,
+    const common::config::LoggingConfiguration* loggingCfg) {
+    if (bytes == nullptr) {
+        throw std::invalid_argument("BytesIn cannot be nullptr");
+    }
 
-  // Read implementation type
-  int8_t implTypeCode = bytes->ReadByte();
-  OrderBookImplType implType = static_cast<OrderBookImplType>(implTypeCode);
+    // Read implementation type
+    int8_t implTypeCode = bytes->ReadByte();
+    OrderBookImplType implType = static_cast<OrderBookImplType>(implTypeCode);
 
-  switch (implType) {
-  case OrderBookImplType::NAIVE:
-    return std::make_unique<OrderBookNaiveImpl>(bytes, loggingCfg);
-  case OrderBookImplType::DIRECT:
-    return std::make_unique<OrderBookDirectImpl>(bytes, objectsPool,
-                                                 eventsHelper, loggingCfg);
-  default:
-    throw std::invalid_argument("Unknown OrderBook implementation type: " +
-                                std::to_string(implTypeCode));
-  }
+    switch (implType) {
+        case OrderBookImplType::NAIVE:
+            return std::make_unique<OrderBookNaiveImpl>(bytes, loggingCfg);
+        case OrderBookImplType::DIRECT:
+            return std::make_unique<OrderBookDirectImpl>(
+                bytes, objectsPool, eventsHelper, loggingCfg);
+        default:
+            throw std::invalid_argument("Unknown OrderBook implementation type: "
+                                        + std::to_string(implTypeCode));
+    }
 }
 
-} // namespace orderbook
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::orderbook

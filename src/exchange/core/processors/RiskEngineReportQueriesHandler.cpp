@@ -23,6 +23,6 @@ namespace processors {
 // Template method implementations are in the header file
 // This file is kept for potential future non-template implementations
 
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace processors
+}  // namespace core
+}  // namespace exchange

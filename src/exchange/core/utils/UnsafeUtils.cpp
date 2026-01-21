@@ -18,9 +18,7 @@
 #include <exchange/core/utils/UnsafeUtils.h>
 #include <atomic>
 
-namespace exchange {
-namespace core {
-namespace utils {
+namespace exchange::core::utils {
 
 void UnsafeUtils::SetResultVolatile(common::cmd::OrderCommand* cmd,
                                     bool result,
@@ -58,6 +56,4 @@ void UnsafeUtils::AppendEventsVolatile(common::cmd::OrderCommand* cmd,
         expected, eventHead, std::memory_order_release, std::memory_order_relaxed));
 }
 
-}  // namespace utils
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::utils

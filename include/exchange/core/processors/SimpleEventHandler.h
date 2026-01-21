@@ -16,30 +16,26 @@
 
 #pragma once
 
-#include "../common/cmd/OrderCommand.h"
 #include <cstdint>
+#include "../common/cmd/OrderCommand.h"
 
-namespace exchange {
-namespace core {
-namespace processors {
+namespace exchange::core::processors {
 
 /**
  * SimpleEventHandler - simple event handler interface
  */
 class SimpleEventHandler {
-public:
-  virtual ~SimpleEventHandler() = default;
+ public:
+    virtual ~SimpleEventHandler() = default;
 
-  /**
-   * Handle command with resulting data
-   *
-   * @param seq   - sequence number
-   * @param event - event
-   * @return true to forcibly publish sequence (batches)
-   */
-  virtual bool OnEvent(int64_t seq, common::cmd::OrderCommand *event) = 0;
+    /**
+     * Handle command with resulting data
+     *
+     * @param seq   - sequence number
+     * @param event - event
+     * @return true to forcibly publish sequence (batches)
+     */
+    virtual bool OnEvent(int64_t seq, common::cmd::OrderCommand* event) = 0;
 };
 
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::processors

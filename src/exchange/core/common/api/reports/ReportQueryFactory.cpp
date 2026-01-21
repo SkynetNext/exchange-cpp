@@ -15,64 +15,55 @@
  */
 
 #include <exchange/core/common/BytesIn.h>
-#include <exchange/core/common/api/reports/ReportQueryFactory.h>
 #include <exchange/core/common/api/reports/ReportQuery.h>
+#include <exchange/core/common/api/reports/ReportQueryFactory.h>
 #include <stdexcept>
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
-namespace reports {
+namespace exchange::core::common::api::reports {
 
 // Use Meyers Singleton
-ReportQueryFactory &ReportQueryFactory::getInstance() {
-  static ReportQueryFactory instance;
-  return instance;
+ReportQueryFactory& ReportQueryFactory::getInstance() {
+    static ReportQueryFactory instance;
+    return instance;
 }
 
 // ReportQueryTypeRegistrar constructor implementation
-detail::ReportQueryTypeRegistrar::ReportQueryTypeRegistrar(
-    ReportType type, ReportQueryConstructor constructor) {
-  ReportQueryFactory::getInstance().registerQueryType(type, constructor);
+detail::ReportQueryTypeRegistrar::ReportQueryTypeRegistrar(ReportType type,
+                                                           ReportQueryConstructor constructor) {
+    ReportQueryFactory::getInstance().registerQueryType(type, constructor);
 }
 
 // Register report query type
-void ReportQueryFactory::registerQueryType(ReportType type,
-                                           ReportQueryConstructor constructor) {
-  size_t index = static_cast<size_t>(ReportTypeToCode(type));
+void ReportQueryFactory::registerQueryType(ReportType type, ReportQueryConstructor constructor) {
+    size_t index = static_cast<size_t>(ReportTypeToCode(type));
 
-  // Resize if needed (lazy initialization)
-  if (constructors_.size() <= index) {
-    constructors_.resize(index + 1);
-  }
+    // Resize if needed (lazy initialization)
+    if (constructors_.size() <= index) {
+        constructors_.resize(index + 1);
+    }
 
-  constructors_[index] = constructor;
+    constructors_[index] = constructor;
 }
 
 // Get constructor for specific type
 ReportQueryConstructor ReportQueryFactory::getConstructor(ReportType type) {
-  size_t index = static_cast<size_t>(ReportTypeToCode(type));
+    size_t index = static_cast<size_t>(ReportTypeToCode(type));
 
-  if (index >= constructors_.size()) {
-    return nullptr;
-  }
+    if (index >= constructors_.size()) {
+        return nullptr;
+    }
 
-  return constructors_[index];
+    return constructors_[index];
 }
 
 // Create report query from bytes (returns ReportQueryBase pointer)
-ReportQueryBase *ReportQueryFactory::createQuery(ReportType type, BytesIn &bytes) {
-  auto constructor = getConstructor(type);
-  if (!constructor) {
-    throw std::runtime_error("No constructor registered for ReportType: " +
-                             std::to_string(ReportTypeToCode(type)));
-  }
-  return constructor(bytes);
+ReportQueryBase* ReportQueryFactory::createQuery(ReportType type, BytesIn& bytes) {
+    auto constructor = getConstructor(type);
+    if (!constructor) {
+        throw std::runtime_error("No constructor registered for ReportType: "
+                                 + std::to_string(ReportTypeToCode(type)));
+    }
+    return constructor(bytes);
 }
 
-} // namespace reports
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::common::api::reports

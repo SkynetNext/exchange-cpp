@@ -18,65 +18,54 @@
 #include <exchange/core/common/api/binary/BinaryDataCommandFactory.h>
 #include <stdexcept>
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
-namespace binary {
+namespace exchange::core::common::api::binary {
 
 // Use Meyers Singleton
-BinaryDataCommandFactory &BinaryDataCommandFactory::getInstance() {
-  static BinaryDataCommandFactory instance;
-  return instance;
+BinaryDataCommandFactory& BinaryDataCommandFactory::getInstance() {
+    static BinaryDataCommandFactory instance;
+    return instance;
 }
 
 // BinaryCommandTypeRegistrar constructor implementation
 detail::BinaryCommandTypeRegistrar::BinaryCommandTypeRegistrar(
-    BinaryCommandType type, BinaryDataCommandConstructor constructor) {
-  BinaryDataCommandFactory::getInstance().registerCommandType(type,
-                                                              constructor);
+    BinaryCommandType type,
+    BinaryDataCommandConstructor constructor) {
+    BinaryDataCommandFactory::getInstance().registerCommandType(type, constructor);
 }
 
 // Register binary command type
-void BinaryDataCommandFactory::registerCommandType(
-    BinaryCommandType type, BinaryDataCommandConstructor constructor) {
-  size_t index = static_cast<size_t>(BinaryCommandTypeToCode(type));
+void BinaryDataCommandFactory::registerCommandType(BinaryCommandType type,
+                                                   BinaryDataCommandConstructor constructor) {
+    size_t index = static_cast<size_t>(BinaryCommandTypeToCode(type));
 
-  // Resize if needed (lazy initialization)
-  if (constructors_.size() <= index) {
-    constructors_.resize(index + 1);
-  }
+    // Resize if needed (lazy initialization)
+    if (constructors_.size() <= index) {
+        constructors_.resize(index + 1);
+    }
 
-  constructors_[index] = constructor;
+    constructors_[index] = constructor;
 }
 
 // Get constructor for specific type
-BinaryDataCommandConstructor
-BinaryDataCommandFactory::getConstructor(BinaryCommandType type) {
-  size_t index = static_cast<size_t>(BinaryCommandTypeToCode(type));
+BinaryDataCommandConstructor BinaryDataCommandFactory::getConstructor(BinaryCommandType type) {
+    size_t index = static_cast<size_t>(BinaryCommandTypeToCode(type));
 
-  if (index >= constructors_.size()) {
-    return nullptr;
-  }
+    if (index >= constructors_.size()) {
+        return nullptr;
+    }
 
-  return constructors_[index];
+    return constructors_[index];
 }
 
 // Create binary command from bytes
-std::unique_ptr<BinaryDataCommand>
-BinaryDataCommandFactory::createCommand(BinaryCommandType type,
-                                        BytesIn &bytes) {
-  auto constructor = getConstructor(type);
-  if (!constructor) {
-    throw std::runtime_error(
-        "No constructor registered for BinaryCommandType: " +
-        std::to_string(BinaryCommandTypeToCode(type)));
-  }
-  return constructor(bytes);
+std::unique_ptr<BinaryDataCommand> BinaryDataCommandFactory::createCommand(BinaryCommandType type,
+                                                                           BytesIn& bytes) {
+    auto constructor = getConstructor(type);
+    if (!constructor) {
+        throw std::runtime_error("No constructor registered for BinaryCommandType: "
+                                 + std::to_string(BinaryCommandTypeToCode(type)));
+    }
+    return constructor(bytes);
 }
 
-} // namespace binary
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::common::api::binary

@@ -17,38 +17,38 @@
 #include <exchange/core/common/CoreSymbolSpecification.h>
 #include <exchange/core/utils/CoreArithmeticUtils.h>
 
-namespace exchange {
-namespace core {
-namespace utils {
+namespace exchange::core::utils {
 
-int64_t CoreArithmeticUtils::CalculateAmountAsk(
-    int64_t size, const common::CoreSymbolSpecification *spec) {
-  return size * spec->baseScaleK;
+int64_t CoreArithmeticUtils::CalculateAmountAsk(int64_t size,
+                                                const common::CoreSymbolSpecification* spec) {
+    return size * spec->baseScaleK;
 }
 
-int64_t CoreArithmeticUtils::CalculateAmountBid(
-    int64_t size, int64_t price, const common::CoreSymbolSpecification *spec) {
-  return size * (price * spec->quoteScaleK);
+int64_t CoreArithmeticUtils::CalculateAmountBid(int64_t size,
+                                                int64_t price,
+                                                const common::CoreSymbolSpecification* spec) {
+    return size * (price * spec->quoteScaleK);
 }
 
 int64_t CoreArithmeticUtils::CalculateAmountBidTakerFee(
-    int64_t size, int64_t price, const common::CoreSymbolSpecification *spec) {
-  return size * (price * spec->quoteScaleK + spec->takerFee);
+    int64_t size,
+    int64_t price,
+    const common::CoreSymbolSpecification* spec) {
+    return size * (price * spec->quoteScaleK + spec->takerFee);
 }
 
 int64_t CoreArithmeticUtils::CalculateAmountBidReleaseCorrMaker(
-    int64_t size, int64_t priceDiff,
-    const common::CoreSymbolSpecification *spec) {
-  return size *
-         (priceDiff * spec->quoteScaleK + (spec->takerFee - spec->makerFee));
+    int64_t size,
+    int64_t priceDiff,
+    const common::CoreSymbolSpecification* spec) {
+    return size * (priceDiff * spec->quoteScaleK + (spec->takerFee - spec->makerFee));
 }
 
 int64_t CoreArithmeticUtils::CalculateAmountBidTakerFeeForBudget(
-    int64_t size, int64_t budgetInSteps,
-    const common::CoreSymbolSpecification *spec) {
-  return budgetInSteps * spec->quoteScaleK + size * spec->takerFee;
+    int64_t size,
+    int64_t budgetInSteps,
+    const common::CoreSymbolSpecification* spec) {
+    return budgetInSteps * spec->quoteScaleK + size * spec->takerFee;
 }
 
-} // namespace utils
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::utils

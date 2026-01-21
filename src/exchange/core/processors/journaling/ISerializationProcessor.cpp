@@ -17,41 +17,34 @@
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/processors/journaling/ISerializationProcessor.h>
 
-namespace exchange {
-namespace core {
-namespace processors {
-namespace journaling {
+namespace exchange::core::processors::journaling {
 
 bool ISerializationProcessor::CanLoadFromSnapshot(
-    ISerializationProcessor *serializationProcessor,
-    const common::config::InitialStateConfiguration *initStateCfg,
-    int32_t shardId, SerializedModuleType module) {
+    ISerializationProcessor* serializationProcessor,
+    const common::config::InitialStateConfiguration* initStateCfg,
+    int32_t shardId,
+    SerializedModuleType module) {
+    if (initStateCfg == nullptr || !initStateCfg->FromSnapshot()) {
+        return false;
+    }
 
-  if (initStateCfg == nullptr || !initStateCfg->FromSnapshot()) {
-    return false;
-  }
+    if (serializationProcessor == nullptr) {
+        return false;
+    }
 
-  if (serializationProcessor == nullptr) {
-    return false;
-  }
+    const bool snapshotExists =
+        serializationProcessor->CheckSnapshotExists(initStateCfg->snapshotId, module, shardId);
 
-  const bool snapshotExists = serializationProcessor->CheckSnapshotExists(
-      initStateCfg->snapshotId, module, shardId);
-
-  if (snapshotExists) {
-    // snapshot requested and exists
-    return true;
-  } else if (initStateCfg->throwIfSnapshotNotFound) {
-    // snapshot requested but not found, and throw flag is set
-    throw std::runtime_error("Snapshot not found: " +
-                             std::to_string(initStateCfg->snapshotId));
-  } else {
-    // snapshot requested but not found, and throw flag is not set
-    return false;
-  }
+    if (snapshotExists) {
+        // snapshot requested and exists
+        return true;
+    } else if (initStateCfg->throwIfSnapshotNotFound) {
+        // snapshot requested but not found, and throw flag is set
+        throw std::runtime_error("Snapshot not found: " + std::to_string(initStateCfg->snapshotId));
+    } else {
+        // snapshot requested but not found, and throw flag is not set
+        return false;
+    }
 }
 
-} // namespace journaling
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::processors::journaling

@@ -16,17 +16,15 @@
 
 #pragma once
 
+#include <memory>
+#include <optional>
 #include "../common/api/reports/ReportQueriesHandler.h"
 #include "../common/api/reports/ReportQuery.h"
 #include "../common/api/reports/ReportResult.h"
 #include "../utils/Logger.h"
 #include "RiskEngine.h"
-#include <memory>
-#include <optional>
 
-namespace exchange {
-namespace core {
-namespace processors {
+namespace exchange::core::processors {
 
 /**
  * RiskEngineReportQueriesHandler - adapter to connect
@@ -35,30 +33,25 @@ namespace processors {
  * Uses type erasure: overrides HandleReportImpl to work with ReportQueryBase*,
  * then calls the type-erased ProcessTypeErased method.
  */
-class RiskEngineReportQueriesHandler
-    : public common::api::reports::ReportQueriesHandler {
-public:
-  explicit RiskEngineReportQueriesHandler(RiskEngine *riskEngine)
-      : riskEngine_(riskEngine) {}
+class RiskEngineReportQueriesHandler : public common::api::reports::ReportQueriesHandler {
+ public:
+    explicit RiskEngineReportQueriesHandler(RiskEngine* riskEngine) : riskEngine_(riskEngine) {}
 
-protected:
-  // Override HandleReportImpl to use type erasure
-  std::optional<std::unique_ptr<common::api::reports::ReportResult>>
-  HandleReportImpl(
-      common::api::reports::ReportQueryBase *reportQuery) override {
-    if (riskEngine_ == nullptr || reportQuery == nullptr) {
-      LOG_WARN("[RiskEngineReportQueriesHandler] HandleReportImpl: riskEngine_ "
-               "or reportQuery is nullptr");
-      return std::nullopt;
+ protected:
+    // Override HandleReportImpl to use type erasure
+    std::optional<std::unique_ptr<common::api::reports::ReportResult>> HandleReportImpl(
+        common::api::reports::ReportQueryBase* reportQuery) override {
+        if (riskEngine_ == nullptr || reportQuery == nullptr) {
+            LOG_WARN("[RiskEngineReportQueriesHandler] HandleReportImpl: riskEngine_ "
+                     "or reportQuery is nullptr");
+            return std::nullopt;
+        }
+
+        return reportQuery->ProcessTypeErased(riskEngine_);
     }
 
-    return reportQuery->ProcessTypeErased(riskEngine_);
-  }
-
-private:
-  RiskEngine *riskEngine_;
+ private:
+    RiskEngine* riskEngine_;
 };
 
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::processors

@@ -16,53 +16,48 @@
 
 #pragma once
 
-#include "../common/CoreSymbolSpecification.h"
 #include <cstdint>
+#include "../common/CoreSymbolSpecification.h"
 
-namespace exchange {
-namespace core {
-namespace utils {
+namespace exchange::core::utils {
 
 /**
  * CoreArithmeticUtils - core arithmetic utilities for order calculations
  */
 class CoreArithmeticUtils {
-public:
-  /**
-   * Calculate amount for ASK order
-   */
-  static int64_t
-  CalculateAmountAsk(int64_t size, const common::CoreSymbolSpecification *spec);
+ public:
+    /**
+     * Calculate amount for ASK order
+     */
+    static int64_t CalculateAmountAsk(int64_t size, const common::CoreSymbolSpecification* spec);
 
-  /**
-   * Calculate amount for BID order
-   */
-  static int64_t
-  CalculateAmountBid(int64_t size, int64_t price,
-                     const common::CoreSymbolSpecification *spec);
+    /**
+     * Calculate amount for BID order
+     */
+    static int64_t CalculateAmountBid(int64_t size,
+                                      int64_t price,
+                                      const common::CoreSymbolSpecification* spec);
 
-  /**
-   * Calculate amount for BID order with taker fee
-   */
-  static int64_t
-  CalculateAmountBidTakerFee(int64_t size, int64_t price,
-                             const common::CoreSymbolSpecification *spec);
+    /**
+     * Calculate amount for BID order with taker fee
+     */
+    static int64_t CalculateAmountBidTakerFee(int64_t size,
+                                              int64_t price,
+                                              const common::CoreSymbolSpecification* spec);
 
-  /**
-   * Calculate amount for BID order release correction for maker
-   */
-  static int64_t CalculateAmountBidReleaseCorrMaker(
-      int64_t size, int64_t priceDiff,
-      const common::CoreSymbolSpecification *spec);
+    /**
+     * Calculate amount for BID order release correction for maker
+     */
+    static int64_t CalculateAmountBidReleaseCorrMaker(int64_t size,
+                                                      int64_t priceDiff,
+                                                      const common::CoreSymbolSpecification* spec);
 
-  /**
-   * Calculate amount for BID order with taker fee for budget
-   */
-  static int64_t CalculateAmountBidTakerFeeForBudget(
-      int64_t size, int64_t budgetInSteps,
-      const common::CoreSymbolSpecification *spec);
+    /**
+     * Calculate amount for BID order with taker fee for budget
+     */
+    static int64_t CalculateAmountBidTakerFeeForBudget(int64_t size,
+                                                       int64_t budgetInSteps,
+                                                       const common::CoreSymbolSpecification* spec);
 };
 
-} // namespace utils
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::utils

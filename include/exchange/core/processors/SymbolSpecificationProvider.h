@@ -16,15 +16,13 @@
 
 #pragma once
 
+#include <ankerl/unordered_dense.h>
+#include <cstdint>
 #include "../common/CoreSymbolSpecification.h"
 #include "../common/StateHash.h"
 #include "../common/WriteBytesMarshallable.h"
-#include <ankerl/unordered_dense.h>
-#include <cstdint>
 
-namespace exchange {
-namespace core {
-namespace processors {
+namespace exchange::core::processors {
 
 /**
  * SymbolSpecificationProvider - manages symbol specifications
@@ -32,54 +30,49 @@ namespace processors {
  */
 class SymbolSpecificationProvider : public common::StateHash,
                                     public common::WriteBytesMarshallable {
-public:
-  SymbolSpecificationProvider();
+ public:
+    SymbolSpecificationProvider();
 
-  /**
-   * Constructor from BytesIn (deserialization)
-   */
-  SymbolSpecificationProvider(common::BytesIn *bytes);
+    /**
+     * Constructor from BytesIn (deserialization)
+     */
+    explicit SymbolSpecificationProvider(common::BytesIn* bytes);
 
-  /**
-   * Add a new symbol specification
-   * @return true if added, false if symbol already exists
-   */
-  bool AddSymbol(const common::CoreSymbolSpecification *symbolSpec);
+    /**
+     * Add a new symbol specification
+     * @return true if added, false if symbol already exists
+     */
+    bool AddSymbol(const common::CoreSymbolSpecification* symbolSpec);
 
-  /**
-   * Get symbol specification by symbol ID
-   * @param symbol - symbol ID
-   * @return symbol specification or nullptr if not found
-   */
-  const common::CoreSymbolSpecification *
-  GetSymbolSpecification(int32_t symbol) const;
+    /**
+     * Get symbol specification by symbol ID
+     * @param symbol - symbol ID
+     * @return symbol specification or nullptr if not found
+     */
+    const common::CoreSymbolSpecification* GetSymbolSpecification(int32_t symbol) const;
 
-  /**
-   * Register a new symbol specification (overwrites if exists)
-   * @param symbol - symbol ID
-   * @param spec - symbol specification
-   */
-  void RegisterSymbol(int32_t symbol,
-                      const common::CoreSymbolSpecification *spec);
+    /**
+     * Register a new symbol specification (overwrites if exists)
+     * @param symbol - symbol ID
+     * @param spec - symbol specification
+     */
+    void RegisterSymbol(int32_t symbol, const common::CoreSymbolSpecification* spec);
 
-  /**
-   * Reset state - clear all symbols
-   */
-  void Reset();
+    /**
+     * Reset state - clear all symbols
+     */
+    void Reset();
 
-  // StateHash interface
-  int32_t GetStateHash() const override;
+    // StateHash interface
+    int32_t GetStateHash() const override;
 
-  // WriteBytesMarshallable interface
-  void WriteMarshallable(common::BytesOut &bytes) const override;
+    // WriteBytesMarshallable interface
+    void WriteMarshallable(common::BytesOut& bytes) const override;
 
-private:
-  // symbol ID -> CoreSymbolSpecification
-  // Using ankerl::unordered_dense for better performance
-  ankerl::unordered_dense::map<int32_t, const common::CoreSymbolSpecification *>
-      symbolSpecs_;
+ private:
+    // symbol ID -> CoreSymbolSpecification
+    // Using ankerl::unordered_dense for better performance
+    ankerl::unordered_dense::map<int32_t, const common::CoreSymbolSpecification*> symbolSpecs_;
 };
 
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::processors

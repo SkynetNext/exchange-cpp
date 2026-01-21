@@ -16,18 +16,14 @@
 
 #pragma once
 
-namespace exchange {
-namespace core {
-namespace utils {
+namespace exchange::core::utils {
 
 /**
  * Utils - general utility functions
  * Placeholder for now
  */
 class Utils {
-  // TODO: Add utility functions as needed
+    // TODO: Add utility functions as needed
 };
 
-} // namespace utils
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::utils

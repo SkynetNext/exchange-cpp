@@ -16,12 +16,10 @@
 
 #pragma once
 
+#include <stdexcept>
 #include <string>
-#include <type_traits>
 
-namespace exchange {
-namespace core {
-namespace utils {
+namespace exchange::core::utils {
 
 /**
  * ReflectionUtils - utility for accessing private fields
@@ -29,36 +27,34 @@ namespace utils {
  * that uses templates and type traits for limited field access
  */
 class ReflectionUtils {
-public:
-  /**
-   * Extract field value from object
-   * Note: This is a simplified version - in practice, you may need to use
-   * friend classes or provide accessor methods
-   */
-  template <typename R, typename T>
-  static R ExtractField(T *object, const std::string &fieldName) {
-    // C++ doesn't have runtime reflection like Java
-    // This would need to be implemented using:
-    // 1. Friend classes
-    // 2. Accessor methods
-    // 3. Or compile-time reflection (C++20 reflection proposal)
-    // For now, this is a placeholder
-    throw std::runtime_error(
-        "Reflection not supported in C++ - use friend classes or accessors");
-  }
+ public:
+    /**
+     * Extract field value from object
+     * Note: This is a simplified version - in practice, you may need to use
+     * friend classes or provide accessor methods
+     */
+    template <typename R, typename T>
+    static R ExtractField(T* object, const std::string& fieldName) {
+        // C++ doesn't have runtime reflection like Java
+        // This would need to be implemented using:
+        // 1. Friend classes
+        // 2. Accessor methods
+        // 3. Or compile-time reflection (C++20 reflection proposal)
+        // For now, this is a placeholder
+        throw std::runtime_error(
+            "Reflection not supported in C++ - use friend classes or accessors");
+    }
 
-  /**
-   * Get field - simplified version
-   * In practice, you would need to provide specific implementations for each
-   * type you want to access
-   */
-  template <typename T>
-  static void *GetField(T *object, const std::string &fieldName) {
-    // Placeholder - would need specific implementations
-    return nullptr;
-  }
+    /**
+     * Get field - simplified version
+     * In practice, you would need to provide specific implementations for each
+     * type you want to access
+     */
+    template <typename T>
+    static void* GetField(T* object, const std::string& fieldName) {
+        // Placeholder - would need specific implementations
+        return nullptr;
+    }
 };
 
-} // namespace utils
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::utils

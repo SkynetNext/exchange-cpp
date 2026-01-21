@@ -16,67 +16,59 @@
 
 #pragma once
 
-#include "../common/CoreWaitStrategy.h"
-#include <condition_variable>
-#include <cstdint>
 #include <disruptor/BlockingWaitStrategy.h>
 #include <disruptor/MultiProducerSequencer.h>
 #include <disruptor/ProcessingSequenceBarrier.h>
 #include <disruptor/RingBuffer.h>
+#include <condition_variable>
+#include <cstdint>
 #include <mutex>
 #include <string>
+#include "../common/CoreWaitStrategy.h"
 
-namespace exchange {
-namespace core {
-namespace processors {} // namespace processors
-} // namespace core
-} // namespace exchange
+namespace exchange::core::processors {}  // namespace exchange::core::processors
 
-namespace exchange {
-namespace core {
-namespace processors {
+namespace exchange::core::processors {
 
 /**
  * WaitSpinningHelper - helper for spinning and waiting on sequence barriers
  */
-template <typename T, typename WaitStrategyT> class WaitSpinningHelper {
-public:
-  WaitSpinningHelper(
-      disruptor::MultiProducerRingBuffer<T, WaitStrategyT> *ringBuffer,
-      disruptor::ProcessingSequenceBarrier<
-          disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT>
-          *sequenceBarrier,
-      int32_t spinLimit, common::CoreWaitStrategy waitStrategy,
-      const std::string &name = "");
+template <typename T, typename WaitStrategyT>
+class WaitSpinningHelper {
+ public:
+    WaitSpinningHelper(
+        disruptor::MultiProducerRingBuffer<T, WaitStrategyT>* ringBuffer,
+        disruptor::ProcessingSequenceBarrier<disruptor::MultiProducerSequencer<WaitStrategyT>,
+                                             WaitStrategyT>* sequenceBarrier,
+        int32_t spinLimit,
+        common::CoreWaitStrategy waitStrategy,
+        const std::string& name = "");
 
-  /**
-   * Try to wait for sequence, with spinning and potentially blocking
-   */
-  int64_t TryWaitFor(int64_t seq);
+    /**
+     * Try to wait for sequence, with spinning and potentially blocking
+     */
+    int64_t TryWaitFor(int64_t seq);
 
-  /**
-   * Signal all waiting threads when blocking
-   */
-  void SignalAllWhenBlocking();
+    /**
+     * Signal all waiting threads when blocking
+     */
+    void SignalAllWhenBlocking();
 
-private:
-  disruptor::ProcessingSequenceBarrier<
-      disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT>
-      *sequenceBarrier_;
-  disruptor::MultiProducerSequencer<WaitStrategyT> *sequencer_;
-  int32_t spinLimit_;
-  int32_t yieldLimit_;
-  bool block_;
+ private:
+    disruptor::ProcessingSequenceBarrier<disruptor::MultiProducerSequencer<WaitStrategyT>,
+                                         WaitStrategyT>* sequenceBarrier_;
+    disruptor::MultiProducerSequencer<WaitStrategyT>* sequencer_;
+    int32_t spinLimit_;
+    int32_t yieldLimit_;
+    bool block_;
 
-  // For blocking mode - matches Java reflection access
-  disruptor::BlockingWaitStrategy *blockingWaitStrategy_;
-  std::mutex *lock_;
-  std::condition_variable *processorNotifyCondition_;
+    // For blocking mode - matches Java reflection access
+    disruptor::BlockingWaitStrategy* blockingWaitStrategy_;
+    std::mutex* lock_;
+    std::condition_variable* processorNotifyCondition_;
 
-  // Name for logging purposes
-  std::string name_;
+    // Name for logging purposes
+    std::string name_;
 };
 
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::processors

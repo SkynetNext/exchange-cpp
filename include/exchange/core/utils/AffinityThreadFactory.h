@@ -23,17 +23,15 @@
 #include <set>
 #include <thread>
 
-namespace exchange {
-namespace core {
-namespace utils {
+namespace exchange::core::utils {
 
 /**
  * ThreadAffinityMode - thread affinity configuration mode
  */
 enum class ThreadAffinityMode {
-  THREAD_AFFINITY_DISABLE,
-  THREAD_AFFINITY_ENABLE_PER_PHYSICAL_CORE,
-  THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE
+    THREAD_AFFINITY_DISABLE,
+    THREAD_AFFINITY_ENABLE_PER_PHYSICAL_CORE,
+    THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE
 };
 
 /**
@@ -44,30 +42,27 @@ enum class ThreadAffinityMode {
  * Note: Must be managed via shared_ptr to ensure lifetime extends beyond
  * threads it creates (which access affinityReservations_ in their cleanup).
  */
-class AffinityThreadFactory
-    : public disruptor::dsl::ThreadFactory,
-      public std::enable_shared_from_this<AffinityThreadFactory> {
-public:
-  explicit AffinityThreadFactory(ThreadAffinityMode threadAffinityMode);
+class AffinityThreadFactory : public disruptor::dsl::ThreadFactory,
+                              public std::enable_shared_from_this<AffinityThreadFactory> {
+ public:
+    explicit AffinityThreadFactory(ThreadAffinityMode threadAffinityMode);
 
-  // disruptor::dsl::ThreadFactory interface
-  std::thread newThread(std::function<void()> r) override;
+    // disruptor::dsl::ThreadFactory interface
+    std::thread newThread(std::function<void()> r) override;
 
-  /**
-   * Check if task was already pinned
-   */
-  bool IsTaskPinned(void *task) const;
+    /**
+     * Check if task was already pinned
+     */
+    bool IsTaskPinned(void* task) const;
 
-private:
-  ThreadAffinityMode threadAffinityMode_;
-  mutable std::mutex mutex_;
-  std::set<void *> affinityReservations_;
-  static std::atomic<int32_t> threadsCounter_;
+ private:
+    ThreadAffinityMode threadAffinityMode_;
+    mutable std::mutex mutex_;
+    std::set<void*> affinityReservations_;
+    static std::atomic<int32_t> threadsCounter_;
 
-  void ExecutePinned(std::function<void()> runnable);
-  int AcquireAffinityLock(int32_t threadId);
+    void ExecutePinned(std::function<void()> runnable);
+    int AcquireAffinityLock(int32_t threadId);
 };
 
-} // namespace utils
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::utils

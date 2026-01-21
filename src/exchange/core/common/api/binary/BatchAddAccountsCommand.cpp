@@ -20,52 +20,42 @@
 #include <exchange/core/common/api/binary/BinaryDataCommandFactory.h>
 #include <exchange/core/utils/SerializationUtils.h>
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
-namespace binary {
+namespace exchange::core::common::api::binary {
 
 using namespace utils;
 
-REGISTER_BINARY_COMMAND_TYPE(BatchAddAccountsCommand,
-                             BinaryCommandType::ADD_ACCOUNTS);
+REGISTER_BINARY_COMMAND_TYPE(BatchAddAccountsCommand, BinaryCommandType::ADD_ACCOUNTS);
 
-BatchAddAccountsCommand::BatchAddAccountsCommand(BytesIn &bytes) {
-  // Read LongObjectHashMap<IntLongHashMap>
-  // Java: users = SerializationUtils.readLongHashMap(bytes, c ->
-  // SerializationUtils.readIntLongHashMap(bytes));
-  auto tempMap = SerializationUtils::ReadLongHashMap<
-      ankerl::unordered_dense::map<int32_t, int64_t>>(
-      bytes,
-      [](BytesIn &b) -> ankerl::unordered_dense::map<int32_t, int64_t> * {
-        auto *map = new ankerl::unordered_dense::map<int32_t, int64_t>(
-            SerializationUtils::ReadIntLongHashMap(b));
-        return map;
-      });
+BatchAddAccountsCommand::BatchAddAccountsCommand(BytesIn& bytes) {
+    // Read LongObjectHashMap<IntLongHashMap>
+    // Java: users = SerializationUtils.readLongHashMap(bytes, c ->
+    // SerializationUtils.readIntLongHashMap(bytes));
+    auto tempMap =
+        SerializationUtils::ReadLongHashMap<ankerl::unordered_dense::map<int32_t, int64_t>>(
+            bytes, [](BytesIn& b) -> ankerl::unordered_dense::map<int32_t, int64_t>* {
+                auto* map = new ankerl::unordered_dense::map<int32_t, int64_t>(
+                    SerializationUtils::ReadIntLongHashMap(b));
+                return map;
+            });
 
-  // Convert from map<int64_t, map<int32_t, int64_t>*> to map<int64_t,
-  // map<int32_t, int64_t>>
-  for (const auto &pair : tempMap) {
-    if (pair.second != nullptr) {
-      users[pair.first] = *pair.second;
-      delete pair.second;
+    // Convert from map<int64_t, map<int32_t, int64_t>*> to map<int64_t,
+    // map<int32_t, int64_t>>
+    for (const auto& pair : tempMap) {
+        if (pair.second != nullptr) {
+            users[pair.first] = *pair.second;
+            delete pair.second;
+        }
     }
-  }
 }
 
-void BatchAddAccountsCommand::WriteMarshallable(BytesOut &bytes) const {
-  // Match Java: SerializationUtils.marshallLongHashMap(users,
-  // SerializationUtils::marshallIntLongHashMap, bytes);
-  bytes.WriteInt(static_cast<int32_t>(users.size()));
-  for (const auto &pair : users) {
-    bytes.WriteLong(pair.first);
-    SerializationUtils::MarshallIntLongHashMap(pair.second, bytes);
-  }
+void BatchAddAccountsCommand::WriteMarshallable(BytesOut& bytes) const {
+    // Match Java: SerializationUtils.marshallLongHashMap(users,
+    // SerializationUtils::marshallIntLongHashMap, bytes);
+    bytes.WriteInt(static_cast<int32_t>(users.size()));
+    for (const auto& pair : users) {
+        bytes.WriteLong(pair.first);
+        SerializationUtils::MarshallIntLongHashMap(pair.second, bytes);
+    }
 }
 
-} // namespace binary
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core::common::api::binary

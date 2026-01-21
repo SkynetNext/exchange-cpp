@@ -113,7 +113,51 @@ Gateway → Grouping → Risk(R1) → Matching → Risk(R2) → Results
 | **std::print** | 类型安全格式化，替代 printf |
 | **constexpr 扩展** | 更多编译期计算，配置表预生成 |
 
-### 4.2 关注的开源项目
+### 4.2 C++26 新特性评估
+
+#### 高价值特性（推荐）
+
+| 特性 | 价值 | 应用场景 | 优先级 |
+|------|------|----------|--------|
+| **std::inplace_vector** | ⭐⭐⭐⭐⭐ | `VectorBytesOut` 小缓冲区，避免堆分配 | 🔥 立即考虑 |
+| **std::hive** | ⭐⭐⭐⭐ | 对象池、事件缓冲区，无重新分配 | 📋 中期考虑 |
+| **std::hazard_pointer** | ⭐⭐⭐ | 自定义无锁数据结构，解决 ABA 问题 | 🔍 按需使用 |
+
+**std::inplace_vector 应用示例**:
+```cpp
+// 当前：可能触发堆分配
+std::vector<uint8_t> data;
+data.resize(100);  // 可能分配堆内存
+
+// 使用 inplace_vector：小数据栈分配
+std::inplace_vector<uint8_t, 256> data;  // 256字节内栈分配
+data.resize(100);  // 无堆分配，零延迟
+```
+
+**适用场景**:
+- `VectorBytesOut`: 序列化缓冲区（通常 < 256 字节）
+- 临时缓冲区: 避免频繁堆分配
+- 性能收益: 减少内存分配延迟，提升热路径性能
+
+#### 中等价值特性
+
+| 特性 | 价值 | 应用场景 | 备注 |
+|------|------|----------|------|
+| **std::simd** | ⭐⭐⭐ | 批量数据处理、数据转换 | 需要明确热点场景 |
+| **std::rcu** | ⭐⭐ | 配置读取（读多写少） | 项目主要是写密集型 |
+
+#### 低价值特性（不太相关）
+
+| 特性 | 价值 | 原因 |
+|------|------|------|
+| **std::contracts** | ⭐⭐ | 调试有用，但可能影响性能 |
+| **std::linalg** | ⭐ | 线性代数库，项目不涉及 |
+| **std::text_encoding** | ⭐ | 文本编码，项目主要是二进制协议 |
+| **std::debugging** | ⭐⭐ | 调试工具，生产环境通常不需要 |
+
+**注意**: `std::hazard_pointer` 主要用于解决 ABA 问题，但项目使用的 Disruptor 已内部处理，当前可能不需要。
+
+### 4.3 关注的开源项目
 
 | 项目 | 原因 |
 |------|------|
@@ -123,7 +167,7 @@ Gateway → Grouping → Risk(R1) → Matching → Risk(R2) → Results
 | **abseil** | Google 通用库，高质量 API 设计参考 |
 | **seastar** | 无共享架构，未来网关层参考 |
 
-### 4.3 实质性行动
+### 4.4 实质性行动
 
 1. **完整翻译** exchange-core Java → C++，含 ART Tree、ObjectsPool
 2. **性能调优**: 通过 perf + flamegraph 定位瓶颈，优化 `orderIdIndex_`
@@ -163,4 +207,4 @@ Gateway → Grouping → Risk(R1) → Matching → Risk(R2) → Results
 
 ---
 
-**Last Updated**: 2026-01-20
+**Last Updated**: 2026-01-21

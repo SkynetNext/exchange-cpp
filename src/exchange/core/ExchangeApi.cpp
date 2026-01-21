@@ -54,197 +54,199 @@
 #include <stdexcept>
 #include <vector>
 
-namespace exchange {
-namespace core {
+namespace exchange::core {
 
 // Event translators - similar to Java version
 namespace {
 // Place order translator
-class NewOrderTranslator
-    : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
-                                              common::api::ApiPlaceOrder> {
-public:
-  void translateTo(common::cmd::OrderCommand &cmd, int64_t seq,
-                   common::api::ApiPlaceOrder api) override {
-    cmd.command = common::cmd::OrderCommandType::PLACE_ORDER;
-    cmd.price = api.price;
-    cmd.reserveBidPrice = api.reservePrice;
-    cmd.size = api.size;
-    cmd.orderId = api.orderId;
-    cmd.timestamp = api.timestamp;
-    cmd.action = api.action;
-    cmd.orderType = api.orderType;
-    cmd.symbol = api.symbol;
-    cmd.uid = api.uid;
-    cmd.userCookie = api.userCookie;
-    cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  }
+class NewOrderTranslator : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
+                                                                   common::api::ApiPlaceOrder> {
+ public:
+    void translateTo(common::cmd::OrderCommand& cmd,
+                     int64_t seq,
+                     common::api::ApiPlaceOrder api) override {
+        cmd.command = common::cmd::OrderCommandType::PLACE_ORDER;
+        cmd.price = api.price;
+        cmd.reserveBidPrice = api.reservePrice;
+        cmd.size = api.size;
+        cmd.orderId = api.orderId;
+        cmd.timestamp = api.timestamp;
+        cmd.action = api.action;
+        cmd.orderType = api.orderType;
+        cmd.symbol = api.symbol;
+        cmd.uid = api.uid;
+        cmd.userCookie = api.userCookie;
+        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    }
 };
 
 // Move order translator
-class MoveOrderTranslator
-    : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
-                                              common::api::ApiMoveOrder> {
-public:
-  void translateTo(common::cmd::OrderCommand &cmd, int64_t seq,
-                   common::api::ApiMoveOrder api) override {
-    cmd.command = common::cmd::OrderCommandType::MOVE_ORDER;
-    cmd.price = api.newPrice;
-    cmd.orderId = api.orderId;
-    cmd.symbol = api.symbol;
-    cmd.uid = api.uid;
-    cmd.timestamp = api.timestamp;
-    cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  }
+class MoveOrderTranslator : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
+                                                                    common::api::ApiMoveOrder> {
+ public:
+    void translateTo(common::cmd::OrderCommand& cmd,
+                     int64_t seq,
+                     common::api::ApiMoveOrder api) override {
+        cmd.command = common::cmd::OrderCommandType::MOVE_ORDER;
+        cmd.price = api.newPrice;
+        cmd.orderId = api.orderId;
+        cmd.symbol = api.symbol;
+        cmd.uid = api.uid;
+        cmd.timestamp = api.timestamp;
+        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    }
 };
 
 // Cancel order translator
-class CancelOrderTranslator
-    : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
-                                              common::api::ApiCancelOrder> {
-public:
-  void translateTo(common::cmd::OrderCommand &cmd, int64_t seq,
-                   common::api::ApiCancelOrder api) override {
-    cmd.command = common::cmd::OrderCommandType::CANCEL_ORDER;
-    cmd.orderId = api.orderId;
-    cmd.symbol = api.symbol;
-    cmd.uid = api.uid;
-    cmd.timestamp = api.timestamp;
-    cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  }
+class CancelOrderTranslator : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
+                                                                      common::api::ApiCancelOrder> {
+ public:
+    void translateTo(common::cmd::OrderCommand& cmd,
+                     int64_t seq,
+                     common::api::ApiCancelOrder api) override {
+        cmd.command = common::cmd::OrderCommandType::CANCEL_ORDER;
+        cmd.orderId = api.orderId;
+        cmd.symbol = api.symbol;
+        cmd.uid = api.uid;
+        cmd.timestamp = api.timestamp;
+        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    }
 };
 
 // Reduce order translator
-class ReduceOrderTranslator
-    : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
-                                              common::api::ApiReduceOrder> {
-public:
-  void translateTo(common::cmd::OrderCommand &cmd, int64_t seq,
-                   common::api::ApiReduceOrder api) override {
-    cmd.command = common::cmd::OrderCommandType::REDUCE_ORDER;
-    cmd.orderId = api.orderId;
-    cmd.symbol = api.symbol;
-    cmd.uid = api.uid;
-    cmd.size = api.reduceSize;
-    cmd.timestamp = api.timestamp;
-    cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  }
+class ReduceOrderTranslator : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
+                                                                      common::api::ApiReduceOrder> {
+ public:
+    void translateTo(common::cmd::OrderCommand& cmd,
+                     int64_t seq,
+                     common::api::ApiReduceOrder api) override {
+        cmd.command = common::cmd::OrderCommandType::REDUCE_ORDER;
+        cmd.orderId = api.orderId;
+        cmd.symbol = api.symbol;
+        cmd.uid = api.uid;
+        cmd.size = api.reduceSize;
+        cmd.timestamp = api.timestamp;
+        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    }
 };
 
 // Order book request translator
 class OrderBookRequestTranslator
-    : public disruptor::EventTranslatorOneArg<
-          common::cmd::OrderCommand, common::api::ApiOrderBookRequest> {
-public:
-  void translateTo(common::cmd::OrderCommand &cmd, int64_t seq,
-                   common::api::ApiOrderBookRequest api) override {
-    cmd.command = common::cmd::OrderCommandType::ORDER_BOOK_REQUEST;
-    cmd.symbol = api.symbol;
-    cmd.size = api.size;
-    cmd.timestamp = api.timestamp;
-    cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  }
+    : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
+                                              common::api::ApiOrderBookRequest> {
+ public:
+    void translateTo(common::cmd::OrderCommand& cmd,
+                     int64_t seq,
+                     common::api::ApiOrderBookRequest api) override {
+        cmd.command = common::cmd::OrderCommandType::ORDER_BOOK_REQUEST;
+        cmd.symbol = api.symbol;
+        cmd.size = api.size;
+        cmd.timestamp = api.timestamp;
+        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    }
 };
 
 // Add user translator
 class AddUserTranslator
-    : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
-                                              common::api::ApiAddUser> {
-public:
-  void translateTo(common::cmd::OrderCommand &cmd, int64_t seq,
-                   common::api::ApiAddUser api) override {
-    cmd.command = common::cmd::OrderCommandType::ADD_USER;
-    cmd.uid = api.uid;
-    cmd.timestamp = api.timestamp;
-    cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  }
+    : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand, common::api::ApiAddUser> {
+ public:
+    void translateTo(common::cmd::OrderCommand& cmd,
+                     int64_t seq,
+                     common::api::ApiAddUser api) override {
+        cmd.command = common::cmd::OrderCommandType::ADD_USER;
+        cmd.uid = api.uid;
+        cmd.timestamp = api.timestamp;
+        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    }
 };
 
 // Suspend user translator
-class SuspendUserTranslator
-    : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
-                                              common::api::ApiSuspendUser> {
-public:
-  void translateTo(common::cmd::OrderCommand &cmd, int64_t seq,
-                   common::api::ApiSuspendUser api) override {
-    cmd.command = common::cmd::OrderCommandType::SUSPEND_USER;
-    cmd.uid = api.uid;
-    cmd.timestamp = api.timestamp;
-    cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  }
+class SuspendUserTranslator : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
+                                                                      common::api::ApiSuspendUser> {
+ public:
+    void translateTo(common::cmd::OrderCommand& cmd,
+                     int64_t seq,
+                     common::api::ApiSuspendUser api) override {
+        cmd.command = common::cmd::OrderCommandType::SUSPEND_USER;
+        cmd.uid = api.uid;
+        cmd.timestamp = api.timestamp;
+        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    }
 };
 
 // Resume user translator
-class ResumeUserTranslator
-    : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
-                                              common::api::ApiResumeUser> {
-public:
-  void translateTo(common::cmd::OrderCommand &cmd, int64_t seq,
-                   common::api::ApiResumeUser api) override {
-    cmd.command = common::cmd::OrderCommandType::RESUME_USER;
-    cmd.uid = api.uid;
-    cmd.timestamp = api.timestamp;
-    cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  }
+class ResumeUserTranslator : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
+                                                                     common::api::ApiResumeUser> {
+ public:
+    void translateTo(common::cmd::OrderCommand& cmd,
+                     int64_t seq,
+                     common::api::ApiResumeUser api) override {
+        cmd.command = common::cmd::OrderCommandType::RESUME_USER;
+        cmd.uid = api.uid;
+        cmd.timestamp = api.timestamp;
+        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    }
 };
 
 // Adjust user balance translator
 class AdjustUserBalanceTranslator
-    : public disruptor::EventTranslatorOneArg<
-          common::cmd::OrderCommand, common::api::ApiAdjustUserBalance> {
-public:
-  void translateTo(common::cmd::OrderCommand &cmd, int64_t seq,
-                   common::api::ApiAdjustUserBalance api) override {
-    cmd.command = common::cmd::OrderCommandType::BALANCE_ADJUSTMENT;
-    cmd.orderId = api.transactionId;
-    cmd.symbol = api.currency;
-    cmd.uid = api.uid;
-    cmd.price = api.amount;
-    cmd.orderType = common::OrderTypeFromCode(
-        common::BalanceAdjustmentTypeToCode(api.adjustmentType));
-    cmd.timestamp = api.timestamp;
-    cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  }
+    : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
+                                              common::api::ApiAdjustUserBalance> {
+ public:
+    void translateTo(common::cmd::OrderCommand& cmd,
+                     int64_t seq,
+                     common::api::ApiAdjustUserBalance api) override {
+        cmd.command = common::cmd::OrderCommandType::BALANCE_ADJUSTMENT;
+        cmd.orderId = api.transactionId;
+        cmd.symbol = api.currency;
+        cmd.uid = api.uid;
+        cmd.price = api.amount;
+        cmd.orderType =
+            common::OrderTypeFromCode(common::BalanceAdjustmentTypeToCode(api.adjustmentType));
+        cmd.timestamp = api.timestamp;
+        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    }
 };
 
 // Reset translator
 class ResetTranslator
-    : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
-                                              common::api::ApiReset> {
-public:
-  void translateTo(common::cmd::OrderCommand &cmd, int64_t seq,
-                   common::api::ApiReset api) override {
-    cmd.command = common::cmd::OrderCommandType::RESET;
-    cmd.timestamp = api.timestamp;
-    cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  }
+    : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand, common::api::ApiReset> {
+ public:
+    void translateTo(common::cmd::OrderCommand& cmd,
+                     int64_t seq,
+                     common::api::ApiReset api) override {
+        cmd.command = common::cmd::OrderCommandType::RESET;
+        cmd.timestamp = api.timestamp;
+        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    }
 };
 
 // Nop translator
 class NopTranslator
-    : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand,
-                                              common::api::ApiNop> {
-public:
-  void translateTo(common::cmd::OrderCommand &cmd, int64_t seq,
-                   common::api::ApiNop api) override {
-    cmd.command = common::cmd::OrderCommandType::NOP;
-    cmd.timestamp = api.timestamp;
-    cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  }
+    : public disruptor::EventTranslatorOneArg<common::cmd::OrderCommand, common::api::ApiNop> {
+ public:
+    void translateTo(common::cmd::OrderCommand& cmd,
+                     int64_t seq,
+                     common::api::ApiNop api) override {
+        cmd.command = common::cmd::OrderCommandType::NOP;
+        cmd.timestamp = api.timestamp;
+        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    }
 };
 
 // Grouping control translator
 class GroupingControlTranslator
-    : public disruptor::EventTranslatorTwoArg<common::cmd::OrderCommand,
-                                              int64_t, int64_t> {
-public:
-  void translateTo(common::cmd::OrderCommand &cmd, int64_t seq,
-                   int64_t timestampNs, int64_t mode) override {
-    cmd.command = common::cmd::OrderCommandType::GROUPING_CONTROL;
-    cmd.resultCode = common::cmd::CommandResultCode::NEW;
-    cmd.orderId = mode;
-    cmd.timestamp = timestampNs;
-  }
+    : public disruptor::EventTranslatorTwoArg<common::cmd::OrderCommand, int64_t, int64_t> {
+ public:
+    void translateTo(common::cmd::OrderCommand& cmd,
+                     int64_t seq,
+                     int64_t timestampNs,
+                     int64_t mode) override {
+        cmd.command = common::cmd::OrderCommandType::GROUPING_CONTROL;
+        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+        cmd.orderId = mode;
+        cmd.timestamp = timestampNs;
+    }
 };
 
 // Static translator instances
@@ -260,538 +262,525 @@ static AdjustUserBalanceTranslator ADJUST_USER_BALANCE_TRANSLATOR;
 static ResetTranslator RESET_TRANSLATOR;
 static NopTranslator NOP_TRANSLATOR;
 static GroupingControlTranslator GROUPING_CONTROL_TRANSLATOR;
-} // namespace
+}  // namespace
 
 template <typename WaitStrategyT>
 ExchangeApi<WaitStrategyT>::ExchangeApi(
-    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>
-        *ringBuffer)
+    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>* ringBuffer)
     : ringBuffer_(ringBuffer) {}
 
 template <typename WaitStrategyT>
-void ExchangeApi<WaitStrategyT>::ProcessResult(int64_t seq,
-                                               common::cmd::OrderCommand *cmd) {
-  // Check if this is a report query result (BINARY_DATA_QUERY)
-  // Match Java: promises.put(seq, orderCommand ->
-  // future.complete(translator.apply(orderCommand)))
-  typename ReportPromiseMap::accessor reportAccessor;
-  if (reportPromises_.find(reportAccessor, seq)) {
-    // This is a report query result
-    // Extract result from OrderCommand and fulfill promise
-    reportAccessor->second(cmd);
-    reportPromises_.erase(reportAccessor);
-    return;
-  }
+void ExchangeApi<WaitStrategyT>::ProcessResult(int64_t seq, common::cmd::OrderCommand* cmd) {
+    // Check if this is a report query result (BINARY_DATA_QUERY)
+    // Match Java: promises.put(seq, orderCommand ->
+    // future.complete(translator.apply(orderCommand)))
+    typename ReportPromiseMap::accessor reportAccessor;
+    if (reportPromises_.find(reportAccessor, seq)) {
+        // This is a report query result
+        // Extract result from OrderCommand and fulfill promise
+        reportAccessor->second(cmd);
+        reportPromises_.erase(reportAccessor);
+        return;
+    }
 
-  // Check if this is an order book request result
-  // Match Java: promises.put(seq, cmd1 -> future.complete(cmd1.marketData))
-  // With shared_ptr, we can simply copy the shared_ptr (cheap operation)
-  typename OrderBookPromiseMap::accessor orderBookAccessor;
-  if (orderBookPromises_.find(orderBookAccessor, seq)) {
-    // Extract marketData from OrderCommand and fulfill promise
-    // Copy shared_ptr (just increments reference count, very cheap)
-    // marketData can be nullptr if orderBook was not found, which is valid
-    // shared_ptr can be directly assigned, even if it's nullptr
-    orderBookAccessor->second.set_value(cmd->marketData);
-    orderBookPromises_.erase(orderBookAccessor);
-    return;
-  }
+    // Check if this is an order book request result
+    // Match Java: promises.put(seq, cmd1 -> future.complete(cmd1.marketData))
+    // With shared_ptr, we can simply copy the shared_ptr (cheap operation)
+    typename OrderBookPromiseMap::accessor orderBookAccessor;
+    if (orderBookPromises_.find(orderBookAccessor, seq)) {
+        // Extract marketData from OrderCommand and fulfill promise
+        // Copy shared_ptr (just increments reference count, very cheap)
+        // marketData can be nullptr if orderBook was not found, which is valid
+        // shared_ptr can be directly assigned, even if it's nullptr
+        orderBookAccessor->second.set_value(cmd->marketData);
+        orderBookPromises_.erase(orderBookAccessor);
+        return;
+    }
 
-  // Check for full response promise first (SubmitCommandAsyncFullResponse)
-  typename FullResponsePromiseMap::accessor fullResponseAccessor;
-  if (fullResponsePromises_.find(fullResponseAccessor, seq)) {
-    // Return complete OrderCommand copy
-    fullResponseAccessor->second.set_value(cmd->Copy());
-    fullResponsePromises_.erase(fullResponseAccessor);
-    return;
-  }
+    // Check for full response promise first (SubmitCommandAsyncFullResponse)
+    typename FullResponsePromiseMap::accessor fullResponseAccessor;
+    if (fullResponsePromises_.find(fullResponseAccessor, seq)) {
+        // Return complete OrderCommand copy
+        fullResponseAccessor->second.set_value(cmd->Copy());
+        fullResponsePromises_.erase(fullResponseAccessor);
+        return;
+    }
 
-  // Regular command result (SubmitCommandAsync)
-  // TBB concurrent_hash_map: lock-free find and erase
-  typename PromiseMap::accessor accessor;
-  if (promises_.find(accessor, seq)) {
-    accessor->second.set_value(cmd->resultCode);
-    promises_.erase(accessor);
-  }
-  // No promise found - this can happen if:
-  // 1. Command was submitted via SubmitCommand (fire-and-forget)
-  // 2. Promise was already consumed (shouldn't happen)
-  // 3. Sequence mismatch (shouldn't happen)
-}
-
-template <typename WaitStrategyT>
-void ExchangeApi<WaitStrategyT>::SubmitCommand(common::api::ApiCommand *cmd) {
-  // Use publishEvent for normal path
-  if (auto *placeOrder = dynamic_cast<common::api::ApiPlaceOrder *>(cmd)) {
-    ringBuffer_->publishEvent(NEW_ORDER_TRANSLATOR, *placeOrder);
-  } else if (auto *moveOrder = dynamic_cast<common::api::ApiMoveOrder *>(cmd)) {
-    ringBuffer_->publishEvent(MOVE_ORDER_TRANSLATOR, *moveOrder);
-  } else if (auto *cancelOrder =
-                 dynamic_cast<common::api::ApiCancelOrder *>(cmd)) {
-    ringBuffer_->publishEvent(CANCEL_ORDER_TRANSLATOR, *cancelOrder);
-  } else if (auto *reduceOrder =
-                 dynamic_cast<common::api::ApiReduceOrder *>(cmd)) {
-    ringBuffer_->publishEvent(REDUCE_ORDER_TRANSLATOR, *reduceOrder);
-  } else if (auto *orderBookRequest =
-                 dynamic_cast<common::api::ApiOrderBookRequest *>(cmd)) {
-    ringBuffer_->publishEvent(ORDER_BOOK_REQUEST_TRANSLATOR, *orderBookRequest);
-  } else if (auto *addUser = dynamic_cast<common::api::ApiAddUser *>(cmd)) {
-    ringBuffer_->publishEvent(ADD_USER_TRANSLATOR, *addUser);
-  } else if (auto *suspendUser =
-                 dynamic_cast<common::api::ApiSuspendUser *>(cmd)) {
-    ringBuffer_->publishEvent(SUSPEND_USER_TRANSLATOR, *suspendUser);
-  } else if (auto *resumeUser =
-                 dynamic_cast<common::api::ApiResumeUser *>(cmd)) {
-    ringBuffer_->publishEvent(RESUME_USER_TRANSLATOR, *resumeUser);
-  } else if (auto *adjustBalance =
-                 dynamic_cast<common::api::ApiAdjustUserBalance *>(cmd)) {
-    ringBuffer_->publishEvent(ADJUST_USER_BALANCE_TRANSLATOR, *adjustBalance);
-  } else if (auto *reset = dynamic_cast<common::api::ApiReset *>(cmd)) {
-    ringBuffer_->publishEvent(RESET_TRANSLATOR, *reset);
-  } else if (auto *nop = dynamic_cast<common::api::ApiNop *>(cmd)) {
-    ringBuffer_->publishEvent(NOP_TRANSLATOR, *nop);
-  } else if (auto *binaryData =
-                 dynamic_cast<common::api::ApiBinaryDataCommand *>(cmd)) {
-    PublishBinaryData(binaryData, [](int64_t) {});
-  } else if (auto *persistState =
-                 dynamic_cast<common::api::ApiPersistState *>(cmd)) {
-    PublishPersistCmd(persistState, [](int64_t, int64_t) {});
-  } else {
-    throw std::invalid_argument("Unsupported command type");
-  }
-}
-
-template <typename WaitStrategyT>
-std::future<common::cmd::CommandResultCode>
-ExchangeApi<WaitStrategyT>::SubmitCommandAsync(common::api::ApiCommand *cmd) {
-  if (!cmd) {
-    throw std::invalid_argument("SubmitCommandAsync: cmd is nullptr");
-  }
-  if (!ringBuffer_) {
-    throw std::runtime_error("SubmitCommandAsync: ringBuffer is nullptr");
-  }
-
-  std::promise<common::cmd::CommandResultCode> promise;
-  auto future = promise.get_future();
-
-  // Handle binary data and persist commands specially - they claim their own
-  // sequences
-  if (auto *binaryData =
-          dynamic_cast<common::api::ApiBinaryDataCommand *>(cmd)) {
-    // PublishBinaryData will claim its own sequences and set promises
-    // Use shared_ptr to make lambda copyable for std::function
-    auto promisePtr =
-        std::make_shared<std::promise<common::cmd::CommandResultCode>>(
-            std::move(promise));
-    PublishBinaryData(binaryData, [this, promisePtr](int64_t seq) {
-      // TBB concurrent_hash_map: lock-free insert
-      typename PromiseMap::accessor accessor;
-      promises_.insert(accessor, seq);
-      accessor->second = std::move(*promisePtr);
-    });
-    return future;
-  } else if (auto *persistState =
-                 dynamic_cast<common::api::ApiPersistState *>(cmd)) {
-    // PublishPersistCmd will claim its own sequences and set promises
-    // For persist, we need to wait for both sequences
-    std::promise<common::cmd::CommandResultCode> promise2;
-    auto future2 = promise2.get_future();
-    // Use shared_ptr to make lambda copyable for std::function
-    auto promise1Ptr =
-        std::make_shared<std::promise<common::cmd::CommandResultCode>>(
-            std::move(promise));
-    auto promise2Ptr =
-        std::make_shared<std::promise<common::cmd::CommandResultCode>>(
-            std::move(promise2));
-    PublishPersistCmd(persistState, [this, promise1Ptr,
-                                     promise2Ptr](int64_t seq1, int64_t seq2) {
-      // TBB concurrent_hash_map: lock-free insert
-      typename PromiseMap::accessor accessor1, accessor2;
-      promises_.insert(accessor1, seq1);
-      accessor1->second = std::move(*promise1Ptr);
-      promises_.insert(accessor2, seq2);
-      accessor2->second = std::move(*promise2Ptr);
-    });
-    // Match Java: return future1.thenCombineAsync(future2,
-    // CommandResultCode::mergeToFirstFailed)
-    // Java thenCombineAsync: registers callback, executes when both futures
-    // complete (doesn't start thread immediately, uses thread pool when both
-    // ready) Use deferred launch to avoid starting thread immediately When
-    // .get() is called, it will wait for both futures and merge results
-    return std::async(
-        std::launch::deferred,
-        [future = std::move(future), future2 = std::move(future2)]() mutable {
-          // Wait for both futures to complete (matching Java thenCombineAsync
-          // behavior - executes when both are ready)
-          auto result1 = future.get();
-          auto result2 = future2.get();
-          // Match Java: CommandResultCode.mergeToFirstFailed(result1, result2)
-          // Java mergeToFirstFailed logic:
-          // - If any failed (not SUCCESS and not ACCEPTED), return first failed
-          // - Otherwise, if any SUCCESS, return SUCCESS
-          // - Otherwise return ACCEPTED
-          std::vector<common::cmd::CommandResultCode> results = {result1,
-                                                                 result2};
-          return common::cmd::MergeToFirstFailed(results);
-        });
-  }
-
-  // For other commands, claim sequence and translate
-  // Get sequence before publishing
-  int64_t seq = ringBuffer_->next();
-
-  // Store promise (TBB concurrent_hash_map: lock-free insert)
-  {
+    // Regular command result (SubmitCommandAsync)
+    // TBB concurrent_hash_map: lock-free find and erase
     typename PromiseMap::accessor accessor;
-    promises_.insert(accessor, seq);
-    accessor->second = std::move(promise);
-  }
-
-  // Get event slot and translate
-  auto &event = ringBuffer_->get(seq);
-
-  // Publish command (manually translate and publish to capture sequence)
-  if (auto *placeOrder = dynamic_cast<common::api::ApiPlaceOrder *>(cmd)) {
-    NEW_ORDER_TRANSLATOR.translateTo(event, seq, *placeOrder);
-  } else if (auto *moveOrder = dynamic_cast<common::api::ApiMoveOrder *>(cmd)) {
-    MOVE_ORDER_TRANSLATOR.translateTo(event, seq, *moveOrder);
-  } else if (auto *cancelOrder =
-                 dynamic_cast<common::api::ApiCancelOrder *>(cmd)) {
-    CANCEL_ORDER_TRANSLATOR.translateTo(event, seq, *cancelOrder);
-  } else if (auto *reduceOrder =
-                 dynamic_cast<common::api::ApiReduceOrder *>(cmd)) {
-    REDUCE_ORDER_TRANSLATOR.translateTo(event, seq, *reduceOrder);
-  } else if (auto *orderBookRequest =
-                 dynamic_cast<common::api::ApiOrderBookRequest *>(cmd)) {
-    ORDER_BOOK_REQUEST_TRANSLATOR.translateTo(event, seq, *orderBookRequest);
-  } else if (auto *addUser = dynamic_cast<common::api::ApiAddUser *>(cmd)) {
-    ADD_USER_TRANSLATOR.translateTo(event, seq, *addUser);
-  } else if (auto *suspendUser =
-                 dynamic_cast<common::api::ApiSuspendUser *>(cmd)) {
-    SUSPEND_USER_TRANSLATOR.translateTo(event, seq, *suspendUser);
-  } else if (auto *resumeUser =
-                 dynamic_cast<common::api::ApiResumeUser *>(cmd)) {
-    RESUME_USER_TRANSLATOR.translateTo(event, seq, *resumeUser);
-  } else if (auto *adjustBalance =
-                 dynamic_cast<common::api::ApiAdjustUserBalance *>(cmd)) {
-    ADJUST_USER_BALANCE_TRANSLATOR.translateTo(event, seq, *adjustBalance);
-  } else if (auto *reset = dynamic_cast<common::api::ApiReset *>(cmd)) {
-    RESET_TRANSLATOR.translateTo(event, seq, *reset);
-  } else if (auto *nop = dynamic_cast<common::api::ApiNop *>(cmd)) {
-    NOP_TRANSLATOR.translateTo(event, seq, *nop);
-  } else {
-    // Remove promise if command type is unsupported
-    promises_.erase(seq);
-    throw std::invalid_argument("Unsupported command type");
-  }
-
-  // Publish the event
-  ringBuffer_->publish(seq);
-
-  return future;
+    if (promises_.find(accessor, seq)) {
+        accessor->second.set_value(cmd->resultCode);
+        promises_.erase(accessor);
+    }
+    // No promise found - this can happen if:
+    // 1. Command was submitted via SubmitCommand (fire-and-forget)
+    // 2. Promise was already consumed (shouldn't happen)
+    // 3. Sequence mismatch (shouldn't happen)
 }
 
 template <typename WaitStrategyT>
-std::future<common::cmd::OrderCommand>
-ExchangeApi<WaitStrategyT>::SubmitCommandAsyncFullResponse(
-    common::api::ApiCommand *cmd) {
-  if (!cmd) {
-    throw std::invalid_argument(
-        "SubmitCommandAsyncFullResponse: cmd is nullptr");
-  }
-  if (!ringBuffer_) {
-    throw std::runtime_error(
-        "SubmitCommandAsyncFullResponse: ringBuffer is nullptr");
-  }
+void ExchangeApi<WaitStrategyT>::SubmitCommand(common::api::ApiCommand* cmd) {
+    // Use publishEvent for normal path
+    if (auto* placeOrder = dynamic_cast<common::api::ApiPlaceOrder*>(cmd)) {
+        ringBuffer_->publishEvent(NEW_ORDER_TRANSLATOR, *placeOrder);
+    } else if (auto* moveOrder = dynamic_cast<common::api::ApiMoveOrder*>(cmd)) {
+        ringBuffer_->publishEvent(MOVE_ORDER_TRANSLATOR, *moveOrder);
+    } else if (auto* cancelOrder = dynamic_cast<common::api::ApiCancelOrder*>(cmd)) {
+        ringBuffer_->publishEvent(CANCEL_ORDER_TRANSLATOR, *cancelOrder);
+    } else if (auto* reduceOrder = dynamic_cast<common::api::ApiReduceOrder*>(cmd)) {
+        ringBuffer_->publishEvent(REDUCE_ORDER_TRANSLATOR, *reduceOrder);
+    } else if (auto* orderBookRequest = dynamic_cast<common::api::ApiOrderBookRequest*>(cmd)) {
+        ringBuffer_->publishEvent(ORDER_BOOK_REQUEST_TRANSLATOR, *orderBookRequest);
+    } else if (auto* addUser = dynamic_cast<common::api::ApiAddUser*>(cmd)) {
+        ringBuffer_->publishEvent(ADD_USER_TRANSLATOR, *addUser);
+    } else if (auto* suspendUser = dynamic_cast<common::api::ApiSuspendUser*>(cmd)) {
+        ringBuffer_->publishEvent(SUSPEND_USER_TRANSLATOR, *suspendUser);
+    } else if (auto* resumeUser = dynamic_cast<common::api::ApiResumeUser*>(cmd)) {
+        ringBuffer_->publishEvent(RESUME_USER_TRANSLATOR, *resumeUser);
+    } else if (auto* adjustBalance = dynamic_cast<common::api::ApiAdjustUserBalance*>(cmd)) {
+        ringBuffer_->publishEvent(ADJUST_USER_BALANCE_TRANSLATOR, *adjustBalance);
+    } else if (auto* reset = dynamic_cast<common::api::ApiReset*>(cmd)) {
+        ringBuffer_->publishEvent(RESET_TRANSLATOR, *reset);
+    } else if (auto* nop = dynamic_cast<common::api::ApiNop*>(cmd)) {
+        ringBuffer_->publishEvent(NOP_TRANSLATOR, *nop);
+    } else if (auto* binaryData = dynamic_cast<common::api::ApiBinaryDataCommand*>(cmd)) {
+        PublishBinaryData(binaryData, [](int64_t) {});
+    } else if (auto* persistState = dynamic_cast<common::api::ApiPersistState*>(cmd)) {
+        PublishPersistCmd(persistState, [](int64_t, int64_t) {});
+    } else {
+        throw std::invalid_argument("Unsupported command type");
+    }
+}
 
-  std::promise<common::cmd::OrderCommand> promise;
-  auto future = promise.get_future();
+template <typename WaitStrategyT>
+std::future<common::cmd::CommandResultCode> ExchangeApi<WaitStrategyT>::SubmitCommandAsync(
+    common::api::ApiCommand* cmd) {
+    if (!cmd) {
+        throw std::invalid_argument("SubmitCommandAsync: cmd is nullptr");
+    }
+    if (!ringBuffer_) {
+        throw std::runtime_error("SubmitCommandAsync: ringBuffer is nullptr");
+    }
 
-  // Handle binary data and persist commands specially - they claim their own
-  // sequences
-  if (auto *binaryData =
-          dynamic_cast<common::api::ApiBinaryDataCommand *>(cmd)) {
-    // For binary data commands, we can't use full response (they don't return
-    // OrderCommand) Fall back to regular async
-    throw std::invalid_argument(
-        "SubmitCommandAsyncFullResponse: BinaryDataCommand not supported");
-  } else if (auto *persistState =
-                 dynamic_cast<common::api::ApiPersistState *>(cmd)) {
-    // For persist commands, we can't use full response
-    throw std::invalid_argument(
-        "SubmitCommandAsyncFullResponse: PersistState not supported");
-  }
+    std::promise<common::cmd::CommandResultCode> promise;
+    auto future = promise.get_future();
 
-  // For other commands, claim sequence and translate
-  // Get sequence before publishing
-  int64_t seq = ringBuffer_->next();
+    // Handle binary data and persist commands specially - they claim their own
+    // sequences
+    if (auto* binaryData = dynamic_cast<common::api::ApiBinaryDataCommand*>(cmd)) {
+        // PublishBinaryData will claim its own sequences and set promises
+        // Use shared_ptr to make lambda copyable for std::function
+        auto promisePtr =
+            std::make_shared<std::promise<common::cmd::CommandResultCode>>(std::move(promise));
+        PublishBinaryData(binaryData, [this, promisePtr](int64_t seq) {
+            // TBB concurrent_hash_map: lock-free insert
+            typename PromiseMap::accessor accessor;
+            promises_.insert(accessor, seq);
+            accessor->second = std::move(*promisePtr);
+        });
+        return future;
+    } else if (auto* persistState = dynamic_cast<common::api::ApiPersistState*>(cmd)) {
+        // PublishPersistCmd will claim its own sequences and set promises
+        // For persist, we need to wait for both sequences
+        std::promise<common::cmd::CommandResultCode> promise2;
+        auto future2 = promise2.get_future();
+        // Use shared_ptr to make lambda copyable for std::function
+        auto promise1Ptr =
+            std::make_shared<std::promise<common::cmd::CommandResultCode>>(std::move(promise));
+        auto promise2Ptr =
+            std::make_shared<std::promise<common::cmd::CommandResultCode>>(std::move(promise2));
+        PublishPersistCmd(persistState,
+                          [this, promise1Ptr, promise2Ptr](int64_t seq1, int64_t seq2) {
+                              // TBB concurrent_hash_map: lock-free insert
+                              typename PromiseMap::accessor accessor1, accessor2;
+                              promises_.insert(accessor1, seq1);
+                              accessor1->second = std::move(*promise1Ptr);
+                              promises_.insert(accessor2, seq2);
+                              accessor2->second = std::move(*promise2Ptr);
+                          });
+        // Match Java: return future1.thenCombineAsync(future2,
+        // CommandResultCode::mergeToFirstFailed)
+        // Java thenCombineAsync: registers callback, executes when both futures
+        // complete (doesn't start thread immediately, uses thread pool when both
+        // ready) Use deferred launch to avoid starting thread immediately When
+        // .get() is called, it will wait for both futures and merge results
+        return std::async(std::launch::deferred,
+                          [future = std::move(future), future2 = std::move(future2)]() mutable {
+                              // Wait for both futures to complete (matching Java thenCombineAsync
+                              // behavior - executes when both are ready)
+                              auto result1 = future.get();
+                              auto result2 = future2.get();
+                              // Match Java: CommandResultCode.mergeToFirstFailed(result1, result2)
+                              // Java mergeToFirstFailed logic:
+                              // - If any failed (not SUCCESS and not ACCEPTED), return first failed
+                              // - Otherwise, if any SUCCESS, return SUCCESS
+                              // - Otherwise return ACCEPTED
+                              std::vector<common::cmd::CommandResultCode> results = {result1,
+                                                                                     result2};
+                              return common::cmd::MergeToFirstFailed(results);
+                          });
+    }
 
-  // Store promise (TBB concurrent_hash_map: lock-free insert)
-  {
-    typename FullResponsePromiseMap::accessor accessor;
-    fullResponsePromises_.insert(accessor, seq);
-    accessor->second = std::move(promise);
-  }
+    // For other commands, claim sequence and translate
+    // Get sequence before publishing
+    int64_t seq = ringBuffer_->next();
 
-  // Get event slot and translate
-  auto &event = ringBuffer_->get(seq);
+    // Store promise (TBB concurrent_hash_map: lock-free insert)
+    {
+        typename PromiseMap::accessor accessor;
+        promises_.insert(accessor, seq);
+        accessor->second = std::move(promise);
+    }
 
-  // Publish command (manually translate and publish to capture sequence)
-  if (auto *placeOrder = dynamic_cast<common::api::ApiPlaceOrder *>(cmd)) {
-    NEW_ORDER_TRANSLATOR.translateTo(event, seq, *placeOrder);
-  } else if (auto *moveOrder = dynamic_cast<common::api::ApiMoveOrder *>(cmd)) {
-    MOVE_ORDER_TRANSLATOR.translateTo(event, seq, *moveOrder);
-  } else if (auto *cancelOrder =
-                 dynamic_cast<common::api::ApiCancelOrder *>(cmd)) {
-    CANCEL_ORDER_TRANSLATOR.translateTo(event, seq, *cancelOrder);
-  } else if (auto *reduceOrder =
-                 dynamic_cast<common::api::ApiReduceOrder *>(cmd)) {
-    REDUCE_ORDER_TRANSLATOR.translateTo(event, seq, *reduceOrder);
-  } else if (auto *orderBookRequest =
-                 dynamic_cast<common::api::ApiOrderBookRequest *>(cmd)) {
-    ORDER_BOOK_REQUEST_TRANSLATOR.translateTo(event, seq, *orderBookRequest);
-  } else if (auto *addUser = dynamic_cast<common::api::ApiAddUser *>(cmd)) {
-    ADD_USER_TRANSLATOR.translateTo(event, seq, *addUser);
-  } else if (auto *suspendUser =
-                 dynamic_cast<common::api::ApiSuspendUser *>(cmd)) {
-    SUSPEND_USER_TRANSLATOR.translateTo(event, seq, *suspendUser);
-  } else if (auto *resumeUser =
-                 dynamic_cast<common::api::ApiResumeUser *>(cmd)) {
-    RESUME_USER_TRANSLATOR.translateTo(event, seq, *resumeUser);
-  } else if (auto *adjustBalance =
-                 dynamic_cast<common::api::ApiAdjustUserBalance *>(cmd)) {
-    ADJUST_USER_BALANCE_TRANSLATOR.translateTo(event, seq, *adjustBalance);
-  } else if (auto *reset = dynamic_cast<common::api::ApiReset *>(cmd)) {
-    RESET_TRANSLATOR.translateTo(event, seq, *reset);
-  } else if (auto *nop = dynamic_cast<common::api::ApiNop *>(cmd)) {
-    NOP_TRANSLATOR.translateTo(event, seq, *nop);
-  } else {
-    // Remove promise if command type is unsupported
-    fullResponsePromises_.erase(seq);
-    throw std::invalid_argument("Unsupported command type");
-  }
+    // Get event slot and translate
+    auto& event = ringBuffer_->get(seq);
 
-  // Publish the event
-  ringBuffer_->publish(seq);
+    // Publish command (manually translate and publish to capture sequence)
+    if (auto* placeOrder = dynamic_cast<common::api::ApiPlaceOrder*>(cmd)) {
+        NEW_ORDER_TRANSLATOR.translateTo(event, seq, *placeOrder);
+    } else if (auto* moveOrder = dynamic_cast<common::api::ApiMoveOrder*>(cmd)) {
+        MOVE_ORDER_TRANSLATOR.translateTo(event, seq, *moveOrder);
+    } else if (auto* cancelOrder = dynamic_cast<common::api::ApiCancelOrder*>(cmd)) {
+        CANCEL_ORDER_TRANSLATOR.translateTo(event, seq, *cancelOrder);
+    } else if (auto* reduceOrder = dynamic_cast<common::api::ApiReduceOrder*>(cmd)) {
+        REDUCE_ORDER_TRANSLATOR.translateTo(event, seq, *reduceOrder);
+    } else if (auto* orderBookRequest = dynamic_cast<common::api::ApiOrderBookRequest*>(cmd)) {
+        ORDER_BOOK_REQUEST_TRANSLATOR.translateTo(event, seq, *orderBookRequest);
+    } else if (auto* addUser = dynamic_cast<common::api::ApiAddUser*>(cmd)) {
+        ADD_USER_TRANSLATOR.translateTo(event, seq, *addUser);
+    } else if (auto* suspendUser = dynamic_cast<common::api::ApiSuspendUser*>(cmd)) {
+        SUSPEND_USER_TRANSLATOR.translateTo(event, seq, *suspendUser);
+    } else if (auto* resumeUser = dynamic_cast<common::api::ApiResumeUser*>(cmd)) {
+        RESUME_USER_TRANSLATOR.translateTo(event, seq, *resumeUser);
+    } else if (auto* adjustBalance = dynamic_cast<common::api::ApiAdjustUserBalance*>(cmd)) {
+        ADJUST_USER_BALANCE_TRANSLATOR.translateTo(event, seq, *adjustBalance);
+    } else if (auto* reset = dynamic_cast<common::api::ApiReset*>(cmd)) {
+        RESET_TRANSLATOR.translateTo(event, seq, *reset);
+    } else if (auto* nop = dynamic_cast<common::api::ApiNop*>(cmd)) {
+        NOP_TRANSLATOR.translateTo(event, seq, *nop);
+    } else {
+        // Remove promise if command type is unsupported
+        promises_.erase(seq);
+        throw std::invalid_argument("Unsupported command type");
+    }
 
-  return future;
+    // Publish the event
+    ringBuffer_->publish(seq);
+
+    return future;
+}
+
+template <typename WaitStrategyT>
+std::future<common::cmd::OrderCommand> ExchangeApi<WaitStrategyT>::SubmitCommandAsyncFullResponse(
+    common::api::ApiCommand* cmd) {
+    if (!cmd) {
+        throw std::invalid_argument("SubmitCommandAsyncFullResponse: cmd is nullptr");
+    }
+    if (!ringBuffer_) {
+        throw std::runtime_error("SubmitCommandAsyncFullResponse: ringBuffer is nullptr");
+    }
+
+    std::promise<common::cmd::OrderCommand> promise;
+    auto future = promise.get_future();
+
+    // Handle binary data and persist commands specially - they claim their own
+    // sequences
+    if (auto* binaryData = dynamic_cast<common::api::ApiBinaryDataCommand*>(cmd)) {
+        // For binary data commands, we can't use full response (they don't return
+        // OrderCommand) Fall back to regular async
+        throw std::invalid_argument(
+            "SubmitCommandAsyncFullResponse: BinaryDataCommand not supported");
+    } else if (auto* persistState = dynamic_cast<common::api::ApiPersistState*>(cmd)) {
+        // For persist commands, we can't use full response
+        throw std::invalid_argument("SubmitCommandAsyncFullResponse: PersistState not supported");
+    }
+
+    // For other commands, claim sequence and translate
+    // Get sequence before publishing
+    int64_t seq = ringBuffer_->next();
+
+    // Store promise (TBB concurrent_hash_map: lock-free insert)
+    {
+        typename FullResponsePromiseMap::accessor accessor;
+        fullResponsePromises_.insert(accessor, seq);
+        accessor->second = std::move(promise);
+    }
+
+    // Get event slot and translate
+    auto& event = ringBuffer_->get(seq);
+
+    // Publish command (manually translate and publish to capture sequence)
+    if (auto* placeOrder = dynamic_cast<common::api::ApiPlaceOrder*>(cmd)) {
+        NEW_ORDER_TRANSLATOR.translateTo(event, seq, *placeOrder);
+    } else if (auto* moveOrder = dynamic_cast<common::api::ApiMoveOrder*>(cmd)) {
+        MOVE_ORDER_TRANSLATOR.translateTo(event, seq, *moveOrder);
+    } else if (auto* cancelOrder = dynamic_cast<common::api::ApiCancelOrder*>(cmd)) {
+        CANCEL_ORDER_TRANSLATOR.translateTo(event, seq, *cancelOrder);
+    } else if (auto* reduceOrder = dynamic_cast<common::api::ApiReduceOrder*>(cmd)) {
+        REDUCE_ORDER_TRANSLATOR.translateTo(event, seq, *reduceOrder);
+    } else if (auto* orderBookRequest = dynamic_cast<common::api::ApiOrderBookRequest*>(cmd)) {
+        ORDER_BOOK_REQUEST_TRANSLATOR.translateTo(event, seq, *orderBookRequest);
+    } else if (auto* addUser = dynamic_cast<common::api::ApiAddUser*>(cmd)) {
+        ADD_USER_TRANSLATOR.translateTo(event, seq, *addUser);
+    } else if (auto* suspendUser = dynamic_cast<common::api::ApiSuspendUser*>(cmd)) {
+        SUSPEND_USER_TRANSLATOR.translateTo(event, seq, *suspendUser);
+    } else if (auto* resumeUser = dynamic_cast<common::api::ApiResumeUser*>(cmd)) {
+        RESUME_USER_TRANSLATOR.translateTo(event, seq, *resumeUser);
+    } else if (auto* adjustBalance = dynamic_cast<common::api::ApiAdjustUserBalance*>(cmd)) {
+        ADJUST_USER_BALANCE_TRANSLATOR.translateTo(event, seq, *adjustBalance);
+    } else if (auto* reset = dynamic_cast<common::api::ApiReset*>(cmd)) {
+        RESET_TRANSLATOR.translateTo(event, seq, *reset);
+    } else if (auto* nop = dynamic_cast<common::api::ApiNop*>(cmd)) {
+        NOP_TRANSLATOR.translateTo(event, seq, *nop);
+    } else {
+        // Remove promise if command type is unsupported
+        fullResponsePromises_.erase(seq);
+        throw std::invalid_argument("Unsupported command type");
+    }
+
+    // Publish the event
+    ringBuffer_->publish(seq);
+
+    return future;
 }
 
 template <typename WaitStrategyT>
 std::future<std::shared_ptr<common::L2MarketData>>
-ExchangeApi<WaitStrategyT>::RequestOrderBookAsync(int32_t symbolId,
-                                                  int32_t depth) {
-  if (!ringBuffer_) {
-    throw std::runtime_error("RequestOrderBookAsync: ringBuffer is nullptr");
-  }
+ExchangeApi<WaitStrategyT>::RequestOrderBookAsync(int32_t symbolId, int32_t depth) {
+    if (!ringBuffer_) {
+        throw std::runtime_error("RequestOrderBookAsync: ringBuffer is nullptr");
+    }
 
-  std::promise<std::shared_ptr<common::L2MarketData>> promise;
-  auto future = promise.get_future();
+    std::promise<std::shared_ptr<common::L2MarketData>> promise;
+    auto future = promise.get_future();
 
-  // Get sequence before publishing (match Java: ringBuffer.publishEvent)
-  int64_t seq = ringBuffer_->next();
+    // Get sequence before publishing (match Java: ringBuffer.publishEvent)
+    int64_t seq = ringBuffer_->next();
 
-  // Store promise (TBB concurrent_hash_map: lock-free insert)
-  {
-    typename OrderBookPromiseMap::accessor accessor;
-    orderBookPromises_.insert(accessor, seq);
-    accessor->second = std::move(promise);
-  }
+    // Store promise (TBB concurrent_hash_map: lock-free insert)
+    {
+        typename OrderBookPromiseMap::accessor accessor;
+        orderBookPromises_.insert(accessor, seq);
+        accessor->second = std::move(promise);
+    }
 
-  // Get event slot and set up order book request
-  // Match Java: ringBuffer.publishEvent(((cmd, seq) -> { ... promises.put(seq,
-  // cmd1 -> future.complete(cmd1.marketData)); }))
-  auto &event = ringBuffer_->get(seq);
-  event.command = common::cmd::OrderCommandType::ORDER_BOOK_REQUEST;
-  event.orderId = -1;
-  event.symbol = symbolId;
-  event.uid = -1;
-  event.size = depth;
-  event.timestamp = utils::FastNanoTime::NowMillis();
-  event.resultCode = common::cmd::CommandResultCode::NEW;
+    // Get event slot and set up order book request
+    // Match Java: ringBuffer.publishEvent(((cmd, seq) -> { ... promises.put(seq,
+    // cmd1 -> future.complete(cmd1.marketData)); }))
+    auto& event = ringBuffer_->get(seq);
+    event.command = common::cmd::OrderCommandType::ORDER_BOOK_REQUEST;
+    event.orderId = -1;
+    event.symbol = symbolId;
+    event.uid = -1;
+    event.size = depth;
+    event.timestamp = utils::FastNanoTime::NowMillis();
+    event.resultCode = common::cmd::CommandResultCode::NEW;
 
-  // Publish event
-  ringBuffer_->publish(seq);
+    // Publish event
+    ringBuffer_->publish(seq);
 
-  return future;
+    return future;
 }
 
 template <typename WaitStrategyT>
-void ExchangeApi<WaitStrategyT>::GroupingControl(int64_t timestampNs,
-                                                 int64_t mode) {
-  if (!ringBuffer_) {
-    throw std::runtime_error("GroupingControl: ringBuffer is nullptr");
-  }
+void ExchangeApi<WaitStrategyT>::GroupingControl(int64_t timestampNs, int64_t mode) {
+    if (!ringBuffer_) {
+        throw std::runtime_error("GroupingControl: ringBuffer is nullptr");
+    }
 
-  // Match Java: ringBuffer.publishEvent((cmd, seq) -> {
-  //     cmd.command = OrderCommandType.GROUPING_CONTROL;
-  //     cmd.resultCode = CommandResultCode.NEW;
-  //     cmd.orderId = mode;
-  //     cmd.timestamp = timestampNs;
-  // });
-  ringBuffer_->publishEvent(GROUPING_CONTROL_TRANSLATOR, timestampNs, mode);
+    // Match Java: ringBuffer.publishEvent((cmd, seq) -> {
+    //     cmd.command = OrderCommandType.GROUPING_CONTROL;
+    //     cmd.resultCode = CommandResultCode.NEW;
+    //     cmd.orderId = mode;
+    //     cmd.timestamp = timestampNs;
+    // });
+    ringBuffer_->publishEvent(GROUPING_CONTROL_TRANSLATOR, timestampNs, mode);
 }
 
 template <typename WaitStrategyT>
 void ExchangeApi<WaitStrategyT>::BinaryData(int32_t serviceFlags,
                                             int64_t eventsGroup,
                                             int64_t timestampNs,
-                                            int8_t lastFlag, int64_t word0,
-                                            int64_t word1, int64_t word2,
-                                            int64_t word3, int64_t word4) {
-  if (!ringBuffer_) {
-    throw std::runtime_error("BinaryData: ringBuffer is nullptr");
-  }
+                                            int8_t lastFlag,
+                                            int64_t word0,
+                                            int64_t word1,
+                                            int64_t word2,
+                                            int64_t word3,
+                                            int64_t word4) {
+    if (!ringBuffer_) {
+        throw std::runtime_error("BinaryData: ringBuffer is nullptr");
+    }
 
-  // Match Java: ringBuffer.publishEvent(((cmd, seq) -> {
-  //     cmd.serviceFlags = serviceFlags;
-  //     cmd.eventsGroup = eventsGroup;
-  //     cmd.command = OrderCommandType.BINARY_DATA_COMMAND;
-  //     cmd.symbol = lastFlag;
-  //     cmd.orderId = word0;
-  //     cmd.price = word1;
-  //     cmd.reserveBidPrice = word2;
-  //     cmd.size = word3;
-  //     cmd.uid = word4;
-  //     cmd.timestamp = timestampNs;
-  //     cmd.resultCode = CommandResultCode.NEW;
-  // }));
-  int64_t seq = ringBuffer_->next();
-  auto &cmd = ringBuffer_->get(seq);
-  cmd.serviceFlags = serviceFlags;
-  cmd.eventsGroup = eventsGroup;
-  cmd.command = common::cmd::OrderCommandType::BINARY_DATA_COMMAND;
-  cmd.symbol = lastFlag;
-  cmd.orderId = word0;
-  cmd.price = word1;
-  cmd.reserveBidPrice = word2;
-  cmd.size = word3;
-  cmd.uid = word4;
-  cmd.timestamp = timestampNs;
-  cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  ringBuffer_->publish(seq);
+    // Match Java: ringBuffer.publishEvent(((cmd, seq) -> {
+    //     cmd.serviceFlags = serviceFlags;
+    //     cmd.eventsGroup = eventsGroup;
+    //     cmd.command = OrderCommandType.BINARY_DATA_COMMAND;
+    //     cmd.symbol = lastFlag;
+    //     cmd.orderId = word0;
+    //     cmd.price = word1;
+    //     cmd.reserveBidPrice = word2;
+    //     cmd.size = word3;
+    //     cmd.uid = word4;
+    //     cmd.timestamp = timestampNs;
+    //     cmd.resultCode = CommandResultCode.NEW;
+    // }));
+    int64_t seq = ringBuffer_->next();
+    auto& cmd = ringBuffer_->get(seq);
+    cmd.serviceFlags = serviceFlags;
+    cmd.eventsGroup = eventsGroup;
+    cmd.command = common::cmd::OrderCommandType::BINARY_DATA_COMMAND;
+    cmd.symbol = static_cast<int32_t>(static_cast<uint8_t>(lastFlag));
+    cmd.orderId = word0;
+    cmd.price = word1;
+    cmd.reserveBidPrice = word2;
+    cmd.size = word3;
+    cmd.uid = word4;
+    cmd.timestamp = timestampNs;
+    cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    ringBuffer_->publish(seq);
 }
 
 template <typename WaitStrategyT>
-void ExchangeApi<WaitStrategyT>::PlaceOrderReplay(
-    int32_t serviceFlags, int64_t eventsGroup, int64_t timestampNs,
-    int64_t orderId, int32_t userCookie, int64_t price,
-    int64_t reservedBidPrice, int64_t size, common::OrderAction action,
-    common::OrderType orderType, int32_t symbol, int64_t uid) {
-  if (!ringBuffer_) {
-    throw std::runtime_error("PlaceOrderReplay: ringBuffer is nullptr");
-  }
-  // Match Java: placeNewOrder(serviceFlags, eventsGroup, timestampNs, ...)
-  int64_t seq = ringBuffer_->next();
-  auto &cmd = ringBuffer_->get(seq);
-  cmd.serviceFlags = serviceFlags;
-  cmd.eventsGroup = eventsGroup;
-  cmd.command = common::cmd::OrderCommandType::PLACE_ORDER;
-  cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  cmd.price = price;
-  cmd.reserveBidPrice = reservedBidPrice;
-  cmd.size = size;
-  cmd.orderId = orderId;
-  cmd.timestamp = timestampNs;
-  cmd.action = action;
-  cmd.orderType = orderType;
-  cmd.symbol = symbol;
-  cmd.uid = uid;
-  cmd.userCookie = userCookie;
-  ringBuffer_->publish(seq);
+void ExchangeApi<WaitStrategyT>::PlaceOrderReplay(int32_t serviceFlags,
+                                                  int64_t eventsGroup,
+                                                  int64_t timestampNs,
+                                                  int64_t orderId,
+                                                  int32_t userCookie,
+                                                  int64_t price,
+                                                  int64_t reservedBidPrice,
+                                                  int64_t size,
+                                                  common::OrderAction action,
+                                                  common::OrderType orderType,
+                                                  int32_t symbol,
+                                                  int64_t uid) {
+    if (!ringBuffer_) {
+        throw std::runtime_error("PlaceOrderReplay: ringBuffer is nullptr");
+    }
+    // Match Java: placeNewOrder(serviceFlags, eventsGroup, timestampNs, ...)
+    int64_t seq = ringBuffer_->next();
+    auto& cmd = ringBuffer_->get(seq);
+    cmd.serviceFlags = serviceFlags;
+    cmd.eventsGroup = eventsGroup;
+    cmd.command = common::cmd::OrderCommandType::PLACE_ORDER;
+    cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    cmd.price = price;
+    cmd.reserveBidPrice = reservedBidPrice;
+    cmd.size = size;
+    cmd.orderId = orderId;
+    cmd.timestamp = timestampNs;
+    cmd.action = action;
+    cmd.orderType = orderType;
+    cmd.symbol = symbol;
+    cmd.uid = uid;
+    cmd.userCookie = userCookie;
+    ringBuffer_->publish(seq);
 }
 
 template <typename WaitStrategyT>
 void ExchangeApi<WaitStrategyT>::MoveOrderReplay(int32_t serviceFlags,
                                                  int64_t eventsGroup,
                                                  int64_t timestampNs,
-                                                 int64_t price, int64_t orderId,
-                                                 int32_t symbol, int64_t uid) {
-  if (!ringBuffer_) {
-    throw std::runtime_error("MoveOrderReplay: ringBuffer is nullptr");
-  }
-  // Match Java: moveOrder(serviceFlags, eventsGroup, timestampNs, ...)
-  int64_t seq = ringBuffer_->next();
-  auto &cmd = ringBuffer_->get(seq);
-  cmd.serviceFlags = serviceFlags;
-  cmd.eventsGroup = eventsGroup;
-  cmd.command = common::cmd::OrderCommandType::MOVE_ORDER;
-  cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  cmd.price = price;
-  cmd.orderId = orderId;
-  cmd.timestamp = timestampNs;
-  cmd.symbol = symbol;
-  cmd.uid = uid;
-  ringBuffer_->publish(seq);
+                                                 int64_t price,
+                                                 int64_t orderId,
+                                                 int32_t symbol,
+                                                 int64_t uid) {
+    if (!ringBuffer_) {
+        throw std::runtime_error("MoveOrderReplay: ringBuffer is nullptr");
+    }
+    // Match Java: moveOrder(serviceFlags, eventsGroup, timestampNs, ...)
+    int64_t seq = ringBuffer_->next();
+    auto& cmd = ringBuffer_->get(seq);
+    cmd.serviceFlags = serviceFlags;
+    cmd.eventsGroup = eventsGroup;
+    cmd.command = common::cmd::OrderCommandType::MOVE_ORDER;
+    cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    cmd.price = price;
+    cmd.orderId = orderId;
+    cmd.timestamp = timestampNs;
+    cmd.symbol = symbol;
+    cmd.uid = uid;
+    ringBuffer_->publish(seq);
 }
 
 template <typename WaitStrategyT>
-void ExchangeApi<WaitStrategyT>::CancelOrderReplay(
-    int32_t serviceFlags, int64_t eventsGroup, int64_t timestampNs,
-    int64_t orderId, int32_t symbol, int64_t uid) {
-  if (!ringBuffer_) {
-    throw std::runtime_error("CancelOrderReplay: ringBuffer is nullptr");
-  }
-  // Match Java: cancelOrder(serviceFlags, eventsGroup, timestampNs, ...)
-  int64_t seq = ringBuffer_->next();
-  auto &cmd = ringBuffer_->get(seq);
-  cmd.serviceFlags = serviceFlags;
-  cmd.eventsGroup = eventsGroup;
-  cmd.command = common::cmd::OrderCommandType::CANCEL_ORDER;
-  cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  cmd.orderId = orderId;
-  cmd.timestamp = timestampNs;
-  cmd.symbol = symbol;
-  cmd.uid = uid;
-  ringBuffer_->publish(seq);
+void ExchangeApi<WaitStrategyT>::CancelOrderReplay(int32_t serviceFlags,
+                                                   int64_t eventsGroup,
+                                                   int64_t timestampNs,
+                                                   int64_t orderId,
+                                                   int32_t symbol,
+                                                   int64_t uid) {
+    if (!ringBuffer_) {
+        throw std::runtime_error("CancelOrderReplay: ringBuffer is nullptr");
+    }
+    // Match Java: cancelOrder(serviceFlags, eventsGroup, timestampNs, ...)
+    int64_t seq = ringBuffer_->next();
+    auto& cmd = ringBuffer_->get(seq);
+    cmd.serviceFlags = serviceFlags;
+    cmd.eventsGroup = eventsGroup;
+    cmd.command = common::cmd::OrderCommandType::CANCEL_ORDER;
+    cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    cmd.orderId = orderId;
+    cmd.timestamp = timestampNs;
+    cmd.symbol = symbol;
+    cmd.uid = uid;
+    ringBuffer_->publish(seq);
 }
 
 template <typename WaitStrategyT>
-void ExchangeApi<WaitStrategyT>::ReduceOrderReplay(
-    int32_t serviceFlags, int64_t eventsGroup, int64_t timestampNs,
-    int64_t reduceSize, int64_t orderId, int32_t symbol, int64_t uid) {
-  if (!ringBuffer_) {
-    throw std::runtime_error("ReduceOrderReplay: ringBuffer is nullptr");
-  }
-  // Match Java: reduceOrder(serviceFlags, eventsGroup, timestampNs, ...)
-  int64_t seq = ringBuffer_->next();
-  auto &cmd = ringBuffer_->get(seq);
-  cmd.serviceFlags = serviceFlags;
-  cmd.eventsGroup = eventsGroup;
-  cmd.command = common::cmd::OrderCommandType::REDUCE_ORDER;
-  cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  cmd.size = reduceSize;
-  cmd.orderId = orderId;
-  cmd.timestamp = timestampNs;
-  cmd.symbol = symbol;
-  cmd.uid = uid;
-  ringBuffer_->publish(seq);
+void ExchangeApi<WaitStrategyT>::ReduceOrderReplay(int32_t serviceFlags,
+                                                   int64_t eventsGroup,
+                                                   int64_t timestampNs,
+                                                   int64_t reduceSize,
+                                                   int64_t orderId,
+                                                   int32_t symbol,
+                                                   int64_t uid) {
+    if (!ringBuffer_) {
+        throw std::runtime_error("ReduceOrderReplay: ringBuffer is nullptr");
+    }
+    // Match Java: reduceOrder(serviceFlags, eventsGroup, timestampNs, ...)
+    int64_t seq = ringBuffer_->next();
+    auto& cmd = ringBuffer_->get(seq);
+    cmd.serviceFlags = serviceFlags;
+    cmd.eventsGroup = eventsGroup;
+    cmd.command = common::cmd::OrderCommandType::REDUCE_ORDER;
+    cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    cmd.size = reduceSize;
+    cmd.orderId = orderId;
+    cmd.timestamp = timestampNs;
+    cmd.symbol = symbol;
+    cmd.uid = uid;
+    ringBuffer_->publish(seq);
 }
 
 template <typename WaitStrategyT>
 void ExchangeApi<WaitStrategyT>::BalanceAdjustmentReplay(
-    int32_t serviceFlags, int64_t eventsGroup, int64_t timestampNs, int64_t uid,
-    int64_t transactionId, int32_t currency, int64_t longAmount,
+    int32_t serviceFlags,
+    int64_t eventsGroup,
+    int64_t timestampNs,
+    int64_t uid,
+    int64_t transactionId,
+    int32_t currency,
+    int64_t longAmount,
     common::BalanceAdjustmentType adjustmentType) {
-  if (!ringBuffer_) {
-    throw std::runtime_error("BalanceAdjustmentReplay: ringBuffer is nullptr");
-  }
-  // Match Java: balanceAdjustment(serviceFlags, eventsGroup, timestampNs, ...)
-  int64_t seq = ringBuffer_->next();
-  auto &cmd = ringBuffer_->get(seq);
-  cmd.serviceFlags = serviceFlags;
-  cmd.eventsGroup = eventsGroup;
-  cmd.command = common::cmd::OrderCommandType::BALANCE_ADJUSTMENT;
-  cmd.orderId = transactionId;
-  cmd.symbol = currency;
-  cmd.uid = uid;
-  cmd.price = longAmount;
-  cmd.orderType = common::OrderTypeFromCode(
-      common::BalanceAdjustmentTypeToCode(adjustmentType));
-  cmd.size = 0;
-  cmd.timestamp = timestampNs;
-  cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  ringBuffer_->publish(seq);
+    if (!ringBuffer_) {
+        throw std::runtime_error("BalanceAdjustmentReplay: ringBuffer is nullptr");
+    }
+    // Match Java: balanceAdjustment(serviceFlags, eventsGroup, timestampNs, ...)
+    int64_t seq = ringBuffer_->next();
+    auto& cmd = ringBuffer_->get(seq);
+    cmd.serviceFlags = serviceFlags;
+    cmd.eventsGroup = eventsGroup;
+    cmd.command = common::cmd::OrderCommandType::BALANCE_ADJUSTMENT;
+    cmd.orderId = transactionId;
+    cmd.symbol = currency;
+    cmd.uid = uid;
+    cmd.price = longAmount;
+    cmd.orderType = common::OrderTypeFromCode(common::BalanceAdjustmentTypeToCode(adjustmentType));
+    cmd.size = 0;
+    cmd.timestamp = timestampNs;
+    cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    ringBuffer_->publish(seq);
 }
 
 template <typename WaitStrategyT>
@@ -799,21 +788,21 @@ void ExchangeApi<WaitStrategyT>::CreateUserReplay(int32_t serviceFlags,
                                                   int64_t eventsGroup,
                                                   int64_t timestampNs,
                                                   int64_t userId) {
-  if (!ringBuffer_) {
-    throw std::runtime_error("CreateUserReplay: ringBuffer is nullptr");
-  }
-  // Match Java: createUser(serviceFlags, eventsGroup, timestampNs, ...)
-  int64_t seq = ringBuffer_->next();
-  auto &cmd = ringBuffer_->get(seq);
-  cmd.serviceFlags = serviceFlags;
-  cmd.eventsGroup = eventsGroup;
-  cmd.command = common::cmd::OrderCommandType::ADD_USER;
-  cmd.orderId = -1;
-  cmd.symbol = -1;
-  cmd.uid = userId;
-  cmd.timestamp = timestampNs;
-  cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  ringBuffer_->publish(seq);
+    if (!ringBuffer_) {
+        throw std::runtime_error("CreateUserReplay: ringBuffer is nullptr");
+    }
+    // Match Java: createUser(serviceFlags, eventsGroup, timestampNs, ...)
+    int64_t seq = ringBuffer_->next();
+    auto& cmd = ringBuffer_->get(seq);
+    cmd.serviceFlags = serviceFlags;
+    cmd.eventsGroup = eventsGroup;
+    cmd.command = common::cmd::OrderCommandType::ADD_USER;
+    cmd.orderId = -1;
+    cmd.symbol = -1;
+    cmd.uid = userId;
+    cmd.timestamp = timestampNs;
+    cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    ringBuffer_->publish(seq);
 }
 
 template <typename WaitStrategyT>
@@ -821,21 +810,21 @@ void ExchangeApi<WaitStrategyT>::SuspendUserReplay(int32_t serviceFlags,
                                                    int64_t eventsGroup,
                                                    int64_t timestampNs,
                                                    int64_t userId) {
-  if (!ringBuffer_) {
-    throw std::runtime_error("SuspendUserReplay: ringBuffer is nullptr");
-  }
-  // Match Java: suspendUser(serviceFlags, eventsGroup, timestampNs, ...)
-  int64_t seq = ringBuffer_->next();
-  auto &cmd = ringBuffer_->get(seq);
-  cmd.serviceFlags = serviceFlags;
-  cmd.eventsGroup = eventsGroup;
-  cmd.command = common::cmd::OrderCommandType::SUSPEND_USER;
-  cmd.orderId = -1;
-  cmd.symbol = -1;
-  cmd.uid = userId;
-  cmd.timestamp = timestampNs;
-  cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  ringBuffer_->publish(seq);
+    if (!ringBuffer_) {
+        throw std::runtime_error("SuspendUserReplay: ringBuffer is nullptr");
+    }
+    // Match Java: suspendUser(serviceFlags, eventsGroup, timestampNs, ...)
+    int64_t seq = ringBuffer_->next();
+    auto& cmd = ringBuffer_->get(seq);
+    cmd.serviceFlags = serviceFlags;
+    cmd.eventsGroup = eventsGroup;
+    cmd.command = common::cmd::OrderCommandType::SUSPEND_USER;
+    cmd.orderId = -1;
+    cmd.symbol = -1;
+    cmd.uid = userId;
+    cmd.timestamp = timestampNs;
+    cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    ringBuffer_->publish(seq);
 }
 
 template <typename WaitStrategyT>
@@ -843,634 +832,596 @@ void ExchangeApi<WaitStrategyT>::ResumeUserReplay(int32_t serviceFlags,
                                                   int64_t eventsGroup,
                                                   int64_t timestampNs,
                                                   int64_t userId) {
-  if (!ringBuffer_) {
-    throw std::runtime_error("ResumeUserReplay: ringBuffer is nullptr");
-  }
-  // Match Java: resumeUser(serviceFlags, eventsGroup, timestampNs, ...)
-  int64_t seq = ringBuffer_->next();
-  auto &cmd = ringBuffer_->get(seq);
-  cmd.serviceFlags = serviceFlags;
-  cmd.eventsGroup = eventsGroup;
-  cmd.command = common::cmd::OrderCommandType::RESUME_USER;
-  cmd.orderId = -1;
-  cmd.symbol = -1;
-  cmd.uid = userId;
-  cmd.timestamp = timestampNs;
-  cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  ringBuffer_->publish(seq);
+    if (!ringBuffer_) {
+        throw std::runtime_error("ResumeUserReplay: ringBuffer is nullptr");
+    }
+    // Match Java: resumeUser(serviceFlags, eventsGroup, timestampNs, ...)
+    int64_t seq = ringBuffer_->next();
+    auto& cmd = ringBuffer_->get(seq);
+    cmd.serviceFlags = serviceFlags;
+    cmd.eventsGroup = eventsGroup;
+    cmd.command = common::cmd::OrderCommandType::RESUME_USER;
+    cmd.orderId = -1;
+    cmd.symbol = -1;
+    cmd.uid = userId;
+    cmd.timestamp = timestampNs;
+    cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    ringBuffer_->publish(seq);
 }
 
 template <typename WaitStrategyT>
 void ExchangeApi<WaitStrategyT>::ResetReplay(int64_t timestampNs) {
-  if (!ringBuffer_) {
-    throw std::runtime_error("ResetReplay: ringBuffer is nullptr");
-  }
-  // Match Java: reset(timestampNs)
-  int64_t seq = ringBuffer_->next();
-  auto &cmd = ringBuffer_->get(seq);
-  cmd.command = common::cmd::OrderCommandType::RESET;
-  cmd.resultCode = common::cmd::CommandResultCode::NEW;
-  cmd.timestamp = timestampNs;
-  ringBuffer_->publish(seq);
+    if (!ringBuffer_) {
+        throw std::runtime_error("ResetReplay: ringBuffer is nullptr");
+    }
+    // Match Java: reset(timestampNs)
+    int64_t seq = ringBuffer_->next();
+    auto& cmd = ringBuffer_->get(seq);
+    cmd.command = common::cmd::OrderCommandType::RESET;
+    cmd.resultCode = common::cmd::CommandResultCode::NEW;
+    cmd.timestamp = timestampNs;
+    ringBuffer_->publish(seq);
 }
 
 template <typename WaitStrategyT>
 void ExchangeApi<WaitStrategyT>::SubmitCommandsSync(
-    const std::vector<common::api::ApiCommand *> &cmds) {
-  if (cmds.empty()) {
-    return;
-  }
+    const std::vector<common::api::ApiCommand*>& cmds) {
+    if (cmds.empty()) {
+        return;
+    }
 
-  // Submit all but last
-  for (size_t i = 0; i < cmds.size() - 1; i++) {
-    SubmitCommand(cmds[i]);
-  }
+    // Submit all but last
+    for (size_t i = 0; i < cmds.size() - 1; i++) {
+        SubmitCommand(cmds[i]);
+    }
 
-  // Submit last one and wait for result
-  auto future = SubmitCommandAsync(cmds[cmds.size() - 1]);
-  future.wait(); // Wait for completion
+    // Submit last one and wait for result
+    auto future = SubmitCommandAsync(cmds[cmds.size() - 1]);
+    future.wait();  // Wait for completion
 }
 
 template <typename WaitStrategyT>
 void ExchangeApi<WaitStrategyT>::SubmitCommandsBatch(
-    const std::vector<common::api::ApiCommand *> &cmds) {
-  if (cmds.empty()) {
-    return;
-  }
-
-  if (!ringBuffer_) {
-    throw std::runtime_error("SubmitCommandsBatch: ringBuffer is nullptr");
-  }
-
-  const size_t batchSize = cmds.size();
-
-  // Batch claim sequences: next(n) instead of n calls to next()
-  const int64_t highSeq = ringBuffer_->next(static_cast<int>(batchSize));
-  const int64_t lowSeq = highSeq - static_cast<int64_t>(batchSize) + 1;
-
-  // Fill commands into ring buffer slots
-  for (size_t i = 0; i < batchSize; i++) {
-    int64_t seq = lowSeq + static_cast<int64_t>(i);
-    auto &cmd = ringBuffer_->get(seq);
-    auto *apiCmd = cmds[i];
-
-    if (!apiCmd) {
-      throw std::invalid_argument("SubmitCommandsBatch: cmd is nullptr");
+    const std::vector<common::api::ApiCommand*>& cmds) {
+    if (cmds.empty()) {
+        return;
     }
 
-    // Translate command using appropriate translator (match SubmitCommand
-    // logic)
-    if (auto *placeOrder = dynamic_cast<common::api::ApiPlaceOrder *>(apiCmd)) {
-      NEW_ORDER_TRANSLATOR.translateTo(cmd, seq, *placeOrder);
-    } else if (auto *moveOrder =
-                   dynamic_cast<common::api::ApiMoveOrder *>(apiCmd)) {
-      MOVE_ORDER_TRANSLATOR.translateTo(cmd, seq, *moveOrder);
-    } else if (auto *cancelOrder =
-                   dynamic_cast<common::api::ApiCancelOrder *>(apiCmd)) {
-      CANCEL_ORDER_TRANSLATOR.translateTo(cmd, seq, *cancelOrder);
-    } else if (auto *reduceOrder =
-                   dynamic_cast<common::api::ApiReduceOrder *>(apiCmd)) {
-      REDUCE_ORDER_TRANSLATOR.translateTo(cmd, seq, *reduceOrder);
-    } else if (auto *orderBookRequest =
-                   dynamic_cast<common::api::ApiOrderBookRequest *>(apiCmd)) {
-      ORDER_BOOK_REQUEST_TRANSLATOR.translateTo(cmd, seq, *orderBookRequest);
-    } else if (auto *addUser =
-                   dynamic_cast<common::api::ApiAddUser *>(apiCmd)) {
-      ADD_USER_TRANSLATOR.translateTo(cmd, seq, *addUser);
-    } else if (auto *suspendUser =
-                   dynamic_cast<common::api::ApiSuspendUser *>(apiCmd)) {
-      SUSPEND_USER_TRANSLATOR.translateTo(cmd, seq, *suspendUser);
-    } else if (auto *resumeUser =
-                   dynamic_cast<common::api::ApiResumeUser *>(apiCmd)) {
-      RESUME_USER_TRANSLATOR.translateTo(cmd, seq, *resumeUser);
-    } else if (auto *adjustBalance =
-                   dynamic_cast<common::api::ApiAdjustUserBalance *>(apiCmd)) {
-      ADJUST_USER_BALANCE_TRANSLATOR.translateTo(cmd, seq, *adjustBalance);
-    } else if (auto *reset = dynamic_cast<common::api::ApiReset *>(apiCmd)) {
-      RESET_TRANSLATOR.translateTo(cmd, seq, *reset);
-    } else if (auto *nop = dynamic_cast<common::api::ApiNop *>(apiCmd)) {
-      NOP_TRANSLATOR.translateTo(cmd, seq, *nop);
-    } else if (auto *binaryData =
-                   dynamic_cast<common::api::ApiBinaryDataCommand *>(apiCmd)) {
-      // Binary data commands need special handling (they claim their own
-      // sequences) For batch, we can't mix them with regular commands
-      throw std::invalid_argument(
-          "SubmitCommandsBatch: BinaryDataCommand not supported in batch");
-    } else if (auto *persistState =
-                   dynamic_cast<common::api::ApiPersistState *>(apiCmd)) {
-      // Persist commands need special handling
-      throw std::invalid_argument(
-          "SubmitCommandsBatch: PersistState not supported in batch");
-    } else {
-      throw std::invalid_argument(
-          "SubmitCommandsBatch: Unsupported command type");
-    }
-  }
-
-  // Batch publish: publish(lo, hi) instead of n calls to publish()
-  ringBuffer_->publish(lowSeq, highSeq);
-}
-
-template <typename WaitStrategyT>
-void ExchangeApi<WaitStrategyT>::PublishCommand(common::api::ApiCommand *cmd,
-                                                int64_t seq) {
-  SubmitCommand(cmd);
-}
-
-template <typename WaitStrategyT>
-void ExchangeApi<WaitStrategyT>::PublishBinaryData(
-    common::api::ApiBinaryDataCommand *apiCmd,
-    std::function<void(int64_t)> endSeqConsumer) {
-  if (!apiCmd || !apiCmd->data) {
-    throw std::invalid_argument("Invalid ApiBinaryDataCommand");
-  }
-  if (!ringBuffer_) {
-    throw std::runtime_error("PublishBinaryData: ringBuffer is nullptr");
-  }
-
-  // Serialize object to bytes
-  std::vector<uint8_t> serializedBytes;
-  serializedBytes.reserve(128);
-  common::VectorBytesOut bytesOut(serializedBytes);
-  bytesOut.WriteInt(apiCmd->data->GetBinaryCommandTypeCode());
-  apiCmd->data->WriteMarshallable(bytesOut);
-
-  // Compress and convert to long array
-  const std::vector<int64_t> longsArrayData =
-      utils::SerializationUtils::BytesToLongArrayLz4(serializedBytes,
-                                                     LONGS_PER_MESSAGE);
-
-  const int totalNumMessagesToClaim =
-      static_cast<int>(longsArrayData.size()) / LONGS_PER_MESSAGE;
-
-  if (totalNumMessagesToClaim == 0) {
-    throw std::runtime_error(
-        "PublishBinaryData: empty data after serialization");
-  }
-
-  // Verify array size is a multiple of LONGS_PER_MESSAGE
-  const int expectedArraySize = totalNumMessagesToClaim * LONGS_PER_MESSAGE;
-  if (static_cast<int>(longsArrayData.size()) < expectedArraySize) {
-    throw std::runtime_error("PublishBinaryData: array size mismatch");
-  }
-
-  // Max fragment size is quarter of ring buffer
-  const int batchSize = ringBuffer_->getBufferSize() / 4;
-
-  int offset = 0;
-  bool isLastFragment = false;
-  int fragmentSize = batchSize;
-
-  do {
-    if (offset + batchSize >= totalNumMessagesToClaim) {
-      fragmentSize = totalNumMessagesToClaim - offset;
-      isLastFragment = true;
+    if (!ringBuffer_) {
+        throw std::runtime_error("SubmitCommandsBatch: ringBuffer is nullptr");
     }
 
-    // Batch publish: next(n) + publish(lo, hi)
-    const int64_t highSeq = ringBuffer_->next(fragmentSize);
-    const int64_t lowSeq = highSeq - fragmentSize + 1;
+    const size_t batchSize = cmds.size();
 
-    // Verify sequence range is valid
-    if (lowSeq < 0 || highSeq < lowSeq) {
-      throw std::runtime_error("PublishBinaryData: invalid sequence range");
-    }
+    // Batch claim sequences: next(n) instead of n calls to next()
+    const int64_t highSeq = ringBuffer_->next(static_cast<int>(batchSize));
+    const int64_t lowSeq = highSeq - static_cast<int64_t>(batchSize) + 1;
 
-    try {
-      int ptr = offset * LONGS_PER_MESSAGE;
-      // Verify ptr bounds before loop
-      const int maxPtr =
-          static_cast<int>(longsArrayData.size()) - LONGS_PER_MESSAGE;
-      if (ptr < 0 || ptr > maxPtr) {
-        throw std::out_of_range("PublishBinaryData: ptr out of range");
-      }
+    // Fill commands into ring buffer slots
+    for (size_t i = 0; i < batchSize; i++) {
+        int64_t seq = lowSeq + static_cast<int64_t>(i);
+        auto& cmd = ringBuffer_->get(seq);
+        auto* apiCmd = cmds[i];
 
-      for (int64_t seq = lowSeq; seq <= highSeq; seq++) {
-        // Verify bounds before accessing array
-        if (ptr + 4 >= static_cast<int>(longsArrayData.size())) {
-          throw std::out_of_range(
-              "PublishBinaryData: array index out of bounds");
+        if (!apiCmd) {
+            throw std::invalid_argument("SubmitCommandsBatch: cmd is nullptr");
         }
 
-        // Verify ringBuffer is still valid before accessing
-        if (!ringBuffer_) {
-          throw std::runtime_error(
-              "PublishBinaryData: ringBuffer became nullptr");
+        // Translate command using appropriate translator (match SubmitCommand
+        // logic)
+        if (auto* placeOrder = dynamic_cast<common::api::ApiPlaceOrder*>(apiCmd)) {
+            NEW_ORDER_TRANSLATOR.translateTo(cmd, seq, *placeOrder);
+        } else if (auto* moveOrder = dynamic_cast<common::api::ApiMoveOrder*>(apiCmd)) {
+            MOVE_ORDER_TRANSLATOR.translateTo(cmd, seq, *moveOrder);
+        } else if (auto* cancelOrder = dynamic_cast<common::api::ApiCancelOrder*>(apiCmd)) {
+            CANCEL_ORDER_TRANSLATOR.translateTo(cmd, seq, *cancelOrder);
+        } else if (auto* reduceOrder = dynamic_cast<common::api::ApiReduceOrder*>(apiCmd)) {
+            REDUCE_ORDER_TRANSLATOR.translateTo(cmd, seq, *reduceOrder);
+        } else if (auto* orderBookRequest =
+                       dynamic_cast<common::api::ApiOrderBookRequest*>(apiCmd)) {
+            ORDER_BOOK_REQUEST_TRANSLATOR.translateTo(cmd, seq, *orderBookRequest);
+        } else if (auto* addUser = dynamic_cast<common::api::ApiAddUser*>(apiCmd)) {
+            ADD_USER_TRANSLATOR.translateTo(cmd, seq, *addUser);
+        } else if (auto* suspendUser = dynamic_cast<common::api::ApiSuspendUser*>(apiCmd)) {
+            SUSPEND_USER_TRANSLATOR.translateTo(cmd, seq, *suspendUser);
+        } else if (auto* resumeUser = dynamic_cast<common::api::ApiResumeUser*>(apiCmd)) {
+            RESUME_USER_TRANSLATOR.translateTo(cmd, seq, *resumeUser);
+        } else if (auto* adjustBalance = dynamic_cast<common::api::ApiAdjustUserBalance*>(apiCmd)) {
+            ADJUST_USER_BALANCE_TRANSLATOR.translateTo(cmd, seq, *adjustBalance);
+        } else if (auto* reset = dynamic_cast<common::api::ApiReset*>(apiCmd)) {
+            RESET_TRANSLATOR.translateTo(cmd, seq, *reset);
+        } else if (auto* nop = dynamic_cast<common::api::ApiNop*>(apiCmd)) {
+            NOP_TRANSLATOR.translateTo(cmd, seq, *nop);
+        } else if (auto* binaryData = dynamic_cast<common::api::ApiBinaryDataCommand*>(apiCmd)) {
+            // Binary data commands need special handling (they claim their own
+            // sequences) For batch, we can't mix them with regular commands
+            throw std::invalid_argument(
+                "SubmitCommandsBatch: BinaryDataCommand not supported in batch");
+        } else if (auto* persistState = dynamic_cast<common::api::ApiPersistState*>(apiCmd)) {
+            // Persist commands need special handling
+            throw std::invalid_argument("SubmitCommandsBatch: PersistState not supported in batch");
+        } else {
+            throw std::invalid_argument("SubmitCommandsBatch: Unsupported command type");
         }
-
-        auto &cmd = ringBuffer_->get(seq);
-        cmd.command = common::cmd::OrderCommandType::BINARY_DATA_COMMAND;
-        cmd.userCookie = apiCmd->transferId;
-        cmd.symbol = (isLastFragment && seq == highSeq) ? -1 : 0;
-
-        cmd.orderId = longsArrayData[ptr];
-        cmd.price = longsArrayData[ptr + 1];
-        cmd.reserveBidPrice = longsArrayData[ptr + 2];
-        cmd.size = longsArrayData[ptr + 3];
-        cmd.uid = longsArrayData[ptr + 4];
-
-        cmd.timestamp = apiCmd->timestamp;
-        cmd.resultCode = common::cmd::CommandResultCode::NEW;
-
-        ptr += LONGS_PER_MESSAGE;
-      }
-    } catch (const std::exception &ex) {
-      // Publish even on error to maintain sequence consistency
-      ringBuffer_->publish(lowSeq, highSeq);
-      throw;
     }
 
-    if (isLastFragment) {
-      // Report last sequence before actually publishing data
-      endSeqConsumer(highSeq);
-    }
-
-    // Batch publish: publish(lo, hi)
+    // Batch publish: publish(lo, hi) instead of n calls to publish()
     ringBuffer_->publish(lowSeq, highSeq);
+}
 
-    offset += batchSize;
-  } while (!isLastFragment);
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::PublishCommand(common::api::ApiCommand* cmd, int64_t seq) {
+    SubmitCommand(cmd);
+}
+
+template <typename WaitStrategyT>
+void ExchangeApi<WaitStrategyT>::PublishBinaryData(common::api::ApiBinaryDataCommand* apiCmd,
+                                                   std::function<void(int64_t)> endSeqConsumer) {
+    if (!apiCmd || !apiCmd->data) {
+        throw std::invalid_argument("Invalid ApiBinaryDataCommand");
+    }
+    if (!ringBuffer_) {
+        throw std::runtime_error("PublishBinaryData: ringBuffer is nullptr");
+    }
+
+    // Serialize object to bytes
+    std::vector<uint8_t> serializedBytes;
+    serializedBytes.reserve(128);
+    common::VectorBytesOut bytesOut(serializedBytes);
+    bytesOut.WriteInt(apiCmd->data->GetBinaryCommandTypeCode());
+    apiCmd->data->WriteMarshallable(bytesOut);
+
+    // Compress and convert to long array
+    const std::vector<int64_t> longsArrayData =
+        utils::SerializationUtils::BytesToLongArrayLz4(serializedBytes, LONGS_PER_MESSAGE);
+
+    const int totalNumMessagesToClaim = static_cast<int>(longsArrayData.size()) / LONGS_PER_MESSAGE;
+
+    if (totalNumMessagesToClaim == 0) {
+        throw std::runtime_error("PublishBinaryData: empty data after serialization");
+    }
+
+    // Verify array size is a multiple of LONGS_PER_MESSAGE
+    const int expectedArraySize = totalNumMessagesToClaim * LONGS_PER_MESSAGE;
+    if (static_cast<int>(longsArrayData.size()) < expectedArraySize) {
+        throw std::runtime_error("PublishBinaryData: array size mismatch");
+    }
+
+    // Max fragment size is quarter of ring buffer
+    const int batchSize = ringBuffer_->getBufferSize() / 4;
+
+    int offset = 0;
+    bool isLastFragment = false;
+    int fragmentSize = batchSize;
+
+    do {
+        if (offset + batchSize >= totalNumMessagesToClaim) {
+            fragmentSize = totalNumMessagesToClaim - offset;
+            isLastFragment = true;
+        }
+
+        // Batch publish: next(n) + publish(lo, hi)
+        const int64_t highSeq = ringBuffer_->next(fragmentSize);
+        const int64_t lowSeq = highSeq - fragmentSize + 1;
+
+        // Verify sequence range is valid
+        if (lowSeq < 0 || highSeq < lowSeq) {
+            throw std::runtime_error("PublishBinaryData: invalid sequence range");
+        }
+
+        try {
+            int ptr = offset * LONGS_PER_MESSAGE;
+            // Verify ptr bounds before loop
+            const int maxPtr = static_cast<int>(longsArrayData.size()) - LONGS_PER_MESSAGE;
+            if (ptr < 0 || ptr > maxPtr) {
+                throw std::out_of_range("PublishBinaryData: ptr out of range");
+            }
+
+            for (int64_t seq = lowSeq; seq <= highSeq; seq++) {
+                // Verify bounds before accessing array
+                if (ptr + 4 >= static_cast<int>(longsArrayData.size())) {
+                    throw std::out_of_range("PublishBinaryData: array index out of bounds");
+                }
+
+                // Verify ringBuffer is still valid before accessing
+                if (!ringBuffer_) {
+                    throw std::runtime_error("PublishBinaryData: ringBuffer became nullptr");
+                }
+
+                auto& cmd = ringBuffer_->get(seq);
+                cmd.command = common::cmd::OrderCommandType::BINARY_DATA_COMMAND;
+                cmd.userCookie = apiCmd->transferId;
+                cmd.symbol = (isLastFragment && seq == highSeq) ? -1 : 0;
+
+                cmd.orderId = longsArrayData[ptr];
+                cmd.price = longsArrayData[ptr + 1];
+                cmd.reserveBidPrice = longsArrayData[ptr + 2];
+                cmd.size = longsArrayData[ptr + 3];
+                cmd.uid = longsArrayData[ptr + 4];
+
+                cmd.timestamp = apiCmd->timestamp;
+                cmd.resultCode = common::cmd::CommandResultCode::NEW;
+
+                ptr += LONGS_PER_MESSAGE;
+            }
+        } catch (const std::exception& ex) {
+            // Publish even on error to maintain sequence consistency
+            ringBuffer_->publish(lowSeq, highSeq);
+            throw;
+        }
+
+        if (isLastFragment) {
+            // Report last sequence before actually publishing data
+            endSeqConsumer(highSeq);
+        }
+
+        // Batch publish: publish(lo, hi)
+        ringBuffer_->publish(lowSeq, highSeq);
+
+        offset += batchSize;
+    } while (!isLastFragment);
 }
 
 template <typename WaitStrategyT>
 void ExchangeApi<WaitStrategyT>::PublishPersistCmd(
-    common::api::ApiPersistState *api,
+    common::api::ApiPersistState* api,
     std::function<void(int64_t, int64_t)> seqConsumer) {
-  if (!api) {
-    throw std::invalid_argument("Invalid ApiPersistState");
-  }
+    if (!api) {
+        throw std::invalid_argument("Invalid ApiPersistState");
+    }
 
-  // Batch publish: next(2) + publish(lo, hi)
-  const int64_t secondSeq = ringBuffer_->next(2);
-  const int64_t firstSeq = secondSeq - 1;
+    // Batch publish: next(2) + publish(lo, hi)
+    const int64_t secondSeq = ringBuffer_->next(2);
+    const int64_t firstSeq = secondSeq - 1;
 
-  try {
-    // Will be ignored by risk handlers, but processed by matching engine
-    auto &cmdMatching = ringBuffer_->get(firstSeq);
-    cmdMatching.command = common::cmd::OrderCommandType::PERSIST_STATE_MATCHING;
-    cmdMatching.orderId = api->dumpId;
-    cmdMatching.symbol = -1;
-    cmdMatching.uid = 0;
-    cmdMatching.price = 0;
-    cmdMatching.timestamp = api->timestamp;
-    cmdMatching.resultCode = common::cmd::CommandResultCode::NEW;
+    try {
+        // Will be ignored by risk handlers, but processed by matching engine
+        auto& cmdMatching = ringBuffer_->get(firstSeq);
+        cmdMatching.command = common::cmd::OrderCommandType::PERSIST_STATE_MATCHING;
+        cmdMatching.orderId = api->dumpId;
+        cmdMatching.symbol = -1;
+        cmdMatching.uid = 0;
+        cmdMatching.price = 0;
+        cmdMatching.timestamp = api->timestamp;
+        cmdMatching.resultCode = common::cmd::CommandResultCode::NEW;
 
-    // Sequential command will make risk handler to create snapshot
-    auto &cmdRisk = ringBuffer_->get(secondSeq);
-    cmdRisk.command = common::cmd::OrderCommandType::PERSIST_STATE_RISK;
-    cmdRisk.orderId = api->dumpId;
-    cmdRisk.symbol = -1;
-    cmdRisk.uid = 0;
-    cmdRisk.price = 0;
-    cmdRisk.timestamp = api->timestamp;
-    cmdRisk.resultCode = common::cmd::CommandResultCode::NEW;
-  } catch (const std::exception &ex) {
-    // Publish even on error to maintain sequence consistency
+        // Sequential command will make risk handler to create snapshot
+        auto& cmdRisk = ringBuffer_->get(secondSeq);
+        cmdRisk.command = common::cmd::OrderCommandType::PERSIST_STATE_RISK;
+        cmdRisk.orderId = api->dumpId;
+        cmdRisk.symbol = -1;
+        cmdRisk.uid = 0;
+        cmdRisk.price = 0;
+        cmdRisk.timestamp = api->timestamp;
+        cmdRisk.resultCode = common::cmd::CommandResultCode::NEW;
+    } catch (const std::exception& ex) {
+        // Publish even on error to maintain sequence consistency
+        ringBuffer_->publish(firstSeq, secondSeq);
+        throw;
+    }
+
+    seqConsumer(firstSeq, secondSeq);
+    // Batch publish: publish(lo, hi)
     ringBuffer_->publish(firstSeq, secondSeq);
-    throw;
-  }
-
-  seqConsumer(firstSeq, secondSeq);
-  // Batch publish: publish(lo, hi)
-  ringBuffer_->publish(firstSeq, secondSeq);
 }
 
 template <typename WaitStrategyT>
-void ExchangeApi<WaitStrategyT>::PublishQuery(
-    common::api::reports::ApiReportQuery *apiCmd,
-    std::function<void(int64_t)> endSeqConsumer) {
-  if (!apiCmd || !apiCmd->query) {
-    throw std::invalid_argument("Invalid ApiReportQuery");
-  }
-  if (!ringBuffer_) {
-    throw std::runtime_error("PublishQuery: ringBuffer is nullptr");
-  }
-
-  // Serialize ReportQuery to bytes (matches Java publishQuery)
-  // ReportQuery base class inherits WriteBytesMarshallable (matches Java)
-  std::vector<uint8_t> serializedBytes;
-  serializedBytes.reserve(128);
-  common::VectorBytesOut bytesOut(serializedBytes);
-  bytesOut.WriteInt(apiCmd->query->GetReportTypeCode());
-  // ReportQuery implements WriteBytesMarshallable (inherited from base class)
-  apiCmd->query->WriteMarshallable(bytesOut);
-
-  // Compress and convert to long array
-  const std::vector<int64_t> longsArrayData =
-      utils::SerializationUtils::BytesToLongArrayLz4(serializedBytes,
-                                                     LONGS_PER_MESSAGE);
-
-  const int totalNumMessagesToClaim =
-      static_cast<int>(longsArrayData.size()) / LONGS_PER_MESSAGE;
-
-  if (totalNumMessagesToClaim == 0) {
-    throw std::runtime_error("PublishQuery: empty data after serialization");
-  }
-
-  // Verify array size is a multiple of LONGS_PER_MESSAGE
-  const int expectedArraySize = totalNumMessagesToClaim * LONGS_PER_MESSAGE;
-  if (static_cast<int>(longsArrayData.size()) < expectedArraySize) {
-    throw std::runtime_error("PublishQuery: array size mismatch");
-  }
-
-  // Max fragment size is quarter of ring buffer
-  const int batchSize = ringBuffer_->getBufferSize() / 4;
-
-  int offset = 0;
-  bool isLastFragment = false;
-  int fragmentSize = batchSize;
-
-  do {
-    if (offset + batchSize >= totalNumMessagesToClaim) {
-      fragmentSize = totalNumMessagesToClaim - offset;
-      isLastFragment = true;
+void ExchangeApi<WaitStrategyT>::PublishQuery(common::api::reports::ApiReportQuery* apiCmd,
+                                              std::function<void(int64_t)> endSeqConsumer) {
+    if (!apiCmd || !apiCmd->query) {
+        throw std::invalid_argument("Invalid ApiReportQuery");
+    }
+    if (!ringBuffer_) {
+        throw std::runtime_error("PublishQuery: ringBuffer is nullptr");
     }
 
-    // Batch publish: next(n) + publish(lo, hi)
-    const int64_t highSeq = ringBuffer_->next(fragmentSize);
-    const int64_t lowSeq = highSeq - fragmentSize + 1;
+    // Serialize ReportQuery to bytes (matches Java publishQuery)
+    // ReportQuery base class inherits WriteBytesMarshallable (matches Java)
+    std::vector<uint8_t> serializedBytes;
+    serializedBytes.reserve(128);
+    common::VectorBytesOut bytesOut(serializedBytes);
+    bytesOut.WriteInt(apiCmd->query->GetReportTypeCode());
+    // ReportQuery implements WriteBytesMarshallable (inherited from base class)
+    apiCmd->query->WriteMarshallable(bytesOut);
 
-    // Verify sequence range is valid
-    if (lowSeq < 0 || highSeq < lowSeq) {
-      throw std::runtime_error("PublishQuery: invalid sequence range");
+    // Compress and convert to long array
+    const std::vector<int64_t> longsArrayData =
+        utils::SerializationUtils::BytesToLongArrayLz4(serializedBytes, LONGS_PER_MESSAGE);
+
+    const int totalNumMessagesToClaim = static_cast<int>(longsArrayData.size()) / LONGS_PER_MESSAGE;
+
+    if (totalNumMessagesToClaim == 0) {
+        throw std::runtime_error("PublishQuery: empty data after serialization");
     }
 
-    try {
-      int ptr = offset * LONGS_PER_MESSAGE;
-      // Verify ptr bounds before loop
-      const int maxPtr =
-          static_cast<int>(longsArrayData.size()) - LONGS_PER_MESSAGE;
-      if (ptr < 0 || ptr > maxPtr) {
-        throw std::out_of_range("PublishQuery: ptr out of range");
-      }
+    // Verify array size is a multiple of LONGS_PER_MESSAGE
+    const int expectedArraySize = totalNumMessagesToClaim * LONGS_PER_MESSAGE;
+    if (static_cast<int>(longsArrayData.size()) < expectedArraySize) {
+        throw std::runtime_error("PublishQuery: array size mismatch");
+    }
 
-      for (int64_t seq = lowSeq; seq <= highSeq; seq++) {
-        // Verify bounds before accessing array
-        if (ptr + 4 >= static_cast<int>(longsArrayData.size())) {
-          throw std::out_of_range("PublishQuery: array index out of bounds");
+    // Max fragment size is quarter of ring buffer
+    const int batchSize = ringBuffer_->getBufferSize() / 4;
+
+    int offset = 0;
+    bool isLastFragment = false;
+    int fragmentSize = batchSize;
+
+    do {
+        if (offset + batchSize >= totalNumMessagesToClaim) {
+            fragmentSize = totalNumMessagesToClaim - offset;
+            isLastFragment = true;
         }
 
-        // Verify ringBuffer is still valid before accessing
-        if (!ringBuffer_) {
-          throw std::runtime_error("PublishQuery: ringBuffer became nullptr");
+        // Batch publish: next(n) + publish(lo, hi)
+        const int64_t highSeq = ringBuffer_->next(fragmentSize);
+        const int64_t lowSeq = highSeq - fragmentSize + 1;
+
+        // Verify sequence range is valid
+        if (lowSeq < 0 || highSeq < lowSeq) {
+            throw std::runtime_error("PublishQuery: invalid sequence range");
         }
 
-        auto &cmd = ringBuffer_->get(seq);
-        // Use BINARY_DATA_QUERY instead of BINARY_DATA_COMMAND
-        cmd.command = common::cmd::OrderCommandType::BINARY_DATA_QUERY;
-        cmd.userCookie = apiCmd->transferId;
-        cmd.symbol = (isLastFragment && seq == highSeq) ? -1 : 0;
+        try {
+            int ptr = offset * LONGS_PER_MESSAGE;
+            // Verify ptr bounds before loop
+            const int maxPtr = static_cast<int>(longsArrayData.size()) - LONGS_PER_MESSAGE;
+            if (ptr < 0 || ptr > maxPtr) {
+                throw std::out_of_range("PublishQuery: ptr out of range");
+            }
 
-        cmd.orderId = longsArrayData[ptr];
-        cmd.price = longsArrayData[ptr + 1];
-        cmd.reserveBidPrice = longsArrayData[ptr + 2];
-        cmd.size = longsArrayData[ptr + 3];
-        cmd.uid = longsArrayData[ptr + 4];
+            for (int64_t seq = lowSeq; seq <= highSeq; seq++) {
+                // Verify bounds before accessing array
+                if (ptr + 4 >= static_cast<int>(longsArrayData.size())) {
+                    throw std::out_of_range("PublishQuery: array index out of bounds");
+                }
 
-        cmd.timestamp = apiCmd->timestamp;
-        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+                // Verify ringBuffer is still valid before accessing
+                if (!ringBuffer_) {
+                    throw std::runtime_error("PublishQuery: ringBuffer became nullptr");
+                }
 
-        ptr += LONGS_PER_MESSAGE;
-      }
-    } catch (const std::exception &ex) {
-      // Publish even on error to maintain sequence consistency
-      ringBuffer_->publish(lowSeq, highSeq);
-      throw;
-    }
+                auto& cmd = ringBuffer_->get(seq);
+                // Use BINARY_DATA_QUERY instead of BINARY_DATA_COMMAND
+                cmd.command = common::cmd::OrderCommandType::BINARY_DATA_QUERY;
+                cmd.userCookie = apiCmd->transferId;
+                cmd.symbol = (isLastFragment && seq == highSeq) ? -1 : 0;
 
-    if (isLastFragment) {
-      // Report last sequence before actually publishing data
-      endSeqConsumer(highSeq);
-    }
+                cmd.orderId = longsArrayData[ptr];
+                cmd.price = longsArrayData[ptr + 1];
+                cmd.reserveBidPrice = longsArrayData[ptr + 2];
+                cmd.size = longsArrayData[ptr + 3];
+                cmd.uid = longsArrayData[ptr + 4];
 
-    // Batch publish: publish(lo, hi)
-    ringBuffer_->publish(lowSeq, highSeq);
+                cmd.timestamp = apiCmd->timestamp;
+                cmd.resultCode = common::cmd::CommandResultCode::NEW;
 
-    offset += batchSize;
-  } while (!isLastFragment);
+                ptr += LONGS_PER_MESSAGE;
+            }
+        } catch (const std::exception& ex) {
+            // Publish even on error to maintain sequence consistency
+            ringBuffer_->publish(lowSeq, highSeq);
+            throw;
+        }
+
+        if (isLastFragment) {
+            // Report last sequence before actually publishing data
+            endSeqConsumer(highSeq);
+        }
+
+        // Batch publish: publish(lo, hi)
+        ringBuffer_->publish(lowSeq, highSeq);
+
+        offset += batchSize;
+    } while (!isLastFragment);
 }
 
 template <typename WaitStrategyT>
 template <typename Q, typename R>
-std::future<std::unique_ptr<R>>
-ExchangeApi<WaitStrategyT>::ProcessReport(std::unique_ptr<Q> query,
-                                          int32_t transferId) {
-  if (!query) {
-    throw std::invalid_argument("ProcessReport: query is nullptr");
-  }
-  if (!ringBuffer_) {
-    throw std::runtime_error("ProcessReport: ringBuffer is nullptr");
-  }
+std::future<std::unique_ptr<R>> ExchangeApi<WaitStrategyT>::ProcessReport(std::unique_ptr<Q> query,
+                                                                          int32_t transferId) {
+    if (!query) {
+        throw std::invalid_argument("ProcessReport: query is nullptr");
+    }
+    if (!ringBuffer_) {
+        throw std::runtime_error("ProcessReport: ringBuffer is nullptr");
+    }
 
-  // Create promise for result
-  std::promise<std::unique_ptr<R>> promise;
-  auto future = promise.get_future();
+    // Create promise for result
+    std::promise<std::unique_ptr<R>> promise;
+    auto future = promise.get_future();
 
-  // Wrap query in ApiReportQuery
-  auto apiReportQuery = std::make_unique<common::api::reports::ApiReportQuery>(
-      transferId, std::move(query));
+    // Wrap query in ApiReportQuery
+    auto apiReportQuery =
+        std::make_unique<common::api::reports::ApiReportQuery>(transferId, std::move(query));
 
-  // Use shared_ptr to make lambda copyable for std::function
-  auto promisePtr =
-      std::make_shared<std::promise<std::unique_ptr<R>>>(std::move(promise));
-  auto queryPtr = apiReportQuery->query.get();
+    // Use shared_ptr to make lambda copyable for std::function
+    auto promisePtr = std::make_shared<std::promise<std::unique_ptr<R>>>(std::move(promise));
+    auto queryPtr = apiReportQuery->query.get();
 
-  // Publish query and set up callback to extract result from OrderCommand
-  // Match Java: submitQueryAsync with translator function
-  PublishQuery(apiReportQuery.get(), [this, promisePtr, queryPtr](int64_t seq) {
-    // Store translator function that will extract result from OrderCommand
-    // Match Java: cmd ->
-    // query.createResult(OrderBookEventsHelper.deserializeEvents(cmd).values().parallelStream().map(Wire::bytes))
-    typename ReportPromiseMap::accessor accessor;
-    reportPromises_.insert(accessor, seq);
-    accessor->second = [promisePtr, queryPtr](common::cmd::OrderCommand *cmd) {
-      // Extract binary events from OrderCommand
-      auto sectionsMap =
-          orderbook::OrderBookEventsHelper::DeserializeEvents(cmd);
+    // Publish query and set up callback to extract result from OrderCommand
+    // Match Java: submitQueryAsync with translator function
+    PublishQuery(apiReportQuery.get(), [this, promisePtr, queryPtr](int64_t seq) {
+        // Store translator function that will extract result from OrderCommand
+        // Match Java: cmd ->
+        // query.createResult(OrderBookEventsHelper.deserializeEvents(cmd).values().parallelStream().map(Wire::bytes))
+        typename ReportPromiseMap::accessor accessor;
+        reportPromises_.insert(accessor, seq);
+        accessor->second = [promisePtr, queryPtr](common::cmd::OrderCommand* cmd) {
+            // Extract binary events from OrderCommand
+            auto sectionsMap = orderbook::OrderBookEventsHelper::DeserializeEvents(cmd);
 
-      // Convert map values to vector of BytesIn pointers
-      // Match Java: .map(Wire::bytes)
-      // Skip empty wires (matches Java behavior where empty sections are
-      // filtered)
-      std::vector<common::BytesIn *> sections;
-      sections.reserve(sectionsMap.size());
-      std::vector<common::Wire> wireOwners;
-      wireOwners.reserve(sectionsMap.size());
+            // Convert map values to vector of BytesIn pointers
+            // Match Java: .map(Wire::bytes)
+            // Skip empty wires (matches Java behavior where empty sections are
+            // filtered)
+            std::vector<common::BytesIn*> sections;
+            sections.reserve(sectionsMap.size());
+            std::vector<common::Wire> wireOwners;
+            wireOwners.reserve(sectionsMap.size());
 
-      for (const auto &[sectionId, wire] : sectionsMap) {
-        const auto &bytes = wire.GetBytes();
-        if (!bytes.empty()) {
-          wireOwners.push_back(wire);
-          sections.push_back(&wireOwners.back().bytes());
-        }
-      }
+            for (const auto& [sectionId, wire] : sectionsMap) {
+                const auto& bytes = wire.GetBytes();
+                if (!bytes.empty()) {
+                    wireOwners.push_back(wire);
+                    sections.push_back(&wireOwners.back().bytes());
+                }
+            }
 
-      // Call query.createResult() to merge sections
-      auto result = queryPtr->CreateResult(sections);
+            // Call query.createResult() to merge sections
+            auto result = queryPtr->CreateResult(sections);
 
-      // Set promise value
-      promisePtr->set_value(
-          std::unique_ptr<R>(static_cast<R *>(result.release())));
-    };
-  });
+            // Set promise value
+            promisePtr->set_value(std::unique_ptr<R>(static_cast<R*>(result.release())));
+        };
+    });
 
-  return future;
+    return future;
 }
 
 template <typename WaitStrategyT>
-std::future<std::vector<std::vector<uint8_t>>>
-ExchangeApi<WaitStrategyT>::ProcessReportAny(int32_t queryTypeId,
-                                             std::vector<uint8_t> queryBytes,
-                                             int32_t transferId) {
-  if (!ringBuffer_) {
-    throw std::runtime_error("ProcessReportAny: ringBuffer is nullptr");
-  }
-
-  // Deserialize query from bytes using factory
-  common::VectorBytesIn bytesIn(queryBytes);
-  // Skip type code (already known from queryTypeId)
-  bytesIn.ReadInt(); // Skip the type code in bytes
-
-  common::api::reports::ReportType reportType =
-      common::api::reports::ReportTypeFromCode(queryTypeId);
-
-  // Create query using factory
-  auto *queryPtr =
-      common::api::reports::ReportQueryFactory::getInstance().createQuery(
-          reportType, bytesIn);
-
-  if (!queryPtr) {
-    throw std::runtime_error(
-        "ProcessReportAny: Failed to create query from bytes");
-  }
-
-  // Create promise for sections result
-  std::promise<std::vector<std::vector<uint8_t>>> promise;
-  auto future = promise.get_future();
-
-  // Wrap query in ApiReportQuery (using type-erased pointer)
-  // We need to store the query pointer and type info
-  auto promisePtr =
-      std::make_shared<std::promise<std::vector<std::vector<uint8_t>>>>(
-          std::move(promise));
-
-  // Publish query - we'll handle the result extraction in ProcessResult
-  // For now, we need to serialize the query again to publish it
-  // Actually, we already have the serialized bytes, so we can use them directly
-  std::vector<uint8_t> serializedBytes = std::move(queryBytes);
-
-  // Compress and convert to long array
-  const std::vector<int64_t> longsArrayData =
-      utils::SerializationUtils::BytesToLongArrayLz4(serializedBytes,
-                                                     LONGS_PER_MESSAGE);
-
-  const int totalNumMessagesToClaim =
-      static_cast<int>(longsArrayData.size()) / LONGS_PER_MESSAGE;
-
-  if (totalNumMessagesToClaim == 0) {
-    throw std::runtime_error(
-        "ProcessReportAny: empty data after serialization");
-  }
-
-  // Max fragment size is quarter of ring buffer
-  const int batchSize = ringBuffer_->getBufferSize() / 4;
-
-  int offset = 0;
-  bool isLastFragment = false;
-  int fragmentSize = batchSize;
-
-  do {
-    if (offset + batchSize >= totalNumMessagesToClaim) {
-      fragmentSize = totalNumMessagesToClaim - offset;
-      isLastFragment = true;
+std::future<std::vector<std::vector<uint8_t>>> ExchangeApi<WaitStrategyT>::ProcessReportAny(
+    int32_t queryTypeId,
+    std::vector<uint8_t> queryBytes,
+    int32_t transferId) {
+    if (!ringBuffer_) {
+        throw std::runtime_error("ProcessReportAny: ringBuffer is nullptr");
     }
 
-    // Batch publish: next(n) + publish(lo, hi)
-    const int64_t highSeq = ringBuffer_->next(fragmentSize);
-    const int64_t lowSeq = highSeq - fragmentSize + 1;
+    // Deserialize query from bytes using factory
+    common::VectorBytesIn bytesIn(queryBytes);
+    // Skip type code (already known from queryTypeId)
+    bytesIn.ReadInt();  // Skip the type code in bytes
 
-    try {
-      int ptr = offset * LONGS_PER_MESSAGE;
-      const int maxPtr =
-          static_cast<int>(longsArrayData.size()) - LONGS_PER_MESSAGE;
-      if (ptr < 0 || ptr > maxPtr) {
-        throw std::out_of_range("ProcessReportAny: ptr out of range");
-      }
+    common::api::reports::ReportType reportType =
+        common::api::reports::ReportTypeFromCode(queryTypeId);
 
-      for (int64_t seq = lowSeq; seq <= highSeq; seq++) {
-        if (ptr + 4 >= static_cast<int>(longsArrayData.size())) {
-          throw std::out_of_range(
-              "ProcessReportAny: array index out of bounds");
+    // Create query using factory
+    auto* queryPtr =
+        common::api::reports::ReportQueryFactory::getInstance().createQuery(reportType, bytesIn);
+
+    if (!queryPtr) {
+        throw std::runtime_error("ProcessReportAny: Failed to create query from bytes");
+    }
+
+    // Create promise for sections result
+    std::promise<std::vector<std::vector<uint8_t>>> promise;
+    auto future = promise.get_future();
+
+    // Wrap query in ApiReportQuery (using type-erased pointer)
+    // We need to store the query pointer and type info
+    auto promisePtr =
+        std::make_shared<std::promise<std::vector<std::vector<uint8_t>>>>(std::move(promise));
+
+    // Publish query - we'll handle the result extraction in ProcessResult
+    // For now, we need to serialize the query again to publish it
+    // Actually, we already have the serialized bytes, so we can use them directly
+    std::vector<uint8_t> serializedBytes = std::move(queryBytes);
+
+    // Compress and convert to long array
+    const std::vector<int64_t> longsArrayData =
+        utils::SerializationUtils::BytesToLongArrayLz4(serializedBytes, LONGS_PER_MESSAGE);
+
+    const int totalNumMessagesToClaim = static_cast<int>(longsArrayData.size()) / LONGS_PER_MESSAGE;
+
+    if (totalNumMessagesToClaim == 0) {
+        throw std::runtime_error("ProcessReportAny: empty data after serialization");
+    }
+
+    // Max fragment size is quarter of ring buffer
+    const int batchSize = ringBuffer_->getBufferSize() / 4;
+
+    int offset = 0;
+    bool isLastFragment = false;
+    int fragmentSize = batchSize;
+
+    do {
+        if (offset + batchSize >= totalNumMessagesToClaim) {
+            fragmentSize = totalNumMessagesToClaim - offset;
+            isLastFragment = true;
         }
 
-        auto &cmd = ringBuffer_->get(seq);
-        cmd.command = common::cmd::OrderCommandType::BINARY_DATA_QUERY;
-        cmd.userCookie = transferId;
-        cmd.symbol = (isLastFragment && seq == highSeq) ? -1 : 0;
+        // Batch publish: next(n) + publish(lo, hi)
+        const int64_t highSeq = ringBuffer_->next(fragmentSize);
+        const int64_t lowSeq = highSeq - fragmentSize + 1;
 
-        cmd.orderId = longsArrayData[ptr];
-        cmd.price = longsArrayData[ptr + 1];
-        cmd.reserveBidPrice = longsArrayData[ptr + 2];
-        cmd.size = longsArrayData[ptr + 3];
-        cmd.uid = longsArrayData[ptr + 4];
+        try {
+            int ptr = offset * LONGS_PER_MESSAGE;
+            const int maxPtr = static_cast<int>(longsArrayData.size()) - LONGS_PER_MESSAGE;
+            if (ptr < 0 || ptr > maxPtr) {
+                throw std::out_of_range("ProcessReportAny: ptr out of range");
+            }
 
-        cmd.resultCode = common::cmd::CommandResultCode::NEW;
+            for (int64_t seq = lowSeq; seq <= highSeq; seq++) {
+                if (ptr + 4 >= static_cast<int>(longsArrayData.size())) {
+                    throw std::out_of_range("ProcessReportAny: array index out of bounds");
+                }
 
-        ptr += LONGS_PER_MESSAGE;
-      }
-    } catch (const std::exception &ex) {
-      ringBuffer_->publish(lowSeq, highSeq);
-      throw;
-    }
+                auto& cmd = ringBuffer_->get(seq);
+                cmd.command = common::cmd::OrderCommandType::BINARY_DATA_QUERY;
+                cmd.userCookie = transferId;
+                cmd.symbol = (isLastFragment && seq == highSeq) ? -1 : 0;
 
-    if (isLastFragment) {
-      // Store promise for result extraction
-      typename ReportPromiseMap::accessor accessor;
-      reportPromises_.insert(accessor, highSeq);
-      accessor->second = [promisePtr, queryPtr,
-                          reportType](common::cmd::OrderCommand *cmd) {
-        // Extract binary events from OrderCommand
-        auto sectionsMap =
-            orderbook::OrderBookEventsHelper::DeserializeEvents(cmd);
+                cmd.orderId = longsArrayData[ptr];
+                cmd.price = longsArrayData[ptr + 1];
+                cmd.reserveBidPrice = longsArrayData[ptr + 2];
+                cmd.size = longsArrayData[ptr + 3];
+                cmd.uid = longsArrayData[ptr + 4];
 
-        // Convert map values to vector of byte vectors
-        // Match Java: .map(Wire::bytes) but for ProcessReportAny we need bytes
-        std::vector<std::vector<uint8_t>> sections;
-        sections.reserve(sectionsMap.size());
-        for (const auto &[sectionId, wire] : sectionsMap) {
-          const auto &bytes = wire.GetBytes();
-          if (!bytes.empty()) {
-            sections.push_back(bytes);
-          }
+                cmd.resultCode = common::cmd::CommandResultCode::NEW;
+
+                ptr += LONGS_PER_MESSAGE;
+            }
+        } catch (const std::exception& ex) {
+            ringBuffer_->publish(lowSeq, highSeq);
+            throw;
         }
 
-        // Clean up query pointer (was created with new)
-        // We need to know the type to delete it properly
-        // For now, we'll leak it (not ideal, but type erasure makes this hard)
-        // TODO: Store deleter function in factory
+        if (isLastFragment) {
+            // Store promise for result extraction
+            typename ReportPromiseMap::accessor accessor;
+            reportPromises_.insert(accessor, highSeq);
+            accessor->second = [promisePtr, queryPtr, reportType](common::cmd::OrderCommand* cmd) {
+                // Extract binary events from OrderCommand
+                auto sectionsMap = orderbook::OrderBookEventsHelper::DeserializeEvents(cmd);
 
-        promisePtr->set_value(std::move(sections));
-      };
-    }
+                // Convert map values to vector of byte vectors
+                // Match Java: .map(Wire::bytes) but for ProcessReportAny we need bytes
+                std::vector<std::vector<uint8_t>> sections;
+                sections.reserve(sectionsMap.size());
+                for (const auto& [sectionId, wire] : sectionsMap) {
+                    const auto& bytes = wire.GetBytes();
+                    if (!bytes.empty()) {
+                        sections.push_back(bytes);
+                    }
+                }
 
-    // Batch publish: publish(lo, hi)
-    ringBuffer_->publish(lowSeq, highSeq);
+                // Clean up query pointer (was created with new)
+                // We need to know the type to delete it properly
+                // For now, we'll leak it (not ideal, but type erasure makes this hard)
+                // TODO: Store deleter function in factory
 
-    offset += batchSize;
-  } while (!isLastFragment);
+                promisePtr->set_value(std::move(sections));
+            };
+        }
 
-  // Clean up query pointer - we need to delete it properly
-  // For now, we'll store it and delete it after the result is received
-  // Actually, we can't easily do this with type erasure...
-  // Let's use a shared_ptr with custom deleter, but that requires storing the
-  // type For now, we'll just leak it (not ideal, but works)
-  // TODO: Improve this by storing deleter in factory
+        // Batch publish: publish(lo, hi)
+        ringBuffer_->publish(lowSeq, highSeq);
 
-  return future;
+        offset += batchSize;
+    } while (!isLastFragment);
+
+    // Clean up query pointer - we need to delete it properly
+    // For now, we'll store it and delete it after the result is received
+    // Actually, we can't easily do this with type erasure...
+    // Let's use a shared_ptr with custom deleter, but that requires storing the
+    // type For now, we'll just leak it (not ideal, but works)
+    // TODO: Improve this by storing deleter in factory
+
+    return future;
 }
 
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core
 
 // Explicit template instantiations for common wait strategies
 // Note: These must be outside the namespace

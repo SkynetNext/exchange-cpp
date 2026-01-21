@@ -16,61 +16,57 @@
 
 #pragma once
 
-#include "ExchangeApi.h"
-#include "common/cmd/OrderCommand.h"
-#include "common/config/ExchangeConfiguration.h"
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include "ExchangeApi.h"
+#include "common/cmd/OrderCommand.h"
+#include "common/config/ExchangeConfiguration.h"
 
 // Forward declarations
-namespace exchange {
-namespace core {
-namespace processors {
-namespace journaling {
+
+namespace exchange::core {
+
+namespace processors::journaling {
 class ISerializationProcessor;
 }
-} // namespace processors
 
 /**
  * ExchangeCore - main exchange core class
  * Builds configuration and starts disruptor pipeline
  */
 class ExchangeCore {
-public:
-  using ResultsConsumer =
-      std::function<void(common::cmd::OrderCommand *, int64_t)>;
+ public:
+    using ResultsConsumer = std::function<void(common::cmd::OrderCommand*, int64_t)>;
 
-  ExchangeCore(
-      ResultsConsumer resultsConsumer,
-      const common::config::ExchangeConfiguration *exchangeConfiguration);
+    ExchangeCore(ResultsConsumer resultsConsumer,
+                 const common::config::ExchangeConfiguration* exchangeConfiguration);
 
-  ~ExchangeCore();
+    ~ExchangeCore();
 
-  /**
-   * Startup - start the disruptor and replay journal
-   */
-  void Startup();
+    /**
+     * Startup - start the disruptor and replay journal
+     */
+    void Startup();
 
-  /**
-   * Shutdown - stop the disruptor
-   */
-  void Shutdown(int64_t timeoutMs = -1);
+    /**
+     * Shutdown - stop the disruptor
+     */
+    void Shutdown(int64_t timeoutMs = -1);
 
-  /**
-   * Get ExchangeApi instance
-   */
-  IExchangeApi *GetApi();
+    /**
+     * Get ExchangeApi instance
+     */
+    IExchangeApi* GetApi();
 
-  // Internal implementation interface (must be public for template class access
-  // in .cpp)
-  struct IImpl;
+    // Internal implementation interface (must be public for template class access
+    // in .cpp)
+    struct IImpl;
 
-private:
-  std::unique_ptr<IImpl> impl_;
+ private:
+    std::unique_ptr<IImpl> impl_;
 
-  const common::config::ExchangeConfiguration *exchangeConfiguration_;
+    const common::config::ExchangeConfiguration* exchangeConfiguration_;
 };
 
-} // namespace core
-} // namespace exchange
+}  // namespace exchange::core

@@ -16,6 +16,12 @@
 
 #pragma once
 
+#include <ankerl/unordered_dense.h>
+#include <cstdint>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
 #include "../collections/objpool/ObjectsPool.h"
 #include "../common/BalanceAdjustmentType.h"
 #include "../common/WriteBytesMarshallable.h"
@@ -26,20 +32,13 @@
 #include "SharedPool.h"
 #include "SymbolSpecificationProvider.h"
 #include "UserProfileService.h"
-#include <ankerl/unordered_dense.h>
-#include <cstdint>
-#include <filesystem>
-#include <memory>
-#include <optional>
-#include <string>
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace config {
+namespace exchange::core {
+
+namespace common::config {
 class ExchangeConfiguration;
 }
-} // namespace common
+
 namespace processors {
 
 // Forward declarations
@@ -51,271 +50,272 @@ class ISerializationProcessor;
  * LastPriceCacheRecord - last price cache record
  */
 struct LastPriceCacheRecord {
-  int64_t askPrice = INT64_MAX;
-  int64_t bidPrice = 0;
+    int64_t askPrice = INT64_MAX;
+    int64_t bidPrice = 0;
 
-  LastPriceCacheRecord() = default;
-  LastPriceCacheRecord(int64_t askPrice, int64_t bidPrice)
-      : askPrice(askPrice), bidPrice(bidPrice) {}
+    LastPriceCacheRecord() = default;
 
-  /**
-   * Constructor from BytesIn (deserialization)
-   */
-  LastPriceCacheRecord(common::BytesIn &bytes) {
-    askPrice = bytes.ReadLong();
-    bidPrice = bytes.ReadLong();
-  }
+    LastPriceCacheRecord(int64_t askPrice, int64_t bidPrice)
+        : askPrice(askPrice), bidPrice(bidPrice) {}
 
-  LastPriceCacheRecord AveragingRecord() const {
-    LastPriceCacheRecord average;
-    average.askPrice = (askPrice + bidPrice) >> 1;
-    average.bidPrice = average.askPrice;
-    return average;
-  }
+    /**
+     * Constructor from BytesIn (deserialization)
+     */
+    explicit LastPriceCacheRecord(common::BytesIn& bytes) {
+        askPrice = bytes.ReadLong();
+        bidPrice = bytes.ReadLong();
+    }
 
-  static LastPriceCacheRecord Dummy() { return LastPriceCacheRecord(42, 42); }
+    LastPriceCacheRecord AveragingRecord() const {
+        LastPriceCacheRecord average;
+        average.askPrice = (askPrice + bidPrice) >> 1;
+        average.bidPrice = average.askPrice;
+        return average;
+    }
 
-  // Helper method for serialization
-  void WriteMarshallable(common::BytesOut &bytes) const {
-    bytes.WriteLong(askPrice);
-    bytes.WriteLong(bidPrice);
-  }
+    static LastPriceCacheRecord Dummy() {
+        return LastPriceCacheRecord(42, 42);
+    }
+
+    // Helper method for serialization
+    void WriteMarshallable(common::BytesOut& bytes) const {
+        bytes.WriteLong(askPrice);
+        bytes.WriteLong(bidPrice);
+    }
 };
 
 /**
  * RiskEngine - stateful risk engine
  * Handles risk management (R1 - Pre-hold, R2 - Release)
  */
-class RiskEngine : public common::WriteBytesMarshallable,
-                   public common::StateHash {
-public:
-  RiskEngine(
-      int32_t shardId, int64_t numShards,
-      journaling::ISerializationProcessor *serializationProcessor,
-      SharedPool *sharedPool,
-      const common::config::ExchangeConfiguration *exchangeConfiguration);
+class RiskEngine : public common::WriteBytesMarshallable, public common::StateHash {
+ public:
+    RiskEngine(int32_t shardId,
+               int64_t numShards,
+               journaling::ISerializationProcessor* serializationProcessor,
+               SharedPool* sharedPool,
+               const common::config::ExchangeConfiguration* exchangeConfiguration);
 
-  /**
-   * Pre-process command handler (R1 - Pre-hold)
-   * @param seq - command sequence
-   * @param cmd - command
-   * @return true if caller should publish sequence even if batch was not
-   * processed yet
-   */
-  bool PreProcessCommand(int64_t seq, common::cmd::OrderCommand *cmd);
+    /**
+     * Pre-process command handler (R1 - Pre-hold)
+     * @param seq - command sequence
+     * @param cmd - command
+     * @return true if caller should publish sequence even if batch was not
+     * processed yet
+     */
+    bool PreProcessCommand(int64_t seq, common::cmd::OrderCommand* cmd);
 
-  /**
-   * Post-process command handler (R2 - Release)
-   * Processes trade events from matching engine
-   */
-  void PostProcessCommand(int64_t seq, common::cmd::OrderCommand *cmd);
+    /**
+     * Post-process command handler (R2 - Release)
+     * Processes trade events from matching engine
+     */
+    void PostProcessCommand(int64_t seq, common::cmd::OrderCommand* cmd);
 
-  /**
-   * Check if UID belongs to this shard
-   */
-  bool UidForThisHandler(int64_t uid) const;
+    /**
+     * Check if UID belongs to this shard
+     */
+    bool UidForThisHandler(int64_t uid) const;
 
-  /**
-   * Get shard ID
-   */
-  int32_t GetShardId() const { return shardId_; }
+    /**
+     * Get shard ID
+     */
+    int32_t GetShardId() const {
+        return shardId_;
+    }
 
-  /**
-   * Get shard mask
-   */
-  int64_t GetShardMask() const { return shardMask_; }
+    /**
+     * Get shard mask
+     */
+    int64_t GetShardMask() const {
+        return shardMask_;
+    }
 
-  /**
-   * Get symbol specification provider
-   */
-  SymbolSpecificationProvider *GetSymbolSpecificationProvider() {
-    return symbolSpecificationProvider_.get();
-  }
+    /**
+     * Get symbol specification provider
+     */
+    SymbolSpecificationProvider* GetSymbolSpecificationProvider() {
+        return symbolSpecificationProvider_.get();
+    }
 
-  /**
-   * Get user profile service
-   */
-  UserProfileService *GetUserProfileService() {
-    return userProfileService_.get();
-  }
+    /**
+     * Get user profile service
+     */
+    UserProfileService* GetUserProfileService() {
+        return userProfileService_.get();
+    }
 
-  /**
-   * Get binary commands processor
-   */
-  BinaryCommandsProcessor *GetBinaryCommandsProcessor() {
-    return binaryCommandsProcessor_.get();
-  }
+    /**
+     * Get binary commands processor
+     */
+    BinaryCommandsProcessor* GetBinaryCommandsProcessor() {
+        return binaryCommandsProcessor_.get();
+    }
 
-  /**
-   * Get last price cache
-   */
-  const ankerl::unordered_dense::map<int32_t, LastPriceCacheRecord> &
-  GetLastPriceCache() const {
-    return lastPriceCache_;
-  }
+    /**
+     * Get last price cache
+     */
+    const ankerl::unordered_dense::map<int32_t, LastPriceCacheRecord>& GetLastPriceCache() const {
+        return lastPriceCache_;
+    }
 
-  /**
-   * Get fees
-   */
-  const ankerl::unordered_dense::map<int32_t, int64_t> &GetFees() const {
-    return fees_;
-  }
+    /**
+     * Get fees
+     */
+    const ankerl::unordered_dense::map<int32_t, int64_t>& GetFees() const {
+        return fees_;
+    }
 
-  /**
-   * Get adjustments
-   */
-  const ankerl::unordered_dense::map<int32_t, int64_t> &GetAdjustments() const {
-    return adjustments_;
-  }
+    /**
+     * Get adjustments
+     */
+    const ankerl::unordered_dense::map<int32_t, int64_t>& GetAdjustments() const {
+        return adjustments_;
+    }
 
-  /**
-   * Get suspends
-   */
-  const ankerl::unordered_dense::map<int32_t, int64_t> &GetSuspends() const {
-    return suspends_;
-  }
+    /**
+     * Get suspends
+     */
+    const ankerl::unordered_dense::map<int32_t, int64_t>& GetSuspends() const {
+        return suspends_;
+    }
 
-  /**
-   * Reset - clear all state
-   */
-  void Reset();
+    /**
+     * Reset - clear all state
+     */
+    void Reset();
 
-  // StateHash interface
-  int32_t GetStateHash() const override;
+    // StateHash interface
+    int32_t GetStateHash() const override;
 
-  // WriteBytesMarshallable interface
-  void WriteMarshallable(common::BytesOut &bytes) const override;
+    // WriteBytesMarshallable interface
+    void WriteMarshallable(common::BytesOut& bytes) const override;
 
-private:
-  int32_t shardId_;
-  int64_t shardMask_; // numShards - 1 (must be power of 2)
+ private:
+    int32_t shardId_;
+    int64_t shardMask_;  // numShards - 1 (must be power of 2)
 
-  std::string exchangeId_; // TODO validate
-  std::filesystem::path folder_;
+    std::string exchangeId_;  // TODO validate
+    std::filesystem::path folder_;
 
-  std::unique_ptr<SymbolSpecificationProvider> symbolSpecificationProvider_;
-  std::unique_ptr<UserProfileService> userProfileService_;
-  std::unique_ptr<BinaryCommandsProcessor> binaryCommandsProcessor_;
-  std::unique_ptr<common::api::reports::ReportQueriesHandler>
-      reportQueriesHandler_;
+    std::unique_ptr<SymbolSpecificationProvider> symbolSpecificationProvider_;
+    std::unique_ptr<UserProfileService> userProfileService_;
+    std::unique_ptr<BinaryCommandsProcessor> binaryCommandsProcessor_;
+    std::unique_ptr<common::api::reports::ReportQueriesHandler> reportQueriesHandler_;
 
-  journaling::ISerializationProcessor *serializationProcessor_;
+    journaling::ISerializationProcessor* serializationProcessor_;
 
-  // Object pool for risk engine operations
-  // Created in constructor with configuration matching Java version
-  std::unique_ptr<::exchange::core::collections::objpool::ObjectsPool>
-      objectsPool_;
+    // Object pool for risk engine operations
+    // Created in constructor with configuration matching Java version
+    std::unique_ptr<::exchange::core::collections::objpool::ObjectsPool> objectsPool_;
 
-  // symbol -> LastPriceCacheRecord
-  ankerl::unordered_dense::map<int32_t, LastPriceCacheRecord> lastPriceCache_;
+    // symbol -> LastPriceCacheRecord
+    ankerl::unordered_dense::map<int32_t, LastPriceCacheRecord> lastPriceCache_;
 
-  // currency -> amount
-  ankerl::unordered_dense::map<int32_t, int64_t> fees_;
-  ankerl::unordered_dense::map<int32_t, int64_t> adjustments_;
-  ankerl::unordered_dense::map<int32_t, int64_t> suspends_;
+    // currency -> amount
+    ankerl::unordered_dense::map<int32_t, int64_t> fees_;
+    ankerl::unordered_dense::map<int32_t, int64_t> adjustments_;
+    ankerl::unordered_dense::map<int32_t, int64_t> suspends_;
 
-  bool cfgIgnoreRiskProcessing_;
-  bool cfgMarginTradingEnabled_;
-  bool logDebug_;
+    bool cfgIgnoreRiskProcessing_;
+    bool cfgMarginTradingEnabled_;
+    bool logDebug_;
 
-  /**
-   * Place order risk check
-   */
-  common::cmd::CommandResultCode
-  PlaceOrderRiskCheck(common::cmd::OrderCommand *cmd);
+    /**
+     * Place order risk check
+     */
+    common::cmd::CommandResultCode PlaceOrderRiskCheck(common::cmd::OrderCommand* cmd);
 
-  /**
-   * Place order (internal)
-   */
-  common::cmd::CommandResultCode
-  PlaceOrder(common::cmd::OrderCommand *cmd, common::UserProfile *userProfile,
-             const common::CoreSymbolSpecification *spec);
+    /**
+     * Place order (internal)
+     */
+    common::cmd::CommandResultCode PlaceOrder(common::cmd::OrderCommand* cmd,
+                                              common::UserProfile* userProfile,
+                                              const common::CoreSymbolSpecification* spec);
 
-  /**
-   * Place exchange order
-   */
-  common::cmd::CommandResultCode
-  PlaceExchangeOrder(common::cmd::OrderCommand *cmd,
-                     common::UserProfile *userProfile,
-                     const common::CoreSymbolSpecification *spec);
+    /**
+     * Place exchange order
+     */
+    common::cmd::CommandResultCode PlaceExchangeOrder(common::cmd::OrderCommand* cmd,
+                                                      common::UserProfile* userProfile,
+                                                      const common::CoreSymbolSpecification* spec);
 
-  /**
-   * Adjust balance
-   */
-  common::cmd::CommandResultCode
-  AdjustBalance(int64_t uid, int32_t currency, int64_t amountDiff,
-                int64_t fundingTransactionId,
-                ::exchange::core::common::BalanceAdjustmentType adjustmentType);
+    /**
+     * Adjust balance
+     */
+    common::cmd::CommandResultCode AdjustBalance(
+        int64_t uid,
+        int32_t currency,
+        int64_t amountDiff,
+        int64_t fundingTransactionId,
+        ::exchange::core::common::BalanceAdjustmentType adjustmentType);
 
-  /**
-   * Handle binary message
-   */
-  void HandleBinaryMessage(common::api::binary::BinaryDataCommand *message);
+    /**
+     * Handle binary message
+     */
+    void HandleBinaryMessage(common::api::binary::BinaryDataCommand* message);
 
-  /**
-   * Handle report query
-   */
-  template <typename R>
-  std::optional<std::unique_ptr<R>>
-  HandleReportQuery(common::api::reports::ReportQuery<R> *reportQuery);
+    /**
+     * Handle report query
+     */
+    template <typename R>
+    std::optional<std::unique_ptr<R>> HandleReportQuery(
+        common::api::reports::ReportQuery<R>* reportQuery);
 
-  // Make HandleReportQuery accessible to RiskEngineReportQueriesHandler
-  friend class RiskEngineReportQueriesHandler;
+    // Make HandleReportQuery accessible to RiskEngineReportQueriesHandler
+    friend class RiskEngineReportQueriesHandler;
 
-  /**
-   * Handle matcher reject/reduce event for exchange
-   */
-  void HandleMatcherRejectReduceEventExchange(
-      common::cmd::OrderCommand *cmd, common::MatcherTradeEvent *ev,
-      const common::CoreSymbolSpecification *spec, bool takerSell,
-      common::UserProfile *taker);
+    /**
+     * Handle matcher reject/reduce event for exchange
+     */
+    void HandleMatcherRejectReduceEventExchange(common::cmd::OrderCommand* cmd,
+                                                common::MatcherTradeEvent* ev,
+                                                const common::CoreSymbolSpecification* spec,
+                                                bool takerSell,
+                                                common::UserProfile* taker);
 
-  /**
-   * Handle matcher events for exchange sell
-   */
-  void
-  HandleMatcherEventsExchangeSell(common::MatcherTradeEvent *ev,
-                                  const common::CoreSymbolSpecification *spec,
-                                  common::UserProfile *taker);
+    /**
+     * Handle matcher events for exchange sell
+     */
+    void HandleMatcherEventsExchangeSell(common::MatcherTradeEvent* ev,
+                                         const common::CoreSymbolSpecification* spec,
+                                         common::UserProfile* taker);
 
-  /**
-   * Handle matcher events for exchange buy
-   */
-  void
-  HandleMatcherEventsExchangeBuy(common::MatcherTradeEvent *ev,
-                                 const common::CoreSymbolSpecification *spec,
-                                 common::UserProfile *taker,
-                                 common::cmd::OrderCommand *cmd);
+    /**
+     * Handle matcher events for exchange buy
+     */
+    void HandleMatcherEventsExchangeBuy(common::MatcherTradeEvent* ev,
+                                        const common::CoreSymbolSpecification* spec,
+                                        common::UserProfile* taker,
+                                        common::cmd::OrderCommand* cmd);
 
-  /**
-   * Handle matcher event for margin trading
-   */
-  void HandleMatcherEventMargin(common::MatcherTradeEvent *ev,
-                                const common::CoreSymbolSpecification *spec,
-                                common::OrderAction takerAction,
-                                common::UserProfile *takerUp,
-                                common::SymbolPositionRecord *takerSpr);
+    /**
+     * Handle matcher event for margin trading
+     */
+    void HandleMatcherEventMargin(common::MatcherTradeEvent* ev,
+                                  const common::CoreSymbolSpecification* spec,
+                                  common::OrderAction takerAction,
+                                  common::UserProfile* takerUp,
+                                  common::SymbolPositionRecord* takerSpr);
 
-  /**
-   * Get opposite action
-   */
-  static common::OrderAction OppositeAction(common::OrderAction action);
+    /**
+     * Get opposite action
+     */
+    static common::OrderAction OppositeAction(common::OrderAction action);
 
-  /**
-   * Check if margin order can be placed
-   */
-  bool CanPlaceMarginOrder(common::cmd::OrderCommand *cmd,
-                           common::UserProfile *userProfile,
-                           const common::CoreSymbolSpecification *spec,
-                           common::SymbolPositionRecord *position);
+    /**
+     * Check if margin order can be placed
+     */
+    bool CanPlaceMarginOrder(common::cmd::OrderCommand* cmd,
+                             common::UserProfile* userProfile,
+                             const common::CoreSymbolSpecification* spec,
+                             common::SymbolPositionRecord* position);
 
-  /**
-   * Remove position record
-   */
-  void RemovePositionRecord(common::SymbolPositionRecord *record,
-                            common::UserProfile *userProfile);
+    /**
+     * Remove position record
+     */
+    void RemovePositionRecord(common::SymbolPositionRecord* record,
+                              common::UserProfile* userProfile);
 };
 
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace processors
+}  // namespace exchange::core
