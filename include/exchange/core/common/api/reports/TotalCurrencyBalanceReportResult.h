@@ -16,15 +16,16 @@
 
 #pragma once
 
-#include "ReportResult.h"
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
+#include "ReportResult.h"
 
 namespace exchange {
 namespace core {
 namespace common {
 class BytesIn;
 class BytesOut;
+
 namespace api {
 namespace reports {
 
@@ -34,38 +35,40 @@ namespace reports {
 class TotalCurrencyBalanceReportResult : public ReportResult {
 public:
   // currency -> balance
-  ankerl::unordered_dense::map<int32_t, int64_t> *accountBalances;
-  ankerl::unordered_dense::map<int32_t, int64_t> *fees;
-  ankerl::unordered_dense::map<int32_t, int64_t> *adjustments;
-  ankerl::unordered_dense::map<int32_t, int64_t> *suspends;
-  ankerl::unordered_dense::map<int32_t, int64_t> *ordersBalances;
+  ankerl::unordered_dense::map<int32_t, int64_t>* accountBalances;
+  ankerl::unordered_dense::map<int32_t, int64_t>* fees;
+  ankerl::unordered_dense::map<int32_t, int64_t>* adjustments;
+  ankerl::unordered_dense::map<int32_t, int64_t>* suspends;
+  ankerl::unordered_dense::map<int32_t, int64_t>* ordersBalances;
 
   // symbol -> volume
-  ankerl::unordered_dense::map<int32_t, int64_t> *openInterestLong;
-  ankerl::unordered_dense::map<int32_t, int64_t> *openInterestShort;
+  ankerl::unordered_dense::map<int32_t, int64_t>* openInterestLong;
+  ankerl::unordered_dense::map<int32_t, int64_t>* openInterestShort;
 
-  TotalCurrencyBalanceReportResult(
-      ankerl::unordered_dense::map<int32_t, int64_t> *accountBalances,
-      ankerl::unordered_dense::map<int32_t, int64_t> *fees,
-      ankerl::unordered_dense::map<int32_t, int64_t> *adjustments,
-      ankerl::unordered_dense::map<int32_t, int64_t> *suspends,
-      ankerl::unordered_dense::map<int32_t, int64_t> *ordersBalances,
-      ankerl::unordered_dense::map<int32_t, int64_t> *openInterestLong,
-      ankerl::unordered_dense::map<int32_t, int64_t> *openInterestShort)
-      : accountBalances(accountBalances), fees(fees), adjustments(adjustments),
-        suspends(suspends), ordersBalances(ordersBalances),
-        openInterestLong(openInterestLong),
-        openInterestShort(openInterestShort) {}
+  TotalCurrencyBalanceReportResult(ankerl::unordered_dense::map<int32_t, int64_t>* accountBalances,
+                                   ankerl::unordered_dense::map<int32_t, int64_t>* fees,
+                                   ankerl::unordered_dense::map<int32_t, int64_t>* adjustments,
+                                   ankerl::unordered_dense::map<int32_t, int64_t>* suspends,
+                                   ankerl::unordered_dense::map<int32_t, int64_t>* ordersBalances,
+                                   ankerl::unordered_dense::map<int32_t, int64_t>* openInterestLong,
+                                   ankerl::unordered_dense::map<int32_t, int64_t>* openInterestShort)
+    : accountBalances(accountBalances)
+    , fees(fees)
+    , adjustments(adjustments)
+    , suspends(suspends)
+    , ordersBalances(ordersBalances)
+    , openInterestLong(openInterestLong)
+    , openInterestShort(openInterestShort) {}
 
-  static TotalCurrencyBalanceReportResult *CreateEmpty();
+  static TotalCurrencyBalanceReportResult* CreateEmpty();
 
-  static TotalCurrencyBalanceReportResult *OfOrderBalances(
-      const ankerl::unordered_dense::map<int32_t, int64_t> &currencyBalance);
+  static TotalCurrencyBalanceReportResult*
+  OfOrderBalances(const ankerl::unordered_dense::map<int32_t, int64_t>& currencyBalance);
 
   /**
    * Constructor from BytesIn (deserialization, matches Java constructor)
    */
-  explicit TotalCurrencyBalanceReportResult(BytesIn &bytes);
+  explicit TotalCurrencyBalanceReportResult(BytesIn& bytes);
 
   /**
    * Merge multiple results (matches Java merge method)
@@ -73,7 +76,7 @@ public:
    * @return Merged result
    */
   static std::unique_ptr<TotalCurrencyBalanceReportResult>
-  Merge(const std::vector<BytesIn *> &pieces);
+  Merge(const std::vector<BytesIn*>& pieces);
 
   /**
    * Get global balances sum (matches Java getGlobalBalancesSum)
@@ -88,11 +91,11 @@ public:
   bool IsGlobalBalancesAllZero() const;
 
   // Serialization method
-  void WriteMarshallable(BytesOut &bytes) const;
+  void WriteMarshallable(BytesOut& bytes) const;
 };
 
-} // namespace reports
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace reports
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

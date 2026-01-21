@@ -28,33 +28,32 @@ using namespace utils;
 REGISTER_BINARY_COMMAND_TYPE(BatchAddSymbolsCommand, BinaryCommandType::ADD_SYMBOLS);
 
 BatchAddSymbolsCommand::BatchAddSymbolsCommand(BytesIn& bytes) {
-    // Read IntObjectHashMap<CoreSymbolSpecification>
-    // Java: symbols = SerializationUtils.readIntHashMap(bytes,
-    // CoreSymbolSpecification::new);
-    auto tempMap = SerializationUtils::ReadIntHashMap<CoreSymbolSpecification>(
-        bytes,
-        [](BytesIn& b) -> CoreSymbolSpecification* { return new CoreSymbolSpecification(b); });
+  // Read IntObjectHashMap<CoreSymbolSpecification>
+  // Java: symbols = SerializationUtils.readIntHashMap(bytes,
+  // CoreSymbolSpecification::new);
+  auto tempMap = SerializationUtils::ReadIntHashMap<CoreSymbolSpecification>(
+    bytes, [](BytesIn& b) -> CoreSymbolSpecification* { return new CoreSymbolSpecification(b); });
 
-    // Convert from map<int32_t, CoreSymbolSpecification*> to map<int32_t, const
-    // CoreSymbolSpecification*>
-    for (const auto& pair : tempMap) {
-        if (pair.second != nullptr) {
-            symbols[pair.first] = pair.second;
-        }
+  // Convert from map<int32_t, CoreSymbolSpecification*> to map<int32_t, const
+  // CoreSymbolSpecification*>
+  for (const auto& pair : tempMap) {
+    if (pair.second != nullptr) {
+      symbols[pair.first] = pair.second;
     }
+  }
 }
 
 void BatchAddSymbolsCommand::WriteMarshallable(BytesOut& bytes) const {
-    // Match Java: SerializationUtils.marshallIntHashMap(symbols, bytes);
-    // Convert from map<int32_t, const CoreSymbolSpecification*> to
-    // map<int32_t, CoreSymbolSpecification*> for template
-    ankerl::unordered_dense::map<int32_t, CoreSymbolSpecification*> tempMap;
-    for (const auto& pair : symbols) {
-        if (pair.second != nullptr) {
-            tempMap[pair.first] = const_cast<CoreSymbolSpecification*>(pair.second);
-        }
+  // Match Java: SerializationUtils.marshallIntHashMap(symbols, bytes);
+  // Convert from map<int32_t, const CoreSymbolSpecification*> to
+  // map<int32_t, CoreSymbolSpecification*> for template
+  ankerl::unordered_dense::map<int32_t, CoreSymbolSpecification*> tempMap;
+  for (const auto& pair : symbols) {
+    if (pair.second != nullptr) {
+      tempMap[pair.first] = const_cast<CoreSymbolSpecification*>(pair.second);
     }
-    SerializationUtils::MarshallIntHashMap(tempMap, bytes);
+  }
+  SerializationUtils::MarshallIntHashMap(tempMap, bytes);
 }
 
 }  // namespace exchange::core::common::api::binary

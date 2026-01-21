@@ -46,22 +46,22 @@ public:
                         ReportsQueriesConfiguration reportsQueriesCfg,
                         LoggingConfiguration loggingCfg,
                         SerializationConfiguration serializationCfg)
-      : ordersProcessingCfg(ordersProcessingCfg),
-        performanceCfg(std::move(performanceCfg)), initStateCfg(initStateCfg),
-        reportsQueriesCfg(reportsQueriesCfg), loggingCfg(loggingCfg),
-        serializationCfg(serializationCfg) {}
+    : ordersProcessingCfg(ordersProcessingCfg)
+    , performanceCfg(std::move(performanceCfg))
+    , initStateCfg(initStateCfg)
+    , reportsQueriesCfg(reportsQueriesCfg)
+    , loggingCfg(loggingCfg)
+    , serializationCfg(serializationCfg) {}
 
   static ExchangeConfiguration Default() {
-    return ExchangeConfiguration(OrdersProcessingConfiguration::Default(),
-                                 PerformanceConfiguration::Default(),
-                                 InitialStateConfiguration::Default(),
-                                 ReportsQueriesConfiguration::Default(),
-                                 LoggingConfiguration::Default(),
-                                 SerializationConfiguration::Default());
+    return ExchangeConfiguration(
+      OrdersProcessingConfiguration::Default(), PerformanceConfiguration::Default(),
+      InitialStateConfiguration::Default(), ReportsQueriesConfiguration::Default(),
+      LoggingConfiguration::Default(), SerializationConfiguration::Default());
   }
 };
 
-} // namespace config
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace config
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

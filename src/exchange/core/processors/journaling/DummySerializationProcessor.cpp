@@ -22,8 +22,8 @@
 namespace exchange::core::processors::journaling {
 
 DummySerializationProcessor* DummySerializationProcessor::Instance() {
-    static DummySerializationProcessor instance;
-    return &instance;
+  static DummySerializationProcessor instance;
+  return &instance;
 }
 
 bool DummySerializationProcessor::StoreData(int64_t snapshotId,
@@ -32,57 +32,57 @@ bool DummySerializationProcessor::StoreData(int64_t snapshotId,
                                             SerializedModuleType type,
                                             int32_t instanceId,
                                             const common::WriteBytesMarshallable* obj) {
-    // Dummy implementation - do nothing
-    return false;
+  // Dummy implementation - do nothing
+  return false;
 }
 
 void DummySerializationProcessor::LoadData(int64_t snapshotId,
                                            SerializedModuleType type,
                                            int32_t instanceId,
                                            std::function<void(common::BytesIn*)> initFunc) {
-    // Dummy implementation - do nothing
+  // Dummy implementation - do nothing
 }
 
 void DummySerializationProcessor::WriteToJournal(common::cmd::OrderCommand* cmd,
                                                  int64_t dSeq,
                                                  bool eob) {
-    // Dummy implementation - do nothing
+  // Dummy implementation - do nothing
 }
 
 void DummySerializationProcessor::EnableJournaling(int64_t afterSeq, IExchangeApi* api) {
-    // Dummy implementation - do nothing
+  // Dummy implementation - do nothing
 }
 
 std::map<int64_t, SnapshotDescriptor*> DummySerializationProcessor::FindAllSnapshotPoints() {
-    // Dummy implementation - return empty map
-    return std::map<int64_t, SnapshotDescriptor*>();
+  // Dummy implementation - return empty map
+  return std::map<int64_t, SnapshotDescriptor*>();
 }
 
 void DummySerializationProcessor::ReplayJournalStep(int64_t snapshotId,
                                                     int64_t seqFrom,
                                                     int64_t seqTo,
                                                     IExchangeApi* api) {
-    // Dummy implementation - do nothing
+  // Dummy implementation - do nothing
 }
 
 int64_t DummySerializationProcessor::ReplayJournalFull(
-    const common::config::InitialStateConfiguration* initialStateConfiguration,
-    IExchangeApi* api) {
-    // Dummy implementation - return 0
-    return 0;
+  const common::config::InitialStateConfiguration* initialStateConfiguration,
+  IExchangeApi* api) {
+  // Dummy implementation - return 0
+  return 0;
 }
 
 void DummySerializationProcessor::ReplayJournalFullAndThenEnableJouraling(
-    const common::config::InitialStateConfiguration* initialStateConfiguration,
-    IExchangeApi* api) {
-    // Dummy implementation - do nothing
+  const common::config::InitialStateConfiguration* initialStateConfiguration,
+  IExchangeApi* api) {
+  // Dummy implementation - do nothing
 }
 
 bool DummySerializationProcessor::CheckSnapshotExists(int64_t snapshotId,
                                                       SerializedModuleType type,
                                                       int32_t instanceId) {
-    // Dummy implementation - return false
-    return false;
+  // Dummy implementation - return false
+  return false;
 }
 
 }  // namespace exchange::core::processors::journaling

@@ -16,17 +16,18 @@
 
 #pragma once
 
-#include "ReportResult.h"
 #include <cstdint>
 #include <map>
 #include <memory>
 #include <vector>
+#include "ReportResult.h"
 
 namespace exchange {
 namespace core {
 namespace common {
 class BytesIn;
 class BytesOut;
+
 namespace api {
 namespace reports {
 
@@ -56,27 +57,26 @@ public:
     SubmoduleType submodule;
 
     SubmoduleKey(int32_t moduleId, SubmoduleType submodule)
-        : moduleId(moduleId), submodule(submodule) {}
+      : moduleId(moduleId), submodule(submodule) {}
 
     /**
      * Constructor from BytesIn (deserialization)
      */
-    SubmoduleKey(BytesIn &bytes);
+    SubmoduleKey(BytesIn& bytes);
 
-    bool operator<(const SubmoduleKey &other) const {
+    bool operator<(const SubmoduleKey& other) const {
       if (submodule != other.submodule) {
-        return static_cast<int32_t>(submodule) <
-               static_cast<int32_t>(other.submodule);
+        return static_cast<int32_t>(submodule) < static_cast<int32_t>(other.submodule);
       }
       return moduleId < other.moduleId;
     }
 
-    bool operator==(const SubmoduleKey &other) const {
+    bool operator==(const SubmoduleKey& other) const {
       return moduleId == other.moduleId && submodule == other.submodule;
     }
 
     // Serialization method (not inheriting WriteBytesMarshallable)
-    void WriteMarshallable(BytesOut &bytes) const;
+    void WriteMarshallable(BytesOut& bytes) const;
   };
 
   static SubmoduleKey CreateKey(int32_t moduleId, SubmoduleType submoduleType) {
@@ -85,27 +85,25 @@ public:
 
   std::map<SubmoduleKey, int32_t> hashCodes;
 
-  explicit StateHashReportResult(
-      const std::map<SubmoduleKey, int32_t> &hashCodes = {})
-      : hashCodes(hashCodes) {}
+  explicit StateHashReportResult(const std::map<SubmoduleKey, int32_t>& hashCodes = {})
+    : hashCodes(hashCodes) {}
 
   // Constructor from BytesIn (deserialization)
-  explicit StateHashReportResult(BytesIn &bytes);
+  explicit StateHashReportResult(BytesIn& bytes);
 
   int32_t GetStateHash() const;
 
   // Serialization method
-  void WriteMarshallable(BytesOut &bytes) const;
+  void WriteMarshallable(BytesOut& bytes) const;
 
   // Merge method (matches Java merge)
-  static std::unique_ptr<StateHashReportResult>
-  Merge(const std::vector<BytesIn *> &pieces);
+  static std::unique_ptr<StateHashReportResult> Merge(const std::vector<BytesIn*>& pieces);
 
   static const StateHashReportResult EMPTY;
 };
 
-} // namespace reports
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace reports
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

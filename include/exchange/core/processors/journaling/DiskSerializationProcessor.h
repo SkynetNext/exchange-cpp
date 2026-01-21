@@ -16,11 +16,6 @@
 
 #pragma once
 
-#include "../../common/cmd/OrderCommand.h"
-#include "../../common/config/ExchangeConfiguration.h"
-#include "../../common/config/InitialStateConfiguration.h"
-#include "DiskSerializationProcessorConfiguration.h"
-#include "ISerializationProcessor.h"
 #include <cstdint>
 #include <fstream>
 #include <istream>
@@ -29,6 +24,11 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include "../../common/cmd/OrderCommand.h"
+#include "../../common/config/ExchangeConfiguration.h"
+#include "../../common/config/InitialStateConfiguration.h"
+#include "DiskSerializationProcessorConfiguration.h"
+#include "ISerializationProcessor.h"
 
 // Forward declarations
 class ExchangeApi;
@@ -49,35 +49,35 @@ struct SnapshotDescriptor;
  */
 class DiskSerializationProcessor : public ISerializationProcessor {
 public:
-  DiskSerializationProcessor(
-      const common::config::ExchangeConfiguration *exchangeConfig,
-      const DiskSerializationProcessorConfiguration *diskConfig);
+  DiskSerializationProcessor(const common::config::ExchangeConfiguration* exchangeConfig,
+                             const DiskSerializationProcessorConfiguration* diskConfig);
 
-  bool StoreData(int64_t snapshotId, int64_t seq, int64_t timestampNs,
-                 SerializedModuleType type, int32_t instanceId,
-                 const common::WriteBytesMarshallable *obj) override;
+  bool StoreData(int64_t snapshotId,
+                 int64_t seq,
+                 int64_t timestampNs,
+                 SerializedModuleType type,
+                 int32_t instanceId,
+                 const common::WriteBytesMarshallable* obj) override;
 
-  void WriteToJournal(common::cmd::OrderCommand *cmd, int64_t dSeq,
-                      bool eob) override;
+  void WriteToJournal(common::cmd::OrderCommand* cmd, int64_t dSeq, bool eob) override;
 
-  void EnableJournaling(int64_t afterSeq, IExchangeApi *api) override;
+  void EnableJournaling(int64_t afterSeq, IExchangeApi* api) override;
 
-  std::map<int64_t, SnapshotDescriptor *> FindAllSnapshotPoints() override;
+  std::map<int64_t, SnapshotDescriptor*> FindAllSnapshotPoints() override;
 
-  void ReplayJournalStep(int64_t snapshotId, int64_t seqFrom, int64_t seqTo,
-                         IExchangeApi *api) override;
+  void
+  ReplayJournalStep(int64_t snapshotId, int64_t seqFrom, int64_t seqTo, IExchangeApi* api) override;
 
-  int64_t ReplayJournalFull(const common::config::InitialStateConfiguration
-                                *initialStateConfiguration,
-                            IExchangeApi *api) override;
+  int64_t
+  ReplayJournalFull(const common::config::InitialStateConfiguration* initialStateConfiguration,
+                    IExchangeApi* api) override;
 
   void ReplayJournalFullAndThenEnableJouraling(
-      const common::config::InitialStateConfiguration
-          *initialStateConfiguration,
-      IExchangeApi *api) override;
+    const common::config::InitialStateConfiguration* initialStateConfiguration,
+    IExchangeApi* api) override;
 
-  bool CheckSnapshotExists(int64_t snapshotId, SerializedModuleType type,
-                           int32_t instanceId) override;
+  bool
+  CheckSnapshotExists(int64_t snapshotId, SerializedModuleType type, int32_t instanceId) override;
 
 private:
   std::string exchangeId_;
@@ -88,16 +88,16 @@ private:
   int64_t journalFileMaxSize_;
   int32_t journalBatchCompressThreshold_;
 
-  std::map<int64_t, SnapshotDescriptor *> snapshotsIndex_;
-  SnapshotDescriptor *lastSnapshotDescriptor_;
-  JournalDescriptor *lastJournalDescriptor_;
+  std::map<int64_t, SnapshotDescriptor*> snapshotsIndex_;
+  SnapshotDescriptor* lastSnapshotDescriptor_;
+  JournalDescriptor* lastJournalDescriptor_;
 
   int64_t baseSnapshotId_;
   int64_t enableJournalAfterSeq_;
 
   int32_t filesCounter_;
   int64_t writtenBytes_;
-  int64_t lastWrittenSeq_; // Track last written sequence number for seqLast
+  int64_t lastWrittenSeq_;  // Track last written sequence number for seqLast
 
   // Journal writing buffers
   std::vector<char> journalWriteBuffer_;
@@ -109,28 +109,27 @@ private:
   std::mutex journalMutex_;
 
   // Internal methods
-  std::string GetSnapshotPath(int64_t snapshotId, SerializedModuleType type,
-                              int32_t instanceId);
+  std::string GetSnapshotPath(int64_t snapshotId, SerializedModuleType type, int32_t instanceId);
   std::string GetJournalPath(int64_t snapshotId, int32_t fileIndex);
 
   // Journal writing helpers
   void FlushBufferSync(bool forceStartNextFile, int64_t timestampNs);
   void StartNewFile(int64_t timestampNs);
   void RegisterNextJournal(int64_t seq, int64_t timestampNs);
-  void RegisterNextSnapshot(int64_t snapshotId, int64_t seq,
-                            int64_t timestampNs);
+  void RegisterNextSnapshot(int64_t snapshotId, int64_t seq, int64_t timestampNs);
 
   // Journal replay helpers
-  void ReadCommands(std::istream &is, IExchangeApi *api, int64_t &lastSeq,
-                    bool insideCompressedBlock);
+  void
+  ReadCommands(std::istream& is, IExchangeApi* api, int64_t& lastSeq, bool insideCompressedBlock);
 
   // Override LoadData from base class
-  void LoadData(int64_t snapshotId, SerializedModuleType type,
+  void LoadData(int64_t snapshotId,
+                SerializedModuleType type,
                 int32_t instanceId,
-                std::function<void(common::BytesIn *)> initFunc) override;
+                std::function<void(common::BytesIn*)> initFunc) override;
 };
 
-} // namespace journaling
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace journaling
+}  // namespace processors
+}  // namespace core
+}  // namespace exchange

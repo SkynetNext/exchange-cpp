@@ -16,9 +16,9 @@
 
 #pragma once
 
+#include <cstdint>
 #include "../BalanceAdjustmentType.h"
 #include "ApiCommand.h"
-#include <cstdint>
 
 namespace exchange {
 namespace core {
@@ -36,14 +36,19 @@ public:
   int64_t transactionId;
   BalanceAdjustmentType adjustmentType;
 
-  ApiAdjustUserBalance(
-      int64_t uid, int32_t currency, int64_t amount, int64_t transactionId,
-      BalanceAdjustmentType adjustmentType = BalanceAdjustmentType::ADJUSTMENT)
-      : uid(uid), currency(currency), amount(amount),
-        transactionId(transactionId), adjustmentType(adjustmentType) {}
+  ApiAdjustUserBalance(int64_t uid,
+                       int32_t currency,
+                       int64_t amount,
+                       int64_t transactionId,
+                       BalanceAdjustmentType adjustmentType = BalanceAdjustmentType::ADJUSTMENT)
+    : uid(uid)
+    , currency(currency)
+    , amount(amount)
+    , transactionId(transactionId)
+    , adjustmentType(adjustmentType) {}
 };
 
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

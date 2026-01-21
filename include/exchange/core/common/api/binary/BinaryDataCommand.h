@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "../../WriteBytesMarshallable.h"
 #include <cstdint>
+#include "../../WriteBytesMarshallable.h"
 
 namespace exchange {
 namespace core {
@@ -39,8 +39,8 @@ public:
   virtual int32_t GetBinaryCommandTypeCode() const = 0;
 };
 
-} // namespace binary
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace binary
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

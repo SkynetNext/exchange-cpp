@@ -27,49 +27,49 @@ namespace exchange::core::utils {
  * HashingUtils - utility functions for state hashing
  */
 class HashingUtils {
- public:
-    /**
-     * Calculate state hash for a hash map of StateHash objects
-     */
-    template <typename T>
-    static int32_t StateHash(const ankerl::unordered_dense::map<int64_t, T*>& hashMap) {
-        std::size_t hash = 0;
-        for (const auto& pair : hashMap) {
-            std::size_t h1 = std::hash<int64_t>{}(pair.first);
-            if (pair.second != nullptr) {
-                h1 ^= static_cast<std::size_t>(pair.second->GetStateHash());
-            }
-            hash ^= (h1 << 1);
-        }
-        return static_cast<int32_t>(hash);
+public:
+  /**
+   * Calculate state hash for a hash map of StateHash objects
+   */
+  template <typename T>
+  static int32_t StateHash(const ankerl::unordered_dense::map<int64_t, T*>& hashMap) {
+    std::size_t hash = 0;
+    for (const auto& pair : hashMap) {
+      std::size_t h1 = std::hash<int64_t>{}(pair.first);
+      if (pair.second != nullptr) {
+        h1 ^= static_cast<std::size_t>(pair.second->GetStateHash());
+      }
+      hash ^= (h1 << 1);
     }
+    return static_cast<int32_t>(hash);
+  }
 
-    template <typename T>
-    static int32_t StateHash(const ankerl::unordered_dense::map<int32_t, T*>& hashMap) {
-        std::size_t hash = 0;
-        for (const auto& pair : hashMap) {
-            std::size_t h1 = std::hash<int32_t>{}(pair.first);
-            if (pair.second != nullptr) {
-                h1 ^= static_cast<std::size_t>(pair.second->GetStateHash());
-            }
-            hash ^= (h1 << 1);
-        }
-        return static_cast<int32_t>(hash);
+  template <typename T>
+  static int32_t StateHash(const ankerl::unordered_dense::map<int32_t, T*>& hashMap) {
+    std::size_t hash = 0;
+    for (const auto& pair : hashMap) {
+      std::size_t h1 = std::hash<int32_t>{}(pair.first);
+      if (pair.second != nullptr) {
+        h1 ^= static_cast<std::size_t>(pair.second->GetStateHash());
+      }
+      hash ^= (h1 << 1);
     }
+    return static_cast<int32_t>(hash);
+  }
 
-    /**
-     * Calculate state hash for a vector of StateHash objects
-     */
-    template <typename T>
-    static int32_t StateHashStream(const std::vector<T*>& items) {
-        int32_t h = 0;
-        for (const auto* item : items) {
-            if (item != nullptr) {
-                h = h * 31 + item->GetStateHash();
-            }
-        }
-        return h;
+  /**
+   * Calculate state hash for a vector of StateHash objects
+   */
+  template <typename T>
+  static int32_t StateHashStream(const std::vector<T*>& items) {
+    int32_t h = 0;
+    for (const auto* item : items) {
+      if (item != nullptr) {
+        h = h * 31 + item->GetStateHash();
+      }
     }
+    return h;
+  }
 };
 
 }  // namespace exchange::core::utils

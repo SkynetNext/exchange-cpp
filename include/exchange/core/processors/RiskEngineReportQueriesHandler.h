@@ -34,24 +34,24 @@ namespace exchange::core::processors {
  * then calls the type-erased ProcessTypeErased method.
  */
 class RiskEngineReportQueriesHandler : public common::api::reports::ReportQueriesHandler {
- public:
-    explicit RiskEngineReportQueriesHandler(RiskEngine* riskEngine) : riskEngine_(riskEngine) {}
+public:
+  explicit RiskEngineReportQueriesHandler(RiskEngine* riskEngine) : riskEngine_(riskEngine) {}
 
- protected:
-    // Override HandleReportImpl to use type erasure
-    std::optional<std::unique_ptr<common::api::reports::ReportResult>> HandleReportImpl(
-        common::api::reports::ReportQueryBase* reportQuery) override {
-        if (riskEngine_ == nullptr || reportQuery == nullptr) {
-            LOG_WARN("[RiskEngineReportQueriesHandler] HandleReportImpl: riskEngine_ "
-                     "or reportQuery is nullptr");
-            return std::nullopt;
-        }
-
-        return reportQuery->ProcessTypeErased(riskEngine_);
+protected:
+  // Override HandleReportImpl to use type erasure
+  std::optional<std::unique_ptr<common::api::reports::ReportResult>>
+  HandleReportImpl(common::api::reports::ReportQueryBase* reportQuery) override {
+    if (riskEngine_ == nullptr || reportQuery == nullptr) {
+      LOG_WARN("[RiskEngineReportQueriesHandler] HandleReportImpl: riskEngine_ "
+               "or reportQuery is nullptr");
+      return std::nullopt;
     }
 
- private:
-    RiskEngine* riskEngine_;
+    return reportQuery->ProcessTypeErased(riskEngine_);
+  }
+
+private:
+  RiskEngine* riskEngine_;
 };
 
 }  // namespace exchange::core::processors

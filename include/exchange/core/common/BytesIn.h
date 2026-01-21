@@ -59,9 +59,9 @@ public:
   /**
    * Read bytes into buffer
    */
-  virtual void Read(void *buffer, size_t length) = 0;
+  virtual void Read(void* buffer, size_t length) = 0;
 };
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

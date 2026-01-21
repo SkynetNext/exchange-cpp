@@ -29,33 +29,33 @@ using ::exchange::core::processors::journaling::ISerializationProcessor;
 }  // anonymous namespace
 
 SerializationConfiguration SerializationConfiguration::Default() {
-    auto factory = [](const ExchangeConfiguration*)
-        -> ::exchange::core::processors::journaling::ISerializationProcessor* {
-        return ::exchange::core::processors::journaling::DummySerializationProcessor::Instance();
-    };
-    return SerializationConfiguration(false, factory);
+  auto factory = [](const ExchangeConfiguration*)
+    -> ::exchange::core::processors::journaling::ISerializationProcessor* {
+    return ::exchange::core::processors::journaling::DummySerializationProcessor::Instance();
+  };
+  return SerializationConfiguration(false, factory);
 }
 
 SerializationConfiguration SerializationConfiguration::DiskSnapshotOnly() {
-    using namespace ::exchange::core::processors::journaling;
-    auto factory = [](const ExchangeConfiguration* exchangeCfg) -> ISerializationProcessor* {
-        static DiskSerializationProcessorConfiguration defaultConfig;
-        // Explicit conversion to base class pointer
-        return static_cast<ISerializationProcessor*>(
-            new DiskSerializationProcessor(exchangeCfg, &defaultConfig));
-    };
-    return SerializationConfiguration(false, factory);
+  using namespace ::exchange::core::processors::journaling;
+  auto factory = [](const ExchangeConfiguration* exchangeCfg) -> ISerializationProcessor* {
+    static DiskSerializationProcessorConfiguration defaultConfig;
+    // Explicit conversion to base class pointer
+    return static_cast<ISerializationProcessor*>(
+      new DiskSerializationProcessor(exchangeCfg, &defaultConfig));
+  };
+  return SerializationConfiguration(false, factory);
 }
 
 SerializationConfiguration SerializationConfiguration::DiskJournaling() {
-    using namespace ::exchange::core::processors::journaling;
-    auto factory = [](const ExchangeConfiguration* exchangeCfg) -> ISerializationProcessor* {
-        static DiskSerializationProcessorConfiguration defaultConfig;
-        // Explicit conversion to base class pointer
-        return static_cast<ISerializationProcessor*>(
-            new DiskSerializationProcessor(exchangeCfg, &defaultConfig));
-    };
-    return SerializationConfiguration(true, factory);
+  using namespace ::exchange::core::processors::journaling;
+  auto factory = [](const ExchangeConfiguration* exchangeCfg) -> ISerializationProcessor* {
+    static DiskSerializationProcessorConfiguration defaultConfig;
+    // Explicit conversion to base class pointer
+    return static_cast<ISerializationProcessor*>(
+      new DiskSerializationProcessor(exchangeCfg, &defaultConfig));
+  };
+  return SerializationConfiguration(true, factory);
 }
 
 }  // namespace exchange::core::common::config

@@ -119,6 +119,37 @@ clang-tidy src/file.cpp -p build --config-file=.clang-tidy
 
 **CI Job**: `static-analysis`
 
+### cppcheck
+
+**Purpose**: Static analysis tool focused on bug detection with low false positive rate.
+
+**Strengths**:
+- Lower false positive rate than many tools
+- Good at detecting common bugs (null pointer, buffer overflows, etc.)
+- Supports MISRA C/C++, AUTOSAR C++, CERT C/C++ standards
+- Can analyze code without full build context
+
+**Configuration**:
+```bash
+--enable=all          # Enable all checks
+--std=c++26           # C++ standard
+--platform=unix64     # Target platform
+--suppress=...        # Suppress specific warnings
+```
+
+**Usage**:
+```bash
+cppcheck --enable=all --std=c++26 src include -i third_party
+```
+
+**CI Job**: `static-analysis-cppcheck`
+
+**Popularity**: Very popular (~6,269 GitHub stars, 1M+ downloads), widely used in safety-critical industries (automotive, medical, aerospace).
+
+**Comparison with clang-tidy**:
+- **cppcheck**: Better at bug detection, lower false positives, supports MISRA standards
+- **clang-tidy**: Better at modern C++ suggestions, code style, and refactoring
+
 ## Code Formatting
 
 ### clang-format
@@ -180,9 +211,10 @@ The code quality checks run in `.github/workflows/code-quality.yml`:
 1. **Sanitizer - ASan+UBSan+LSan**: Most common memory errors
 2. **Sanitizer - MSan+UBSan**: Uninitialized memory detection
 3. **Sanitizer - TSan**: Thread safety checks
-4. **Static Analysis**: clang-tidy checks
-5. **Code Format**: clang-format validation
-6. **Code Coverage**: gcov/lcov coverage analysis
+4. **Static Analysis - clang-tidy**: Modern C++ analysis and suggestions
+5. **Static Analysis - cppcheck**: Bug detection with low false positives
+6. **Code Format**: clang-format validation
+7. **Code Coverage**: gcov/lcov coverage analysis
 
 ### Running Locally
 
@@ -228,6 +260,23 @@ cmake --build .
 find ../src -name "*.cpp" | xargs clang-tidy -p . --config-file=../.clang-tidy
 ```
 
+#### cppcheck
+```bash
+# Basic usage
+cppcheck --enable=all --std=c++26 src include -i third_party
+
+# With XML output
+cppcheck --enable=all --std=c++26 --xml --xml-version=2 \
+  --output-file=cppcheck-report.xml \
+  src include -i third_party -i build
+
+# Suppress specific warnings
+cppcheck --enable=all --std=c++26 \
+  --suppress=missingIncludeSystem \
+  --suppress=unusedFunction \
+  src include -i third_party
+```
+
 #### clang-format
 ```bash
 # Check all files
@@ -261,11 +310,12 @@ genhtml coverage.info --output-directory coverage-report
 
 1. **Run sanitizers before committing**: Catch memory errors early
 2. **Fix clang-tidy warnings**: Improve code quality and maintainability
-3. **Keep code formatted**: Use clang-format or enable editor integration
-4. **Run TSan on multi-threaded code**: Essential for lock-free data structures
-5. **Use MSan for new code**: Catch uninitialized memory issues
-6. **Monitor code coverage**: Aim for high coverage on critical paths, identify untested code
-7. **Exclude third-party code from coverage**: Focus on your own code
+3. **Use cppcheck for bug detection**: Lower false positives, good for finding common bugs
+4. **Keep code formatted**: Use clang-format or enable editor integration
+5. **Run TSan on multi-threaded code**: Essential for lock-free data structures
+6. **Use MSan for new code**: Catch uninitialized memory issues
+7. **Monitor code coverage**: Aim for high coverage on critical paths, identify untested code
+8. **Exclude third-party code**: Focus analysis and coverage on your own code
 
 ## Performance Considerations
 
@@ -287,6 +337,7 @@ genhtml coverage.info --output-directory coverage-report
 - [ThreadSanitizer Documentation](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual)
 - [MemorySanitizer Documentation](https://github.com/google/sanitizers/wiki/MemorySanitizer)
 - [clang-tidy Documentation](https://clang.llvm.org/extra/clang-tidy/)
+- [cppcheck Documentation](https://cppcheck.sourceforge.io/manual.html)
 - [clang-format Documentation](https://clang.llvm.org/docs/ClangFormat.html)
 - [gcov Documentation](https://gcc.gnu.org/onlinedocs/gcc/Gcov.html)
 - [lcov Documentation](https://github.com/linux-test-project/lcov)

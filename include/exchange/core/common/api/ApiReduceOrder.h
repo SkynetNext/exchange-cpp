@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "ApiCommand.h"
 #include <cstdint>
+#include "ApiCommand.h"
 
 namespace exchange {
 namespace core {
@@ -34,12 +34,11 @@ public:
   int32_t symbol;
   int64_t reduceSize;
 
-  ApiReduceOrder(int64_t orderId, int64_t uid, int32_t symbol,
-                 int64_t reduceSize)
-      : orderId(orderId), uid(uid), symbol(symbol), reduceSize(reduceSize) {}
+  ApiReduceOrder(int64_t orderId, int64_t uid, int32_t symbol, int64_t reduceSize)
+    : orderId(orderId), uid(uid), symbol(symbol), reduceSize(reduceSize) {}
 };
 
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

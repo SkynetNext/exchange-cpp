@@ -24,26 +24,20 @@ namespace exchange {
 namespace core {
 namespace common {
 
-enum class MatcherEventType : uint8_t {
-  TRADE = 0,
-  REDUCE = 1,
-  REJECT = 2,
-  BINARY_EVENT = 3
-};
+enum class MatcherEventType : uint8_t { TRADE = 0, REDUCE = 1, REJECT = 2, BINARY_EVENT = 3 };
 
 inline MatcherEventType MatcherEventTypeFromCode(uint8_t code) {
   switch (code) {
-  case 0:
-    return MatcherEventType::TRADE;
-  case 1:
-    return MatcherEventType::REDUCE;
-  case 2:
-    return MatcherEventType::REJECT;
-  case 3:
-    return MatcherEventType::BINARY_EVENT;
-  default:
-    throw std::invalid_argument("unknown MatcherEventType: " +
-                                std::to_string(code));
+    case 0:
+      return MatcherEventType::TRADE;
+    case 1:
+      return MatcherEventType::REDUCE;
+    case 2:
+      return MatcherEventType::REJECT;
+    case 3:
+      return MatcherEventType::BINARY_EVENT;
+    default:
+      throw std::invalid_argument("unknown MatcherEventType: " + std::to_string(code));
   }
 }
 
@@ -51,6 +45,6 @@ inline uint8_t MatcherEventTypeToCode(MatcherEventType type) {
   return static_cast<uint8_t>(type);
 }
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

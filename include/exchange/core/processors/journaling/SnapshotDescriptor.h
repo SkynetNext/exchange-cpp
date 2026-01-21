@@ -33,28 +33,35 @@ struct JournalDescriptor;
  * Matches Java: SnapshotDescriptor with linked list structure
  */
 struct SnapshotDescriptor {
-  int64_t snapshotId; // 0 means empty snapshot (clean start)
-  int64_t seq;        // sequence when snapshot was made
+  int64_t snapshotId;  // 0 means empty snapshot (clean start)
+  int64_t seq;         // sequence when snapshot was made
   int64_t timestampNs;
   std::string path;
 
   // Linked list structure
-  SnapshotDescriptor *prev;
-  SnapshotDescriptor *next;
+  SnapshotDescriptor* prev;
+  SnapshotDescriptor* next;
 
   int32_t numMatchingEngines;
   int32_t numRiskEngines;
 
   // All journals based on this snapshot
   // mapping: startingSeq -> JournalDescriptor*
-  std::map<int64_t, JournalDescriptor *> journals;
+  std::map<int64_t, JournalDescriptor*> journals;
 
-  SnapshotDescriptor(int64_t snapshotId, int64_t seq, int64_t timestampNs,
-                     SnapshotDescriptor *prev, int32_t numMatchingEngines,
+  SnapshotDescriptor(int64_t snapshotId,
+                     int64_t seq,
+                     int64_t timestampNs,
+                     SnapshotDescriptor* prev,
+                     int32_t numMatchingEngines,
                      int32_t numRiskEngines)
-      : snapshotId(snapshotId), seq(seq), timestampNs(timestampNs), prev(prev),
-        next(nullptr), numMatchingEngines(numMatchingEngines),
-        numRiskEngines(numRiskEngines) {
+    : snapshotId(snapshotId)
+    , seq(seq)
+    , timestampNs(timestampNs)
+    , prev(prev)
+    , next(nullptr)
+    , numMatchingEngines(numMatchingEngines)
+    , numRiskEngines(numRiskEngines) {
     if (prev) {
       prev->next = this;
     }
@@ -63,22 +70,20 @@ struct SnapshotDescriptor {
   /**
    * Create initial empty snapshot descriptor
    */
-  static SnapshotDescriptor *CreateEmpty(int32_t initialNumME,
-                                         int32_t initialNumRE) {
+  static SnapshotDescriptor* CreateEmpty(int32_t initialNumME, int32_t initialNumRE) {
     return new SnapshotDescriptor(0, 0, 0, nullptr, initialNumME, initialNumRE);
   }
 
   /**
    * Create next snapshot descriptor
    */
-  SnapshotDescriptor *CreateNext(int64_t snapshotId, int64_t seq,
-                                 int64_t timestampNs) {
-    return new SnapshotDescriptor(snapshotId, seq, timestampNs, this,
-                                  numMatchingEngines, numRiskEngines);
+  SnapshotDescriptor* CreateNext(int64_t snapshotId, int64_t seq, int64_t timestampNs) {
+    return new SnapshotDescriptor(snapshotId, seq, timestampNs, this, numMatchingEngines,
+                                  numRiskEngines);
   }
 };
 
-} // namespace journaling
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace journaling
+}  // namespace processors
+}  // namespace core
+}  // namespace exchange

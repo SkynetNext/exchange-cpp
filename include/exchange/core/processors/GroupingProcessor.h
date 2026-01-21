@@ -16,16 +16,16 @@
 
 #pragma once
 
-#include "../common/CoreWaitStrategy.h"
-#include "../common/config/PerformanceConfiguration.h"
-#include "SharedPool.h"
-#include "WaitSpinningHelper.h"
-#include <atomic>
-#include <cstdint>
 #include <disruptor/EventProcessor.h>
 #include <disruptor/MultiProducerSequencer.h>
 #include <disruptor/ProcessingSequenceBarrier.h>
 #include <disruptor/RingBuffer.h>
+#include <atomic>
+#include <cstdint>
+#include "../common/CoreWaitStrategy.h"
+#include "../common/config/PerformanceConfiguration.h"
+#include "SharedPool.h"
+#include "WaitSpinningHelper.h"
 
 namespace exchange {
 namespace core {
@@ -39,16 +39,15 @@ template <typename WaitStrategyT>
 class GroupingProcessor : public disruptor::EventProcessor {
 public:
   GroupingProcessor(
-      disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand,
-                                         WaitStrategyT> *ringBuffer,
-      disruptor::ProcessingSequenceBarrier<
-          disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT>
-          *sequenceBarrier,
-      const common::config::PerformanceConfiguration *perfCfg,
-      common::CoreWaitStrategy coreWaitStrategy, SharedPool *sharedPool);
+    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>* ringBuffer,
+    disruptor::ProcessingSequenceBarrier<disruptor::MultiProducerSequencer<WaitStrategyT>,
+                                         WaitStrategyT>* sequenceBarrier,
+    const common::config::PerformanceConfiguration* perfCfg,
+    common::CoreWaitStrategy coreWaitStrategy,
+    SharedPool* sharedPool);
 
   // EventProcessor interface implementation
-  disruptor::Sequence &getSequence() override;
+  disruptor::Sequence& getSequence() override;
   void halt() override;
   bool isRunning() override;
   void run() override;
@@ -61,21 +60,18 @@ private:
   static constexpr int64_t L2_PUBLISH_INTERVAL_NS = 10'000'000;
 
   std::atomic<int32_t> running_;
-  disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>
-      *ringBuffer_;
-  disruptor::ProcessingSequenceBarrier<
-      disruptor::MultiProducerSequencer<WaitStrategyT>, WaitStrategyT>
-      *sequenceBarrier_;
-  WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>
-      *waitSpinningHelper_;
-  disruptor::Sequence sequence_; // Changed from pointer to value (matches Java)
-  SharedPool *sharedPool_;
+  disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>* ringBuffer_;
+  disruptor::ProcessingSequenceBarrier<disruptor::MultiProducerSequencer<WaitStrategyT>,
+                                       WaitStrategyT>* sequenceBarrier_;
+  WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>* waitSpinningHelper_;
+  disruptor::Sequence sequence_;  // Changed from pointer to value (matches Java)
+  SharedPool* sharedPool_;
   int32_t msgsInGroupLimit_;
   int64_t maxGroupDurationNs_;
 
   void ProcessEvents();
 };
 
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace processors
+}  // namespace core
+}  // namespace exchange

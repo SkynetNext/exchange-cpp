@@ -16,21 +16,22 @@
 
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <optional>
 #include "../../BytesIn.h"
 #include "../../BytesOut.h"
 #include "ReportQuery.h"
 #include "ReportType.h"
 #include "SingleUserReportResult.h"
-#include <cstdint>
-#include <memory>
-#include <optional>
 
 namespace exchange {
 namespace core {
 namespace processors {
 class MatchingEngineRouter;
 class RiskEngine;
-} // namespace processors
+}  // namespace processors
+
 namespace common {
 namespace api {
 namespace reports {
@@ -44,29 +45,29 @@ public:
   int64_t uid;
 
   explicit SingleUserReportQuery(int64_t uid) : uid(uid) {}
-  explicit SingleUserReportQuery(BytesIn &bytesIn);
+
+  explicit SingleUserReportQuery(BytesIn& bytesIn);
 
   int32_t GetReportTypeCode() const override {
     return static_cast<int32_t>(ReportType::SINGLE_USER_REPORT);
   }
 
   std::optional<std::unique_ptr<SingleUserReportResult>>
-  Process(::exchange::core::processors::MatchingEngineRouter *matchingEngine)
-      override;
+  Process(::exchange::core::processors::MatchingEngineRouter* matchingEngine) override;
 
   std::optional<std::unique_ptr<SingleUserReportResult>>
-  Process(::exchange::core::processors::RiskEngine *riskEngine) override;
+  Process(::exchange::core::processors::RiskEngine* riskEngine) override;
 
   // CreateResult implementation (matches Java createResult)
   std::unique_ptr<SingleUserReportResult>
-  CreateResult(const std::vector<BytesIn *> &sections) override;
+  CreateResult(const std::vector<BytesIn*>& sections) override;
 
   // WriteMarshallable implementation (matches Java writeMarshallable)
-  void WriteMarshallable(BytesOut &bytes) const override;
+  void WriteMarshallable(BytesOut& bytes) const override;
 };
 
-} // namespace reports
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace reports
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

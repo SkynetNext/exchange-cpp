@@ -24,36 +24,36 @@ void UnsafeUtils::SetResultVolatile(common::cmd::OrderCommand* cmd,
                                     bool result,
                                     common::cmd::CommandResultCode successCode,
                                     common::cmd::CommandResultCode failureCode) {
-    common::cmd::CommandResultCode codeToSet = result ? successCode : failureCode;
+  common::cmd::CommandResultCode codeToSet = result ? successCode : failureCode;
 
-    // Use atomic_ref (C++20) for safer atomic operations on non-atomic fields
-    // This avoids reinterpret_cast and is guaranteed to work correctly
-    std::atomic_ref<common::cmd::CommandResultCode> atomicRef(cmd->resultCode);
-    common::cmd::CommandResultCode expected = atomicRef.load(std::memory_order_relaxed);
-    while (expected != codeToSet && expected != failureCode) {
-        if (atomicRef.compare_exchange_weak(
-                expected, codeToSet, std::memory_order_release, std::memory_order_relaxed)) {
-            break;
-        }
+  // Use atomic_ref (C++20) for safer atomic operations on non-atomic fields
+  // This avoids reinterpret_cast and is guaranteed to work correctly
+  std::atomic_ref<common::cmd::CommandResultCode> atomicRef(cmd->resultCode);
+  common::cmd::CommandResultCode expected = atomicRef.load(std::memory_order_relaxed);
+  while (expected != codeToSet && expected != failureCode) {
+    if (atomicRef.compare_exchange_weak(expected, codeToSet, std::memory_order_release,
+                                        std::memory_order_relaxed)) {
+      break;
     }
+  }
 }
 
 void UnsafeUtils::AppendEventsVolatile(common::cmd::OrderCommand* cmd,
                                        common::MatcherTradeEvent* eventHead) {
-    if (eventHead == nullptr) {
-        return;
-    }
+  if (eventHead == nullptr) {
+    return;
+  }
 
-    common::MatcherTradeEvent* tail = eventHead->FindTail();
+  common::MatcherTradeEvent* tail = eventHead->FindTail();
 
-    // Use atomic_ref (C++20) for safer atomic operations on non-atomic fields
-    // This avoids reinterpret_cast and is guaranteed to work correctly
-    std::atomic_ref<common::MatcherTradeEvent*> atomicRef(cmd->matcherEvent);
-    common::MatcherTradeEvent* expected = atomicRef.load(std::memory_order_relaxed);
-    do {
-        tail->nextEvent = expected;
-    } while (!atomicRef.compare_exchange_weak(
-        expected, eventHead, std::memory_order_release, std::memory_order_relaxed));
+  // Use atomic_ref (C++20) for safer atomic operations on non-atomic fields
+  // This avoids reinterpret_cast and is guaranteed to work correctly
+  std::atomic_ref<common::MatcherTradeEvent*> atomicRef(cmd->matcherEvent);
+  common::MatcherTradeEvent* expected = atomicRef.load(std::memory_order_relaxed);
+  do {
+    tail->nextEvent = expected;
+  } while (!atomicRef.compare_exchange_weak(expected, eventHead, std::memory_order_release,
+                                            std::memory_order_relaxed));
 }
 
 }  // namespace exchange::core::utils

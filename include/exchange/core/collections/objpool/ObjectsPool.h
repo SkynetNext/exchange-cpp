@@ -45,27 +45,27 @@ public:
    * Create default test pool
    * Small capacity for fast startup, suitable for unit tests and benchmarks
    */
-  static ObjectsPool *CreateDefaultTestPool();
+  static ObjectsPool* CreateDefaultTestPool();
 
   /**
    * Create production pool
    * Large capacity to minimize allocations, suitable for production
    * environments Matches Java MatchingEngineRouter configuration
    */
-  static ObjectsPool *CreateProductionPool();
+  static ObjectsPool* CreateProductionPool();
 
   /**
    * Create high-load pool
    * Extra large capacity for maximum performance, suitable for high-frequency
    * trading
    */
-  static ObjectsPool *CreateHighLoadPool();
+  static ObjectsPool* CreateHighLoadPool();
 
   /**
    * Constructor with size configuration
    * @param sizesConfig Map of pool type -> size
    */
-  explicit ObjectsPool(const std::unordered_map<int, int> &sizesConfig);
+  explicit ObjectsPool(const std::unordered_map<int, int>& sizesConfig);
 
   /**
    * Destructor
@@ -73,10 +73,10 @@ public:
   ~ObjectsPool();
 
   // Non-copyable, movable
-  ObjectsPool(const ObjectsPool &) = delete;
-  ObjectsPool &operator=(const ObjectsPool &) = delete;
-  ObjectsPool(ObjectsPool &&other) noexcept;
-  ObjectsPool &operator=(ObjectsPool &&other) noexcept;
+  ObjectsPool(const ObjectsPool&) = delete;
+  ObjectsPool& operator=(const ObjectsPool&) = delete;
+  ObjectsPool(ObjectsPool&& other) noexcept;
+  ObjectsPool& operator=(ObjectsPool&& other) noexcept;
 
   /**
    * Get object from pool or create new one
@@ -95,8 +95,9 @@ public:
    *   auto *obj = pool->Get<DirectOrder>(DIRECT_ORDER,
    *       []() { return new DirectOrder(); });
    */
-  template <typename T, typename Supplier> T *Get(int type, Supplier supplier) {
-    T *obj = static_cast<T *>(Pop(type));
+  template <typename T, typename Supplier>
+  T* Get(int type, Supplier supplier) {
+    T* obj = static_cast<T*>(Pop(type));
     if (obj == nullptr) {
       return supplier();
     }
@@ -116,11 +117,12 @@ public:
    *
    * Destructor is called before putting object back to pool.
    */
-  template <typename T> void Put(int type, T *object) {
+  template <typename T>
+  void Put(int type, T* object) {
     if (object != nullptr) {
       // Call destructor before returning to pool
       object->~T();
-      PutRaw(type, static_cast<void *>(object));
+      PutRaw(type, static_cast<void*>(object));
     }
   }
 
@@ -128,7 +130,7 @@ public:
    * Put raw pointer back to pool (without calling destructor)
    * Use this only if you've already called destructor manually
    */
-  void PutRaw(int type, void *object);
+  void PutRaw(int type, void* object);
 
 private:
   class ArrayStack {
@@ -136,21 +138,21 @@ private:
     explicit ArrayStack(int fixedSize);
     ~ArrayStack();
 
-    void *Pop();
-    void Add(void *element);
+    void* Pop();
+    void Add(void* element);
 
   private:
     int count_;
-    void **objects_;
+    void** objects_;
     int capacity_;
   };
 
-  std::vector<ArrayStack *> pools_;
+  std::vector<ArrayStack*> pools_;
 
-  void *Pop(int type);
+  void* Pop(int type);
 };
 
-} // namespace objpool
-} // namespace collections
-} // namespace core
-} // namespace exchange
+}  // namespace objpool
+}  // namespace collections
+}  // namespace core
+}  // namespace exchange

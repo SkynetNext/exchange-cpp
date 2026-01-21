@@ -16,13 +16,13 @@
 
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <map>
 #include "../common/IOrder.h"
 #include "../common/MatcherTradeEvent.h"
 #include "../common/Wire.h"
 #include "../common/cmd/OrderCommand.h"
-#include <cstdint>
-#include <functional>
-#include <map>
 
 namespace exchange {
 namespace core {
@@ -46,7 +46,7 @@ public:
   static constexpr bool EVENTS_POOLING = true;
 
   // Factory function type for creating events
-  using EventFactory = std::function<common::MatcherTradeEvent *()>;
+  using EventFactory = std::function<common::MatcherTradeEvent*()>;
 
   /**
    * Constructor
@@ -59,35 +59,32 @@ public:
   });
 
   // Create a trade event
-  common::MatcherTradeEvent *SendTradeEvent(const common::IOrder *matchingOrder,
+  common::MatcherTradeEvent* SendTradeEvent(const common::IOrder* matchingOrder,
                                             bool makerCompleted,
-                                            bool takerCompleted, int64_t size,
+                                            bool takerCompleted,
+                                            int64_t size,
                                             int64_t bidderHoldPrice);
 
   // Create a reduce event
-  common::MatcherTradeEvent *SendReduceEvent(const common::IOrder *order,
-                                             int64_t reduceSize,
-                                             bool completed);
+  common::MatcherTradeEvent*
+  SendReduceEvent(const common::IOrder* order, int64_t reduceSize, bool completed);
 
   // Create a reduce event (overload with price parameters to avoid
   // use-after-free) Use this version when the order will be released/deleted
   // after the call
-  common::MatcherTradeEvent *SendReduceEvent(int64_t price,
-                                             int64_t reserveBidPrice,
-                                             int64_t reduceSize,
-                                             bool completed);
+  common::MatcherTradeEvent*
+  SendReduceEvent(int64_t price, int64_t reserveBidPrice, int64_t reduceSize, bool completed);
 
   // Attach a reject event to command
-  void AttachRejectEvent(common::cmd::OrderCommand *cmd, int64_t rejectedSize);
+  void AttachRejectEvent(common::cmd::OrderCommand* cmd, int64_t rejectedSize);
 
   // Create binary events chain from bytes
   // Match Java: createBinaryEventsChain()
-  common::MatcherTradeEvent *
-  CreateBinaryEventsChain(int64_t timestamp, int32_t section,
-                          const std::vector<uint8_t> &bytes);
+  common::MatcherTradeEvent*
+  CreateBinaryEventsChain(int64_t timestamp, int32_t section, const std::vector<uint8_t>& bytes);
 
   // Static instance for non-pooled events
-  static OrderBookEventsHelper *NonPooledEventsHelper();
+  static OrderBookEventsHelper* NonPooledEventsHelper();
 
   /**
    * Deserialize events from OrderCommand (matches Java deserializeEvents)
@@ -95,19 +92,18 @@ public:
    * @param cmd OrderCommand with matcherEvent chain
    * @return Map of section -> Wire (matches Java NavigableMap<Integer, Wire>)
    */
-  static std::map<int32_t, common::Wire>
-  DeserializeEvents(const common::cmd::OrderCommand *cmd);
+  static std::map<int32_t, common::Wire> DeserializeEvents(const common::cmd::OrderCommand* cmd);
 
 private:
   EventFactory eventFactory_;
   // Current chain head for event pooling (matches Java eventsChainHead)
   // When EVENTS_POOLING is true, we maintain a current chain and consume nodes
   // sequentially
-  common::MatcherTradeEvent *eventsChainHead_ = nullptr;
+  common::MatcherTradeEvent* eventsChainHead_ = nullptr;
 
-  common::MatcherTradeEvent *NewMatcherEvent();
+  common::MatcherTradeEvent* NewMatcherEvent();
 };
 
-} // namespace orderbook
-} // namespace core
-} // namespace exchange
+}  // namespace orderbook
+}  // namespace core
+}  // namespace exchange

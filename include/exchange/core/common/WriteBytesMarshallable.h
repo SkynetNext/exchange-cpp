@@ -34,9 +34,9 @@ public:
    * Write object to bytes
    * Const method - serialization should not modify object state
    */
-  virtual void WriteMarshallable(BytesOut &bytes) const = 0;
+  virtual void WriteMarshallable(BytesOut& bytes) const = 0;
 };
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

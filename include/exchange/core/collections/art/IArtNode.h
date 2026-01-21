@@ -25,17 +25,20 @@ namespace core {
 namespace collections {
 namespace objpool {
 class ObjectsPool;
-} // namespace objpool
+}  // namespace objpool
+
 namespace art {
 
 // Forward declarations
-template <typename V> class LongObjConsumer;
+template <typename V>
+class LongObjConsumer;
 
 /**
  * IArtNode - interface for ART tree nodes
  * @tparam V Value type
  */
-template <typename V> class IArtNode {
+template <typename V>
+class IArtNode {
 public:
   virtual ~IArtNode() = default;
 
@@ -45,7 +48,7 @@ public:
    * @param level Current level (bits from MSB, 56 = initial level)
    * @return Value if found, nullptr otherwise
    */
-  virtual V *GetValue(int64_t key, int level) = 0;
+  virtual V* GetValue(int64_t key, int level) = 0;
 
   /**
    * Put key-value pair
@@ -54,7 +57,7 @@ public:
    * @param value Value to store
    * @return New node if resized (upsized), nullptr otherwise
    */
-  virtual IArtNode<V> *Put(int64_t key, int level, V *value) = 0;
+  virtual IArtNode<V>* Put(int64_t key, int level, V* value) = 0;
 
   /**
    * Remove key-value pair
@@ -63,7 +66,7 @@ public:
    * @return New node if resized (downsized), nullptr if empty, this if
    * unchanged
    */
-  virtual IArtNode<V> *Remove(int64_t key, int level) = 0;
+  virtual IArtNode<V>* Remove(int64_t key, int level) = 0;
 
   /**
    * Get ceiling value (smallest key >= given key)
@@ -71,7 +74,7 @@ public:
    * @param level Current level
    * @return Value with smallest key >= key, or nullptr
    */
-  virtual V *GetCeilingValue(int64_t key, int level) = 0;
+  virtual V* GetCeilingValue(int64_t key, int level) = 0;
 
   /**
    * Get floor value (largest key <= given key)
@@ -79,7 +82,7 @@ public:
    * @param level Current level
    * @return Value with largest key <= key, or nullptr
    */
-  virtual V *GetFloorValue(int64_t key, int level) = 0;
+  virtual V* GetFloorValue(int64_t key, int level) = 0;
 
   /**
    * For each element in ascending order
@@ -88,7 +91,7 @@ public:
    * @param limit Maximum number of elements to process
    * @return Number of elements processed
    */
-  virtual int ForEach(LongObjConsumer<V> *consumer, int limit) const = 0;
+  virtual int ForEach(LongObjConsumer<V>* consumer, int limit) const = 0;
 
   /**
    * For each element in descending order
@@ -97,7 +100,7 @@ public:
    * @param limit Maximum number of elements to process
    * @return Number of elements processed
    */
-  virtual int ForEachDesc(LongObjConsumer<V> *consumer, int limit) const = 0;
+  virtual int ForEachDesc(LongObjConsumer<V>* consumer, int limit) const = 0;
 
   /**
    * Get number of elements
@@ -118,26 +121,28 @@ public:
    * @param level Current level
    * @return Diagram string
    */
-  virtual std::string PrintDiagram(const std::string &prefix, int level) = 0;
+  virtual std::string PrintDiagram(const std::string& prefix, int level) = 0;
 
   /**
    * Get entries list (for testing)
    * @return List of key-value pairs
    */
-  virtual std::list<std::pair<int64_t, V *>> Entries() = 0;
+  virtual std::list<std::pair<int64_t, V*>> Entries() = 0;
 
   /**
    * Get objects pool
    * @return ObjectsPool instance
    */
-  virtual objpool::ObjectsPool *GetObjectsPool() = 0;
+  virtual objpool::ObjectsPool* GetObjectsPool() = 0;
 
   /**
    * Get node type for object pool recycling
    * @return Node type constant (ObjectsPool::ART_NODE_4/16/48/256)
    * Non-virtual for performance - returns stored nodeType_ member
    */
-  int GetNodeType() const { return nodeType_; }
+  int GetNodeType() const {
+    return nodeType_;
+  }
 
 protected:
   /**
@@ -152,7 +157,7 @@ protected:
   explicit IArtNode(int nodeType) : nodeType_(nodeType) {}
 };
 
-} // namespace art
-} // namespace collections
-} // namespace core
-} // namespace exchange
+}  // namespace art
+}  // namespace collections
+}  // namespace core
+}  // namespace exchange

@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "ApiCommand.h"
 #include <cstdint>
+#include "ApiCommand.h"
 
 namespace exchange {
 namespace core {
@@ -34,7 +34,7 @@ public:
   explicit ApiAddUser(int64_t uid) : uid(uid) {}
 };
 
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

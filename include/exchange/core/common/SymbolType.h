@@ -24,23 +24,18 @@ namespace exchange {
 namespace core {
 namespace common {
 
-enum class SymbolType : uint8_t {
-  CURRENCY_EXCHANGE_PAIR = 0,
-  FUTURES_CONTRACT = 1,
-  OPTION = 2
-};
+enum class SymbolType : uint8_t { CURRENCY_EXCHANGE_PAIR = 0, FUTURES_CONTRACT = 1, OPTION = 2 };
 
 inline SymbolType SymbolTypeFromCode(int32_t code) {
   switch (code) {
-  case 0:
-    return SymbolType::CURRENCY_EXCHANGE_PAIR;
-  case 1:
-    return SymbolType::FUTURES_CONTRACT;
-  case 2:
-    return SymbolType::OPTION;
-  default:
-    throw std::invalid_argument("unknown SymbolType code: " +
-                                std::to_string(code));
+    case 0:
+      return SymbolType::CURRENCY_EXCHANGE_PAIR;
+    case 1:
+      return SymbolType::FUTURES_CONTRACT;
+    case 2:
+      return SymbolType::OPTION;
+    default:
+      throw std::invalid_argument("unknown SymbolType code: " + std::to_string(code));
   }
 }
 
@@ -48,6 +43,6 @@ inline uint8_t SymbolTypeToCode(SymbolType type) {
   return static_cast<uint8_t>(type);
 }
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

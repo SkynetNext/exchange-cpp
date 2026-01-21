@@ -269,6 +269,68 @@ jobs:
               --config-file=.clang-tidy \
               -- -std=c++26 || exit 1
 
+  # Static Analysis: cppcheck
+  static-analysis-cppcheck:
+    name: Static Analysis - cppcheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+          cppcheck --version
+
+      - name: Run cppcheck
+        run: |
+          # Run cppcheck on source files
+          # Exclude third-party code and build directories
+          cppcheck \
+            --enable=all \
+            --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
+            --suppress=unmatchedSuppression \
+            --inline-suppr \
+            --std=c++26 \
+            --platform=unix64 \
+            --error-exitcode=1 \
+            --xml \
+            --xml-version=2 \
+            --output-file=cppcheck-report.xml \
+            src include \
+            -i third_party \
+            -i build \
+            -i .git \
+            || true
+          
+          # Also output to console for visibility
+          cppcheck \
+            --enable=all \
+            --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
+            --suppress=unmatchedSuppression \
+            --inline-suppr \
+            --std=c++26 \
+            --platform=unix64 \
+            --error-exitcode=1 \
+            src include \
+            -i third_party \
+            -i build \
+            -i .git
+
+      - name: Upload cppcheck report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cppcheck-report
+          path: cppcheck-report.xml
+          retention-days: 7
+
   # Code Formatting: clang-format check
   code-format:
     name: Code Format - clang-format
@@ -308,22 +370,34 @@ jobs:
           
           # Check formatting
           MISFORMATTED=""
+          COUNT=0
           for file in $FILES; do
             if [ -f "$file" ]; then
               if ! clang-format-19 "$file" | diff -q "$file" - > /dev/null 2>&1; then
-                echo "Formatting issue in $file"
+                echo "::error file=$file::Formatting issue detected"
                 MISFORMATTED="$MISFORMATTED $file"
+                COUNT=$((COUNT + 1))
+                # Show first few differences for debugging
+                if [ $COUNT -le 3 ]; then
+                  echo "=== Diff for $file (first 20 lines) ==="
+                  clang-format-19 "$file" | diff -u "$file" - | head -20 || true
+                fi
               fi
             fi
           done
           
           if [ -n "$MISFORMATTED" ]; then
-            echo "Files with formatting issues:$MISFORMATTED"
-            echo "Run: clang-format-19 -i <file> to fix"
+            echo "::error::Found $COUNT file(s) with formatting issues"
+            echo ""
+            echo "To fix all files, run:"
+            echo "  find src include -name '*.cpp' -o -name '*.hpp' -o -name '*.h' | grep -v third_party | xargs clang-format-19 -i"
+            echo ""
+            echo "Or fix individual files:"
+            echo "  clang-format-19 -i <file>"
             exit 1
           fi
           
-          echo "All files are properly formatted"
+          echo "✓ All files are properly formatted"
 
   # Code Coverage: gcov/lcov
   code-coverage:

@@ -16,23 +16,25 @@
 
 #pragma once
 
-#include "ReportQuery.h"
-#include "ReportType.h"
 #include <functional>
 #include <vector>
+#include "ReportQuery.h"
+#include "ReportType.h"
 
 namespace exchange {
 namespace core {
 namespace common {
 class BytesIn;
+
 namespace api {
 namespace reports {
 
 // Forward declaration
-template <typename T> class ReportQuery;
+template <typename T>
+class ReportQuery;
 
 // Type-erased report query constructor
-using ReportQueryConstructor = std::function<ReportQueryBase *(BytesIn &)>;
+using ReportQueryConstructor = std::function<ReportQueryBase*(BytesIn&)>;
 
 class ReportQueryFactory {
 private:
@@ -41,11 +43,11 @@ private:
   ReportQueryFactory() = default;
 
 public:
-  ReportQueryFactory(ReportQueryFactory const &) = delete;
-  ReportQueryFactory &operator=(ReportQueryFactory const &) = delete;
+  ReportQueryFactory(ReportQueryFactory const&) = delete;
+  ReportQueryFactory& operator=(ReportQueryFactory const&) = delete;
 
   // Use Meyers Singleton
-  static ReportQueryFactory &getInstance();
+  static ReportQueryFactory& getInstance();
 
   // Register report query type
   void registerQueryType(ReportType type, ReportQueryConstructor constructor);
@@ -54,24 +56,22 @@ public:
   ReportQueryConstructor getConstructor(ReportType type);
 
   // Create report query from bytes (returns ReportQueryBase pointer)
-  ReportQueryBase *createQuery(ReportType type, BytesIn &bytes);
+  ReportQueryBase* createQuery(ReportType type, BytesIn& bytes);
 };
 
 namespace detail {
 struct ReportQueryTypeRegistrar {
   ReportQueryTypeRegistrar(ReportType type, ReportQueryConstructor constructor);
 };
-} // namespace detail
+}  // namespace detail
 
 // Register report query type macro
-#define REGISTER_REPORT_QUERY_TYPE(QueryType, EnumType)                        \
-  static detail::ReportQueryTypeRegistrar QueryType##_registrar(               \
-      EnumType, [](BytesIn &bytes) -> ReportQueryBase * {                      \
-        return new QueryType(bytes);                                           \
-      })
+#define REGISTER_REPORT_QUERY_TYPE(QueryType, EnumType)          \
+  static detail::ReportQueryTypeRegistrar QueryType##_registrar( \
+    EnumType, [](BytesIn& bytes) -> ReportQueryBase* { return new QueryType(bytes); })
 
-} // namespace reports
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace reports
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

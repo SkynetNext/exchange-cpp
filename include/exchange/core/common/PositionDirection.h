@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "OrderAction.h"
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include "OrderAction.h"
 
 namespace exchange {
 namespace core {
@@ -32,35 +32,32 @@ inline int32_t GetMultiplier(PositionDirection direction) {
 }
 
 inline PositionDirection PositionDirectionFromOrderAction(OrderAction action) {
-  return action == OrderAction::BID ? PositionDirection::LONG
-                                    : PositionDirection::SHORT;
+  return action == OrderAction::BID ? PositionDirection::LONG : PositionDirection::SHORT;
 }
 
 inline PositionDirection PositionDirectionFromCode(int8_t code) {
   switch (code) {
-  case 1:
-    return PositionDirection::LONG;
-  case -1:
-    return PositionDirection::SHORT;
-  case 0:
-    return PositionDirection::EMPTY;
-  default:
-    throw std::invalid_argument("unknown PositionDirection: " +
-                                std::to_string(code));
+    case 1:
+      return PositionDirection::LONG;
+    case -1:
+      return PositionDirection::SHORT;
+    case 0:
+      return PositionDirection::EMPTY;
+    default:
+      throw std::invalid_argument("unknown PositionDirection: " + std::to_string(code));
   }
 }
 
-inline bool IsOppositeToAction(PositionDirection direction,
-                               OrderAction action) {
-  return (direction == PositionDirection::LONG && action == OrderAction::ASK) ||
-         (direction == PositionDirection::SHORT && action == OrderAction::BID);
+inline bool IsOppositeToAction(PositionDirection direction, OrderAction action) {
+  return (direction == PositionDirection::LONG && action == OrderAction::ASK)
+         || (direction == PositionDirection::SHORT && action == OrderAction::BID);
 }
 
 inline bool IsSameAsAction(PositionDirection direction, OrderAction action) {
-  return (direction == PositionDirection::LONG && action == OrderAction::BID) ||
-         (direction == PositionDirection::SHORT && action == OrderAction::ASK);
+  return (direction == PositionDirection::LONG && action == OrderAction::BID)
+         || (direction == PositionDirection::SHORT && action == OrderAction::ASK);
 }
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

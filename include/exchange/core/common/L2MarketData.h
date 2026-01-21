@@ -48,12 +48,12 @@ public:
 
   L2MarketData() = default;
 
-  L2MarketData(const std::vector<int64_t> &askPrices,
-               const std::vector<int64_t> &askVolumes,
-               const std::vector<int64_t> &askOrders,
-               const std::vector<int64_t> &bidPrices,
-               const std::vector<int64_t> &bidVolumes,
-               const std::vector<int64_t> &bidOrders);
+  L2MarketData(const std::vector<int64_t>& askPrices,
+               const std::vector<int64_t>& askVolumes,
+               const std::vector<int64_t>& askOrders,
+               const std::vector<int64_t>& bidPrices,
+               const std::vector<int64_t>& bidVolumes,
+               const std::vector<int64_t>& bidOrders);
 
   L2MarketData(int32_t askSize, int32_t bidSize);
 
@@ -69,9 +69,9 @@ public:
 
   std::unique_ptr<L2MarketData> Copy() const;
 
-  bool operator==(const L2MarketData &other) const;
+  bool operator==(const L2MarketData& other) const;
 };
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

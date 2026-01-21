@@ -16,25 +16,28 @@
 
 #pragma once
 
-#include "../../orderbook/IOrderBook.h"
-#include "../CoreWaitStrategy.h"
-#include <cstdint>
 #include <disruptor/dsl/ThreadFactory.h>
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include "../../orderbook/IOrderBook.h"
+#include "../CoreWaitStrategy.h"
 
 namespace exchange {
 namespace core {
 // Forward declarations
 class CoreSymbolSpecification;
+
 namespace collections {
 namespace objpool {
 class ObjectsPool;
 }
-} // namespace collections
+}  // namespace collections
+
 namespace orderbook {
 class OrderBookEventsHelper;
 }
+
 namespace common {
 namespace config {
 
@@ -75,31 +78,38 @@ public:
 
   // OrderBook factory (matches Java IOrderBook.OrderBookFactory signature)
   using OrderBookFactory = std::function<std::unique_ptr<orderbook::IOrderBook>(
-      const CoreSymbolSpecification *spec,
-      ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
-      orderbook::OrderBookEventsHelper *eventsHelper)>;
+    const CoreSymbolSpecification* spec,
+    ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
+    orderbook::OrderBookEventsHelper* eventsHelper)>;
   OrderBookFactory orderBookFactory;
 
-  PerformanceConfiguration(
-      int32_t ringBufferSize, int32_t matchingEnginesNum,
-      int32_t riskEnginesNum, int32_t msgsInGroupLimit,
-      int64_t maxGroupDurationNs, bool sendL2ForEveryCmd,
-      int32_t l2RefreshDepth, CoreWaitStrategy waitStrategy,
-      std::shared_ptr<disruptor::dsl::ThreadFactory> threadFactory,
-      OrderBookFactory orderBookFactory)
-      : ringBufferSize(ringBufferSize), matchingEnginesNum(matchingEnginesNum),
-        riskEnginesNum(riskEnginesNum), msgsInGroupLimit(msgsInGroupLimit),
-        maxGroupDurationNs(maxGroupDurationNs),
-        sendL2ForEveryCmd(sendL2ForEveryCmd), l2RefreshDepth(l2RefreshDepth),
-        waitStrategy(waitStrategy), threadFactory(threadFactory),
-        orderBookFactory(std::move(orderBookFactory)) {}
+  PerformanceConfiguration(int32_t ringBufferSize,
+                           int32_t matchingEnginesNum,
+                           int32_t riskEnginesNum,
+                           int32_t msgsInGroupLimit,
+                           int64_t maxGroupDurationNs,
+                           bool sendL2ForEveryCmd,
+                           int32_t l2RefreshDepth,
+                           CoreWaitStrategy waitStrategy,
+                           std::shared_ptr<disruptor::dsl::ThreadFactory> threadFactory,
+                           OrderBookFactory orderBookFactory)
+    : ringBufferSize(ringBufferSize)
+    , matchingEnginesNum(matchingEnginesNum)
+    , riskEnginesNum(riskEnginesNum)
+    , msgsInGroupLimit(msgsInGroupLimit)
+    , maxGroupDurationNs(maxGroupDurationNs)
+    , sendL2ForEveryCmd(sendL2ForEveryCmd)
+    , l2RefreshDepth(l2RefreshDepth)
+    , waitStrategy(waitStrategy)
+    , threadFactory(threadFactory)
+    , orderBookFactory(std::move(orderBookFactory)) {}
 
   static PerformanceConfiguration Default();
   static PerformanceConfiguration LatencyPerformanceBuilder();
   static PerformanceConfiguration ThroughputPerformanceBuilder();
 };
 
-} // namespace config
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace config
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

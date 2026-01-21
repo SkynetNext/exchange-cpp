@@ -31,9 +31,9 @@ class L2MarketData;
 struct MatcherTradeEvent;
 enum class OrderAction : uint8_t;
 enum class OrderType : uint8_t;
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange
 
 #include "../IOrder.h"
 #include "../L2MarketData.h"
@@ -85,7 +85,7 @@ struct alignas(64) OrderCommand : public IOrder, public StateHash {
   CommandResultCode resultCode = CommandResultCode::NEW;
 
   // trade events chain
-  MatcherTradeEvent *matcherEvent = nullptr;
+  MatcherTradeEvent* matcherEvent = nullptr;
 
   // optional market data
   // Use shared_ptr to allow OrderCommand to be copyable (matching Java
@@ -96,9 +96,12 @@ struct alignas(64) OrderCommand : public IOrder, public StateHash {
   // ---- potential false sharing section ------
 
   // Static factory methods
-  static OrderCommand NewOrder(OrderType orderType, int64_t orderId,
-                               int64_t uid, int64_t price,
-                               int64_t reserveBidPrice, int64_t size,
+  static OrderCommand NewOrder(OrderType orderType,
+                               int64_t orderId,
+                               int64_t uid,
+                               int64_t price,
+                               int64_t reserveBidPrice,
+                               int64_t size,
                                OrderAction action);
 
   static OrderCommand Cancel(int64_t orderId, int64_t uid);
@@ -111,8 +114,8 @@ struct alignas(64) OrderCommand : public IOrder, public StateHash {
    * Handles full MatcherTradeEvent chain, without removing/revoking them
    */
   template <typename Handler>
-  void ProcessMatcherEvents(Handler &&handler) const {
-    MatcherTradeEvent *mte = this->matcherEvent;
+  void ProcessMatcherEvents(Handler&& handler) const {
+    MatcherTradeEvent* mte = this->matcherEvent;
     while (mte != nullptr) {
       handler(mte);
       mte = mte->nextEvent;
@@ -122,25 +125,48 @@ struct alignas(64) OrderCommand : public IOrder, public StateHash {
   /**
    * Produces garbage - For testing only !!!
    */
-  std::vector<MatcherTradeEvent *> ExtractEvents() const;
+  std::vector<MatcherTradeEvent*> ExtractEvents() const;
 
   /**
    * Write only command data, not status or events
    */
-  void WriteTo(OrderCommand &cmd2) const;
+  void WriteTo(OrderCommand& cmd2) const;
 
   // slow - testing only
   OrderCommand Copy() const;
 
   // IOrder interface implementation
-  int64_t GetPrice() const override { return price; }
-  int64_t GetSize() const override { return size; }
-  int64_t GetFilled() const override { return 0; }
-  int64_t GetUid() const override { return uid; }
-  OrderAction GetAction() const override { return action; }
-  int64_t GetOrderId() const override { return orderId; }
-  int64_t GetTimestamp() const override { return timestamp; }
-  int64_t GetReserveBidPrice() const override { return reserveBidPrice; }
+  int64_t GetPrice() const override {
+    return price;
+  }
+
+  int64_t GetSize() const override {
+    return size;
+  }
+
+  int64_t GetFilled() const override {
+    return 0;
+  }
+
+  int64_t GetUid() const override {
+    return uid;
+  }
+
+  OrderAction GetAction() const override {
+    return action;
+  }
+
+  int64_t GetOrderId() const override {
+    return orderId;
+  }
+
+  int64_t GetTimestamp() const override {
+    return timestamp;
+  }
+
+  int64_t GetReserveBidPrice() const override {
+    return reserveBidPrice;
+  }
 
   // StateHash interface implementation
   int32_t GetStateHash() const override {
@@ -148,7 +174,7 @@ struct alignas(64) OrderCommand : public IOrder, public StateHash {
   }
 };
 
-} // namespace cmd
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace cmd
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

@@ -25,18 +25,18 @@ namespace core {
 namespace common {
 
 enum class UserStatus : uint8_t {
-  ACTIVE = 0,   // normal user
-  SUSPENDED = 1 // suspended
+  ACTIVE = 0,    // normal user
+  SUSPENDED = 1  // suspended
 };
 
 inline UserStatus UserStatusFromCode(uint8_t code) {
   switch (code) {
-  case 0:
-    return UserStatus::ACTIVE;
-  case 1:
-    return UserStatus::SUSPENDED;
-  default:
-    throw std::invalid_argument("unknown UserStatus: " + std::to_string(code));
+    case 0:
+      return UserStatus::ACTIVE;
+    case 1:
+      return UserStatus::SUSPENDED;
+    default:
+      throw std::invalid_argument("unknown UserStatus: " + std::to_string(code));
   }
 }
 
@@ -44,6 +44,6 @@ inline uint8_t UserStatusToCode(UserStatus status) {
   return static_cast<uint8_t>(status);
 }
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

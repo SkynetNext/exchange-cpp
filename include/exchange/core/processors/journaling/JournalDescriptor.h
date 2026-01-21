@@ -34,26 +34,31 @@ struct SnapshotDescriptor;
 struct JournalDescriptor {
   int64_t timestampNs;
   int64_t seqFirst;
-  int64_t seqLast; // -1 if not finished yet
+  int64_t seqLast;  // -1 if not finished yet
 
-  SnapshotDescriptor *baseSnapshot;
+  SnapshotDescriptor* baseSnapshot;
 
   // Linked list structure
-  JournalDescriptor *prev; // can be null
-  JournalDescriptor *next; // can be null
+  JournalDescriptor* prev;  // can be null
+  JournalDescriptor* next;  // can be null
 
-  JournalDescriptor(int64_t timestampNs, int64_t seqFirst,
-                    SnapshotDescriptor *baseSnapshot,
-                    JournalDescriptor *prev)
-      : timestampNs(timestampNs), seqFirst(seqFirst), seqLast(-1),
-        baseSnapshot(baseSnapshot), prev(prev), next(nullptr) {
+  JournalDescriptor(int64_t timestampNs,
+                    int64_t seqFirst,
+                    SnapshotDescriptor* baseSnapshot,
+                    JournalDescriptor* prev)
+    : timestampNs(timestampNs)
+    , seqFirst(seqFirst)
+    , seqLast(-1)
+    , baseSnapshot(baseSnapshot)
+    , prev(prev)
+    , next(nullptr) {
     if (prev) {
       prev->next = this;
     }
   }
 };
 
-} // namespace journaling
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace journaling
+}  // namespace processors
+}  // namespace core
+}  // namespace exchange

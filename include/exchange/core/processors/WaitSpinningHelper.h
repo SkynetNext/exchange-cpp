@@ -35,40 +35,40 @@ namespace exchange::core::processors {
  */
 template <typename T, typename WaitStrategyT>
 class WaitSpinningHelper {
- public:
-    WaitSpinningHelper(
-        disruptor::MultiProducerRingBuffer<T, WaitStrategyT>* ringBuffer,
-        disruptor::ProcessingSequenceBarrier<disruptor::MultiProducerSequencer<WaitStrategyT>,
-                                             WaitStrategyT>* sequenceBarrier,
-        int32_t spinLimit,
-        common::CoreWaitStrategy waitStrategy,
-        const std::string& name = "");
-
-    /**
-     * Try to wait for sequence, with spinning and potentially blocking
-     */
-    int64_t TryWaitFor(int64_t seq);
-
-    /**
-     * Signal all waiting threads when blocking
-     */
-    void SignalAllWhenBlocking();
-
- private:
+public:
+  WaitSpinningHelper(
+    disruptor::MultiProducerRingBuffer<T, WaitStrategyT>* ringBuffer,
     disruptor::ProcessingSequenceBarrier<disruptor::MultiProducerSequencer<WaitStrategyT>,
-                                         WaitStrategyT>* sequenceBarrier_;
-    disruptor::MultiProducerSequencer<WaitStrategyT>* sequencer_;
-    int32_t spinLimit_;
-    int32_t yieldLimit_;
-    bool block_;
+                                         WaitStrategyT>* sequenceBarrier,
+    int32_t spinLimit,
+    common::CoreWaitStrategy waitStrategy,
+    const std::string& name = "");
 
-    // For blocking mode - matches Java reflection access
-    disruptor::BlockingWaitStrategy* blockingWaitStrategy_;
-    std::mutex* lock_;
-    std::condition_variable* processorNotifyCondition_;
+  /**
+   * Try to wait for sequence, with spinning and potentially blocking
+   */
+  int64_t TryWaitFor(int64_t seq);
 
-    // Name for logging purposes
-    std::string name_;
+  /**
+   * Signal all waiting threads when blocking
+   */
+  void SignalAllWhenBlocking();
+
+private:
+  disruptor::ProcessingSequenceBarrier<disruptor::MultiProducerSequencer<WaitStrategyT>,
+                                       WaitStrategyT>* sequenceBarrier_;
+  disruptor::MultiProducerSequencer<WaitStrategyT>* sequencer_;
+  int32_t spinLimit_;
+  int32_t yieldLimit_;
+  bool block_;
+
+  // For blocking mode - matches Java reflection access
+  disruptor::BlockingWaitStrategy* blockingWaitStrategy_;
+  std::mutex* lock_;
+  std::condition_variable* processorNotifyCondition_;
+
+  // Name for logging purposes
+  std::string name_;
 };
 
 }  // namespace exchange::core::processors

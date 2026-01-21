@@ -28,16 +28,12 @@ namespace config {
  */
 class LoggingConfiguration {
 public:
-  enum class LoggingLevel {
-    LOGGING_WARNINGS,
-    LOGGING_RISK_DEBUG,
-    LOGGING_MATCHING_DEBUG
-  };
+  enum class LoggingLevel { LOGGING_WARNINGS, LOGGING_RISK_DEBUG, LOGGING_MATCHING_DEBUG };
 
   std::set<LoggingLevel> loggingLevels;
 
   LoggingConfiguration(std::set<LoggingLevel> loggingLevels)
-      : loggingLevels(std::move(loggingLevels)) {}
+    : loggingLevels(std::move(loggingLevels)) {}
 
   static LoggingConfiguration Default() {
     return LoggingConfiguration({LoggingLevel::LOGGING_WARNINGS});
@@ -48,7 +44,7 @@ public:
   }
 };
 
-} // namespace config
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace config
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

@@ -27,35 +27,35 @@ using namespace utils;
 REGISTER_BINARY_COMMAND_TYPE(BatchAddAccountsCommand, BinaryCommandType::ADD_ACCOUNTS);
 
 BatchAddAccountsCommand::BatchAddAccountsCommand(BytesIn& bytes) {
-    // Read LongObjectHashMap<IntLongHashMap>
-    // Java: users = SerializationUtils.readLongHashMap(bytes, c ->
-    // SerializationUtils.readIntLongHashMap(bytes));
-    auto tempMap =
-        SerializationUtils::ReadLongHashMap<ankerl::unordered_dense::map<int32_t, int64_t>>(
-            bytes, [](BytesIn& b) -> ankerl::unordered_dense::map<int32_t, int64_t>* {
-                auto* map = new ankerl::unordered_dense::map<int32_t, int64_t>(
-                    SerializationUtils::ReadIntLongHashMap(b));
-                return map;
-            });
+  // Read LongObjectHashMap<IntLongHashMap>
+  // Java: users = SerializationUtils.readLongHashMap(bytes, c ->
+  // SerializationUtils.readIntLongHashMap(bytes));
+  auto tempMap =
+    SerializationUtils::ReadLongHashMap<ankerl::unordered_dense::map<int32_t, int64_t>>(
+      bytes, [](BytesIn& b) -> ankerl::unordered_dense::map<int32_t, int64_t>* {
+        auto* map = new ankerl::unordered_dense::map<int32_t, int64_t>(
+          SerializationUtils::ReadIntLongHashMap(b));
+        return map;
+      });
 
-    // Convert from map<int64_t, map<int32_t, int64_t>*> to map<int64_t,
-    // map<int32_t, int64_t>>
-    for (const auto& pair : tempMap) {
-        if (pair.second != nullptr) {
-            users[pair.first] = *pair.second;
-            delete pair.second;
-        }
+  // Convert from map<int64_t, map<int32_t, int64_t>*> to map<int64_t,
+  // map<int32_t, int64_t>>
+  for (const auto& pair : tempMap) {
+    if (pair.second != nullptr) {
+      users[pair.first] = *pair.second;
+      delete pair.second;
     }
+  }
 }
 
 void BatchAddAccountsCommand::WriteMarshallable(BytesOut& bytes) const {
-    // Match Java: SerializationUtils.marshallLongHashMap(users,
-    // SerializationUtils::marshallIntLongHashMap, bytes);
-    bytes.WriteInt(static_cast<int32_t>(users.size()));
-    for (const auto& pair : users) {
-        bytes.WriteLong(pair.first);
-        SerializationUtils::MarshallIntLongHashMap(pair.second, bytes);
-    }
+  // Match Java: SerializationUtils.marshallLongHashMap(users,
+  // SerializationUtils::marshallIntLongHashMap, bytes);
+  bytes.WriteInt(static_cast<int32_t>(users.size()));
+  for (const auto& pair : users) {
+    bytes.WriteLong(pair.first);
+    SerializationUtils::MarshallIntLongHashMap(pair.second, bytes);
+  }
 }
 
 }  // namespace exchange::core::common::api::binary

@@ -16,13 +16,13 @@
 
 #pragma once
 
+#include <cstdint>
+#include <functional>
+#include <map>
 #include "../../common/BytesIn.h"
 #include "../../common/WriteBytesMarshallable.h"
 #include "../../common/cmd/OrderCommand.h"
 #include "../../common/config/InitialStateConfiguration.h"
-#include <cstdint>
-#include <functional>
-#include <map>
 
 // Forward declarations
 class ExchangeApi;
@@ -49,73 +49,73 @@ public:
    * Serialize state into storage
    * @param obj - object implementing WriteBytesMarshallable interface
    */
-  virtual bool StoreData(int64_t snapshotId, int64_t seq, int64_t timestampNs,
-                         SerializedModuleType type, int32_t instanceId,
-                         const common::WriteBytesMarshallable *obj) = 0;
+  virtual bool StoreData(int64_t snapshotId,
+                         int64_t seq,
+                         int64_t timestampNs,
+                         SerializedModuleType type,
+                         int32_t instanceId,
+                         const common::WriteBytesMarshallable* obj) = 0;
 
   /**
    * Deserialize state from storage using callback pattern
    * @param initFunc - callback that receives BytesIn and initializes the object
    */
-  virtual void LoadData(int64_t snapshotId, SerializedModuleType type,
+  virtual void LoadData(int64_t snapshotId,
+                        SerializedModuleType type,
                         int32_t instanceId,
-                        std::function<void(common::BytesIn *)> initFunc) = 0;
+                        std::function<void(common::BytesIn*)> initFunc) = 0;
 
   /**
    * Write command into journal
    */
-  virtual void WriteToJournal(common::cmd::OrderCommand *cmd, int64_t dSeq,
-                              bool eob) = 0;
+  virtual void WriteToJournal(common::cmd::OrderCommand* cmd, int64_t dSeq, bool eob) = 0;
 
   /**
    * Activate journal
    */
-  virtual void EnableJournaling(int64_t afterSeq, IExchangeApi *api) = 0;
+  virtual void EnableJournaling(int64_t afterSeq, IExchangeApi* api) = 0;
 
   /**
    * Get all available snapshots
    */
-  virtual std::map<int64_t, SnapshotDescriptor *> FindAllSnapshotPoints() = 0;
+  virtual std::map<int64_t, SnapshotDescriptor*> FindAllSnapshotPoints() = 0;
 
   /**
    * Replay journal step
    */
-  virtual void ReplayJournalStep(int64_t snapshotId, int64_t seqFrom,
-                                 int64_t seqTo, IExchangeApi *api) = 0;
+  virtual void
+  ReplayJournalStep(int64_t snapshotId, int64_t seqFrom, int64_t seqTo, IExchangeApi* api) = 0;
 
   /**
    * Replay journal full
    */
   virtual int64_t
-  ReplayJournalFull(const common::config::InitialStateConfiguration
-                        *initialStateConfiguration,
-                    IExchangeApi *api) = 0;
+  ReplayJournalFull(const common::config::InitialStateConfiguration* initialStateConfiguration,
+                    IExchangeApi* api) = 0;
 
   /**
    * Replay journal full and then enable journaling
    */
   virtual void ReplayJournalFullAndThenEnableJouraling(
-      const common::config::InitialStateConfiguration
-          *initialStateConfiguration,
-      IExchangeApi *api) = 0;
+    const common::config::InitialStateConfiguration* initialStateConfiguration,
+    IExchangeApi* api) = 0;
 
   /**
    * Check if snapshot exists
    */
-  virtual bool CheckSnapshotExists(int64_t snapshotId,
-                                   SerializedModuleType type,
-                                   int32_t instanceId) = 0;
+  virtual bool
+  CheckSnapshotExists(int64_t snapshotId, SerializedModuleType type, int32_t instanceId) = 0;
 
   /**
    * Check if can load from snapshot
    */
-  static bool CanLoadFromSnapshot(
-      ISerializationProcessor *serializationProcessor,
-      const common::config::InitialStateConfiguration *initStateCfg,
-      int32_t shardId, SerializedModuleType module);
+  static bool CanLoadFromSnapshot(ISerializationProcessor* serializationProcessor,
+                                  const common::config::InitialStateConfiguration* initStateCfg,
+                                  int32_t shardId,
+                                  SerializedModuleType module);
 };
 
-} // namespace journaling
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace journaling
+}  // namespace processors
+}  // namespace core
+}  // namespace exchange

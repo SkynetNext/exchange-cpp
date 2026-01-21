@@ -16,13 +16,13 @@
 
 #pragma once
 
-#include "../../BytesIn.h"
-#include "../../WriteBytesMarshallable.h"
-#include "ReportResult.h"
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
+#include "../../BytesIn.h"
+#include "../../WriteBytesMarshallable.h"
+#include "ReportResult.h"
 
 namespace exchange {
 namespace core {
@@ -30,7 +30,8 @@ namespace core {
 namespace processors {
 class MatchingEngineRouter;
 class RiskEngine;
-} // namespace processors
+}  // namespace processors
+
 namespace common {
 namespace api {
 namespace reports {
@@ -53,15 +54,15 @@ public:
    * Type-erased Process method for MatchingEngineRouter
    * Returns ReportResult* instead of template type
    */
-  virtual std::optional<std::unique_ptr<ReportResult>> ProcessTypeErased(
-      ::exchange::core::processors::MatchingEngineRouter *matchingEngine) = 0;
+  virtual std::optional<std::unique_ptr<ReportResult>>
+  ProcessTypeErased(::exchange::core::processors::MatchingEngineRouter* matchingEngine) = 0;
 
   /**
    * Type-erased Process method for RiskEngine
    * Returns ReportResult* instead of template type
    */
   virtual std::optional<std::unique_ptr<ReportResult>>
-  ProcessTypeErased(::exchange::core::processors::RiskEngine *riskEngine) = 0;
+  ProcessTypeErased(::exchange::core::processors::RiskEngine* riskEngine) = 0;
 
   /**
    * Create result from sections (matches Java createResult)
@@ -69,7 +70,7 @@ public:
    * @return Merged result as ReportResult*
    */
   virtual std::unique_ptr<ReportResult>
-  CreateResultTypeErased(const std::vector<BytesIn *> &sections) = 0;
+  CreateResultTypeErased(const std::vector<BytesIn*>& sections) = 0;
 };
 
 /**
@@ -78,7 +79,8 @@ public:
  * Matches Java: public interface ReportQuery<T extends ReportResult> extends
  * WriteBytesMarshallable
  */
-template <typename T> class ReportQuery : public ReportQueryBase {
+template <typename T>
+class ReportQuery : public ReportQueryBase {
 public:
   virtual ~ReportQuery() = default;
 
@@ -89,8 +91,8 @@ public:
    * @param matchingEngine matcher engine instance
    * @return custom result
    */
-  virtual std::optional<std::unique_ptr<T>> Process(
-      ::exchange::core::processors::MatchingEngineRouter *matchingEngine) = 0;
+  virtual std::optional<std::unique_ptr<T>>
+  Process(::exchange::core::processors::MatchingEngineRouter* matchingEngine) = 0;
 
   /**
    * Report main logic
@@ -100,47 +102,45 @@ public:
    * @return custom result
    */
   virtual std::optional<std::unique_ptr<T>>
-  Process(::exchange::core::processors::RiskEngine *riskEngine) = 0;
+  Process(::exchange::core::processors::RiskEngine* riskEngine) = 0;
 
   /**
    * Create result from sections (matches Java createResult)
    * @param sections Vector of BytesIn sections (one per shard/section)
    * @return Merged result
    */
-  virtual std::unique_ptr<T>
-  CreateResult(const std::vector<BytesIn *> &sections) = 0;
+  virtual std::unique_ptr<T> CreateResult(const std::vector<BytesIn*>& sections) = 0;
 
   // Implementation of type-erased methods from ReportQueryBase
-  std::optional<std::unique_ptr<ReportResult>> ProcessTypeErased(
-      ::exchange::core::processors::MatchingEngineRouter *matchingEngine)
-      override {
+  std::optional<std::unique_ptr<ReportResult>>
+  ProcessTypeErased(::exchange::core::processors::MatchingEngineRouter* matchingEngine) override {
     auto result = Process(matchingEngine);
     if (result.has_value()) {
       return std::optional<std::unique_ptr<ReportResult>>(
-          std::unique_ptr<ReportResult>(result.value().release()));
+        std::unique_ptr<ReportResult>(result.value().release()));
     }
     return std::nullopt;
   }
 
-  std::optional<std::unique_ptr<ReportResult>> ProcessTypeErased(
-      ::exchange::core::processors::RiskEngine *riskEngine) override {
+  std::optional<std::unique_ptr<ReportResult>>
+  ProcessTypeErased(::exchange::core::processors::RiskEngine* riskEngine) override {
     auto result = Process(riskEngine);
     if (result.has_value()) {
       return std::optional<std::unique_ptr<ReportResult>>(
-          std::unique_ptr<ReportResult>(result.value().release()));
+        std::unique_ptr<ReportResult>(result.value().release()));
     }
     return std::nullopt;
   }
 
   std::unique_ptr<ReportResult>
-  CreateResultTypeErased(const std::vector<BytesIn *> &sections) override {
+  CreateResultTypeErased(const std::vector<BytesIn*>& sections) override {
     auto result = CreateResult(sections);
     return std::unique_ptr<ReportResult>(result.release());
   }
 };
 
-} // namespace reports
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace reports
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

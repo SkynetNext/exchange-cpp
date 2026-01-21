@@ -27,7 +27,8 @@ namespace art {
  * LongObjConsumer - functional interface for consuming key-value pairs
  * @tparam V Value type
  */
-template <typename V> class LongObjConsumer {
+template <typename V>
+class LongObjConsumer {
 public:
   virtual ~LongObjConsumer() = default;
 
@@ -36,7 +37,7 @@ public:
    * @param key 64-bit key
    * @param value Value
    */
-  virtual void Accept(int64_t key, V *value) = 0;
+  virtual void Accept(int64_t key, V* value) = 0;
 };
 
 /**
@@ -46,13 +47,16 @@ template <typename V, typename F>
 class LambdaConsumer : public LongObjConsumer<V> {
 public:
   explicit LambdaConsumer(F f) : f_(f) {}
-  void Accept(int64_t key, V *value) override { f_(key, value); }
+
+  void Accept(int64_t key, V* value) override {
+    f_(key, value);
+  }
 
 private:
   F f_;
 };
 
-} // namespace art
-} // namespace collections
-} // namespace core
-} // namespace exchange
+}  // namespace art
+}  // namespace collections
+}  // namespace core
+}  // namespace exchange

@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "BytesIn.h"
-#include "VectorBytesIn.h"
 #include <memory>
 #include <vector>
+#include "BytesIn.h"
+#include "VectorBytesIn.h"
 
 namespace exchange {
 namespace core {
@@ -40,21 +40,18 @@ public:
   Wire() : bytes_(), bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
 
   explicit Wire(std::vector<uint8_t> bytes)
-      : bytes_(std::move(bytes)),
-        bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
+    : bytes_(std::move(bytes)), bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
 
   // Copy constructor - ensure bytesIn_ references the new bytes_
-  Wire(const Wire &other)
-      : bytes_(other.bytes_),
-        bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
+  Wire(const Wire& other)
+    : bytes_(other.bytes_), bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
 
   // Move constructor
-  Wire(Wire &&other) noexcept
-      : bytes_(std::move(other.bytes_)),
-        bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
+  Wire(Wire&& other) noexcept
+    : bytes_(std::move(other.bytes_)), bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
 
   // Copy assignment operator
-  Wire &operator=(const Wire &other) {
+  Wire& operator=(const Wire& other) {
     if (this != &other) {
       bytes_ = other.bytes_;
       bytesIn_ = std::make_shared<VectorBytesIn>(bytes_);
@@ -63,7 +60,7 @@ public:
   }
 
   // Move assignment operator
-  Wire &operator=(Wire &&other) noexcept {
+  Wire& operator=(Wire&& other) noexcept {
     if (this != &other) {
       bytes_ = std::move(other.bytes_);
       bytesIn_ = std::make_shared<VectorBytesIn>(bytes_);
@@ -77,13 +74,13 @@ public:
    * Reset position to 0 before returning (each call should start from
    * beginning)
    */
-  BytesIn &bytes() {
+  BytesIn& bytes() {
     bytesIn_->SetPosition(0);
     return *bytesIn_;
   }
 
-  const BytesIn &bytes() const {
-    const_cast<VectorBytesIn *>(bytesIn_.get())->SetPosition(0);
+  const BytesIn& bytes() const {
+    const_cast<VectorBytesIn*>(bytesIn_.get())->SetPosition(0);
     return *bytesIn_;
   }
 
@@ -91,9 +88,11 @@ public:
    * Get underlying bytes vector
    * For ProcessReportAny compatibility
    */
-  const std::vector<uint8_t> &GetBytes() const { return bytes_; }
+  const std::vector<uint8_t>& GetBytes() const {
+    return bytes_;
+  }
 };
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

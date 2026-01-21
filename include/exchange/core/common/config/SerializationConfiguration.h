@@ -25,7 +25,8 @@ namespace processors {
 namespace journaling {
 class ISerializationProcessor;
 }
-} // namespace processors
+}  // namespace processors
+
 namespace common {
 namespace config {
 
@@ -41,26 +42,22 @@ class SerializationConfiguration {
 public:
   bool enableJournaling;
   // Use fully qualified namespace to avoid ambiguity in config namespace
-  std::function<
-      ::exchange::core::processors::journaling::ISerializationProcessor *(
-          const ExchangeConfiguration *)>
-      serializationProcessorFactory;
+  std::function<::exchange::core::processors::journaling::ISerializationProcessor*(
+    const ExchangeConfiguration*)>
+    serializationProcessorFactory;
 
   SerializationConfiguration(
-      bool enableJournaling,
-      std::function<
-          ::exchange::core::processors::journaling::ISerializationProcessor *(
-              const ExchangeConfiguration *)>
-          factory)
-      : enableJournaling(enableJournaling),
-        serializationProcessorFactory(factory) {}
+    bool enableJournaling,
+    std::function<::exchange::core::processors::journaling::ISerializationProcessor*(
+      const ExchangeConfiguration*)> factory)
+    : enableJournaling(enableJournaling), serializationProcessorFactory(factory) {}
 
   static SerializationConfiguration Default();
   static SerializationConfiguration DiskSnapshotOnly();
   static SerializationConfiguration DiskJournaling();
 };
 
-} // namespace config
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace config
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

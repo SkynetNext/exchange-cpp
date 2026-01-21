@@ -16,13 +16,13 @@
 
 #pragma once
 
+#include <ankerl/unordered_dense.h>
+#include <cstdint>
+#include <string>
 #include "StateHash.h"
 #include "SymbolPositionRecord.h"
 #include "UserStatus.h"
 #include "WriteBytesMarshallable.h"
-#include <ankerl/unordered_dense.h>
-#include <cstdint>
-#include <string>
 
 namespace exchange {
 namespace core {
@@ -34,7 +34,7 @@ public:
 
   // symbol -> margin position records
   // TODO initialize lazily (only needed if margin trading allowed)
-  ankerl::unordered_dense::map<int32_t, SymbolPositionRecord *> positions;
+  ankerl::unordered_dense::map<int32_t, SymbolPositionRecord*> positions;
 
   // protects from double adjustment
   int64_t adjustmentsCounter = 0;
@@ -52,19 +52,19 @@ public:
   /**
    * Constructor from BytesIn (deserialization)
    */
-  UserProfile(BytesIn *bytes);
+  UserProfile(BytesIn* bytes);
 
-  SymbolPositionRecord *GetPositionRecordOrThrowEx(int32_t symbol);
+  SymbolPositionRecord* GetPositionRecordOrThrowEx(int32_t symbol);
 
   // StateHash interface implementation
   int32_t GetStateHash() const override;
 
   // WriteBytesMarshallable interface
-  void WriteMarshallable(BytesOut &bytes) const override;
+  void WriteMarshallable(BytesOut& bytes) const override;
 
   std::string ToString() const;
 };
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

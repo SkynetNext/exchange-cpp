@@ -16,15 +16,15 @@
 
 #pragma once
 
-#include "IArtNode.h"
-#include "LongObjConsumer.h"
+#include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
-#include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <list>
 #include <stdexcept>
 #include <string>
+#include "IArtNode.h"
+#include "LongObjConsumer.h"
 
 namespace exchange {
 namespace core {
@@ -32,37 +32,41 @@ namespace collections {
 namespace art {
 
 // Forward declarations
-template <typename V> class ArtNode16;
-template <typename V> class LongAdaptiveRadixTreeMap;
 template <typename V>
-IArtNode<V> *BranchIfRequired(int64_t key, V *value, int64_t nodeKey,
-                              int nodeLevel, IArtNode<V> *caller);
-template <typename V> void RecycleNodeToPool(IArtNode<V> *oldNode);
+class ArtNode16;
+template <typename V>
+class LongAdaptiveRadixTreeMap;
+template <typename V>
+IArtNode<V>*
+BranchIfRequired(int64_t key, V* value, int64_t nodeKey, int nodeLevel, IArtNode<V>* caller);
+template <typename V>
+void RecycleNodeToPool(IArtNode<V>* oldNode);
 
 /**
  * ArtNode4 - The smallest node type can store up to 4 child pointers
  */
-template <typename V> class ArtNode4 : public IArtNode<V> {
+template <typename V>
+class ArtNode4 : public IArtNode<V> {
 public:
-  explicit ArtNode4(
-      ::exchange::core::collections::objpool::ObjectsPool *objectsPool)
-      : IArtNode<V>(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4),
-        objectsPool_(objectsPool), nodeKey_(0), nodeLevel_(0), numChildren_(0) {
+  explicit ArtNode4(::exchange::core::collections::objpool::ObjectsPool* objectsPool)
+    : IArtNode<V>(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4)
+    , objectsPool_(objectsPool)
+    , nodeKey_(0)
+    , nodeLevel_(0)
+    , numChildren_(0) {
     std::memset(keys_, 0, sizeof(keys_));
     std::memset(nodes_, 0, sizeof(nodes_));
   }
 
-  V *GetValue(int64_t key, int level) override {
-    if (level != nodeLevel_ &&
-        ((key ^ nodeKey_) & (-1LL << (nodeLevel_ + 8))) != 0)
+  V* GetValue(int64_t key, int level) override {
+    if (level != nodeLevel_ && ((key ^ nodeKey_) & (-1LL << (nodeLevel_ + 8))) != 0)
       return nullptr;
     const int16_t nodeIndex = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
     for (int i = 0; i < numChildren_; i++) {
       if (keys_[i] == nodeIndex) {
-        void *node = nodes_[i];
-        return nodeLevel_ == 0 ? static_cast<V *>(node)
-                               : static_cast<IArtNode<V> *>(node)->GetValue(
-                                     key, nodeLevel_ - 8);
+        void* node = nodes_[i];
+        return nodeLevel_ == 0 ? static_cast<V*>(node)
+                               : static_cast<IArtNode<V>*>(node)->GetValue(key, nodeLevel_ - 8);
       }
       if (nodeIndex < keys_[i])
         break;
@@ -70,22 +74,22 @@ public:
     return nullptr;
   }
 
-  IArtNode<V> *Put(int64_t key, int level, V *value) override;
-  IArtNode<V> *Remove(int64_t key, int level) override;
-  V *GetCeilingValue(int64_t key, int level) override;
-  V *GetFloorValue(int64_t key, int level) override;
-  int ForEach(LongObjConsumer<V> *consumer, int limit) const override;
-  int ForEachDesc(LongObjConsumer<V> *consumer, int limit) const override;
+  IArtNode<V>* Put(int64_t key, int level, V* value) override;
+  IArtNode<V>* Remove(int64_t key, int level) override;
+  V* GetCeilingValue(int64_t key, int level) override;
+  V* GetFloorValue(int64_t key, int level) override;
+  int ForEach(LongObjConsumer<V>* consumer, int limit) const override;
+  int ForEachDesc(LongObjConsumer<V>* consumer, int limit) const override;
   int Size(int limit) override;
   void ValidateInternalState(int level) override;
-  std::string PrintDiagram(const std::string &prefix, int level) override;
-  std::list<std::pair<int64_t, V *>> Entries() override;
-  ::exchange::core::collections::objpool::ObjectsPool *
-  GetObjectsPool() override {
+  std::string PrintDiagram(const std::string& prefix, int level) override;
+  std::list<std::pair<int64_t, V*>> Entries() override;
+
+  ::exchange::core::collections::objpool::ObjectsPool* GetObjectsPool() override {
     return objectsPool_;
   }
 
-  void InitFirstKey(int64_t key, V *value) {
+  void InitFirstKey(int64_t key, V* value) {
     std::memset(keys_, 0, sizeof(keys_));
     std::memset(nodes_, 0, sizeof(nodes_));
     numChildren_ = 1;
@@ -95,8 +99,7 @@ public:
     nodeLevel_ = 0;
   }
 
-  void InitTwoKeys(int64_t key1, void *value1, int64_t key2, void *value2,
-                   int level) {
+  void InitTwoKeys(int64_t key1, void* value1, int64_t key2, void* value2, int level) {
     std::memset(keys_, 0, sizeof(keys_));
     std::memset(nodes_, 0, sizeof(nodes_));
     numChildren_ = 2;
@@ -117,12 +120,12 @@ public:
     nodeLevel_ = level;
   }
 
-  void InitFromNode16(ArtNode16<V> *node16) {
+  void InitFromNode16(ArtNode16<V>* node16) {
     std::memset(keys_, 0, sizeof(keys_));
     std::memset(nodes_, 0, sizeof(nodes_));
     numChildren_ = node16->numChildren_;
     std::memcpy(keys_, node16->keys_, numChildren_ * sizeof(int16_t));
-    std::memcpy(nodes_, node16->nodes_, numChildren_ * sizeof(void *));
+    std::memcpy(nodes_, node16->nodes_, numChildren_ * sizeof(void*));
     nodeLevel_ = node16->nodeLevel_;
     nodeKey_ = node16->nodeKey_;
     for (int i = numChildren_; i < 4; i++)
@@ -130,12 +133,13 @@ public:
     // node16 should be recycled by the caller
   }
 
-  template <typename U> friend class ArtNode16;
+  template <typename U>
+  friend class ArtNode16;
 
 private:
   int16_t keys_[4];
-  void *nodes_[4];
-  ::exchange::core::collections::objpool::ObjectsPool *objectsPool_;
+  void* nodes_[4];
+  ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;
   int64_t nodeKey_;
   int nodeLevel_;
   uint8_t numChildren_;
@@ -144,7 +148,7 @@ private:
     const int copyLength = numChildren_ - (pos + 1);
     if (copyLength > 0) {
       std::memmove(keys_ + pos, keys_ + pos + 1, copyLength * sizeof(int16_t));
-      std::memmove(nodes_ + pos, nodes_ + pos + 1, copyLength * sizeof(void *));
+      std::memmove(nodes_ + pos, nodes_ + pos + 1, copyLength * sizeof(void*));
     }
     numChildren_--;
     nodes_[numChildren_] = nullptr;
@@ -154,10 +158,9 @@ private:
 // --- Implementation ---
 
 template <typename V>
-IArtNode<V> *ArtNode4<V>::Put(int64_t key, int level, V *value) {
+IArtNode<V>* ArtNode4<V>::Put(int64_t key, int level, V* value) {
   if (level != nodeLevel_) {
-    IArtNode<V> *branch =
-        BranchIfRequired<V>(key, value, nodeKey_, nodeLevel_, this);
+    IArtNode<V>* branch = BranchIfRequired<V>(key, value, nodeKey_, nodeLevel_, this);
     if (branch)
       return branch;
   }
@@ -168,8 +171,8 @@ IArtNode<V> *ArtNode4<V>::Put(int64_t key, int level, V *value) {
       if (nodeLevel_ == 0)
         nodes_[pos] = value;
       else {
-        IArtNode<V> *oldSubNode = static_cast<IArtNode<V> *>(nodes_[pos]);
-        IArtNode<V> *resizedNode = oldSubNode->Put(key, nodeLevel_ - 8, value);
+        IArtNode<V>* oldSubNode = static_cast<IArtNode<V>*>(nodes_[pos]);
+        IArtNode<V>* resizedNode = oldSubNode->Put(key, nodeLevel_ - 8, value);
         if (resizedNode != nullptr) {
           nodes_[pos] = resizedNode;
         }
@@ -184,43 +187,43 @@ IArtNode<V> *ArtNode4<V>::Put(int64_t key, int level, V *value) {
     const int copyLength = numChildren_ - pos;
     if (copyLength > 0) {
       std::memmove(keys_ + pos + 1, keys_ + pos, copyLength * sizeof(int16_t));
-      std::memmove(nodes_ + pos + 1, nodes_ + pos, copyLength * sizeof(void *));
+      std::memmove(nodes_ + pos + 1, nodes_ + pos, copyLength * sizeof(void*));
     }
     keys_[pos] = nodeIndex;
     if (nodeLevel_ == 0)
       nodes_[pos] = value;
     else {
-      auto *newSub = objectsPool_->template Get<ArtNode4<V>>(
-          ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4,
-          [this]() { return new ArtNode4<V>(objectsPool_); });
+      auto* newSub = objectsPool_->template Get<ArtNode4<V>>(
+        ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4,
+        [this]() { return new ArtNode4<V>(objectsPool_); });
       newSub->InitFirstKey(key, value);
       nodes_[pos] = newSub;
     }
     numChildren_++;
     return nullptr;
   } else {
-    void *newElement;
+    void* newElement;
     if (nodeLevel_ == 0)
       newElement = value;
     else {
-      auto *newSub = objectsPool_->template Get<ArtNode4<V>>(
-          ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4,
-          [this]() { return new ArtNode4<V>(objectsPool_); });
+      auto* newSub = objectsPool_->template Get<ArtNode4<V>>(
+        ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4,
+        [this]() { return new ArtNode4<V>(objectsPool_); });
       newSub->InitFirstKey(key, value);
       newElement = newSub;
     }
-    auto *node16 = objectsPool_->template Get<ArtNode16<V>>(
-        ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_16,
-        [this]() { return new ArtNode16<V>(objectsPool_); });
+    auto* node16 = objectsPool_->template Get<ArtNode16<V>>(
+      ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_16,
+      [this]() { return new ArtNode16<V>(objectsPool_); });
     node16->InitFromNode4(this, nodeIndex, newElement);
     RecycleNodeToPool<V>(this);
     return node16;
   }
 }
 
-template <typename V> IArtNode<V> *ArtNode4<V>::Remove(int64_t key, int level) {
-  if (level != nodeLevel_ &&
-      ((key ^ nodeKey_) & (-1LL << (nodeLevel_ + 8))) != 0)
+template <typename V>
+IArtNode<V>* ArtNode4<V>::Remove(int64_t key, int level) {
+  if (level != nodeLevel_ && ((key ^ nodeKey_) & (-1LL << (nodeLevel_ + 8))) != 0)
     return this;
   const int16_t nodeIndex = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
   int pos = 0;
@@ -231,14 +234,14 @@ template <typename V> IArtNode<V> *ArtNode4<V>::Remove(int64_t key, int level) {
   if (nodeLevel_ == 0) {
     RemoveElementAtPos(pos);
   } else {
-    IArtNode<V> *oldNode = static_cast<IArtNode<V> *>(nodes_[pos]);
-    IArtNode<V> *resizedNode = oldNode->Remove(key, nodeLevel_ - 8);
+    IArtNode<V>* oldNode = static_cast<IArtNode<V>*>(nodes_[pos]);
+    IArtNode<V>* resizedNode = oldNode->Remove(key, nodeLevel_ - 8);
     if (resizedNode != oldNode) {
       nodes_[pos] = resizedNode;
       if (resizedNode == nullptr) {
         RemoveElementAtPos(pos);
         if (numChildren_ == 1 && nodeLevel_ != 0) {
-          IArtNode<V> *lastNode = static_cast<IArtNode<V> *>(nodes_[0]);
+          IArtNode<V>* lastNode = static_cast<IArtNode<V>*>(nodes_[0]);
           nodes_[0] = nullptr;
           RecycleNodeToPool<V>(this);
           return lastNode;
@@ -253,7 +256,8 @@ template <typename V> IArtNode<V> *ArtNode4<V>::Remove(int64_t key, int level) {
   return this;
 }
 
-template <typename V> V *ArtNode4<V>::GetCeilingValue(int64_t key, int level) {
+template <typename V>
+V* ArtNode4<V>::GetCeilingValue(int64_t key, int level) {
   if (level != nodeLevel_) {
     const int64_t mask = -1LL << (nodeLevel_ + 8);
     if ((nodeKey_ & mask) < (key & mask))
@@ -264,23 +268,22 @@ template <typename V> V *ArtNode4<V>::GetCeilingValue(int64_t key, int level) {
   const int16_t nodeIndex = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
   for (int i = 0; i < numChildren_; i++) {
     if (keys_[i] == nodeIndex) {
-      V *res = nodeLevel_ == 0
-                   ? static_cast<V *>(nodes_[i])
-                   : static_cast<IArtNode<V> *>(nodes_[i])->GetCeilingValue(
-                         key, nodeLevel_ - 8);
+      V* res = nodeLevel_ == 0
+                 ? static_cast<V*>(nodes_[i])
+                 : static_cast<IArtNode<V>*>(nodes_[i])->GetCeilingValue(key, nodeLevel_ - 8);
       if (res)
         return res;
     } else if (keys_[i] > nodeIndex) {
       return nodeLevel_ == 0
-                 ? static_cast<V *>(nodes_[i])
-                 : static_cast<IArtNode<V> *>(nodes_[i])->GetCeilingValue(
-                       0, nodeLevel_ - 8);
+               ? static_cast<V*>(nodes_[i])
+               : static_cast<IArtNode<V>*>(nodes_[i])->GetCeilingValue(0, nodeLevel_ - 8);
     }
   }
   return nullptr;
 }
 
-template <typename V> V *ArtNode4<V>::GetFloorValue(int64_t key, int level) {
+template <typename V>
+V* ArtNode4<V>::GetFloorValue(int64_t key, int level) {
   if (level != nodeLevel_) {
     const int64_t mask = -1LL << (nodeLevel_ + 8);
     if ((nodeKey_ & mask) > (key & mask))
@@ -291,66 +294,64 @@ template <typename V> V *ArtNode4<V>::GetFloorValue(int64_t key, int level) {
   const int16_t nodeIndex = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
   for (int i = numChildren_ - 1; i >= 0; i--) {
     if (keys_[i] == nodeIndex) {
-      V *res = nodeLevel_ == 0
-                   ? static_cast<V *>(nodes_[i])
-                   : static_cast<IArtNode<V> *>(nodes_[i])->GetFloorValue(
-                         key, nodeLevel_ - 8);
+      V* res = nodeLevel_ == 0
+                 ? static_cast<V*>(nodes_[i])
+                 : static_cast<IArtNode<V>*>(nodes_[i])->GetFloorValue(key, nodeLevel_ - 8);
       if (res)
         return res;
     } else if (keys_[i] < nodeIndex) {
       return nodeLevel_ == 0
-                 ? static_cast<V *>(nodes_[i])
-                 : static_cast<IArtNode<V> *>(nodes_[i])->GetFloorValue(
-                       INT64_MAX, nodeLevel_ - 8);
+               ? static_cast<V*>(nodes_[i])
+               : static_cast<IArtNode<V>*>(nodes_[i])->GetFloorValue(INT64_MAX, nodeLevel_ - 8);
     }
   }
   return nullptr;
 }
 
 template <typename V>
-int ArtNode4<V>::ForEach(LongObjConsumer<V> *consumer, int limit) const {
+int ArtNode4<V>::ForEach(LongObjConsumer<V>* consumer, int limit) const {
   if (nodeLevel_ == 0) {
     const int64_t keyBase = nodeKey_ & (-1LL << 8);
     const int n = std::min(static_cast<int>(numChildren_), limit);
     for (int i = 0; i < n; i++)
-      consumer->Accept(keyBase + keys_[i], static_cast<V *>(nodes_[i]));
+      consumer->Accept(keyBase + keys_[i], static_cast<V*>(nodes_[i]));
     return n;
   }
   int numLeft = limit;
   for (int i = 0; i < numChildren_ && numLeft > 0; i++)
-    numLeft -=
-        static_cast<IArtNode<V> *>(nodes_[i])->ForEach(consumer, numLeft);
+    numLeft -= static_cast<IArtNode<V>*>(nodes_[i])->ForEach(consumer, numLeft);
   return limit - numLeft;
 }
 
 template <typename V>
-int ArtNode4<V>::ForEachDesc(LongObjConsumer<V> *consumer, int limit) const {
+int ArtNode4<V>::ForEachDesc(LongObjConsumer<V>* consumer, int limit) const {
   if (nodeLevel_ == 0) {
     const int64_t keyBase = nodeKey_ & (-1LL << 8);
     int numFound = 0;
     for (int i = numChildren_ - 1; i >= 0 && numFound < limit; i--) {
-      consumer->Accept(keyBase + keys_[i], static_cast<V *>(nodes_[i]));
+      consumer->Accept(keyBase + keys_[i], static_cast<V*>(nodes_[i]));
       numFound++;
     }
     return numFound;
   }
   int numLeft = limit;
   for (int i = numChildren_ - 1; i >= 0 && numLeft > 0; i--)
-    numLeft -=
-        static_cast<IArtNode<V> *>(nodes_[i])->ForEachDesc(consumer, numLeft);
+    numLeft -= static_cast<IArtNode<V>*>(nodes_[i])->ForEachDesc(consumer, numLeft);
   return limit - numLeft;
 }
 
-template <typename V> int ArtNode4<V>::Size(int limit) {
+template <typename V>
+int ArtNode4<V>::Size(int limit) {
   if (nodeLevel_ == 0)
     return numChildren_;
   int numLeft = limit;
   for (int i = 0; i < numChildren_ && numLeft > 0; i++)
-    numLeft -= static_cast<IArtNode<V> *>(nodes_[i])->Size(numLeft);
+    numLeft -= static_cast<IArtNode<V>*>(nodes_[i])->Size(numLeft);
   return limit - numLeft;
 }
 
-template <typename V> void ArtNode4<V>::ValidateInternalState(int level) {
+template <typename V>
+void ArtNode4<V>::ValidateInternalState(int level) {
   if (nodeLevel_ > level)
     throw std::runtime_error("unexpected nodeLevel");
   if (numChildren_ > 4 || numChildren_ < 1)
@@ -366,38 +367,35 @@ template <typename V> void ArtNode4<V>::ValidateInternalState(int level) {
         throw std::runtime_error("wrong key order/duplicate");
       last = keys_[i];
       if (nodeLevel_ != 0)
-        static_cast<IArtNode<V> *>(nodes_[i])->ValidateInternalState(
-            nodeLevel_ - 8);
+        static_cast<IArtNode<V>*>(nodes_[i])->ValidateInternalState(nodeLevel_ - 8);
     } else if (nodes_[i])
       throw std::runtime_error("not released node");
   }
 }
 
 template <typename V>
-std::string ArtNode4<V>::PrintDiagram(const std::string &prefix, int level) {
+std::string ArtNode4<V>::PrintDiagram(const std::string& prefix, int level) {
   return LongAdaptiveRadixTreeMap<V>::PrintDiagram(
-      prefix, level, nodeLevel_, nodeKey_, numChildren_,
-      [this](int idx) { return keys_[idx]; },
-      [this](int idx) { return nodes_[idx]; });
+    prefix, level, nodeLevel_, nodeKey_, numChildren_, [this](int idx) { return keys_[idx]; },
+    [this](int idx) { return nodes_[idx]; });
 }
 
 template <typename V>
-std::list<std::pair<int64_t, V *>> ArtNode4<V>::Entries() {
+std::list<std::pair<int64_t, V*>> ArtNode4<V>::Entries() {
   const int64_t keyPrefix = nodeKey_ & (-1LL << 8);
-  std::list<std::pair<int64_t, V *>> list;
+  std::list<std::pair<int64_t, V*>> list;
   for (int i = 0; i < numChildren_; i++) {
     if (nodeLevel_ == 0)
-      list.push_back(
-          {keyPrefix + (keys_[i] & 0xFF), static_cast<V *>(nodes_[i])});
+      list.push_back({keyPrefix + (keys_[i] & 0xFF), static_cast<V*>(nodes_[i])});
     else {
-      auto sub = static_cast<IArtNode<V> *>(nodes_[i])->Entries();
+      auto sub = static_cast<IArtNode<V>*>(nodes_[i])->Entries();
       list.splice(list.end(), sub);
     }
   }
   return list;
 }
 
-} // namespace art
-} // namespace collections
-} // namespace core
-} // namespace exchange
+}  // namespace art
+}  // namespace collections
+}  // namespace core
+}  // namespace exchange

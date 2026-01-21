@@ -35,29 +35,29 @@ namespace exchange::core::utils {
  * - chrono: ~50-100ns (portable but slower)
  */
 class FastNanoTime {
- public:
-    /**
-     * Get current time in nanoseconds (monotonic clock)
-     * Equivalent to Java System.nanoTime()
-     *
-     * @return nanoseconds since some arbitrary point (monotonic, not wall-clock)
-     */
-    static int64_t Now();
+public:
+  /**
+   * Get current time in nanoseconds (monotonic clock)
+   * Equivalent to Java System.nanoTime()
+   *
+   * @return nanoseconds since some arbitrary point (monotonic, not wall-clock)
+   */
+  static int64_t Now();
 
-    /**
-     * Get current time in milliseconds (monotonic clock)
-     * Equivalent to Java System.currentTimeMillis() but using monotonic clock
-     * Optimized to avoid division overhead
-     *
-     * @return milliseconds since some arbitrary point (monotonic, not wall-clock)
-     */
-    static int64_t NowMillis();
+  /**
+   * Get current time in milliseconds (monotonic clock)
+   * Equivalent to Java System.currentTimeMillis() but using monotonic clock
+   * Optimized to avoid division overhead
+   *
+   * @return milliseconds since some arbitrary point (monotonic, not wall-clock)
+   */
+  static int64_t NowMillis();
 
-    /**
-     * Initialize (calibrate TSC if available)
-     * Should be called once at startup
-     */
-    static void Initialize();
+  /**
+   * Initialize (calibrate TSC if available)
+   * Should be called once at startup
+   */
+  static void Initialize();
 };
 
 }  // namespace exchange::core::utils

@@ -16,13 +16,13 @@
 
 #pragma once
 
+#include <ankerl/unordered_dense.h>
+#include <cstdint>
+#include <vector>
 #include "../../BytesIn.h"
 #include "../../CoreSymbolSpecification.h"
 #include "BinaryCommandType.h"
 #include "BinaryDataCommand.h"
-#include <ankerl/unordered_dense.h>
-#include <cstdint>
-#include <vector>
 
 namespace exchange {
 namespace core {
@@ -36,39 +36,37 @@ namespace binary {
 class BatchAddSymbolsCommand : public BinaryDataCommand {
 public:
   // symbol ID -> CoreSymbolSpecification
-  ankerl::unordered_dense::map<int32_t, const CoreSymbolSpecification *>
-      symbols;
+  ankerl::unordered_dense::map<int32_t, const CoreSymbolSpecification*> symbols;
 
-  BatchAddSymbolsCommand(const ankerl::unordered_dense::map<
-                         int32_t, const CoreSymbolSpecification *> &symbols)
-      : symbols(symbols) {}
+  BatchAddSymbolsCommand(
+    const ankerl::unordered_dense::map<int32_t, const CoreSymbolSpecification*>& symbols)
+    : symbols(symbols) {}
 
-  explicit BatchAddSymbolsCommand(const CoreSymbolSpecification *symbol) {
+  explicit BatchAddSymbolsCommand(const CoreSymbolSpecification* symbol) {
     if (symbol != nullptr) {
       symbols[symbol->symbolId] = symbol;
     }
   }
 
-  BatchAddSymbolsCommand(
-      const std::vector<const CoreSymbolSpecification *> &collection) {
-    for (const auto *spec : collection) {
+  BatchAddSymbolsCommand(const std::vector<const CoreSymbolSpecification*>& collection) {
+    for (const auto* spec : collection) {
       if (spec != nullptr) {
         symbols[spec->symbolId] = spec;
       }
     }
   }
 
-  explicit BatchAddSymbolsCommand(BytesIn &bytes);
+  explicit BatchAddSymbolsCommand(BytesIn& bytes);
 
   int32_t GetBinaryCommandTypeCode() const override {
     return static_cast<int32_t>(BinaryCommandType::ADD_SYMBOLS);
   }
 
-  void WriteMarshallable(BytesOut &bytes) const override;
+  void WriteMarshallable(BytesOut& bytes) const override;
 };
 
-} // namespace binary
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace binary
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

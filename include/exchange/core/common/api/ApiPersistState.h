@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "ApiCommand.h"
 #include <cstdint>
+#include "ApiCommand.h"
 
 namespace exchange {
 namespace core {
@@ -35,7 +35,7 @@ public:
   ApiPersistState(int64_t dumpId, bool seal) : dumpId(dumpId), seal(seal) {}
 };
 
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

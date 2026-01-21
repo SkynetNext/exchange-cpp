@@ -38,145 +38,144 @@ using RiskEngineType = ::exchange::core::processors::RiskEngine;
 REGISTER_REPORT_QUERY_TYPE(TotalCurrencyBalanceReportQuery, ReportType::TOTAL_CURRENCY_BALANCE);
 
 void TotalCurrencyBalanceReportQuery::WriteMarshallable(BytesOut& bytes) const {
-    // Match Java: do nothing (empty implementation)
-    // TotalCurrencyBalanceReportQuery has no fields to serialize
+  // Match Java: do nothing (empty implementation)
+  // TotalCurrencyBalanceReportQuery has no fields to serialize
 }
 
-std::unique_ptr<TotalCurrencyBalanceReportResult> TotalCurrencyBalanceReportQuery::CreateResult(
-    const std::vector<BytesIn*>& sections) {
-    // Match Java: createResult(final Stream<BytesIn> sections)
-    return TotalCurrencyBalanceReportResult::Merge(sections);
+std::unique_ptr<TotalCurrencyBalanceReportResult>
+TotalCurrencyBalanceReportQuery::CreateResult(const std::vector<BytesIn*>& sections) {
+  // Match Java: createResult(final Stream<BytesIn> sections)
+  return TotalCurrencyBalanceReportResult::Merge(sections);
 }
 
 std::optional<std::unique_ptr<TotalCurrencyBalanceReportResult>>
 TotalCurrencyBalanceReportQuery::Process(MatchingEngineRouterType* matchingEngine) {
-    // Match Java: process(MatchingEngineRouter matchingEngine)
-    ankerl::unordered_dense::map<int32_t, int64_t> currencyBalance;
+  // Match Java: process(MatchingEngineRouter matchingEngine)
+  ankerl::unordered_dense::map<int32_t, int64_t> currencyBalance;
 
-    const auto& orderBooks = matchingEngine->GetOrderBooks();
-    for (auto* orderBook : orderBooks) {
-        if (!orderBook) {
-            continue;
-        }
-        const auto* spec = orderBook->GetSymbolSpec();
-        if (!spec || spec->type != common::SymbolType::CURRENCY_EXCHANGE_PAIR) {
-            continue;
-        }
-
-        // Process ask orders
-        orderBook->ProcessAskOrders([&](const common::IOrder* order) {
-            if (!order) {
-                return;
-            }
-            int64_t remainingSize = order->GetSize() - order->GetFilled();
-            if (remainingSize > 0) {
-                int64_t amount =
-                    utils::CoreArithmeticUtils::CalculateAmountAsk(remainingSize, spec);
-                currencyBalance[spec->baseCurrency] += amount;
-            }
-        });
-
-        // Process bid orders
-        orderBook->ProcessBidOrders([&](const common::IOrder* order) {
-            if (!order) {
-                return;
-            }
-            int64_t remainingSize = order->GetSize() - order->GetFilled();
-            if (remainingSize > 0) {
-                int64_t amount = utils::CoreArithmeticUtils::CalculateAmountBidTakerFee(
-                    remainingSize, order->GetReserveBidPrice(), spec);
-                currencyBalance[spec->quoteCurrency] += amount;
-            }
-        });
+  const auto& orderBooks = matchingEngine->GetOrderBooks();
+  for (auto* orderBook : orderBooks) {
+    if (!orderBook) {
+      continue;
+    }
+    const auto* spec = orderBook->GetSymbolSpec();
+    if (!spec || spec->type != common::SymbolType::CURRENCY_EXCHANGE_PAIR) {
+      continue;
     }
 
-    return std::make_optional(std::unique_ptr<TotalCurrencyBalanceReportResult>(
-        TotalCurrencyBalanceReportResult::OfOrderBalances(currencyBalance)));
+    // Process ask orders
+    orderBook->ProcessAskOrders([&](const common::IOrder* order) {
+      if (!order) {
+        return;
+      }
+      int64_t remainingSize = order->GetSize() - order->GetFilled();
+      if (remainingSize > 0) {
+        int64_t amount = utils::CoreArithmeticUtils::CalculateAmountAsk(remainingSize, spec);
+        currencyBalance[spec->baseCurrency] += amount;
+      }
+    });
+
+    // Process bid orders
+    orderBook->ProcessBidOrders([&](const common::IOrder* order) {
+      if (!order) {
+        return;
+      }
+      int64_t remainingSize = order->GetSize() - order->GetFilled();
+      if (remainingSize > 0) {
+        int64_t amount = utils::CoreArithmeticUtils::CalculateAmountBidTakerFee(
+          remainingSize, order->GetReserveBidPrice(), spec);
+        currencyBalance[spec->quoteCurrency] += amount;
+      }
+    });
+  }
+
+  return std::make_optional(std::unique_ptr<TotalCurrencyBalanceReportResult>(
+    TotalCurrencyBalanceReportResult::OfOrderBalances(currencyBalance)));
 }
 
 std::optional<std::unique_ptr<TotalCurrencyBalanceReportResult>>
 TotalCurrencyBalanceReportQuery::Process(RiskEngineType* riskEngine) {
-    // Match Java: process(RiskEngine riskEngine)
-    // Prepare fast price cache for profit estimation
-    ankerl::unordered_dense::map<int32_t, ::exchange::core::processors::LastPriceCacheRecord>
-        dummyLastPriceCache;
-    const auto& lastPriceCache = riskEngine->GetLastPriceCache();
-    for (const auto& [symbolId, record] : lastPriceCache) {
-        dummyLastPriceCache[symbolId] = record.AveragingRecord();
+  // Match Java: process(RiskEngine riskEngine)
+  // Prepare fast price cache for profit estimation
+  ankerl::unordered_dense::map<int32_t, ::exchange::core::processors::LastPriceCacheRecord>
+    dummyLastPriceCache;
+  const auto& lastPriceCache = riskEngine->GetLastPriceCache();
+  for (const auto& [symbolId, record] : lastPriceCache) {
+    dummyLastPriceCache[symbolId] = record.AveragingRecord();
+  }
+
+  ankerl::unordered_dense::map<int32_t, int64_t> currencyBalance;
+  ankerl::unordered_dense::map<int32_t, int64_t> symbolOpenInterestLong;
+  ankerl::unordered_dense::map<int32_t, int64_t> symbolOpenInterestShort;
+
+  auto* symbolSpecProvider = riskEngine->GetSymbolSpecificationProvider();
+  auto* userProfileService = riskEngine->GetUserProfileService();
+
+  if (!symbolSpecProvider || !userProfileService) {
+    return std::nullopt;
+  }
+
+  // Process all user profiles
+  // Match Java:
+  // riskEngine.getUserProfileService().getUserProfiles().forEach(...)
+  auto userProfiles = userProfileService->GetUserProfiles();
+  for (const auto* profile : userProfiles) {
+    if (!profile) {
+      continue;
     }
 
-    ankerl::unordered_dense::map<int32_t, int64_t> currencyBalance;
-    ankerl::unordered_dense::map<int32_t, int64_t> symbolOpenInterestLong;
-    ankerl::unordered_dense::map<int32_t, int64_t> symbolOpenInterestShort;
-
-    auto* symbolSpecProvider = riskEngine->GetSymbolSpecificationProvider();
-    auto* userProfileService = riskEngine->GetUserProfileService();
-
-    if (!symbolSpecProvider || !userProfileService) {
-        return std::nullopt;
+    // Add accounts
+    for (const auto& [currency, balance] : profile->accounts) {
+      currencyBalance[currency] += balance;
     }
 
-    // Process all user profiles
-    // Match Java:
-    // riskEngine.getUserProfileService().getUserProfiles().forEach(...)
-    auto userProfiles = userProfileService->GetUserProfiles();
-    for (const auto* profile : userProfiles) {
-        if (!profile) {
-            continue;
-        }
+    // Process positions
+    for (const auto& [symbolId, positionRecord] : profile->positions) {
+      if (!positionRecord) {
+        continue;
+      }
+      const auto* spec = symbolSpecProvider->GetSymbolSpecification(symbolId);
+      if (!spec) {
+        continue;
+      }
 
-        // Add accounts
-        for (const auto& [currency, balance] : profile->accounts) {
-            currencyBalance[currency] += balance;
-        }
+      auto avgPriceIt = dummyLastPriceCache.find(symbolId);
+      // Convert RiskEngine::LastPriceCacheRecord to
+      // common::processors::LastPriceCacheRecord (as done in RiskEngine.cpp)
+      common::processors::LastPriceCacheRecord avgPrice;
+      if (avgPriceIt != dummyLastPriceCache.end()) {
+        avgPrice.askPrice = avgPriceIt->second.askPrice;
+        avgPrice.bidPrice = avgPriceIt->second.bidPrice;
+      } else {
+        // Use dummy values
+        avgPrice.askPrice = 42;
+        avgPrice.bidPrice = 42;
+      }
 
-        // Process positions
-        for (const auto& [symbolId, positionRecord] : profile->positions) {
-            if (!positionRecord) {
-                continue;
-            }
-            const auto* spec = symbolSpecProvider->GetSymbolSpecification(symbolId);
-            if (!spec) {
-                continue;
-            }
+      int64_t profit = positionRecord->EstimateProfit(*spec, &avgPrice);
+      currencyBalance[positionRecord->currency] += profit;
 
-            auto avgPriceIt = dummyLastPriceCache.find(symbolId);
-            // Convert RiskEngine::LastPriceCacheRecord to
-            // common::processors::LastPriceCacheRecord (as done in RiskEngine.cpp)
-            common::processors::LastPriceCacheRecord avgPrice;
-            if (avgPriceIt != dummyLastPriceCache.end()) {
-                avgPrice.askPrice = avgPriceIt->second.askPrice;
-                avgPrice.bidPrice = avgPriceIt->second.bidPrice;
-            } else {
-                // Use dummy values
-                avgPrice.askPrice = 42;
-                avgPrice.bidPrice = 42;
-            }
-
-            int64_t profit = positionRecord->EstimateProfit(*spec, &avgPrice);
-            currencyBalance[positionRecord->currency] += profit;
-
-            if (positionRecord->direction == common::PositionDirection::LONG) {
-                symbolOpenInterestLong[symbolId] += positionRecord->openVolume;
-            } else if (positionRecord->direction == common::PositionDirection::SHORT) {
-                symbolOpenInterestShort[symbolId] += positionRecord->openVolume;
-            }
-        }
+      if (positionRecord->direction == common::PositionDirection::LONG) {
+        symbolOpenInterestLong[symbolId] += positionRecord->openVolume;
+      } else if (positionRecord->direction == common::PositionDirection::SHORT) {
+        symbolOpenInterestShort[symbolId] += positionRecord->openVolume;
+      }
     }
+  }
 
-    // Create result with all data
-    // Match Java: new TotalCurrencyBalanceReportResult(...)
-    // Constructor takes raw pointers, not unique_ptr
-    auto result = std::make_unique<TotalCurrencyBalanceReportResult>(
-        new ankerl::unordered_dense::map<int32_t, int64_t>(currencyBalance),
-        new ankerl::unordered_dense::map<int32_t, int64_t>(riskEngine->GetFees()),
-        new ankerl::unordered_dense::map<int32_t, int64_t>(riskEngine->GetAdjustments()),
-        new ankerl::unordered_dense::map<int32_t, int64_t>(riskEngine->GetSuspends()),
-        nullptr,  // ordersBalances - not set in RiskEngine process
-        new ankerl::unordered_dense::map<int32_t, int64_t>(symbolOpenInterestLong),
-        new ankerl::unordered_dense::map<int32_t, int64_t>(symbolOpenInterestShort));
+  // Create result with all data
+  // Match Java: new TotalCurrencyBalanceReportResult(...)
+  // Constructor takes raw pointers, not unique_ptr
+  auto result = std::make_unique<TotalCurrencyBalanceReportResult>(
+    new ankerl::unordered_dense::map<int32_t, int64_t>(currencyBalance),
+    new ankerl::unordered_dense::map<int32_t, int64_t>(riskEngine->GetFees()),
+    new ankerl::unordered_dense::map<int32_t, int64_t>(riskEngine->GetAdjustments()),
+    new ankerl::unordered_dense::map<int32_t, int64_t>(riskEngine->GetSuspends()),
+    nullptr,  // ordersBalances - not set in RiskEngine process
+    new ankerl::unordered_dense::map<int32_t, int64_t>(symbolOpenInterestLong),
+    new ankerl::unordered_dense::map<int32_t, int64_t>(symbolOpenInterestShort));
 
-    return std::make_optional(std::move(result));
+  return std::make_optional(std::move(result));
 }
 
 }  // namespace exchange::core::common::api::reports

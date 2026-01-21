@@ -35,7 +35,7 @@ public:
   virtual ~ApiCommand() = default;
 };
 
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

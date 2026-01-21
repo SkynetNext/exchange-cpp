@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "ReportQuery.h"
-#include "ReportResult.h"
 #include <memory>
 #include <optional>
+#include "ReportQuery.h"
+#include "ReportResult.h"
 
 namespace exchange {
 namespace core {
@@ -39,15 +39,15 @@ public:
   virtual ~ReportQueriesHandler() = default;
 
   template <typename R>
-  std::optional<std::unique_ptr<R>> HandleReport(ReportQuery<R> *reportQuery) {
+  std::optional<std::unique_ptr<R>> HandleReport(ReportQuery<R>* reportQuery) {
     // Call virtual method with type erasure
     // Subclasses override HandleReportImpl to provide actual implementation
     // ReportQuery<R>* can be safely cast to ReportQueryBase* since
     // ReportQuery<R> inherits from ReportQueryBase
-    auto result = HandleReportImpl(static_cast<ReportQueryBase *>(reportQuery));
+    auto result = HandleReportImpl(static_cast<ReportQueryBase*>(reportQuery));
     if (result.has_value()) {
       // Cast from ReportResult* to R*
-      R *casted = dynamic_cast<R *>(result.value().get());
+      R* casted = dynamic_cast<R*>(result.value().get());
       if (casted != nullptr) {
         // Transfer ownership
         result.value().release();
@@ -62,13 +62,13 @@ protected:
   // Subclasses should override this to provide actual implementation
   // Uses ReportQueryBase* for type erasure (non-template base class)
   virtual std::optional<std::unique_ptr<ReportResult>>
-  HandleReportImpl(ReportQueryBase *reportQuery) {
+  HandleReportImpl(ReportQueryBase* reportQuery) {
     return std::nullopt;
   }
 };
 
-} // namespace reports
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace reports
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

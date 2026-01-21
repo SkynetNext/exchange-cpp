@@ -16,15 +16,15 @@
 
 #pragma once
 
-#include "../common/IOrder.h"
-#include "../common/MatcherTradeEvent.h"
-#include "../common/Order.h"
-#include "../common/WriteBytesMarshallable.h"
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
 #include <functional>
 #include <list>
 #include <vector>
+#include "../common/IOrder.h"
+#include "../common/MatcherTradeEvent.h"
+#include "../common/Order.h"
+#include "../common/WriteBytesMarshallable.h"
 
 namespace exchange {
 namespace core {
@@ -43,10 +43,16 @@ public:
   /**
    * Constructor from BytesIn (deserialization)
    */
-  OrdersBucket(common::BytesIn *bytes);
+  OrdersBucket(common::BytesIn* bytes);
 
-  int64_t GetPrice() const { return price_; }
-  int64_t GetTotalVolume() const { return totalVolume_; }
+  int64_t GetPrice() const {
+    return price_;
+  }
+
+  int64_t GetTotalVolume() const {
+    return totalVolume_;
+  }
+
   int32_t GetNumOrders() const {
     return static_cast<int32_t>(orderList_.size());
   }
@@ -54,13 +60,13 @@ public:
   /**
    * Put a new order into bucket
    */
-  void Put(::exchange::core::common::Order *order);
+  void Put(::exchange::core::common::Order* order);
 
   /**
    * Remove order from the bucket
    * @return order if removed, or nullptr if not found
    */
-  ::exchange::core::common::Order *Remove(int64_t orderId, int64_t uid);
+  ::exchange::core::common::Order* Remove(int64_t orderId, int64_t uid);
 
   /**
    * Match orders starting from eldest (FIFO)
@@ -70,15 +76,15 @@ public:
    * @return matching result with events chain and volume
    */
   struct MatcherResult {
-    ::exchange::core::common::MatcherTradeEvent *eventsChainHead = nullptr;
-    ::exchange::core::common::MatcherTradeEvent *eventsChainTail = nullptr;
+    ::exchange::core::common::MatcherTradeEvent* eventsChainHead = nullptr;
+    ::exchange::core::common::MatcherTradeEvent* eventsChainTail = nullptr;
     int64_t volume = 0;
     std::vector<int64_t> ordersToRemove;
   };
 
   MatcherResult Match(int64_t volumeToCollect,
-                      const ::exchange::core::common::IOrder *activeOrder,
-                      OrderBookEventsHelper *helper);
+                      const ::exchange::core::common::IOrder* activeOrder,
+                      OrderBookEventsHelper* helper);
 
   /**
    * Reduce size of an order
@@ -88,18 +94,17 @@ public:
   /**
    * Find order by ID
    */
-  ::exchange::core::common::Order *FindOrder(int64_t orderId);
+  ::exchange::core::common::Order* FindOrder(int64_t orderId);
 
   /**
    * Execute action for each order (preserving FIFO order)
    */
-  void
-  ForEachOrder(std::function<void(::exchange::core::common::Order *)> consumer);
+  void ForEachOrder(std::function<void(::exchange::core::common::Order*)> consumer);
 
   /**
    * Get all orders (for testing only - creates new list)
    */
-  std::vector<::exchange::core::common::Order *> GetAllOrders() const;
+  std::vector<::exchange::core::common::Order*> GetAllOrders() const;
 
   /**
    * Validate internal state
@@ -109,7 +114,7 @@ public:
   /**
    * WriteMarshallable interface
    */
-  void WriteMarshallable(common::BytesOut &bytes) const override;
+  void WriteMarshallable(common::BytesOut& bytes) const override;
 
 private:
   int64_t price_;
@@ -118,12 +123,11 @@ private:
   // Maintain insertion order using list, but also have fast lookup by orderId
   // Using ankerl::unordered_dense for better performance (2-3x faster than
   // std::unordered_map)
-  std::list<::exchange::core::common::Order *> orderList_;
-  ankerl::unordered_dense::map<
-      int64_t, std::list<::exchange::core::common::Order *>::iterator>
-      orderMap_;
+  std::list<::exchange::core::common::Order*> orderList_;
+  ankerl::unordered_dense::map<int64_t, std::list<::exchange::core::common::Order*>::iterator>
+    orderMap_;
 };
 
-} // namespace orderbook
-} // namespace core
-} // namespace exchange
+}  // namespace orderbook
+}  // namespace core
+}  // namespace exchange

@@ -16,12 +16,12 @@
 
 #pragma once
 
+#include <memory>
+#include <optional>
 #include "../../BytesIn.h"
 #include "ReportQuery.h"
 #include "ReportType.h"
 #include "StateHashReportResult.h"
-#include <memory>
-#include <optional>
 
 namespace exchange {
 namespace core {
@@ -29,7 +29,8 @@ namespace core {
 namespace processors {
 class MatchingEngineRouter;
 class RiskEngine;
-} // namespace processors
+}  // namespace processors
+
 namespace common {
 namespace api {
 namespace reports {
@@ -40,7 +41,8 @@ namespace reports {
 class StateHashReportQuery : public ReportQuery<StateHashReportResult> {
 public:
   StateHashReportQuery() {}
-  explicit StateHashReportQuery(BytesIn &bytesIn) {
+
+  explicit StateHashReportQuery(BytesIn& bytesIn) {
     // do nothing
   }
 
@@ -49,21 +51,20 @@ public:
   }
 
   std::unique_ptr<StateHashReportResult>
-  CreateResult(const std::vector<BytesIn *> &sections) override;
+  CreateResult(const std::vector<BytesIn*>& sections) override;
 
   std::optional<std::unique_ptr<StateHashReportResult>>
-  Process(::exchange::core::processors::MatchingEngineRouter *matchingEngine)
-      override;
+  Process(::exchange::core::processors::MatchingEngineRouter* matchingEngine) override;
 
   std::optional<std::unique_ptr<StateHashReportResult>>
-  Process(::exchange::core::processors::RiskEngine *riskEngine) override;
+  Process(::exchange::core::processors::RiskEngine* riskEngine) override;
 
   // WriteMarshallable implementation (matches Java writeMarshallable)
-  void WriteMarshallable(BytesOut &bytes) const override;
+  void WriteMarshallable(BytesOut& bytes) const override;
 };
 
-} // namespace reports
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace reports
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

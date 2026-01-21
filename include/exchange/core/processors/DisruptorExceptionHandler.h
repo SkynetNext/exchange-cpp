@@ -28,26 +28,24 @@ namespace processors {
 /**
  * DisruptorExceptionHandler - exception handler for Disruptor
  */
-template <typename T> class DisruptorExceptionHandler {
+template <typename T>
+class DisruptorExceptionHandler {
 public:
-  using OnExceptionHandler =
-      std::function<void(const std::exception &, int64_t)>;
+  using OnExceptionHandler = std::function<void(const std::exception&, int64_t)>;
 
-  DisruptorExceptionHandler(const std::string &name,
-                            OnExceptionHandler onException)
-      : name_(name), onException_(std::move(onException)) {}
+  DisruptorExceptionHandler(const std::string& name, OnExceptionHandler onException)
+    : name_(name), onException_(std::move(onException)) {}
 
-  void HandleEventException(const std::exception &ex, int64_t sequence,
-                            T *event) {
+  void HandleEventException(const std::exception& ex, int64_t sequence, T* event) {
     // Log and call handler
     onException_(ex, sequence);
   }
 
-  void HandleOnStartException(const std::exception &ex) {
+  void HandleOnStartException(const std::exception& ex) {
     // Log startup exception
   }
 
-  void HandleOnShutdownException(const std::exception &ex) {
+  void HandleOnShutdownException(const std::exception& ex) {
     // Log shutdown exception
   }
 
@@ -56,6 +54,6 @@ private:
   OnExceptionHandler onException_;
 };
 
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace processors
+}  // namespace core
+}  // namespace exchange

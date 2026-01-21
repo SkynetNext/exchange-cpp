@@ -23,7 +23,7 @@ namespace exchange::core::utils {
  * Placeholder for now
  */
 class Utils {
-    // TODO: Add utility functions as needed
+  // TODO: Add utility functions as needed
 };
 
 }  // namespace exchange::core::utils

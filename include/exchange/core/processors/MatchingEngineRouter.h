@@ -16,6 +16,13 @@
 
 #pragma once
 
+#include <ankerl/unordered_dense.h>
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <string>
 #include "../collections/objpool/ObjectsPool.h"
 #include "../common/WriteBytesMarshallable.h"
 #include "../common/api/reports/ReportQuery.h"
@@ -27,13 +34,6 @@
 #include "BinaryCommandsProcessor.h"
 #include "SymbolSpecificationProvider.h"
 #include "journaling/ISerializationProcessor.h"
-#include <ankerl/unordered_dense.h>
-#include <cstdint>
-#include <filesystem>
-#include <functional>
-#include <memory>
-#include <optional>
-#include <string>
 
 namespace exchange {
 namespace core {
@@ -56,32 +56,33 @@ public:
   // OrderBook factory function type
   // Matches Java IOrderBook.OrderBookFactory signature
   using OrderBookFactory = std::function<std::unique_ptr<orderbook::IOrderBook>(
-      const common::CoreSymbolSpecification *spec,
-      ::exchange::core::collections::objpool::ObjectsPool *objectsPool,
-      orderbook::OrderBookEventsHelper *eventsHelper)>;
+    const common::CoreSymbolSpecification* spec,
+    ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
+    orderbook::OrderBookEventsHelper* eventsHelper)>;
 
-  MatchingEngineRouter(
-      int32_t shardId, int64_t numShards, OrderBookFactory orderBookFactory,
-      SharedPool *sharedPool,
-      const common::config::ExchangeConfiguration *exchangeCfg,
-      journaling::ISerializationProcessor *serializationProcessor,
-      SymbolSpecificationProvider *symbolSpecProvider = nullptr);
+  MatchingEngineRouter(int32_t shardId,
+                       int64_t numShards,
+                       OrderBookFactory orderBookFactory,
+                       SharedPool* sharedPool,
+                       const common::config::ExchangeConfiguration* exchangeCfg,
+                       journaling::ISerializationProcessor* serializationProcessor,
+                       SymbolSpecificationProvider* symbolSpecProvider = nullptr);
 
   /**
    * Process an order command
    * Routes to appropriate OrderBook based on symbol ID
    */
-  void ProcessOrder(int64_t seq, common::cmd::OrderCommand *cmd);
+  void ProcessOrder(int64_t seq, common::cmd::OrderCommand* cmd);
 
   /**
    * Add a symbol and create its OrderBook
    */
-  void AddSymbol(const common::CoreSymbolSpecification *spec);
+  void AddSymbol(const common::CoreSymbolSpecification* spec);
 
   /**
    * Get OrderBook for a symbol
    */
-  orderbook::IOrderBook *GetOrderBook(int32_t symbol);
+  orderbook::IOrderBook* GetOrderBook(int32_t symbol);
 
   /**
    * Reset - clear all order books
@@ -91,49 +92,51 @@ public:
   /**
    * Get shard ID
    */
-  int32_t GetShardId() const { return shardId_; }
+  int32_t GetShardId() const {
+    return shardId_;
+  }
 
   /**
    * Get shard mask
    */
-  int64_t GetShardMask() const { return shardMask_; }
+  int64_t GetShardMask() const {
+    return shardMask_;
+  }
 
   /**
    * Get all order books (for iteration)
    */
-  std::vector<orderbook::IOrderBook *> GetOrderBooks() const;
+  std::vector<orderbook::IOrderBook*> GetOrderBooks() const;
 
   /**
    * Get BinaryCommandsProcessor (for external access)
    */
-  BinaryCommandsProcessor *GetBinaryCommandsProcessor() {
+  BinaryCommandsProcessor* GetBinaryCommandsProcessor() {
     return binaryCommandsProcessor_.get();
   }
 
   /**
    * WriteMarshallable interface
    */
-  void WriteMarshallable(common::BytesOut &bytes) const override;
+  void WriteMarshallable(common::BytesOut& bytes) const override;
 
 private:
   int32_t shardId_;
-  int64_t shardMask_; // numShards - 1 (must be power of 2)
+  int64_t shardMask_;  // numShards - 1 (must be power of 2)
 
-  std::string exchangeId_; // TODO validate
+  std::string exchangeId_;  // TODO validate
   std::filesystem::path folder_;
 
-  SymbolSpecificationProvider *symbolSpecProvider_;
+  SymbolSpecificationProvider* symbolSpecProvider_;
   OrderBookFactory orderBookFactory_;
 
   // Object pool for order book operations
   // Created in constructor with production configuration
-  std::unique_ptr<::exchange::core::collections::objpool::ObjectsPool>
-      objectsPool_;
+  std::unique_ptr<::exchange::core::collections::objpool::ObjectsPool> objectsPool_;
 
   // symbol ID -> OrderBook
   // Using ankerl::unordered_dense for better performance
-  ankerl::unordered_dense::map<int32_t, std::unique_ptr<orderbook::IOrderBook>>
-      orderBooks_;
+  ankerl::unordered_dense::map<int32_t, std::unique_ptr<orderbook::IOrderBook>> orderBooks_;
 
   // Events helper (shared across all order books)
   std::unique_ptr<orderbook::OrderBookEventsHelper> eventsHelper_;
@@ -142,11 +145,10 @@ private:
   std::unique_ptr<BinaryCommandsProcessor> binaryCommandsProcessor_;
 
   // Report queries handler (adapter for BinaryCommandsProcessor)
-  std::unique_ptr<common::api::reports::ReportQueriesHandler>
-      reportQueriesHandler_;
+  std::unique_ptr<common::api::reports::ReportQueriesHandler> reportQueriesHandler_;
 
   // Serialization processor
-  journaling::ISerializationProcessor *serializationProcessor_;
+  journaling::ISerializationProcessor* serializationProcessor_;
 
   // Configuration flags
   bool cfgMarginTradingEnabled_;
@@ -162,19 +164,18 @@ private:
   /**
    * Process matching command (PLACE_ORDER, CANCEL_ORDER, etc.)
    */
-  void ProcessMatchingCommand(common::cmd::OrderCommand *cmd);
+  void ProcessMatchingCommand(common::cmd::OrderCommand* cmd);
 
   /**
    * Handle binary message (BatchAddSymbolsCommand, BatchAddAccountsCommand)
    */
-  void HandleBinaryMessage(common::api::binary::BinaryDataCommand *message);
+  void HandleBinaryMessage(common::api::binary::BinaryDataCommand* message);
 
   /**
    * Handle report query
    */
   template <typename R>
-  std::optional<std::unique_ptr<R>>
-  HandleReportQuery(common::api::reports::ReportQuery<R> *query) {
+  std::optional<std::unique_ptr<R>> HandleReportQuery(common::api::reports::ReportQuery<R>* query) {
     if (query == nullptr) {
       return std::nullopt;
     }
@@ -189,6 +190,6 @@ private:
   }
 };
 
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace processors
+}  // namespace core
+}  // namespace exchange

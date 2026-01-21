@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "ApiCommand.h"
 #include <cstdint>
+#include "ApiCommand.h"
 
 namespace exchange {
 namespace core {
@@ -35,10 +35,10 @@ public:
   int32_t symbol;
 
   ApiMoveOrder(int64_t orderId, int64_t newPrice, int64_t uid, int32_t symbol)
-      : orderId(orderId), newPrice(newPrice), uid(uid), symbol(symbol) {}
+    : orderId(orderId), newPrice(newPrice), uid(uid), symbol(symbol) {}
 };
 
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

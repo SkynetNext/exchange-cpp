@@ -16,21 +16,21 @@
 
 #pragma once
 
-#include "BinaryCommandType.h"
-#include "BinaryDataCommand.h"
 #include <functional>
 #include <memory>
 #include <vector>
+#include "BinaryCommandType.h"
+#include "BinaryDataCommand.h"
 
 namespace exchange {
 namespace core {
 namespace common {
 class BytesIn;
+
 namespace api {
 namespace binary {
 
-using BinaryDataCommandConstructor =
-    std::function<std::unique_ptr<BinaryDataCommand>(BytesIn &)>;
+using BinaryDataCommandConstructor = std::function<std::unique_ptr<BinaryDataCommand>(BytesIn&)>;
 
 class BinaryDataCommandFactory {
 private:
@@ -39,41 +39,37 @@ private:
   BinaryDataCommandFactory() = default;
 
 public:
-  BinaryDataCommandFactory(BinaryDataCommandFactory const &) = delete;
-  BinaryDataCommandFactory &
-  operator=(BinaryDataCommandFactory const &) = delete;
+  BinaryDataCommandFactory(BinaryDataCommandFactory const&) = delete;
+  BinaryDataCommandFactory& operator=(BinaryDataCommandFactory const&) = delete;
 
   // Use Meyers Singleton
-  static BinaryDataCommandFactory &getInstance();
+  static BinaryDataCommandFactory& getInstance();
 
   // Register binary command type
-  void registerCommandType(BinaryCommandType type,
-                           BinaryDataCommandConstructor constructor);
+  void registerCommandType(BinaryCommandType type, BinaryDataCommandConstructor constructor);
 
   // Get constructor for specific type
   BinaryDataCommandConstructor getConstructor(BinaryCommandType type);
 
   // Create binary command from bytes
-  std::unique_ptr<BinaryDataCommand> createCommand(BinaryCommandType type,
-                                                   BytesIn &bytes);
+  std::unique_ptr<BinaryDataCommand> createCommand(BinaryCommandType type, BytesIn& bytes);
 };
 
 namespace detail {
 struct BinaryCommandTypeRegistrar {
-  BinaryCommandTypeRegistrar(BinaryCommandType type,
-                             BinaryDataCommandConstructor constructor);
+  BinaryCommandTypeRegistrar(BinaryCommandType type, BinaryDataCommandConstructor constructor);
 };
-} // namespace detail
+}  // namespace detail
 
 // Register binary command type macro
-#define REGISTER_BINARY_COMMAND_TYPE(CommandType, EnumType)                    \
-  static detail::BinaryCommandTypeRegistrar CommandType##_registrar(           \
-      EnumType, [](BytesIn &bytes) -> std::unique_ptr<BinaryDataCommand> {     \
-        return std::make_unique<CommandType>(bytes);                           \
-      })
+#define REGISTER_BINARY_COMMAND_TYPE(CommandType, EnumType)              \
+  static detail::BinaryCommandTypeRegistrar CommandType##_registrar(     \
+    EnumType, [](BytesIn& bytes) -> std::unique_ptr<BinaryDataCommand> { \
+      return std::make_unique<CommandType>(bytes);                       \
+    })
 
-} // namespace binary
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace binary
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

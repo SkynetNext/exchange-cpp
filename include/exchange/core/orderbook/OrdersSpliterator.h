@@ -32,8 +32,7 @@ class OrderBookDirectImpl;
  */
 class OrdersSpliterator {
 public:
-  using DirectOrder =
-      void *; // Will be properly typed when OrderBookDirectImpl is complete
+  using DirectOrder = void*;  // Will be properly typed when OrderBookDirectImpl is complete
 
   explicit OrdersSpliterator(DirectOrder pointer) : pointer_(pointer) {}
 
@@ -45,17 +44,21 @@ public:
   /**
    * Estimate size (always returns max for simplicity)
    */
-  int64_t EstimateSize() const { return INT64_MAX; }
+  int64_t EstimateSize() const {
+    return INT64_MAX;
+  }
 
   /**
    * Characteristics (ordered)
    */
-  int32_t Characteristics() const { return 1; } // ORDERED
+  int32_t Characteristics() const {
+    return 1;
+  }  // ORDERED
 
 private:
   DirectOrder pointer_;
 };
 
-} // namespace orderbook
-} // namespace core
-} // namespace exchange
+}  // namespace orderbook
+}  // namespace core
+}  // namespace exchange

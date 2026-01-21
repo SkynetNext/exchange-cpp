@@ -16,11 +16,11 @@
 
 #pragma once
 
+#include <ankerl/unordered_dense.h>
+#include <cstdint>
 #include "../../BytesIn.h"
 #include "BinaryCommandType.h"
 #include "BinaryDataCommand.h"
-#include <ankerl/unordered_dense.h>
-#include <cstdint>
 
 namespace exchange {
 namespace core {
@@ -35,26 +35,24 @@ namespace binary {
 class BatchAddAccountsCommand : public BinaryDataCommand {
 public:
   // UID -> (currency -> balance)
-  ankerl::unordered_dense::map<int64_t,
-                               ankerl::unordered_dense::map<int32_t, int64_t>>
-      users;
+  ankerl::unordered_dense::map<int64_t, ankerl::unordered_dense::map<int32_t, int64_t>> users;
 
   explicit BatchAddAccountsCommand(
-      const ankerl::unordered_dense::map<
-          int64_t, ankerl::unordered_dense::map<int32_t, int64_t>> &users)
-      : users(users) {}
+    const ankerl::unordered_dense::map<int64_t, ankerl::unordered_dense::map<int32_t, int64_t>>&
+      users)
+    : users(users) {}
 
-  explicit BatchAddAccountsCommand(BytesIn &bytes);
+  explicit BatchAddAccountsCommand(BytesIn& bytes);
 
   int32_t GetBinaryCommandTypeCode() const override {
     return static_cast<int32_t>(BinaryCommandType::ADD_ACCOUNTS);
   }
 
-  void WriteMarshallable(BytesOut &bytes) const override;
+  void WriteMarshallable(BytesOut& bytes) const override;
 };
 
-} // namespace binary
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace binary
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

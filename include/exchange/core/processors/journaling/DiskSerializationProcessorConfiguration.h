@@ -30,27 +30,27 @@ namespace journaling {
  */
 class DiskSerializationProcessorConfiguration {
 public:
-  static constexpr const char *DEFAULT_FOLDER = "./dumps";
+  static constexpr const char* DEFAULT_FOLDER = "./dumps";
 
   std::string storageFolder;
-  int32_t journalBufferSize; // Buffer size for journal writing
+  int32_t journalBufferSize;  // Buffer size for journal writing
   int32_t journalBufferFlushTrigger;
   int64_t journalFileMaxSize;
   int32_t journalBatchCompressThreshold;
 
-  DiskSerializationProcessorConfiguration(
-      const std::string &storageFolder = DEFAULT_FOLDER,
-      int32_t journalBufferSize = 256 * 1024, // 256 KB default
-      int64_t journalFileMaxSize = 1024 * 1024 * 1024,
-      int32_t journalBatchCompressThreshold = 4096)
-      : storageFolder(storageFolder), journalBufferSize(journalBufferSize),
-        journalBufferFlushTrigger(journalBufferSize -
-                                  256), // MAX_COMMAND_SIZE_BYTES
-        journalFileMaxSize(journalFileMaxSize - journalBufferSize),
-        journalBatchCompressThreshold(journalBatchCompressThreshold) {}
+  DiskSerializationProcessorConfiguration(const std::string& storageFolder = DEFAULT_FOLDER,
+                                          int32_t journalBufferSize = 256 * 1024,  // 256 KB default
+                                          int64_t journalFileMaxSize = 1024 * 1024 * 1024,
+                                          int32_t journalBatchCompressThreshold = 4096)
+    : storageFolder(storageFolder)
+    , journalBufferSize(journalBufferSize)
+    , journalBufferFlushTrigger(journalBufferSize - 256)
+    ,  // MAX_COMMAND_SIZE_BYTES
+    journalFileMaxSize(journalFileMaxSize - journalBufferSize)
+    , journalBatchCompressThreshold(journalBatchCompressThreshold) {}
 };
 
-} // namespace journaling
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace journaling
+}  // namespace processors
+}  // namespace core
+}  // namespace exchange

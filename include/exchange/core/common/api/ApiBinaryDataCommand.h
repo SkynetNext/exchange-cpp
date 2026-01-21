@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "ApiCommand.h"
-#include "binary/BinaryDataCommand.h"
 #include <cstdint>
 #include <memory>
+#include "ApiCommand.h"
+#include "binary/BinaryDataCommand.h"
 
 namespace exchange {
 namespace core {
@@ -38,12 +38,11 @@ public:
   // serializable object
   std::unique_ptr<binary::BinaryDataCommand> data;
 
-  ApiBinaryDataCommand(int32_t transferId,
-                       std::unique_ptr<binary::BinaryDataCommand> data)
-      : transferId(transferId), data(std::move(data)) {}
+  ApiBinaryDataCommand(int32_t transferId, std::unique_ptr<binary::BinaryDataCommand> data)
+    : transferId(transferId), data(std::move(data)) {}
 };
 
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "ApiCommand.h"
 #include <cstdint>
+#include "ApiCommand.h"
 
 namespace exchange {
 namespace core {
@@ -32,11 +32,10 @@ public:
   int32_t symbol;
   int32_t size;
 
-  ApiOrderBookRequest(int32_t symbol, int32_t size)
-      : symbol(symbol), size(size) {}
+  ApiOrderBookRequest(int32_t symbol, int32_t size) : symbol(symbol), size(size) {}
 };
 
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

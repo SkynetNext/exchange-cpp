@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "ReportQuery.h"
-#include "ReportResult.h"
 #include <cstdint>
 #include <memory>
+#include "ReportQuery.h"
+#include "ReportResult.h"
 
 namespace exchange {
 namespace core {
@@ -41,13 +41,12 @@ public:
   // serializable object
   std::unique_ptr<ReportQuery<ReportResult>> query;
 
-  ApiReportQuery(int32_t transferId,
-                 std::unique_ptr<ReportQuery<ReportResult>> query)
-      : transferId(transferId), query(std::move(query)) {}
+  ApiReportQuery(int32_t transferId, std::unique_ptr<ReportQuery<ReportResult>> query)
+    : transferId(transferId), query(std::move(query)) {}
 };
 
-} // namespace reports
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace reports
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

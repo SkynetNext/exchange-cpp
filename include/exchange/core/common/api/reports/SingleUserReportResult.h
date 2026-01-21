@@ -16,23 +16,23 @@
 
 #pragma once
 
-#include "../../Order.h"
-#include "../../PositionDirection.h"
-#include "../../UserStatus.h"
-#include "ReportResult.h"
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include "../../Order.h"
+#include "../../PositionDirection.h"
+#include "../../UserStatus.h"
+#include "ReportResult.h"
 
 namespace exchange {
 namespace core {
 namespace common {
 class BytesIn;
 class BytesOut;
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange
 
 namespace exchange {
 namespace core {
@@ -58,73 +58,87 @@ public:
 
     // Default constructor (needed for unordered_dense::map operator[])
     Position()
-        : quoteCurrency(0), direction(PositionDirection::EMPTY), openVolume(0),
-          openPriceSum(0), profit(0), pendingSellSize(0), pendingBuySize(0) {}
+      : quoteCurrency(0)
+      , direction(PositionDirection::EMPTY)
+      , openVolume(0)
+      , openPriceSum(0)
+      , profit(0)
+      , pendingSellSize(0)
+      , pendingBuySize(0) {}
 
-    Position(int32_t quoteCurrency, PositionDirection direction,
-             int64_t openVolume, int64_t openPriceSum, int64_t profit,
-             int64_t pendingSellSize, int64_t pendingBuySize)
-        : quoteCurrency(quoteCurrency), direction(direction),
-          openVolume(openVolume), openPriceSum(openPriceSum), profit(profit),
-          pendingSellSize(pendingSellSize), pendingBuySize(pendingBuySize) {}
+    Position(int32_t quoteCurrency,
+             PositionDirection direction,
+             int64_t openVolume,
+             int64_t openPriceSum,
+             int64_t profit,
+             int64_t pendingSellSize,
+             int64_t pendingBuySize)
+      : quoteCurrency(quoteCurrency)
+      , direction(direction)
+      , openVolume(openVolume)
+      , openPriceSum(openPriceSum)
+      , profit(profit)
+      , pendingSellSize(pendingSellSize)
+      , pendingBuySize(pendingBuySize) {}
 
     /**
      * Constructor from BytesIn (deserialization)
      */
-    Position(BytesIn &bytes);
+    Position(BytesIn& bytes);
 
     // Serialization method (not inheriting WriteBytesMarshallable)
-    void WriteMarshallable(BytesOut &bytes) const;
+    void WriteMarshallable(BytesOut& bytes) const;
   };
 
   int64_t uid;
-  UserStatus *userStatus;
+  UserStatus* userStatus;
   std::unique_ptr<ankerl::unordered_dense::map<int32_t, int64_t>> accounts;
   std::unique_ptr<ankerl::unordered_dense::map<int32_t, Position>> positions;
-  std::unique_ptr<ankerl::unordered_dense::map<int32_t, std::vector<Order *>>>
-      orders;
+  std::unique_ptr<ankerl::unordered_dense::map<int32_t, std::vector<Order*>>> orders;
   QueryExecutionStatus queryExecutionStatus;
 
   /**
    * Default constructor (for static factory methods)
    */
   SingleUserReportResult()
-      : uid(0), userStatus(nullptr), accounts(nullptr), positions(nullptr),
-        orders(nullptr), queryExecutionStatus(QueryExecutionStatus::OK) {}
+    : uid(0)
+    , userStatus(nullptr)
+    , accounts(nullptr)
+    , positions(nullptr)
+    , orders(nullptr)
+    , queryExecutionStatus(QueryExecutionStatus::OK) {}
 
   /**
    * Constructor from BytesIn (deserialization, matches Java private
    * constructor)
    */
-  explicit SingleUserReportResult(BytesIn &bytes);
+  explicit SingleUserReportResult(BytesIn& bytes);
 
-  static SingleUserReportResult *CreateFromMatchingEngine(
-      int64_t uid,
-      const ankerl::unordered_dense::map<int32_t, std::vector<Order *>>
-          &orders);
+  static SingleUserReportResult* CreateFromMatchingEngine(
+    int64_t uid,
+    const ankerl::unordered_dense::map<int32_t, std::vector<Order*>>& orders);
 
-  static SingleUserReportResult *CreateFromRiskEngineFound(
-      int64_t uid, UserStatus *userStatus,
-      const ankerl::unordered_dense::map<int32_t, int64_t> &accounts,
-      const ankerl::unordered_dense::map<int32_t, Position> &positions);
+  static SingleUserReportResult*
+  CreateFromRiskEngineFound(int64_t uid,
+                            UserStatus* userStatus,
+                            const ankerl::unordered_dense::map<int32_t, int64_t>& accounts,
+                            const ankerl::unordered_dense::map<int32_t, Position>& positions);
 
-  static std::unique_ptr<SingleUserReportResult>
-  CreateFromRiskEngineNotFound(int64_t uid);
+  static std::unique_ptr<SingleUserReportResult> CreateFromRiskEngineNotFound(int64_t uid);
 
   /**
    * Merge multiple results (matches Java merge method)
    * @param pieces Vector of BytesIn sections (one per shard)
    * @return Merged result
    */
-  static std::unique_ptr<SingleUserReportResult>
-  Merge(const std::vector<BytesIn *> &pieces);
+  static std::unique_ptr<SingleUserReportResult> Merge(const std::vector<BytesIn*>& pieces);
 
   // Serialization method
-  void WriteMarshallable(BytesOut &bytes) const;
+  void WriteMarshallable(BytesOut& bytes) const;
 };
 
-} // namespace reports
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace reports
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

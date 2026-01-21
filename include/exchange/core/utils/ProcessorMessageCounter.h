@@ -40,104 +40,104 @@ enum class ProcessorType : uint8_t { GROUPING = 0, R1 = 1, R2 = 2, ME = 3, MAX_T
  * 4. Fixed-size arrays to avoid frequent allocations
  */
 class ProcessorMessageCounter {
- public:
-    /**
-     * Record a batch size (number of messages processed in one loop iteration)
-     * High-performance: uses enum + processorId, thread-local storage
-     */
-    static void RecordBatchSize(ProcessorType type, int32_t processorId, int64_t batchSize);
+public:
+  /**
+   * Record a batch size (number of messages processed in one loop iteration)
+   * High-performance: uses enum + processorId, thread-local storage
+   */
+  static void RecordBatchSize(ProcessorType type, int32_t processorId, int64_t batchSize);
 
-    /**
-     * Get batch size statistics for a processor
-     * Returns: {total_batches, min, max, p50, p90, p95, p99, p99.9}
-     */
-    static std::vector<int64_t> GetStatistics(ProcessorType type, int32_t processorId);
+  /**
+   * Get batch size statistics for a processor
+   * Returns: {total_batches, min, max, p50, p90, p95, p99, p99.9}
+   */
+  static std::vector<int64_t> GetStatistics(ProcessorType type, int32_t processorId);
 
-    /**
-     * Get all processor statistics
-     * Returns a map of processor name -> statistics vector
-     */
-    static std::unordered_map<std::string, std::vector<int64_t>> GetAllStatistics();
+  /**
+   * Get all processor statistics
+   * Returns a map of processor name -> statistics vector
+   */
+  static std::unordered_map<std::string, std::vector<int64_t>> GetAllStatistics();
 
-    /**
-     * Reset all statistics
-     */
-    static void Reset();
+  /**
+   * Reset all statistics
+   */
+  static void Reset();
 
-    /**
-     * Reset statistics for a specific processor
-     */
-    static void Reset(ProcessorType type, int32_t processorId);
+  /**
+   * Reset statistics for a specific processor
+   */
+  static void Reset(ProcessorType type, int32_t processorId);
 
-    /**
-     * Print statistics for a processor to log
-     */
-    static void PrintStatistics(ProcessorType type, int32_t processorId);
+  /**
+   * Print statistics for a processor to log
+   */
+  static void PrintStatistics(ProcessorType type, int32_t processorId);
 
-    /**
-     * Print all processor statistics to log
-     */
-    static void PrintAllStatistics();
+  /**
+   * Print all processor statistics to log
+   */
+  static void PrintAllStatistics();
 
-    /**
-     * Flush thread-local data to global storage (call periodically or at
-     * shutdown)
-     */
-    static void FlushThreadLocalData();
+  /**
+   * Flush thread-local data to global storage (call periodically or at
+   * shutdown)
+   */
+  static void FlushThreadLocalData();
 
-    // Thread-local storage to reduce lock contention
-    struct ThreadLocalData {
-        static constexpr size_t BATCH_SIZE = 64;
+  // Thread-local storage to reduce lock contention
+  struct ThreadLocalData {
+    static constexpr size_t BATCH_SIZE = 64;
 
-        struct BatchEntry {
-            ProcessorType type;
-            int32_t processorId;
-            int64_t batchSize;
-        };
-
-        std::array<BatchEntry, BATCH_SIZE> entries_{};
-        size_t count_ = 0;
-
-        ThreadLocalData() : entries_{}, count_(0) {}
-
-        void Add(ProcessorType type, int32_t processorId, int64_t batchSize) {
-            if (count_ < BATCH_SIZE) {
-                entries_[count_] = {type, processorId, batchSize};
-                count_++;
-            } else {
-                // Flush when full
-                FlushToGlobal();
-                entries_[0] = {type, processorId, batchSize};
-                count_ = 1;
-            }
-        }
-
-        void FlushToGlobal();
+    struct BatchEntry {
+      ProcessorType type;
+      int32_t processorId;
+      int64_t batchSize;
     };
 
-    // Global storage structure - minimal overhead, only store raw data
-    struct BatchSizeData {
-        std::vector<int64_t> batchSizes;  // Store batch sizes for percentile calculation
-        std::mutex mutex;
-    };
+    std::array<BatchEntry, BATCH_SIZE> entries_{};
+    size_t count_ = 0;
 
- private:
-    // Fast lookup: [type][processorId] -> BatchSizeData*
-    static constexpr size_t MAX_PROCESSORS_PER_TYPE = 64;
-    static constexpr size_t MAX_TYPES_COUNT = static_cast<size_t>(ProcessorType::MAX_TYPES);
-    static std::array<std::array<BatchSizeData*, MAX_PROCESSORS_PER_TYPE>, MAX_TYPES_COUNT>
-        processors_;
+    ThreadLocalData() : entries_{}, count_(0) {}
 
-    // Mutex to protect processor creation (rare contention)
-    static std::mutex processors_mutex_;
+    void Add(ProcessorType type, int32_t processorId, int64_t batchSize) {
+      if (count_ < BATCH_SIZE) {
+        entries_[count_] = {type, processorId, batchSize};
+        count_++;
+      } else {
+        // Flush when full
+        FlushToGlobal();
+        entries_[0] = {type, processorId, batchSize};
+        count_ = 1;
+      }
+    }
 
-    // Thread-local storage
-    static thread_local ThreadLocalData threadLocalData_;
+    void FlushToGlobal();
+  };
 
-    // Helper functions
-    static BatchSizeData* GetOrCreateProcessor(ProcessorType type, int32_t processorId);
-    static int64_t CalculatePercentile(const std::vector<int64_t>& sorted, double percentile);
-    static std::string GetProcessorName(ProcessorType type, int32_t processorId);
+  // Global storage structure - minimal overhead, only store raw data
+  struct BatchSizeData {
+    std::vector<int64_t> batchSizes;  // Store batch sizes for percentile calculation
+    std::mutex mutex;
+  };
+
+private:
+  // Fast lookup: [type][processorId] -> BatchSizeData*
+  static constexpr size_t MAX_PROCESSORS_PER_TYPE = 64;
+  static constexpr size_t MAX_TYPES_COUNT = static_cast<size_t>(ProcessorType::MAX_TYPES);
+  static std::array<std::array<BatchSizeData*, MAX_PROCESSORS_PER_TYPE>, MAX_TYPES_COUNT>
+    processors_;
+
+  // Mutex to protect processor creation (rare contention)
+  static std::mutex processors_mutex_;
+
+  // Thread-local storage
+  static thread_local ThreadLocalData threadLocalData_;
+
+  // Helper functions
+  static BatchSizeData* GetOrCreateProcessor(ProcessorType type, int32_t processorId);
+  static int64_t CalculatePercentile(const std::vector<int64_t>& sorted, double percentile);
+  static std::string GetProcessorName(ProcessorType type, int32_t processorId);
 };
 
 }  // namespace exchange::core::utils
@@ -149,12 +149,12 @@ class ProcessorMessageCounter {
  * Disable: #define ENABLE_PROCESSOR_STATISTICS 0 (or leave undefined)
  */
 #ifndef ENABLE_PROCESSOR_STATISTICS
-#define ENABLE_PROCESSOR_STATISTICS 1
+#  define ENABLE_PROCESSOR_STATISTICS 1
 #endif
 
 #if ENABLE_PROCESSOR_STATISTICS == 1
-#define PROCESSOR_RECORD_BATCH_SIZE(type, id, size) \
+#  define PROCESSOR_RECORD_BATCH_SIZE(type, id, size) \
     exchange::core::utils::ProcessorMessageCounter::RecordBatchSize(type, id, size)
 #else
-#define PROCESSOR_RECORD_BATCH_SIZE(type, id, size) ((void)0)
+#  define PROCESSOR_RECORD_BATCH_SIZE(type, id, size) ((void)0)
 #endif

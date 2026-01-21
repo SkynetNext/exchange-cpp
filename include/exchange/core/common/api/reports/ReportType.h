@@ -37,14 +37,14 @@ enum class ReportType : int32_t {
 
 inline ReportType ReportTypeFromCode(int32_t code) {
   switch (code) {
-  case 10001:
-    return ReportType::STATE_HASH;
-  case 10002:
-    return ReportType::SINGLE_USER_REPORT;
-  case 10003:
-    return ReportType::TOTAL_CURRENCY_BALANCE;
-  default:
-    throw std::invalid_argument("unknown ReportType: " + std::to_string(code));
+    case 10001:
+      return ReportType::STATE_HASH;
+    case 10002:
+      return ReportType::SINGLE_USER_REPORT;
+    case 10003:
+      return ReportType::TOTAL_CURRENCY_BALANCE;
+    default:
+      throw std::invalid_argument("unknown ReportType: " + std::to_string(code));
   }
 }
 
@@ -52,8 +52,8 @@ inline int32_t ReportTypeToCode(ReportType type) {
   return static_cast<int32_t>(type);
 }
 
-} // namespace reports
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace reports
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

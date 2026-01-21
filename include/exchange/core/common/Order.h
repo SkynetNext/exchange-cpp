@@ -16,13 +16,13 @@
 
 #pragma once
 
+#include <cstdint>
+#include <string>
 #include "BytesIn.h"
 #include "IOrder.h"
 #include "OrderAction.h"
 #include "StateHash.h"
 #include "WriteBytesMarshallable.h"
-#include <cstdint>
-#include <string>
 
 namespace exchange {
 namespace core {
@@ -55,42 +55,78 @@ public:
 
   Order() = default;
 
-  Order(int64_t orderId, int64_t price, int64_t size, int64_t filled,
-        int64_t reserveBidPrice, OrderAction action, int64_t uid,
+  Order(int64_t orderId,
+        int64_t price,
+        int64_t size,
+        int64_t filled,
+        int64_t reserveBidPrice,
+        OrderAction action,
+        int64_t uid,
         int64_t timestamp)
-      : orderId(orderId), price(price), size(size), filled(filled),
-        reserveBidPrice(reserveBidPrice), action(action), uid(uid),
-        timestamp(timestamp) {}
+    : orderId(orderId)
+    , price(price)
+    , size(size)
+    , filled(filled)
+    , reserveBidPrice(reserveBidPrice)
+    , action(action)
+    , uid(uid)
+    , timestamp(timestamp) {}
 
   /**
    * Constructor from BytesIn (deserialization)
    */
-  Order(BytesIn &bytes);
+  Order(BytesIn& bytes);
 
   // IOrder interface implementation
-  int64_t GetPrice() const override { return price; }
-  int64_t GetSize() const override { return size; }
-  int64_t GetFilled() const override { return filled; }
-  int64_t GetUid() const override { return uid; }
-  OrderAction GetAction() const override { return action; }
-  int64_t GetOrderId() const override { return orderId; }
-  int64_t GetTimestamp() const override { return timestamp; }
-  int64_t GetReserveBidPrice() const override { return reserveBidPrice; }
+  int64_t GetPrice() const override {
+    return price;
+  }
+
+  int64_t GetSize() const override {
+    return size;
+  }
+
+  int64_t GetFilled() const override {
+    return filled;
+  }
+
+  int64_t GetUid() const override {
+    return uid;
+  }
+
+  OrderAction GetAction() const override {
+    return action;
+  }
+
+  int64_t GetOrderId() const override {
+    return orderId;
+  }
+
+  int64_t GetTimestamp() const override {
+    return timestamp;
+  }
+
+  int64_t GetReserveBidPrice() const override {
+    return reserveBidPrice;
+  }
 
   // StateHash interface implementation
   int32_t GetStateHash() const override;
 
   // WriteBytesMarshallable interface
-  void WriteMarshallable(BytesOut &bytes) const override;
+  void WriteMarshallable(BytesOut& bytes) const override;
 
   // Comparison operators
-  bool operator==(const Order &other) const;
-  bool operator!=(const Order &other) const { return !(*this == other); }
+  bool operator==(const Order& other) const;
+
+  bool operator!=(const Order& other) const {
+    return !(*this == other);
+  }
 
   // String representation
   std::string ToString() const;
 };
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

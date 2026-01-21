@@ -29,9 +29,9 @@ namespace exchange::core::utils {
  * ThreadAffinityMode - thread affinity configuration mode
  */
 enum class ThreadAffinityMode {
-    THREAD_AFFINITY_DISABLE,
-    THREAD_AFFINITY_ENABLE_PER_PHYSICAL_CORE,
-    THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE
+  THREAD_AFFINITY_DISABLE,
+  THREAD_AFFINITY_ENABLE_PER_PHYSICAL_CORE,
+  THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE
 };
 
 /**
@@ -44,25 +44,25 @@ enum class ThreadAffinityMode {
  */
 class AffinityThreadFactory : public disruptor::dsl::ThreadFactory,
                               public std::enable_shared_from_this<AffinityThreadFactory> {
- public:
-    explicit AffinityThreadFactory(ThreadAffinityMode threadAffinityMode);
+public:
+  explicit AffinityThreadFactory(ThreadAffinityMode threadAffinityMode);
 
-    // disruptor::dsl::ThreadFactory interface
-    std::thread newThread(std::function<void()> r) override;
+  // disruptor::dsl::ThreadFactory interface
+  std::thread newThread(std::function<void()> r) override;
 
-    /**
-     * Check if task was already pinned
-     */
-    bool IsTaskPinned(void* task) const;
+  /**
+   * Check if task was already pinned
+   */
+  bool IsTaskPinned(void* task) const;
 
- private:
-    ThreadAffinityMode threadAffinityMode_;
-    mutable std::mutex mutex_;
-    std::set<void*> affinityReservations_;
-    static std::atomic<int32_t> threadsCounter_;
+private:
+  ThreadAffinityMode threadAffinityMode_;
+  mutable std::mutex mutex_;
+  std::set<void*> affinityReservations_;
+  static std::atomic<int32_t> threadsCounter_;
 
-    void ExecutePinned(std::function<void()> runnable);
-    int AcquireAffinityLock(int32_t threadId);
+  void ExecutePinned(std::function<void()> runnable);
+  int AcquireAffinityLock(int32_t threadId);
 };
 
 }  // namespace exchange::core::utils

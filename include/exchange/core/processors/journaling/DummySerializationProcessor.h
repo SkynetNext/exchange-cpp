@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "ISerializationProcessor.h"
 #include <map>
+#include "ISerializationProcessor.h"
 
 // Forward declarations
 class ExchangeApi;
@@ -33,43 +33,45 @@ namespace journaling {
  */
 class DummySerializationProcessor : public ISerializationProcessor {
 public:
-  static DummySerializationProcessor *Instance();
+  static DummySerializationProcessor* Instance();
 
-  bool StoreData(int64_t snapshotId, int64_t seq, int64_t timestampNs,
-                 SerializedModuleType type, int32_t instanceId,
-                 const common::WriteBytesMarshallable *obj) override;
+  bool StoreData(int64_t snapshotId,
+                 int64_t seq,
+                 int64_t timestampNs,
+                 SerializedModuleType type,
+                 int32_t instanceId,
+                 const common::WriteBytesMarshallable* obj) override;
 
-  void LoadData(int64_t snapshotId, SerializedModuleType type,
+  void LoadData(int64_t snapshotId,
+                SerializedModuleType type,
                 int32_t instanceId,
-                std::function<void(common::BytesIn *)> initFunc) override;
+                std::function<void(common::BytesIn*)> initFunc) override;
 
-  void WriteToJournal(common::cmd::OrderCommand *cmd, int64_t dSeq,
-                      bool eob) override;
+  void WriteToJournal(common::cmd::OrderCommand* cmd, int64_t dSeq, bool eob) override;
 
-  void EnableJournaling(int64_t afterSeq, IExchangeApi *api) override;
+  void EnableJournaling(int64_t afterSeq, IExchangeApi* api) override;
 
-  std::map<int64_t, SnapshotDescriptor *> FindAllSnapshotPoints() override;
+  std::map<int64_t, SnapshotDescriptor*> FindAllSnapshotPoints() override;
 
-  void ReplayJournalStep(int64_t snapshotId, int64_t seqFrom, int64_t seqTo,
-                         IExchangeApi *api) override;
+  void
+  ReplayJournalStep(int64_t snapshotId, int64_t seqFrom, int64_t seqTo, IExchangeApi* api) override;
 
-  int64_t ReplayJournalFull(const common::config::InitialStateConfiguration
-                                *initialStateConfiguration,
-                            IExchangeApi *api) override;
+  int64_t
+  ReplayJournalFull(const common::config::InitialStateConfiguration* initialStateConfiguration,
+                    IExchangeApi* api) override;
 
   void ReplayJournalFullAndThenEnableJouraling(
-      const common::config::InitialStateConfiguration
-          *initialStateConfiguration,
-      IExchangeApi *api) override;
+    const common::config::InitialStateConfiguration* initialStateConfiguration,
+    IExchangeApi* api) override;
 
-  bool CheckSnapshotExists(int64_t snapshotId, SerializedModuleType type,
-                           int32_t instanceId) override;
+  bool
+  CheckSnapshotExists(int64_t snapshotId, SerializedModuleType type, int32_t instanceId) override;
 
 private:
   DummySerializationProcessor() = default;
 };
 
-} // namespace journaling
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace journaling
+}  // namespace processors
+}  // namespace core
+}  // namespace exchange

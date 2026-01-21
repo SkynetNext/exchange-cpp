@@ -27,20 +27,20 @@ namespace exchange::core::utils {
  * Uses std::atomic for thread-safe operations
  */
 class UnsafeUtils {
- public:
-    /**
-     * Set result code atomically with CAS
-     */
-    static void SetResultVolatile(common::cmd::OrderCommand* cmd,
-                                  bool result,
-                                  common::cmd::CommandResultCode successCode,
-                                  common::cmd::CommandResultCode failureCode);
+public:
+  /**
+   * Set result code atomically with CAS
+   */
+  static void SetResultVolatile(common::cmd::OrderCommand* cmd,
+                                bool result,
+                                common::cmd::CommandResultCode successCode,
+                                common::cmd::CommandResultCode failureCode);
 
-    /**
-     * Append events atomically with CAS
-     */
-    static void AppendEventsVolatile(common::cmd::OrderCommand* cmd,
-                                     common::MatcherTradeEvent* eventHead);
+  /**
+   * Append events atomically with CAS
+   */
+  static void AppendEventsVolatile(common::cmd::OrderCommand* cmd,
+                                   common::MatcherTradeEvent* eventHead);
 };
 
 }  // namespace exchange::core::utils

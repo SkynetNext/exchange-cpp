@@ -30,185 +30,185 @@ namespace exchange::core::processors {
 
 template <typename WaitStrategyT>
 TwoStepMasterProcessor<WaitStrategyT>::TwoStepMasterProcessor(
-    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>* ringBuffer,
-    disruptor::ProcessingSequenceBarrier<disruptor::MultiProducerSequencer<WaitStrategyT>,
-                                         WaitStrategyT>* sequenceBarrier,
-    SimpleEventHandler* eventHandler,
-    DisruptorExceptionHandler<common::cmd::OrderCommand>* exceptionHandler,
-    common::CoreWaitStrategy coreWaitStrategy,
-    const std::string& name)
-    : running_(IDLE)
-    , ringBuffer_(ringBuffer)
-    , sequenceBarrier_(sequenceBarrier)
-    , waitSpinningHelper_(
-          new WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>(ringBuffer,
-                                                                           sequenceBarrier,
-                                                                           MASTER_SPIN_LIMIT,
-                                                                           coreWaitStrategy,
-                                                                           name))
-    , eventHandler_(eventHandler)
-    , exceptionHandler_(exceptionHandler)
-    , name_(name)
-    , sequence_(disruptor::Sequence::INITIAL_VALUE)
-    , slaveProcessor_(nullptr) {}
+  disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>* ringBuffer,
+  disruptor::ProcessingSequenceBarrier<disruptor::MultiProducerSequencer<WaitStrategyT>,
+                                       WaitStrategyT>* sequenceBarrier,
+  SimpleEventHandler* eventHandler,
+  DisruptorExceptionHandler<common::cmd::OrderCommand>* exceptionHandler,
+  common::CoreWaitStrategy coreWaitStrategy,
+  const std::string& name)
+  : running_(IDLE)
+  , ringBuffer_(ringBuffer)
+  , sequenceBarrier_(sequenceBarrier)
+  , waitSpinningHelper_(
+      new WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>(ringBuffer,
+                                                                       sequenceBarrier,
+                                                                       MASTER_SPIN_LIMIT,
+                                                                       coreWaitStrategy,
+                                                                       name))
+  , eventHandler_(eventHandler)
+  , exceptionHandler_(exceptionHandler)
+  , name_(name)
+  , sequence_(disruptor::Sequence::INITIAL_VALUE)
+  , slaveProcessor_(nullptr) {}
 
 template <typename WaitStrategyT>
 disruptor::Sequence& TwoStepMasterProcessor<WaitStrategyT>::getSequence() {
-    return sequence_;
+  return sequence_;
 }
 
 template <typename WaitStrategyT>
 void TwoStepMasterProcessor<WaitStrategyT>::halt() {
-    running_.store(HALTED);
-    sequenceBarrier_->alert();
+  running_.store(HALTED);
+  sequenceBarrier_->alert();
 }
 
 template <typename WaitStrategyT>
 bool TwoStepMasterProcessor<WaitStrategyT>::isRunning() {
-    return running_.load() != IDLE;
+  return running_.load() != IDLE;
 }
 
 template <typename WaitStrategyT>
 void TwoStepMasterProcessor<WaitStrategyT>::run() {
-    if (running_.compare_exchange_strong(const_cast<int32_t&>(IDLE), RUNNING)) {
-        sequenceBarrier_->clearAlert();
+  if (running_.compare_exchange_strong(const_cast<int32_t&>(IDLE), RUNNING)) {
+    sequenceBarrier_->clearAlert();
 
-        try {
-            if (running_.load() == RUNNING) {
-                ProcessEvents();
-            }
-        } catch (...) {
-            // Match Java: finally block ensures running is set to IDLE
-            // Exception is allowed to propagate (no catch here)
-        }
-        // Match Java: finally block - always set to IDLE
-        running_.store(IDLE);
+    try {
+      if (running_.load() == RUNNING) {
+        ProcessEvents();
+      }
+    } catch (...) {
+      // Match Java: finally block ensures running is set to IDLE
+      // Exception is allowed to propagate (no catch here)
     }
+    // Match Java: finally block - always set to IDLE
+    running_.store(IDLE);
+  }
 }
 
 template <typename WaitStrategyT>
 void TwoStepMasterProcessor<WaitStrategyT>::SetSlaveProcessor(
-    TwoStepSlaveProcessor<WaitStrategyT>* slaveProcessor) {
-    slaveProcessor_ = slaveProcessor;
+  TwoStepSlaveProcessor<WaitStrategyT>* slaveProcessor) {
+  slaveProcessor_ = slaveProcessor;
 }
 
 template <typename WaitStrategyT>
 void TwoStepMasterProcessor<WaitStrategyT>::ProcessEvents() {
-    // Match Java: Thread.currentThread().setName("Thread-" + name);
-    // Note: C++ doesn't have thread naming in standard library, skip for now
+  // Match Java: Thread.currentThread().setName("Thread-" + name);
+  // Note: C++ doesn't have thread naming in standard library, skip for now
 
-    // Cache sequence_.get() to avoid redundant atomic operation
-    // Sequence overflow is practically impossible (would take ~292K years at 1M
-    // msgs/sec)
-    int64_t initialSequence = sequence_.get();
-    int64_t nextSequence = initialSequence + 1L;
-    int64_t currentSequenceGroup = 0;                 // Match Java: initialize to 0
-    int64_t lastTriggeredSequence = initialSequence;  // Track last triggered sequence
+  // Cache sequence_.get() to avoid redundant atomic operation
+  // Sequence overflow is practically impossible (would take ~292K years at 1M
+  // msgs/sec)
+  int64_t initialSequence = sequence_.get();
+  int64_t nextSequence = initialSequence + 1L;
+  int64_t currentSequenceGroup = 0;                 // Match Java: initialize to 0
+  int64_t lastTriggeredSequence = initialSequence;  // Track last triggered sequence
 
-    // wait until slave processor has instructed to run
-    // Match Java: while (!slaveProcessor.isRunning())
-    // C++ adds null check for safety
-    while (slaveProcessor_ != nullptr && !slaveProcessor_->isRunning()) {
-        std::this_thread::yield();
-    }
+  // wait until slave processor has instructed to run
+  // Match Java: while (!slaveProcessor.isRunning())
+  // C++ adds null check for safety
+  while (slaveProcessor_ != nullptr && !slaveProcessor_->isRunning()) {
+    std::this_thread::yield();
+  }
 
-    while (true) {
-        common::cmd::OrderCommand* cmd = nullptr;
-        try {
-            // should spin and also check another barrier
-            int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
+  while (true) {
+    common::cmd::OrderCommand* cmd = nullptr;
+    try {
+      // should spin and also check another barrier
+      int64_t availableSequence = waitSpinningHelper_->TryWaitFor(nextSequence);
 
-            if (nextSequence <= availableSequence) {
-                int64_t startSequence = nextSequence;  // Track start to detect if any
-                                                       // messages were processed
-                while (nextSequence <= availableSequence) {
-                    cmd = &ringBuffer_->get(nextSequence);
+      if (nextSequence <= availableSequence) {
+        int64_t startSequence = nextSequence;  // Track start to detect if any
+                                               // messages were processed
+        while (nextSequence <= availableSequence) {
+          cmd = &ringBuffer_->get(nextSequence);
 
-                    // switch to next group - let slave processor start doing its handling
-                    // cycle
-                    if (cmd->eventsGroup != currentSequenceGroup) {
-                        // Trigger previous group when detecting new group boundary
-                        PublishProgressAndTriggerSlaveProcessor(nextSequence);
-                        lastTriggeredSequence = nextSequence - 1;
-                        currentSequenceGroup = cmd->eventsGroup;
-                    }
-                    // Match Java: direct call without inner try-catch
-                    // Exception will be caught by outer catch block
-                    bool forcedPublish = eventHandler_->OnEvent(nextSequence, cmd);
-                    nextSequence++;
+          // switch to next group - let slave processor start doing its handling
+          // cycle
+          if (cmd->eventsGroup != currentSequenceGroup) {
+            // Trigger previous group when detecting new group boundary
+            PublishProgressAndTriggerSlaveProcessor(nextSequence);
+            lastTriggeredSequence = nextSequence - 1;
+            currentSequenceGroup = cmd->eventsGroup;
+          }
+          // Match Java: direct call without inner try-catch
+          // Exception will be caught by outer catch block
+          bool forcedPublish = eventHandler_->OnEvent(nextSequence, cmd);
+          nextSequence++;
 
-                    if (forcedPublish) {
-                        sequence_.set(nextSequence - 1);
-                        waitSpinningHelper_->SignalAllWhenBlocking();
-                    }
-
-                    if (cmd->command == common::cmd::OrderCommandType::SHUTDOWN_SIGNAL) {
-                        // Match Java: having all sequences aligned with the ringbuffer
-                        // cursor is a requirement for proper shutdown let following
-                        // processors to catch up Note: Java version doesn't log
-                        // SHUTDOWN_SIGNAL, C++ adds LOG_INFO for debugging
-                        LOG_INFO("[TwoStepMasterProcessor:{}] SHUTDOWN_SIGNAL detected", name_);
-                        PublishProgressAndTriggerSlaveProcessor(nextSequence);
-                    }
-                }
-                // Match Java: update sequence after processing all available messages
-                // Also trigger slave processor for the last group if it hasn't been
-                // triggered. This ensures that even if all messages are in the same
-                // group (e.g., < 20 messages), the slave processor will still process
-                // the group. This is an improvement over Java version which may miss
-                // the last group if it's incomplete.
-                if (nextSequence > startSequence) {
-                    int64_t lastProcessedSequence = nextSequence - 1;
-                    // If the last group hasn't been triggered (no group change detected
-                    // in loop), trigger it now
-                    if (lastProcessedSequence > lastTriggeredSequence) {
-                        PublishProgressAndTriggerSlaveProcessor(nextSequence);
-                    }
-                }
-
-                sequence_.set(availableSequence);
-                waitSpinningHelper_->SignalAllWhenBlocking();
-            }
-        } catch (const disruptor::AlertException& ex) {
-            if (running_.load() != RUNNING) {
-                break;
-            }
-        } catch (const std::exception& ex) {
-            // Match Java: catch (final Throwable ex)
-            // Java version doesn't log here, directly calls exceptionHandler
-            // C++ adds LOG_ERROR for debugging, but behavior matches Java
-            if (exceptionHandler_) {
-                exceptionHandler_->HandleEventException(ex, nextSequence, cmd);
-            }
-            sequence_.set(nextSequence);
+          if (forcedPublish) {
+            sequence_.set(nextSequence - 1);
             waitSpinningHelper_->SignalAllWhenBlocking();
-            nextSequence++;
-        } catch (...) {
-            // Match Java: catch (final Throwable ex) - catches all exceptions
-            // Java version doesn't log here, directly calls exceptionHandler
-            // C++ adds LOG_ERROR for debugging, but behavior matches Java
-            if (exceptionHandler_) {
-                exceptionHandler_->HandleEventException(
-                    std::runtime_error("Unknown exception"), nextSequence, cmd);
-            }
-            sequence_.set(nextSequence);
-            waitSpinningHelper_->SignalAllWhenBlocking();
-            nextSequence++;
+          }
+
+          if (cmd->command == common::cmd::OrderCommandType::SHUTDOWN_SIGNAL) {
+            // Match Java: having all sequences aligned with the ringbuffer
+            // cursor is a requirement for proper shutdown let following
+            // processors to catch up Note: Java version doesn't log
+            // SHUTDOWN_SIGNAL, C++ adds LOG_INFO for debugging
+            LOG_INFO("[TwoStepMasterProcessor:{}] SHUTDOWN_SIGNAL detected", name_);
+            PublishProgressAndTriggerSlaveProcessor(nextSequence);
+          }
         }
+        // Match Java: update sequence after processing all available messages
+        // Also trigger slave processor for the last group if it hasn't been
+        // triggered. This ensures that even if all messages are in the same
+        // group (e.g., < 20 messages), the slave processor will still process
+        // the group. This is an improvement over Java version which may miss
+        // the last group if it's incomplete.
+        if (nextSequence > startSequence) {
+          int64_t lastProcessedSequence = nextSequence - 1;
+          // If the last group hasn't been triggered (no group change detected
+          // in loop), trigger it now
+          if (lastProcessedSequence > lastTriggeredSequence) {
+            PublishProgressAndTriggerSlaveProcessor(nextSequence);
+          }
+        }
+
+        sequence_.set(availableSequence);
+        waitSpinningHelper_->SignalAllWhenBlocking();
+      }
+    } catch (const disruptor::AlertException& ex) {
+      if (running_.load() != RUNNING) {
+        break;
+      }
+    } catch (const std::exception& ex) {
+      // Match Java: catch (final Throwable ex)
+      // Java version doesn't log here, directly calls exceptionHandler
+      // C++ adds LOG_ERROR for debugging, but behavior matches Java
+      if (exceptionHandler_) {
+        exceptionHandler_->HandleEventException(ex, nextSequence, cmd);
+      }
+      sequence_.set(nextSequence);
+      waitSpinningHelper_->SignalAllWhenBlocking();
+      nextSequence++;
+    } catch (...) {
+      // Match Java: catch (final Throwable ex) - catches all exceptions
+      // Java version doesn't log here, directly calls exceptionHandler
+      // C++ adds LOG_ERROR for debugging, but behavior matches Java
+      if (exceptionHandler_) {
+        exceptionHandler_->HandleEventException(std::runtime_error("Unknown exception"),
+                                                nextSequence, cmd);
+      }
+      sequence_.set(nextSequence);
+      waitSpinningHelper_->SignalAllWhenBlocking();
+      nextSequence++;
     }
+  }
 }
 
 template <typename WaitStrategyT>
 void TwoStepMasterProcessor<WaitStrategyT>::PublishProgressAndTriggerSlaveProcessor(
-    int64_t nextSequence) {
-    sequence_.set(nextSequence - 1);
-    waitSpinningHelper_->SignalAllWhenBlocking();
-    // Match Java: slaveProcessor.handlingCycle(nextSequence);
-    // Java version doesn't check null (assumes it's set), C++ adds null check for
-    // safety
-    if (slaveProcessor_ != nullptr) {
-        slaveProcessor_->HandlingCycle(nextSequence);
-    }
+  int64_t nextSequence) {
+  sequence_.set(nextSequence - 1);
+  waitSpinningHelper_->SignalAllWhenBlocking();
+  // Match Java: slaveProcessor.handlingCycle(nextSequence);
+  // Java version doesn't check null (assumes it's set), C++ adds null check for
+  // safety
+  if (slaveProcessor_ != nullptr) {
+    slaveProcessor_->HandlingCycle(nextSequence);
+  }
 }
 
 // Explicit template instantiations

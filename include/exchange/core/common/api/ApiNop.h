@@ -28,7 +28,7 @@ namespace api {
  */
 class ApiNop : public ApiCommand {};
 
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

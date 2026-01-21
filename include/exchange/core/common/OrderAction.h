@@ -28,12 +28,12 @@ enum class OrderAction : uint8_t { ASK = 0, BID = 1 };
 
 inline OrderAction OrderActionFromCode(uint8_t code) {
   switch (code) {
-  case 0:
-    return OrderAction::ASK;
-  case 1:
-    return OrderAction::BID;
-  default:
-    throw std::invalid_argument("unknown OrderAction: " + std::to_string(code));
+    case 0:
+      return OrderAction::ASK;
+    case 1:
+      return OrderAction::BID;
+    default:
+      throw std::invalid_argument("unknown OrderAction: " + std::to_string(code));
   }
 }
 
@@ -45,6 +45,6 @@ inline OrderAction Opposite(OrderAction action) {
   return action == OrderAction::ASK ? OrderAction::BID : OrderAction::ASK;
 }
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

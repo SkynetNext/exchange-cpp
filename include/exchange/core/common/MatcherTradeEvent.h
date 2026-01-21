@@ -26,8 +26,7 @@ namespace common {
 enum class MatcherEventType : uint8_t;
 
 struct MatcherTradeEvent {
-  MatcherEventType
-      eventType; // TRADE, REDUCE, REJECT (rare) or BINARY_EVENT (reports data)
+  MatcherEventType eventType;  // TRADE, REDUCE, REJECT (rare) or BINARY_EVENT (reports data)
 
   int32_t section;
 
@@ -38,9 +37,9 @@ struct MatcherTradeEvent {
 
   // maker (for TRADE event type only)
   int64_t matchedOrderId;
-  int64_t matchedOrderUid;    // 0 for rejection
-  bool matchedOrderCompleted; // false, except when matchedOrder is completely
-                              // filled
+  int64_t matchedOrderUid;     // 0 for rejection
+  bool matchedOrderCompleted;  // false, except when matchedOrder is completely
+                               // filled
 
   // actual price of the deal (from maker order), 0 for rejection
   int64_t price;
@@ -54,26 +53,26 @@ struct MatcherTradeEvent {
   int64_t bidderHoldPrice;
 
   // reference to next event in chain
-  MatcherTradeEvent *nextEvent = nullptr;
+  MatcherTradeEvent* nextEvent = nullptr;
 
   // testing only
   MatcherTradeEvent Copy() const;
 
   // testing only
-  MatcherTradeEvent *FindTail();
+  MatcherTradeEvent* FindTail();
 
   int32_t GetChainSize() const;
 
-  static MatcherTradeEvent *CreateEventChain(int32_t chainLength);
+  static MatcherTradeEvent* CreateEventChain(int32_t chainLength);
 
   // Delete an entire event chain
   // @param head Head of chain to delete, or nullptr
-  static void DeleteChain(MatcherTradeEvent *head);
+  static void DeleteChain(MatcherTradeEvent* head);
 
   // testing only
-  static std::vector<MatcherTradeEvent *> AsList(MatcherTradeEvent *head);
+  static std::vector<MatcherTradeEvent*> AsList(MatcherTradeEvent* head);
 };
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

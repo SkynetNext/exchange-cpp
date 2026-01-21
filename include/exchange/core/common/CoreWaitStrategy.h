@@ -27,10 +27,10 @@ namespace common {
  * Maps to disruptor-cpp wait strategies
  */
 enum class CoreWaitStrategy : uint8_t {
-  BUSY_SPIN = 0, // BusySpinWaitStrategy - lowest latency, highest CPU
-  YIELDING = 1,  // YieldingWaitStrategy - moderate latency, moderate CPU
-  BLOCKING = 2,  // BlockingWaitStrategy - higher latency, lower CPU
-  SECOND_STEP_NO_WAIT = 3 // special case - no wait for second step
+  BUSY_SPIN = 0,           // BusySpinWaitStrategy - lowest latency, highest CPU
+  YIELDING = 1,            // YieldingWaitStrategy - moderate latency, moderate CPU
+  BLOCKING = 2,            // BlockingWaitStrategy - higher latency, lower CPU
+  SECOND_STEP_NO_WAIT = 3  // special case - no wait for second step
 };
 
 inline bool ShouldYield(CoreWaitStrategy strategy) {
@@ -45,6 +45,6 @@ inline bool IsNoWait(CoreWaitStrategy strategy) {
   return strategy == CoreWaitStrategy::SECOND_STEP_NO_WAIT;
 }
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

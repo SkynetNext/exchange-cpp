@@ -34,7 +34,7 @@ public:
   }
 };
 
-} // namespace config
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace config
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

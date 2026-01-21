@@ -27,77 +27,76 @@
 namespace exchange::core::common::config {
 
 PerformanceConfiguration PerformanceConfiguration::Default() {
-    // Java: .threadFactory(Thread::new) - simple thread factory
-    class SimpleThreadFactory : public disruptor::dsl::ThreadFactory {
-     public:
-        std::thread newThread(std::function<void()> r) override {
-            return std::thread(r);
-        }
-    };
+  // Java: .threadFactory(Thread::new) - simple thread factory
+  class SimpleThreadFactory : public disruptor::dsl::ThreadFactory {
+  public:
+    std::thread newThread(std::function<void()> r) override {
+      return std::thread(r);
+    }
+  };
 
-    return PerformanceConfiguration(
-        16 * 1024,  // ringBufferSize
-        1,          // matchingEnginesNum
-        1,          // riskEnginesNum
-        256,        // msgsInGroupLimit
-        10'000,     // maxGroupDurationNs (10 microseconds)
-        false,      // sendL2ForEveryCmd
-        8,          // l2RefreshDepth
-        CoreWaitStrategy::BLOCKING,
-        std::make_shared<SimpleThreadFactory>(),
-        [](const CoreSymbolSpecification* spec,
-           ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
-           orderbook::OrderBookEventsHelper* eventsHelper) {
-            // OrderBookNaiveImpl doesn't use ObjectsPool, but accepts it for
-            // interface consistency
-            return std::make_unique<orderbook::OrderBookNaiveImpl>(spec, objectsPool, eventsHelper);
-        });
+  return PerformanceConfiguration(
+    16 * 1024,  // ringBufferSize
+    1,          // matchingEnginesNum
+    1,          // riskEnginesNum
+    256,        // msgsInGroupLimit
+    10'000,     // maxGroupDurationNs (10 microseconds)
+    false,      // sendL2ForEveryCmd
+    8,          // l2RefreshDepth
+    CoreWaitStrategy::BLOCKING, std::make_shared<SimpleThreadFactory>(),
+    [](const CoreSymbolSpecification* spec,
+       ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
+       orderbook::OrderBookEventsHelper* eventsHelper) {
+      // OrderBookNaiveImpl doesn't use ObjectsPool, but accepts it for
+      // interface consistency
+      return std::make_unique<orderbook::OrderBookNaiveImpl>(spec, objectsPool, eventsHelper);
+    });
 }
 
 PerformanceConfiguration PerformanceConfiguration::LatencyPerformanceBuilder() {
-    // Java: .threadFactory(new
-    // AffinityThreadFactory(THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE))
-    return PerformanceConfiguration(
-        2 * 1024,  // ringBufferSize
-        1,         // matchingEnginesNum
-        1,         // riskEnginesNum
-        256,       // msgsInGroupLimit
-        10'000,    // maxGroupDurationNs (10 microseconds)
-        false,     // sendL2ForEveryCmd
-        8,         // l2RefreshDepth
-        CoreWaitStrategy::BUSY_SPIN,
-        std::make_shared<utils::AffinityThreadFactory>(
-            utils::ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE),
-        [](const CoreSymbolSpecification* spec,
-           ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
-           orderbook::OrderBookEventsHelper* eventsHelper) {
-            static const auto defaultLoggingCfg = LoggingConfiguration::Default();
-            return std::make_unique<orderbook::OrderBookDirectImpl>(
-                spec, objectsPool, eventsHelper, &defaultLoggingCfg);
-        });
+  // Java: .threadFactory(new
+  // AffinityThreadFactory(THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE))
+  return PerformanceConfiguration(
+    2 * 1024,  // ringBufferSize
+    1,         // matchingEnginesNum
+    1,         // riskEnginesNum
+    256,       // msgsInGroupLimit
+    10'000,    // maxGroupDurationNs (10 microseconds)
+    false,     // sendL2ForEveryCmd
+    8,         // l2RefreshDepth
+    CoreWaitStrategy::BUSY_SPIN,
+    std::make_shared<utils::AffinityThreadFactory>(
+      utils::ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE),
+    [](const CoreSymbolSpecification* spec,
+       ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
+       orderbook::OrderBookEventsHelper* eventsHelper) {
+      static const auto defaultLoggingCfg = LoggingConfiguration::Default();
+      return std::make_unique<orderbook::OrderBookDirectImpl>(spec, objectsPool, eventsHelper,
+                                                              &defaultLoggingCfg);
+    });
 }
 
 PerformanceConfiguration PerformanceConfiguration::ThroughputPerformanceBuilder() {
-    // Java: .threadFactory(new
-    // AffinityThreadFactory(THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE))
-    return PerformanceConfiguration(
-        64 * 1024,  // ringBufferSize
-        4,          // matchingEnginesNum
-        2,          // riskEnginesNum
-        4096,       // msgsInGroupLimit
-        4'000'000,  // maxGroupDurationNs (4 milliseconds)
-        false,      // sendL2ForEveryCmd
-        8,          // l2RefreshDepth
-        CoreWaitStrategy::BUSY_SPIN,
-        std::make_shared<utils::AffinityThreadFactory>(
-            utils::ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE),
-        [](const CoreSymbolSpecification* spec,
-           ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
-           orderbook::OrderBookEventsHelper* eventsHelper) {
-            static const auto defaultLoggingCfg = LoggingConfiguration::Default();
-            return std::make_unique<orderbook::OrderBookDirectImpl>(
-                spec, objectsPool, eventsHelper, &defaultLoggingCfg);
-        });
+  // Java: .threadFactory(new
+  // AffinityThreadFactory(THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE))
+  return PerformanceConfiguration(
+    64 * 1024,  // ringBufferSize
+    4,          // matchingEnginesNum
+    2,          // riskEnginesNum
+    4096,       // msgsInGroupLimit
+    4'000'000,  // maxGroupDurationNs (4 milliseconds)
+    false,      // sendL2ForEveryCmd
+    8,          // l2RefreshDepth
+    CoreWaitStrategy::BUSY_SPIN,
+    std::make_shared<utils::AffinityThreadFactory>(
+      utils::ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE),
+    [](const CoreSymbolSpecification* spec,
+       ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
+       orderbook::OrderBookEventsHelper* eventsHelper) {
+      static const auto defaultLoggingCfg = LoggingConfiguration::Default();
+      return std::make_unique<orderbook::OrderBookDirectImpl>(spec, objectsPool, eventsHelper,
+                                                              &defaultLoggingCfg);
+    });
 }
 
 }  // namespace exchange::core::common::config

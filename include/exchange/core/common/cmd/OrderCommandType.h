@@ -55,65 +55,64 @@ enum class OrderCommandType : int8_t {
 
 inline bool IsMutate(OrderCommandType type) {
   switch (type) {
-  case OrderCommandType::PLACE_ORDER:
-  case OrderCommandType::CANCEL_ORDER:
-  case OrderCommandType::MOVE_ORDER:
-  case OrderCommandType::REDUCE_ORDER:
-  case OrderCommandType::ADD_USER:
-  case OrderCommandType::BALANCE_ADJUSTMENT:
-  case OrderCommandType::SUSPEND_USER:
-  case OrderCommandType::RESUME_USER:
-  case OrderCommandType::BINARY_DATA_COMMAND:
-  case OrderCommandType::PERSIST_STATE_MATCHING:
-  case OrderCommandType::PERSIST_STATE_RISK:
-  case OrderCommandType::RESET:
-    return true;
-  default:
-    return false;
+    case OrderCommandType::PLACE_ORDER:
+    case OrderCommandType::CANCEL_ORDER:
+    case OrderCommandType::MOVE_ORDER:
+    case OrderCommandType::REDUCE_ORDER:
+    case OrderCommandType::ADD_USER:
+    case OrderCommandType::BALANCE_ADJUSTMENT:
+    case OrderCommandType::SUSPEND_USER:
+    case OrderCommandType::RESUME_USER:
+    case OrderCommandType::BINARY_DATA_COMMAND:
+    case OrderCommandType::PERSIST_STATE_MATCHING:
+    case OrderCommandType::PERSIST_STATE_RISK:
+    case OrderCommandType::RESET:
+      return true;
+    default:
+      return false;
   }
 }
 
 inline OrderCommandType OrderCommandTypeFromCode(int8_t code) {
   switch (code) {
-  case 1:
-    return OrderCommandType::PLACE_ORDER;
-  case 2:
-    return OrderCommandType::CANCEL_ORDER;
-  case 3:
-    return OrderCommandType::MOVE_ORDER;
-  case 4:
-    return OrderCommandType::REDUCE_ORDER;
-  case 6:
-    return OrderCommandType::ORDER_BOOK_REQUEST;
-  case 10:
-    return OrderCommandType::ADD_USER;
-  case 11:
-    return OrderCommandType::BALANCE_ADJUSTMENT;
-  case 12:
-    return OrderCommandType::SUSPEND_USER;
-  case 13:
-    return OrderCommandType::RESUME_USER;
-  case 90:
-    return OrderCommandType::BINARY_DATA_QUERY;
-  case 91:
-    return OrderCommandType::BINARY_DATA_COMMAND;
-  case 110:
-    return OrderCommandType::PERSIST_STATE_MATCHING;
-  case 111:
-    return OrderCommandType::PERSIST_STATE_RISK;
-  case 118:
-    return OrderCommandType::GROUPING_CONTROL;
-  case 120:
-    return OrderCommandType::NOP;
-  case 124:
-    return OrderCommandType::RESET;
-  case 127:
-    return OrderCommandType::SHUTDOWN_SIGNAL;
-  case -1:
-    return OrderCommandType::RESERVED_COMPRESSED;
-  default:
-    throw std::invalid_argument("Unknown order command type code: " +
-                                std::to_string(code));
+    case 1:
+      return OrderCommandType::PLACE_ORDER;
+    case 2:
+      return OrderCommandType::CANCEL_ORDER;
+    case 3:
+      return OrderCommandType::MOVE_ORDER;
+    case 4:
+      return OrderCommandType::REDUCE_ORDER;
+    case 6:
+      return OrderCommandType::ORDER_BOOK_REQUEST;
+    case 10:
+      return OrderCommandType::ADD_USER;
+    case 11:
+      return OrderCommandType::BALANCE_ADJUSTMENT;
+    case 12:
+      return OrderCommandType::SUSPEND_USER;
+    case 13:
+      return OrderCommandType::RESUME_USER;
+    case 90:
+      return OrderCommandType::BINARY_DATA_QUERY;
+    case 91:
+      return OrderCommandType::BINARY_DATA_COMMAND;
+    case 110:
+      return OrderCommandType::PERSIST_STATE_MATCHING;
+    case 111:
+      return OrderCommandType::PERSIST_STATE_RISK;
+    case 118:
+      return OrderCommandType::GROUPING_CONTROL;
+    case 120:
+      return OrderCommandType::NOP;
+    case 124:
+      return OrderCommandType::RESET;
+    case 127:
+      return OrderCommandType::SHUTDOWN_SIGNAL;
+    case -1:
+      return OrderCommandType::RESERVED_COMPRESSED;
+    default:
+      throw std::invalid_argument("Unknown order command type code: " + std::to_string(code));
   }
 }
 
@@ -121,7 +120,7 @@ inline int8_t OrderCommandTypeToCode(OrderCommandType type) {
   return static_cast<int8_t>(type);
 }
 
-} // namespace cmd
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace cmd
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

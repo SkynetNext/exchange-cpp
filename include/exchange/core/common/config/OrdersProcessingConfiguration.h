@@ -34,27 +34,22 @@ public:
     NO_RISK_PROCESSING
   };
 
-  enum class MarginTradingMode {
-    MARGIN_TRADING_DISABLED,
-    MARGIN_TRADING_ENABLED
-  };
+  enum class MarginTradingMode { MARGIN_TRADING_DISABLED, MARGIN_TRADING_ENABLED };
 
   RiskProcessingMode riskProcessingMode;
   MarginTradingMode marginTradingMode;
 
   OrdersProcessingConfiguration(RiskProcessingMode riskProcessingMode,
                                 MarginTradingMode marginTradingMode)
-      : riskProcessingMode(riskProcessingMode),
-        marginTradingMode(marginTradingMode) {}
+    : riskProcessingMode(riskProcessingMode), marginTradingMode(marginTradingMode) {}
 
   static OrdersProcessingConfiguration Default() {
-    return OrdersProcessingConfiguration(
-        RiskProcessingMode::FULL_PER_CURRENCY,
-        MarginTradingMode::MARGIN_TRADING_ENABLED);
+    return OrdersProcessingConfiguration(RiskProcessingMode::FULL_PER_CURRENCY,
+                                         MarginTradingMode::MARGIN_TRADING_ENABLED);
   }
 };
 
-} // namespace config
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace config
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

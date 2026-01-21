@@ -28,6 +28,6 @@ public:
   virtual int32_t GetStateHash() const = 0;
 };
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

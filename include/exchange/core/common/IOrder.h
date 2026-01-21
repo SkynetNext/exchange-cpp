@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "OrderAction.h"
 #include <cstdint>
+#include "OrderAction.h"
 
 namespace exchange {
 namespace core {
@@ -40,6 +40,6 @@ public:
   virtual int64_t GetReserveBidPrice() const = 0;
 };
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

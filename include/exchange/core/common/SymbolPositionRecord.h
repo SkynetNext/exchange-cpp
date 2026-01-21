@@ -16,19 +16,20 @@
 
 #pragma once
 
+#include <cstdint>
 #include "OrderAction.h"
 #include "PositionDirection.h"
 #include "StateHash.h"
 #include "WriteBytesMarshallable.h"
-#include <cstdint>
 
 namespace exchange {
 namespace core {
 namespace common {
 class BytesIn;
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange
+
 #include <string>
 
 namespace exchange {
@@ -43,7 +44,7 @@ struct LastPriceCacheRecord {
   int64_t askPrice = INT64_MAX;
   int64_t bidPrice = 0;
 };
-} // namespace processors
+}  // namespace processors
 
 class SymbolPositionRecord : public StateHash, public WriteBytesMarshallable {
 public:
@@ -70,7 +71,7 @@ public:
   /**
    * Constructor from BytesIn (deserialization)
    */
-  SymbolPositionRecord(int64_t uid, common::BytesIn &bytes);
+  SymbolPositionRecord(int64_t uid, common::BytesIn& bytes);
 
   void Initialize(int64_t uid, int32_t symbol, int32_t currency);
 
@@ -83,23 +84,21 @@ public:
   void PendingHold(OrderAction orderAction, int64_t size);
   void PendingRelease(OrderAction orderAction, int64_t size);
 
-  int64_t EstimateProfit(
-      const CoreSymbolSpecification &spec,
-      const processors::LastPriceCacheRecord *lastPriceCacheRecord) const;
+  int64_t EstimateProfit(const CoreSymbolSpecification& spec,
+                         const processors::LastPriceCacheRecord* lastPriceCacheRecord) const;
 
   /**
    * Calculate required margin based on specification and current
    * position/orders
    */
-  int64_t
-  CalculateRequiredMarginForFutures(const CoreSymbolSpecification &spec) const;
+  int64_t CalculateRequiredMarginForFutures(const CoreSymbolSpecification& spec) const;
 
   /**
    * Calculate required margin based on specification and current
    * position/orders considering extra size added to current position (or
    * outstanding orders)
    */
-  int64_t CalculateRequiredMarginForOrder(const CoreSymbolSpecification &spec,
+  int64_t CalculateRequiredMarginForOrder(const CoreSymbolSpecification& spec,
                                           OrderAction action,
                                           int64_t size) const;
 
@@ -110,8 +109,7 @@ public:
    * 3. Increase forward position accordingly (if size left in the trading
    * event)
    */
-  int64_t UpdatePositionForMarginTrade(OrderAction action, int64_t size,
-                                       int64_t price);
+  int64_t UpdatePositionForMarginTrade(OrderAction action, int64_t size, int64_t price);
 
   void Reset();
 
@@ -121,17 +119,15 @@ public:
   int32_t GetStateHash() const override;
 
   // WriteBytesMarshallable interface
-  void WriteMarshallable(BytesOut &bytes) const override;
+  void WriteMarshallable(BytesOut& bytes) const override;
 
   std::string ToString() const;
 
 private:
-  int64_t CloseCurrentPositionFutures(OrderAction action, int64_t tradeSize,
-                                      int64_t tradePrice);
-  void OpenPositionMargin(OrderAction action, int64_t sizeToOpen,
-                          int64_t tradePrice);
+  int64_t CloseCurrentPositionFutures(OrderAction action, int64_t tradeSize, int64_t tradePrice);
+  void OpenPositionMargin(OrderAction action, int64_t sizeToOpen, int64_t tradePrice);
 };
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

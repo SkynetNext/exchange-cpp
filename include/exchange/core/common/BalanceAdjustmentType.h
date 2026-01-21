@@ -28,13 +28,12 @@ enum class BalanceAdjustmentType : uint8_t { ADJUSTMENT = 0, SUSPEND = 1 };
 
 inline BalanceAdjustmentType BalanceAdjustmentTypeFromCode(uint8_t code) {
   switch (code) {
-  case 0:
-    return BalanceAdjustmentType::ADJUSTMENT;
-  case 1:
-    return BalanceAdjustmentType::SUSPEND;
-  default:
-    throw std::invalid_argument("unknown BalanceAdjustmentType: " +
-                                std::to_string(code));
+    case 0:
+      return BalanceAdjustmentType::ADJUSTMENT;
+    case 1:
+      return BalanceAdjustmentType::SUSPEND;
+    default:
+      throw std::invalid_argument("unknown BalanceAdjustmentType: " + std::to_string(code));
   }
 }
 
@@ -42,6 +41,6 @@ inline uint8_t BalanceAdjustmentTypeToCode(BalanceAdjustmentType type) {
   return static_cast<uint8_t>(type);
 }
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

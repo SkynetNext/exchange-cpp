@@ -25,17 +25,17 @@ namespace exchange::core::processors {
  * SimpleEventHandler - simple event handler interface
  */
 class SimpleEventHandler {
- public:
-    virtual ~SimpleEventHandler() = default;
+public:
+  virtual ~SimpleEventHandler() = default;
 
-    /**
-     * Handle command with resulting data
-     *
-     * @param seq   - sequence number
-     * @param event - event
-     * @return true to forcibly publish sequence (batches)
-     */
-    virtual bool OnEvent(int64_t seq, common::cmd::OrderCommand* event) = 0;
+  /**
+   * Handle command with resulting data
+   *
+   * @param seq   - sequence number
+   * @param event - event
+   * @return true to forcibly publish sequence (batches)
+   */
+  virtual bool OnEvent(int64_t seq, common::cmd::OrderCommand* event) = 0;
 };
 
 }  // namespace exchange::core::processors

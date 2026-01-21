@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "../common/cmd/OrderCommand.h"
-#include "../common/cmd/OrderCommandType.h"
 #include <cstdint>
 #include <functional>
+#include "../common/cmd/OrderCommand.h"
+#include "../common/cmd/OrderCommandType.h"
 
 namespace exchange {
 namespace core {
@@ -30,15 +30,12 @@ namespace processors {
  */
 class ResultsHandler {
 public:
-  using ResultsConsumer =
-      std::function<void(common::cmd::OrderCommand *, int64_t)>;
+  using ResultsConsumer = std::function<void(common::cmd::OrderCommand*, int64_t)>;
 
   explicit ResultsHandler(ResultsConsumer resultsConsumer)
-      : resultsConsumer_(std::move(resultsConsumer)), processingEnabled_(true) {
-  }
+    : resultsConsumer_(std::move(resultsConsumer)), processingEnabled_(true) {}
 
-  void OnEvent(common::cmd::OrderCommand *cmd, int64_t sequence,
-               bool endOfBatch) {
+  void OnEvent(common::cmd::OrderCommand* cmd, int64_t sequence, bool endOfBatch) {
     if (cmd->command == common::cmd::OrderCommandType::GROUPING_CONTROL) {
       processingEnabled_ = (cmd->orderId == 1);
     }
@@ -53,6 +50,6 @@ private:
   bool processingEnabled_;
 };
 
-} // namespace processors
-} // namespace core
-} // namespace exchange
+}  // namespace processors
+}  // namespace core
+}  // namespace exchange

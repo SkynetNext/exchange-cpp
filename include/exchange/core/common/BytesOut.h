@@ -34,27 +34,27 @@ public:
   /**
    * Write a byte
    */
-  virtual BytesOut &WriteByte(int8_t value) = 0;
+  virtual BytesOut& WriteByte(int8_t value) = 0;
 
   /**
    * Write an int
    */
-  virtual BytesOut &WriteInt(int32_t value) = 0;
+  virtual BytesOut& WriteInt(int32_t value) = 0;
 
   /**
    * Write a long
    */
-  virtual BytesOut &WriteLong(int64_t value) = 0;
+  virtual BytesOut& WriteLong(int64_t value) = 0;
 
   /**
    * Write a boolean
    */
-  virtual BytesOut &WriteBoolean(bool value) = 0;
+  virtual BytesOut& WriteBoolean(bool value) = 0;
 
   /**
    * Write bytes from buffer
    */
-  virtual BytesOut &Write(const void *buffer, size_t length) = 0;
+  virtual BytesOut& Write(const void* buffer, size_t length) = 0;
 
   /**
    * Get current write position
@@ -62,6 +62,6 @@ public:
   virtual int64_t WritePosition() const = 0;
 };
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

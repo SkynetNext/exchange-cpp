@@ -35,46 +35,46 @@ namespace exchange::core::processors {
  */
 template <typename WaitStrategyT>
 class TwoStepSlaveProcessor : public disruptor::EventProcessor {
- public:
-    TwoStepSlaveProcessor(
-        disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>* ringBuffer,
-        disruptor::ProcessingSequenceBarrier<disruptor::MultiProducerSequencer<WaitStrategyT>,
-                                             WaitStrategyT>* sequenceBarrier,
-        SimpleEventHandler* eventHandler,
-        DisruptorExceptionHandler<common::cmd::OrderCommand>* exceptionHandler,
-        const std::string& name);
-
-    // EventProcessor interface implementation
-    disruptor::Sequence& getSequence() override;
-    void halt() override;
-    bool isRunning() override;
-    void run() override;
-
-    /**
-     * Handling cycle (matches Java public handlingCycle method)
-     * Called by master processor to trigger slave processing
-     * In Java, handlingCycle uses member variable nextSequence (set in run()).
-     * The parameter processUpToSequence is the upper bound for processing.
-     */
-    void HandlingCycle(int64_t processUpToSequence);
-
- private:
-    static constexpr int32_t IDLE = 0;
-    static constexpr int32_t HALTED = 1;
-    static constexpr int32_t RUNNING = 2;
-
-    std::atomic<int32_t> running_;
-    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>* ringBuffer_;
+public:
+  TwoStepSlaveProcessor(
+    disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>* ringBuffer,
     disruptor::ProcessingSequenceBarrier<disruptor::MultiProducerSequencer<WaitStrategyT>,
-                                         WaitStrategyT>* sequenceBarrier_;
-    WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>* waitSpinningHelper_;
-    SimpleEventHandler* eventHandler_;
-    DisruptorExceptionHandler<common::cmd::OrderCommand>* exceptionHandler_;
-    std::string name_;
-    disruptor::Sequence sequence_;  // Changed from pointer to value (matches Java)
-    int64_t nextSequence_;
+                                         WaitStrategyT>* sequenceBarrier,
+    SimpleEventHandler* eventHandler,
+    DisruptorExceptionHandler<common::cmd::OrderCommand>* exceptionHandler,
+    const std::string& name);
 
-    void ProcessEvents();
+  // EventProcessor interface implementation
+  disruptor::Sequence& getSequence() override;
+  void halt() override;
+  bool isRunning() override;
+  void run() override;
+
+  /**
+   * Handling cycle (matches Java public handlingCycle method)
+   * Called by master processor to trigger slave processing
+   * In Java, handlingCycle uses member variable nextSequence (set in run()).
+   * The parameter processUpToSequence is the upper bound for processing.
+   */
+  void HandlingCycle(int64_t processUpToSequence);
+
+private:
+  static constexpr int32_t IDLE = 0;
+  static constexpr int32_t HALTED = 1;
+  static constexpr int32_t RUNNING = 2;
+
+  std::atomic<int32_t> running_;
+  disruptor::MultiProducerRingBuffer<common::cmd::OrderCommand, WaitStrategyT>* ringBuffer_;
+  disruptor::ProcessingSequenceBarrier<disruptor::MultiProducerSequencer<WaitStrategyT>,
+                                       WaitStrategyT>* sequenceBarrier_;
+  WaitSpinningHelper<common::cmd::OrderCommand, WaitStrategyT>* waitSpinningHelper_;
+  SimpleEventHandler* eventHandler_;
+  DisruptorExceptionHandler<common::cmd::OrderCommand>* exceptionHandler_;
+  std::string name_;
+  disruptor::Sequence sequence_;  // Changed from pointer to value (matches Java)
+  int64_t nextSequence_;
+
+  void ProcessEvents();
 };
 
 }  // namespace exchange::core::processors

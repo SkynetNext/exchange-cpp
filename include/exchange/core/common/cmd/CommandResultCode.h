@@ -79,29 +79,25 @@ inline int32_t CommandResultCodeToInt(CommandResultCode code) {
   return static_cast<int32_t>(code);
 }
 
-inline CommandResultCode
-MergeToFirstFailed(const std::vector<CommandResultCode> &results) {
+inline CommandResultCode MergeToFirstFailed(const std::vector<CommandResultCode>& results) {
   // Find first failed result (not SUCCESS and not ACCEPTED)
-  auto it =
-      std::find_if(results.begin(), results.end(), [](CommandResultCode r) {
-        return r != CommandResultCode::SUCCESS &&
-               r != CommandResultCode::ACCEPTED;
-      });
+  auto it = std::find_if(results.begin(), results.end(), [](CommandResultCode r) {
+    return r != CommandResultCode::SUCCESS && r != CommandResultCode::ACCEPTED;
+  });
 
   if (it != results.end()) {
     return *it;
   }
 
   // If no failure, return SUCCESS if any, otherwise ACCEPTED
-  bool hasSuccess =
-      std::any_of(results.begin(), results.end(), [](CommandResultCode r) {
-        return r == CommandResultCode::SUCCESS;
-      });
+  bool hasSuccess = std::any_of(results.begin(), results.end(), [](CommandResultCode r) {
+    return r == CommandResultCode::SUCCESS;
+  });
 
   return hasSuccess ? CommandResultCode::SUCCESS : CommandResultCode::ACCEPTED;
 }
 
-} // namespace cmd
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace cmd
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

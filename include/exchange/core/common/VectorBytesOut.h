@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include "BytesOut.h"
 #include <cstring>
 #include <vector>
+#include "BytesOut.h"
 
 namespace exchange {
 namespace core {
@@ -30,14 +30,13 @@ namespace common {
  */
 class VectorBytesOut : public BytesOut {
 private:
-  std::vector<uint8_t> &data_;
+  std::vector<uint8_t>& data_;
   size_t position_;
 
 public:
-  explicit VectorBytesOut(std::vector<uint8_t> &data)
-      : data_(data), position_(0) {}
+  explicit VectorBytesOut(std::vector<uint8_t>& data) : data_(data), position_(0) {}
 
-  BytesOut &WriteByte(int8_t value) override {
+  BytesOut& WriteByte(int8_t value) override {
     if (position_ >= data_.size()) {
       data_.resize(position_ + 1);
     }
@@ -45,7 +44,7 @@ public:
     return *this;
   }
 
-  BytesOut &WriteInt(int32_t value) override {
+  BytesOut& WriteInt(int32_t value) override {
     if (position_ + sizeof(int32_t) > data_.size()) {
       data_.resize(position_ + sizeof(int32_t));
     }
@@ -54,7 +53,7 @@ public:
     return *this;
   }
 
-  BytesOut &WriteLong(int64_t value) override {
+  BytesOut& WriteLong(int64_t value) override {
     if (position_ + sizeof(int64_t) > data_.size()) {
       data_.resize(position_ + sizeof(int64_t));
     }
@@ -63,7 +62,7 @@ public:
     return *this;
   }
 
-  BytesOut &WriteBoolean(bool value) override {
+  BytesOut& WriteBoolean(bool value) override {
     if (position_ >= data_.size()) {
       data_.resize(position_ + 1);
     }
@@ -71,7 +70,7 @@ public:
     return *this;
   }
 
-  BytesOut &Write(const void *buffer, size_t length) override {
+  BytesOut& Write(const void* buffer, size_t length) override {
     if (position_ + length > data_.size()) {
       data_.resize(position_ + length);
     }
@@ -84,14 +83,24 @@ public:
     return static_cast<int64_t>(position_);
   }
 
-  size_t GetPosition() const { return position_; }
-  void SetPosition(size_t pos) { position_ = pos; }
+  size_t GetPosition() const {
+    return position_;
+  }
+
+  void SetPosition(size_t pos) {
+    position_ = pos;
+  }
 
   // Get the underlying vector (for reading back)
-  const std::vector<uint8_t> &GetData() const { return data_; }
-  std::vector<uint8_t> &GetData() { return data_; }
+  const std::vector<uint8_t>& GetData() const {
+    return data_;
+  }
+
+  std::vector<uint8_t>& GetData() {
+    return data_;
+  }
 };
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

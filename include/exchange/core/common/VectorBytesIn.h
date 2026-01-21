@@ -34,12 +34,11 @@ using runtime_error = std::runtime_error;
  */
 class VectorBytesIn : public BytesIn {
 private:
-  const std::vector<uint8_t> &data_;
+  const std::vector<uint8_t>& data_;
   size_t position_;
 
 public:
-  explicit VectorBytesIn(const std::vector<uint8_t> &data)
-      : data_(data), position_(0) {}
+  explicit VectorBytesIn(const std::vector<uint8_t>& data) : data_(data), position_(0) {}
 
   int8_t ReadByte() override {
     if (position_ >= data_.size()) {
@@ -79,7 +78,7 @@ public:
     return static_cast<int64_t>(data_.size() - position_);
   }
 
-  void Read(void *buffer, size_t length) override {
+  void Read(void* buffer, size_t length) override {
     if (position_ + length > data_.size()) {
       throw runtime_error("VectorBytesIn: Read beyond end of data");
     }
@@ -87,10 +86,15 @@ public:
     position_ += length;
   }
 
-  size_t GetPosition() const { return position_; }
-  void SetPosition(size_t pos) { position_ = pos; }
+  size_t GetPosition() const {
+    return position_;
+  }
+
+  void SetPosition(size_t pos) {
+    position_ = pos;
+  }
 };
 
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

@@ -21,54 +21,54 @@
 namespace exchange::core::processors {
 
 std::unique_ptr<SharedPool> SharedPool::CreateTestSharedPool() {
-    return std::make_unique<SharedPool>(8, 4, 256);
+  return std::make_unique<SharedPool>(8, 4, 256);
 }
 
 SharedPool::SharedPool(int32_t poolMaxSize, int32_t poolInitialSize, int32_t chainLength)
-    : poolMaxSize_(poolMaxSize), chainLength_(chainLength) {
-    if (poolInitialSize > poolMaxSize) {
-        throw std::invalid_argument("too big poolInitialSize");
-    }
+  : poolMaxSize_(poolMaxSize), chainLength_(chainLength) {
+  if (poolInitialSize > poolMaxSize) {
+    throw std::invalid_argument("too big poolInitialSize");
+  }
 
-    // Pre-generate initial chains
-    for (int32_t i = 0; i < poolInitialSize; i++) {
-        common::MatcherTradeEvent* chain = common::MatcherTradeEvent::CreateEventChain(chainLength);
-        eventChainsBuffer_.enqueue(chain);
-    }
+  // Pre-generate initial chains
+  for (int32_t i = 0; i < poolInitialSize; i++) {
+    common::MatcherTradeEvent* chain = common::MatcherTradeEvent::CreateEventChain(chainLength);
+    eventChainsBuffer_.enqueue(chain);
+  }
 }
 
 common::MatcherTradeEvent* SharedPool::GetChain() {
-    common::MatcherTradeEvent* head = nullptr;
-    // Lock-free try_dequeue - much faster than mutex-based approach
-    if (eventChainsBuffer_.try_dequeue(head)) {
-        return head;
-    }
-    // Pool is empty, create new chain
-    return common::MatcherTradeEvent::CreateEventChain(chainLength_);
+  common::MatcherTradeEvent* head = nullptr;
+  // Lock-free try_dequeue - much faster than mutex-based approach
+  if (eventChainsBuffer_.try_dequeue(head)) {
+    return head;
+  }
+  // Pool is empty, create new chain
+  return common::MatcherTradeEvent::CreateEventChain(chainLength_);
 }
 
 void SharedPool::PutChain(common::MatcherTradeEvent* head) {
-    if (head == nullptr) {
-        return;
-    }
+  if (head == nullptr) {
+    return;
+  }
 
-    // Match Java: LinkedBlockingQueue.offer() behavior
-    // Java version ignores offer() return value, so we also use unbounded queue
-    // for maximum performance. Unbounded queue performs better under high load
-    // (see PERFORMANCE_BENCHMARK_COMPARISON.md).
-    eventChainsBuffer_.enqueue(head);
+  // Match Java: LinkedBlockingQueue.offer() behavior
+  // Java version ignores offer() return value, so we also use unbounded queue
+  // for maximum performance. Unbounded queue performs better under high load
+  // (see PERFORMANCE_BENCHMARK_COMPARISON.md).
+  eventChainsBuffer_.enqueue(head);
 }
 
 void SharedPool::DeleteChain(common::MatcherTradeEvent* head) {
-    common::MatcherTradeEvent::DeleteChain(head);
+  common::MatcherTradeEvent::DeleteChain(head);
 }
 
 SharedPool::~SharedPool() {
-    // Dequeue and delete all chains remaining in the pool
-    common::MatcherTradeEvent* chain = nullptr;
-    while (eventChainsBuffer_.try_dequeue(chain)) {
-        DeleteChain(chain);
-    }
+  // Dequeue and delete all chains remaining in the pool
+  common::MatcherTradeEvent* chain = nullptr;
+  while (eventChainsBuffer_.try_dequeue(chain)) {
+    DeleteChain(chain);
+  }
 }
 
 }  // namespace exchange::core::processors

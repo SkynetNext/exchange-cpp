@@ -16,10 +16,10 @@
 
 #pragma once
 
+#include <cstdint>
 #include "../OrderAction.h"
 #include "../OrderType.h"
 #include "ApiCommand.h"
-#include <cstdint>
 
 namespace exchange {
 namespace core {
@@ -41,15 +41,27 @@ public:
   int32_t userCookie;
   int64_t reservePrice;
 
-  ApiPlaceOrder(int64_t price, int64_t size, int64_t orderId,
-                OrderAction action, OrderType orderType, int64_t uid,
-                int32_t symbol, int32_t userCookie, int64_t reservePrice)
-      : price(price), size(size), orderId(orderId), action(action),
-        orderType(orderType), uid(uid), symbol(symbol), userCookie(userCookie),
-        reservePrice(reservePrice) {}
+  ApiPlaceOrder(int64_t price,
+                int64_t size,
+                int64_t orderId,
+                OrderAction action,
+                OrderType orderType,
+                int64_t uid,
+                int32_t symbol,
+                int32_t userCookie,
+                int64_t reservePrice)
+    : price(price)
+    , size(size)
+    , orderId(orderId)
+    , action(action)
+    , orderType(orderType)
+    , uid(uid)
+    , symbol(symbol)
+    , userCookie(userCookie)
+    , reservePrice(reservePrice) {}
 };
 
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange

@@ -16,20 +16,21 @@
 
 #pragma once
 
+#include <memory>
+#include <optional>
 #include "../../BytesIn.h"
 #include "../../BytesOut.h"
 #include "ReportQuery.h"
 #include "ReportType.h"
 #include "TotalCurrencyBalanceReportResult.h"
-#include <memory>
-#include <optional>
 
 namespace exchange {
 namespace core {
 namespace processors {
 class MatchingEngineRouter;
 class RiskEngine;
-} // namespace processors
+}  // namespace processors
+
 namespace common {
 namespace api {
 namespace reports {
@@ -38,11 +39,11 @@ namespace reports {
  * TotalCurrencyBalanceReportQuery - total currency balance report query
  * WriteBytesMarshallable is inherited from ReportQuery base class
  */
-class TotalCurrencyBalanceReportQuery
-    : public ReportQuery<TotalCurrencyBalanceReportResult> {
+class TotalCurrencyBalanceReportQuery : public ReportQuery<TotalCurrencyBalanceReportResult> {
 public:
   TotalCurrencyBalanceReportQuery() {}
-  explicit TotalCurrencyBalanceReportQuery(BytesIn &bytesIn) {
+
+  explicit TotalCurrencyBalanceReportQuery(BytesIn& bytesIn) {
     // do nothing
   }
 
@@ -51,22 +52,21 @@ public:
   }
 
   std::optional<std::unique_ptr<TotalCurrencyBalanceReportResult>>
-  Process(::exchange::core::processors::MatchingEngineRouter *matchingEngine)
-      override;
+  Process(::exchange::core::processors::MatchingEngineRouter* matchingEngine) override;
 
   std::optional<std::unique_ptr<TotalCurrencyBalanceReportResult>>
-  Process(::exchange::core::processors::RiskEngine *riskEngine) override;
+  Process(::exchange::core::processors::RiskEngine* riskEngine) override;
 
   // CreateResult implementation (matches Java createResult)
   std::unique_ptr<TotalCurrencyBalanceReportResult>
-  CreateResult(const std::vector<BytesIn *> &sections) override;
+  CreateResult(const std::vector<BytesIn*>& sections) override;
 
   // WriteMarshallable implementation (matches Java writeMarshallable)
-  void WriteMarshallable(BytesOut &bytes) const override;
+  void WriteMarshallable(BytesOut& bytes) const override;
 };
 
-} // namespace reports
-} // namespace api
-} // namespace common
-} // namespace core
-} // namespace exchange
+}  // namespace reports
+}  // namespace api
+}  // namespace common
+}  // namespace core
+}  // namespace exchange
