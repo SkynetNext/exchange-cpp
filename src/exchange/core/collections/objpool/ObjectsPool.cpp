@@ -32,13 +32,13 @@ ObjectsPool* ObjectsPool::CreateDefaultTestPool() {
   //   During insertion, nodes split frequently, requiring more nodes than final count
   // Note: Objects are reused during test execution, but peak usage can exceed these values
   // TSan instrumentation slows down object reuse, so we need extra capacity
-  config[DIRECT_ORDER] =
-    65536;  // Increased from 32768 (for 100K transaction test with TSan overhead)
-  config[DIRECT_BUCKET] = 4096;  // Increased from 2048
-  config[ART_NODE_4] = 131072;   // Increased from 32768 (for 100K ART items with splits)
-  config[ART_NODE_16] = 65536;   // Increased from 16384
-  config[ART_NODE_48] = 32768;   // Increased from 8192
-  config[ART_NODE_256] = 16384;  // Increased from 4096
+  config[DIRECT_ORDER] = 131072;  // Increased from 65536 (for 100K transaction test with TSan
+                                  // overhead and high peak usage)
+  config[DIRECT_BUCKET] = 4096;   // Increased from 2048
+  config[ART_NODE_4] = 131072;    // Increased from 32768 (for 100K ART items with splits)
+  config[ART_NODE_16] = 65536;    // Increased from 16384
+  config[ART_NODE_48] = 32768;    // Increased from 8192
+  config[ART_NODE_256] = 16384;   // Increased from 4096
   return new ObjectsPool(config);
 }
 

@@ -315,8 +315,9 @@ if(BUILD_TESTING AND GTest_FOUND)
             GTest::gmock
     )
     add_test(NAME ITExchangeCoreIntegrationRejectionBasic COMMAND test_integration_rejection_basic)
-    # These tests process many transactions and run slower under TSan
-    set_tests_properties(ITExchangeCoreIntegrationRejectionBasic PROPERTIES TIMEOUT 600)
+    # These tests have 28 sub-tests and run slower under sanitizers/TSan
+    # Each sub-test takes ~500-800ms, but with 28 tests and overhead, total can exceed 600s
+    set_tests_properties(ITExchangeCoreIntegrationRejectionBasic PROPERTIES TIMEOUT 900)
     list(APPEND ALL_TEST_TARGETS test_integration_rejection_basic)
 
     # ITExchangeCoreIntegrationRejectionLatency
