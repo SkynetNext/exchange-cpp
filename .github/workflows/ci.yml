@@ -74,7 +74,8 @@ jobs:
             ninja-build \
             liblz4-dev \
             gdb \
-            psmisc
+            psmisc \
+            libpthread-stubs0-dev
 
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
@@ -104,6 +105,10 @@ jobs:
             CMAKE_ARGS+=(-DCMAKE_CXX_COMPILER=/usr/bin/clang++-19)
             # Ensure Clang uses GCC 14's libstdc++ for C++26 features
             CMAKE_ARGS+=(-DCMAKE_CXX_FLAGS="-stdlib=libstdc++")
+            # Force thread support for Clang
+            CMAKE_ARGS+=(-DCMAKE_THREAD_LIBS_INIT="-pthread")
+            CMAKE_ARGS+=(-DThreads_FOUND=TRUE)
+            CMAKE_ARGS+=(-DCMAKE_HAVE_LIBC_PTHREAD=TRUE)
             echo "Using Clang 19 with GCC 14 libstdc++"
             /usr/bin/clang++-19 --version
           fi
