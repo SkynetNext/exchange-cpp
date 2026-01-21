@@ -646,7 +646,8 @@ int32_t OrderBookDirectImpl::DirectOrder::GetStateHash() const {
   result = result * 31 + static_cast<int32_t>(static_cast<int8_t>(action));
   result = result * 31 + static_cast<int32_t>((price >> 32) ^ static_cast<uint32_t>(price));
   result = result * 31 + static_cast<int32_t>((size >> 32) ^ static_cast<uint32_t>(size));
-  result = result * 31 + static_cast<int32_t>((reserveBidPrice >> 32) ^ static_cast<uint32_t>(reserveBidPrice));
+  result = result * 31
+           + static_cast<int32_t>((reserveBidPrice >> 32) ^ static_cast<uint32_t>(reserveBidPrice));
   result = result * 31 + static_cast<int32_t>((filled >> 32) ^ static_cast<uint32_t>(filled));
   result = result * 31 + static_cast<int32_t>((uid >> 32) ^ static_cast<uint32_t>(uid));
   return result;
