@@ -1,0 +1,417 @@
+name: Code Quality
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+  # Run on schedule (weekly) to catch regressions
+  schedule:
+    - cron: '0 0 * * 0'  # Every Sunday at midnight UTC
+
+jobs:
+  # Sanitizers: ASan + UBSan + LSan (combined, most common)
+  sanitizer-asan-ubsan:
+    name: Sanitizer - ASan+UBSan+LSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup GCC
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-14 g++-14
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
+          g++ --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            ninja-build \
+            liblz4-dev \
+            libpthread-stubs0-dev
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.30'
+
+      - name: Configure CMake (ASan+UBSan)
+        shell: bash
+        run: |
+          CMAKE_ARGS=(
+            -B build
+            -G Ninja
+            -DCMAKE_BUILD_TYPE=Debug
+            -DCMAKE_C_COMPILER=gcc
+            -DCMAKE_CXX_COMPILER=g++
+            -DBUILD_TESTING=ON
+            -DBUILD_BENCHMARKS=OFF
+            -DBUILD_EXAMPLES=ON
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -g -O1"
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -g -O1"
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+          )
+          cmake "${CMAKE_ARGS[@]}"
+
+      - name: Build
+        run: cmake --build build --config Debug --parallel 2
+
+      - name: Run tests
+        env:
+          ASAN_OPTIONS: "detect_leaks=1:check_initialization_order=1:strict_init_order=1:alloc_dealloc_mismatch=0"
+          UBSAN_OPTIONS: "print_stacktrace=1:halt_on_error=1"
+        run: |
+          cd build
+          ctest --output-on-failure -E "Perf.*" --parallel 2 --timeout 300
+
+  # MemorySanitizer + UBSan (detects uninitialized memory reads)
+  sanitizer-msan:
+    name: Sanitizer - MSan+UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-14 g++-14
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main" -y
+          sudo apt-get update
+          sudo apt-get install -y clang-19 clang-tools-19
+          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100
+          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
+          sudo update-alternatives --set clang /usr/bin/clang-19
+          sudo update-alternatives --set clang++ /usr/bin/clang++-19
+          clang++ --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            ninja-build \
+            liblz4-dev \
+            libpthread-stubs0-dev
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.30'
+
+      - name: Configure CMake (MSan+UBSan)
+        shell: bash
+        run: |
+          CMAKE_ARGS=(
+            -B build
+            -G Ninja
+            -DCMAKE_BUILD_TYPE=Debug
+            -DCMAKE_C_COMPILER=/usr/bin/clang-19
+            -DCMAKE_CXX_COMPILER=/usr/bin/clang++-19
+            -DBUILD_TESTING=ON
+            -DBUILD_BENCHMARKS=OFF
+            -DBUILD_EXAMPLES=ON
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
+            -DCMAKE_CXX_FLAGS="-fsanitize=memory,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -g -O1 -fsanitize-memory-track-origins"
+            -DCMAKE_C_FLAGS="-fsanitize=memory,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -g -O1 -fsanitize-memory-track-origins"
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=memory,undefined"
+          )
+          cmake "${CMAKE_ARGS[@]}"
+
+      - name: Build
+        run: cmake --build build --config Debug --parallel 2
+
+      - name: Run tests
+        env:
+          MSAN_OPTIONS: "print_stats=1:halt_on_error=1"
+          UBSAN_OPTIONS: "print_stacktrace=1:halt_on_error=1"
+        run: |
+          cd build
+          ctest --output-on-failure -E "Perf.*" --parallel 2 --timeout 300
+
+  # ThreadSanitizer (must run separately, cannot combine with other sanitizers)
+  sanitizer-tsan:
+    name: Sanitizer - TSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup GCC
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-14 g++-14
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
+          g++ --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            ninja-build \
+            liblz4-dev \
+            libpthread-stubs0-dev
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.30'
+
+      - name: Configure CMake (TSan)
+        shell: bash
+        run: |
+          CMAKE_ARGS=(
+            -B build
+            -G Ninja
+            -DCMAKE_BUILD_TYPE=Debug
+            -DCMAKE_C_COMPILER=gcc
+            -DCMAKE_CXX_COMPILER=g++
+            -DBUILD_TESTING=ON
+            -DBUILD_BENCHMARKS=OFF
+            -DBUILD_EXAMPLES=ON
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
+            -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -fno-sanitize-recover=all -g -O1"
+            -DCMAKE_C_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -fno-sanitize-recover=all -g -O1"
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+          )
+          cmake "${CMAKE_ARGS[@]}"
+
+      - name: Build
+        run: cmake --build build --config Debug --parallel 2
+
+      - name: Run tests
+        env:
+          TSAN_OPTIONS: "halt_on_error=1:history_size=7"
+        run: |
+          cd build
+          ctest --output-on-failure -E "Perf.*" --parallel 2 --timeout 300
+
+  # Static Analysis: clang-tidy
+  static-analysis:
+    name: Static Analysis - clang-tidy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Clang
+        run: |
+          sudo apt-get update
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main" -y
+          sudo apt-get update
+          sudo apt-get install -y clang-19 clang-tools-19
+          clang-tidy --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            ninja-build \
+            liblz4-dev \
+            libpthread-stubs0-dev \
+            python3
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.30'
+
+      - name: Configure CMake
+        shell: bash
+        run: |
+          CMAKE_ARGS=(
+            -B build
+            -G Ninja
+            -DCMAKE_BUILD_TYPE=Debug
+            -DCMAKE_C_COMPILER=/usr/bin/clang-19
+            -DCMAKE_CXX_COMPILER=/usr/bin/clang++-19
+            -DBUILD_TESTING=ON
+            -DBUILD_BENCHMARKS=OFF
+            -DBUILD_EXAMPLES=ON
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          )
+          cmake "${CMAKE_ARGS[@]}"
+
+      - name: Run clang-tidy
+        run: |
+          # Run clang-tidy on all source files
+          find src include -name "*.cpp" -o -name "*.hpp" -o -name "*.h" | \
+            grep -v third_party | \
+            xargs -I {} clang-tidy {} \
+              -p build \
+              --config-file=.clang-tidy \
+              -- -std=c++26 || exit 1
+
+  # Code Formatting: clang-format check
+  code-format:
+    name: Code Format - clang-format
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup clang-format
+        run: |
+          sudo apt-get update
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main" -y
+          sudo apt-get update
+          sudo apt-get install -y clang-format-19
+          clang-format-19 --version
+
+      - name: Check code formatting
+        run: |
+          # Check formatting on changed files (for PRs) or all files (for push)
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            # For PRs, check only changed files
+            FILES=$(git diff --name-only --diff-filter=ACMRTUXB origin/${{ github.base_ref }}...HEAD | \
+              grep -E '\.(cpp|hpp|h)$' | \
+              grep -v third_party || true)
+          else
+            # For pushes, check all source files
+            FILES=$(find src include -name "*.cpp" -o -name "*.hpp" -o -name "*.h" | \
+              grep -v third_party || true)
+          fi
+          
+          if [ -z "$FILES" ]; then
+            echo "No C++ files to check"
+            exit 0
+          fi
+          
+          # Check formatting
+          MISFORMATTED=""
+          for file in $FILES; do
+            if [ -f "$file" ]; then
+              if ! clang-format-19 "$file" | diff -q "$file" - > /dev/null 2>&1; then
+                echo "Formatting issue in $file"
+                MISFORMATTED="$MISFORMATTED $file"
+              fi
+            fi
+          done
+          
+          if [ -n "$MISFORMATTED" ]; then
+            echo "Files with formatting issues:$MISFORMATTED"
+            echo "Run: clang-format-19 -i <file> to fix"
+            exit 1
+          fi
+          
+          echo "All files are properly formatted"
+
+  # Code Coverage: gcov/lcov
+  code-coverage:
+    name: Code Coverage - gcov/lcov
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup GCC
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-14 g++-14
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
+          g++ --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            ninja-build \
+            liblz4-dev \
+            libpthread-stubs0-dev \
+            lcov
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.30'
+
+      - name: Configure CMake (with coverage)
+        shell: bash
+        run: |
+          CMAKE_ARGS=(
+            -B build
+            -G Ninja
+            -DCMAKE_BUILD_TYPE=Debug
+            -DCMAKE_C_COMPILER=gcc
+            -DCMAKE_CXX_COMPILER=g++
+            -DBUILD_TESTING=ON
+            -DBUILD_BENCHMARKS=OFF
+            -DBUILD_EXAMPLES=ON
+            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
+            -DCMAKE_CXX_FLAGS="--coverage -g -O0"
+            -DCMAKE_C_FLAGS="--coverage -g -O0"
+            -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+          )
+          cmake "${CMAKE_ARGS[@]}"
+
+      - name: Build
+        run: cmake --build build --config Debug --parallel 2
+
+      - name: Run tests
+        run: |
+          cd build
+          ctest --output-on-failure -E "Perf.*" --parallel 2 --timeout 300
+
+      - name: Generate coverage report
+        run: |
+          cd build
+          # Collect coverage data
+          lcov --capture --directory . --output-file coverage.info
+          # Remove coverage for third-party code
+          lcov --remove coverage.info \
+            '*/third_party/*' \
+            '*/build/_deps/*' \
+            '*/tests/*' \
+            '*/include/*' \
+            --output-file coverage.info
+          # Generate HTML report
+          genhtml coverage.info --output-directory coverage-report
+          # Print summary
+          lcov --list coverage.info
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/coverage-report
+          retention-days: 30
+
+      - name: Coverage summary
+        run: |
+          cd build
+          echo "=== Coverage Summary ==="
+          lcov --summary coverage.info || true
