@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <random>
 #include <set>
+#include <unordered_map>
 
 using namespace exchange::core::common;
 using namespace exchange::core::common::cmd;
@@ -197,13 +198,20 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders) {
   std::vector<Order*> orders1(orders.begin(), orders.begin() + 80);
   std::set<int64_t> removedOrderIds;
 
-  // Collect all orderIds from orders1 BEFORE deletion to avoid accessing freed memory
+  // CRITICAL: Save all orderIds BEFORE any deletion to avoid accessing freed memory
+  // Map order pointer to orderId for safe cleanup later
+  std::unordered_map<Order*, int64_t> orderToIdMap;
+  for (auto* order : orders) {
+    orderToIdMap[order] = order->orderId;
+  }
+
+  // Collect orderIds from orders1 that will be removed
   for (auto* order : orders1) {
-    removedOrderIds.insert(order->orderId);
+    removedOrderIds.insert(orderToIdMap[order]);
   }
 
   for (auto* order : orders1) {
-    int64_t orderId = order->orderId;  // Save orderId before removal
+    int64_t orderId = orderToIdMap[order];  // Use saved orderId, not order->orderId
     auto removed = bucket_->Remove(orderId, UID_2);
     ASSERT_NE(removed, nullptr);
     int64_t orderSize = removed->size;
@@ -224,8 +232,10 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders) {
   ASSERT_EQ(bucket_->GetTotalVolume(), 0L);
 
   // Clean up remaining orders (those that were matched, not removed)
+  // Use saved orderId from map instead of accessing order->orderId (which may be freed)
   for (auto* order : orders) {
-    if (removedOrderIds.find(order->orderId) == removedOrderIds.end()) {
+    int64_t orderId = orderToIdMap[order];  // Use saved orderId, never access order->orderId
+    if (removedOrderIds.find(orderId) == removedOrderIds.end()) {
       delete order;
     }
   }

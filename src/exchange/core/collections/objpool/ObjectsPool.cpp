@@ -26,11 +26,14 @@ ObjectsPool* ObjectsPool::CreateDefaultTestPool() {
   // Increased capacities for tests that create many objects:
   // - SequentialAsksTest creates ~2000 orders
   // - MultipleCommandsCompareTest processes 100,000 transactions (needs large DIRECT_ORDER pool)
-  //   Peak usage can be high as orders are created and matched/removed throughout the test
+  //   Peak usage can be very high as orders are created, matched, and removed throughout the test
+  //   Under TSan, object reuse is slower, requiring even larger capacity
   // - ShouldLoadManyItems creates 100,000 ART entries (needs many nodes)
   //   During insertion, nodes split frequently, requiring more nodes than final count
   // Note: Objects are reused during test execution, but peak usage can exceed these values
-  config[DIRECT_ORDER] = 32768;  // Increased from 16384 (for 100K transaction test with peak usage)
+  // TSan instrumentation slows down object reuse, so we need extra capacity
+  config[DIRECT_ORDER] =
+    65536;  // Increased from 32768 (for 100K transaction test with TSan overhead)
   config[DIRECT_BUCKET] = 4096;  // Increased from 2048
   config[ART_NODE_4] = 131072;   // Increased from 32768 (for 100K ART items with splits)
   config[ART_NODE_16] = 65536;   // Increased from 16384

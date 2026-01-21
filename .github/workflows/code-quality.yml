@@ -223,9 +223,9 @@ jobs:
           TSAN_OPTIONS: "halt_on_error=1:history_size=7"
         run: |
           cd build
-          # Use longer timeout for TSan tests (they run slower due to instrumentation)
           # Individual test timeouts are set in CMakeLists.txt for long-running tests
-          ctest --output-on-failure -E "Perf.*" --parallel 2 --timeout 1000
+          # Don't use --timeout here to respect per-test timeouts (600s/900s for stress tests)
+          ctest --output-on-failure -E "Perf.*" --parallel 2
 
   # Static Analysis: clang-tidy
   static-analysis:
