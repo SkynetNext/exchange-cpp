@@ -328,6 +328,14 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         -Werror
         -Wno-unused-parameter
     )
+    # For TSan: allow tsan warnings in SharedPool.cpp which uses concurrentqueue
+    # concurrentqueue is a header-only library that uses atomic_thread_fence
+    if(DEFINED ENV{ENABLE_SANITIZER_TSAN} AND "$ENV{ENABLE_SANITIZER_TSAN}")
+        set_source_files_properties(
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/exchange/core/processors/SharedPool.cpp"
+            PROPERTIES COMPILE_FLAGS "-Wno-error=tsan"
+        )
+    endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     target_compile_options(exchange-cpp PRIVATE /WX)
 endif()
