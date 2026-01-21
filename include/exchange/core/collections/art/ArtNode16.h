@@ -23,6 +23,9 @@
 #include <list>
 #include <stdexcept>
 #include <string>
+#if __cpp_lib_simd >= 202411L
+#  include <simd>
+#endif
 #include "IArtNode.h"
 #include "LongObjConsumer.h"
 
@@ -61,6 +64,14 @@ public:
     if (level != nodeLevel_ && ((key ^ nodeKey_) & (-1LL << (nodeLevel_ + 8))) != 0)
       return nullptr;
     const int16_t nodeIndex = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+#if __cpp_lib_simd >= 202411L
+    const int pos = FindExactMatchSimd(nodeIndex);
+    if (pos >= 0) {
+      void* node = nodes_[pos];
+      return nodeLevel_ == 0 ? static_cast<V*>(node)
+                             : static_cast<IArtNode<V>*>(node)->GetValue(key, nodeLevel_ - 8);
+    }
+#else
     for (int i = 0; i < numChildren_; i++) {
       if (keys_[i] == nodeIndex) {
         void* node = nodes_[i];
@@ -70,6 +81,7 @@ public:
       if (nodeIndex < keys_[i])
         break;
     }
+#endif
     return nullptr;
   }
 
@@ -103,6 +115,91 @@ private:
   int64_t nodeKey_ = 0;
   int nodeLevel_ = 0;
   uint8_t numChildren_ = 0;
+
+#if __cpp_lib_simd >= 202411L
+  /**
+   * SIMD-optimized search for exact match or insertion position
+   * @param target Key to search for
+   * @return Position if exact match found, or position where target should be inserted
+   *         Returns numChildren_ if target is larger than all keys
+   */
+  int FindPositionSimd(int16_t target) const {
+    namespace datapar = std::datapar;
+    if (numChildren_ == 0)
+      return 0;
+
+    // Use default SIMD width for int16_t
+    using simd_type = datapar::simd<int16_t>;
+    constexpr size_t simd_width = simd_type::size();
+
+    // Since ArtNode16 has at most 16 elements, we can load them all at once
+    // Pad with max value to ensure comparisons work correctly
+    std::array<int16_t, simd_width> padded_keys;
+    std::copy(keys_.begin(), keys_.begin() + numChildren_, padded_keys.begin());
+    std::fill(padded_keys.begin() + numChildren_, padded_keys.end(),
+              std::numeric_limits<int16_t>::max());
+
+    simd_type keys_vec = datapar::unchecked_load<int16_t>(padded_keys.data());
+    simd_type target_vec(target);
+
+    // Find matches and positions where key > target
+    auto matches = (keys_vec == target_vec);
+    auto greater_than = (keys_vec > target_vec);
+
+    // Check for exact match first
+    if (datapar::any_of(matches)) {
+      for (int j = 0; j < numChildren_; ++j) {
+        if (keys_[j] == target) {
+          return j;
+        }
+      }
+    }
+
+    // Check for first position where key > target (insertion point)
+    if (datapar::any_of(greater_than)) {
+      for (int j = 0; j < numChildren_; ++j) {
+        if (keys_[j] > target) {
+          return j;
+        }
+      }
+    }
+
+    // Target is larger than all keys
+    return numChildren_;
+  }
+
+  /**
+   * SIMD-optimized search for exact match only
+   * @param target Key to search for
+   * @return Position if found, -1 otherwise
+   */
+  int FindExactMatchSimd(int16_t target) const {
+    namespace datapar = std::datapar;
+    if (numChildren_ == 0)
+      return -1;
+
+    using simd_type = datapar::simd<int16_t>;
+    constexpr size_t simd_width = simd_type::size();
+
+    // Load all keys at once (pad with 0, doesn't matter for equality check)
+    std::array<int16_t, simd_width> padded_keys{};
+    std::copy(keys_.begin(), keys_.begin() + numChildren_, padded_keys.begin());
+
+    simd_type keys_vec = datapar::unchecked_load<int16_t>(padded_keys.data());
+    simd_type target_vec(target);
+    auto matches = (keys_vec == target_vec);
+
+    if (datapar::any_of(matches)) {
+      for (int j = 0; j < numChildren_; ++j) {
+        if (keys_[j] == target) {
+          return j;
+        }
+      }
+    }
+
+    return -1;
+  }
+#endif
 
   void RemoveElementAtPos(int pos) {
     const int copyLength = numChildren_ - (pos + 1);
@@ -167,6 +264,23 @@ IArtNode<V>* ArtNode16<V>::Put(int64_t key, int level, V* value) {
       return branch;
   }
   const int16_t nodeIndex = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+#if __cpp_lib_simd >= 202411L
+  int pos = FindPositionSimd(nodeIndex);
+  if (pos < numChildren_ && keys_[pos] == nodeIndex) {
+    // Exact match found
+    if (nodeLevel_ == 0)
+      nodes_[pos] = value;
+    else {
+      IArtNode<V>* oldSubNode = static_cast<IArtNode<V>*>(nodes_[pos]);
+      IArtNode<V>* resizedNode = oldSubNode->Put(key, nodeLevel_ - 8, value);
+      if (resizedNode != nullptr) {
+        nodes_[pos] = resizedNode;
+      }
+    }
+    return nullptr;
+  }
+  // pos now points to insertion position
+#else
   int pos = 0;
   while (pos < numChildren_) {
     if (keys_[pos] == nodeIndex) {
@@ -185,6 +299,7 @@ IArtNode<V>* ArtNode16<V>::Put(int64_t key, int level, V* value) {
       break;
     pos++;
   }
+#endif
   if (numChildren_ < 16) {
     const int copyLength = numChildren_ - pos;
     if (copyLength > 0) {
@@ -230,11 +345,17 @@ IArtNode<V>* ArtNode16<V>::Remove(int64_t key, int level) {
   if (level != nodeLevel_ && ((key ^ nodeKey_) & (-1LL << (nodeLevel_ + 8))) != 0)
     return this;
   const int16_t nodeIndex = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+#if __cpp_lib_simd >= 202411L
+  int pos = FindExactMatchSimd(nodeIndex);
+  if (pos < 0)
+    return this;
+#else
   int pos = 0;
   while (pos < numChildren_ && keys_[pos] != nodeIndex)
     pos++;
   if (pos == numChildren_)
     return this;
+#endif
   if (nodeLevel_ == 0) {
     RemoveElementAtPos(pos);
   } else {
@@ -267,6 +388,26 @@ V* ArtNode16<V>::GetCeilingValue(int64_t key, int level) {
       key = 0;
   }
   const int16_t nodeIndex = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+#if __cpp_lib_simd >= 202411L
+  int pos = FindPositionSimd(nodeIndex);
+  if (pos < numChildren_) {
+    if (keys_[pos] == nodeIndex) {
+      V* res = nodeLevel_ == 0
+                 ? static_cast<V*>(nodes_[pos])
+                 : static_cast<IArtNode<V>*>(nodes_[pos])->GetCeilingValue(key, nodeLevel_ - 8);
+      if (res)
+        return res;
+      // Continue to next key if current match didn't yield result
+      pos++;
+    }
+    // pos now points to first key > nodeIndex (or numChildren_ if none)
+    if (pos < numChildren_) {
+      return nodeLevel_ == 0
+               ? static_cast<V*>(nodes_[pos])
+               : static_cast<IArtNode<V>*>(nodes_[pos])->GetCeilingValue(0, nodeLevel_ - 8);
+    }
+  }
+#else
   for (int i = 0; i < numChildren_; i++) {
     if (keys_[i] == nodeIndex) {
       V* res = nodeLevel_ == 0
@@ -280,6 +421,7 @@ V* ArtNode16<V>::GetCeilingValue(int64_t key, int level) {
                : static_cast<IArtNode<V>*>(nodes_[i])->GetCeilingValue(0, nodeLevel_ - 8);
     }
   }
+#endif
   return nullptr;
 }
 
@@ -293,6 +435,33 @@ V* ArtNode16<V>::GetFloorValue(int64_t key, int level) {
       key = INT64_MAX;
   }
   const int16_t nodeIndex = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+#if __cpp_lib_simd >= 202411L
+  // For GetFloorValue, we need to search backwards, so we use SIMD to find the position
+  // then search backwards from there
+  int pos = FindPositionSimd(nodeIndex);
+  // pos points to first key >= nodeIndex
+  // For floor, we need to check pos-1 if pos > 0 and keys_[pos-1] < nodeIndex
+  // Or check pos if keys_[pos] == nodeIndex
+
+  // First check exact match at pos
+  if (pos < numChildren_ && keys_[pos] == nodeIndex) {
+    V* res = nodeLevel_ == 0
+               ? static_cast<V*>(nodes_[pos])
+               : static_cast<IArtNode<V>*>(nodes_[pos])->GetFloorValue(key, nodeLevel_ - 8);
+    if (res)
+      return res;
+  }
+
+  // Check previous position (first key < nodeIndex)
+  if (pos > 0) {
+    int checkPos = pos - 1;
+    if (keys_[checkPos] < nodeIndex) {
+      return nodeLevel_ == 0 ? static_cast<V*>(nodes_[checkPos])
+                             : static_cast<IArtNode<V>*>(nodes_[checkPos])
+                                 ->GetFloorValue(INT64_MAX, nodeLevel_ - 8);
+    }
+  }
+#else
   for (int i = numChildren_ - 1; i >= 0; i--) {
     if (keys_[i] == nodeIndex) {
       V* res = nodeLevel_ == 0
@@ -306,6 +475,7 @@ V* ArtNode16<V>::GetFloorValue(int64_t key, int level) {
                : static_cast<IArtNode<V>*>(nodes_[i])->GetFloorValue(INT64_MAX, nodeLevel_ - 8);
     }
   }
+#endif
   return nullptr;
 }
 
