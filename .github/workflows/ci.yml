@@ -12,6 +12,7 @@ on:
 jobs:
   linux-gcc:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,7 +35,9 @@ jobs:
             cmake \
             ninja-build \
             g++ \
-            liblz4-dev
+            liblz4-dev \
+            gdb \
+            psmisc
 
       - name: Configure CMake (GCC)
         run: |
@@ -49,12 +52,33 @@ jobs:
         run: cmake --build build --config Release
 
       - name: Run tests (skip perf tests)
+        id: run_tests
         run: |
           cd build
-          ctest --output-on-failure -E "Perf.*" --parallel $(nproc)
+          # Each test has 5 minute timeout, job has 30 minute timeout
+          ctest --output-on-failure -E "Perf.*" --parallel $(nproc) --timeout 300
+
+      - name: Collect diagnostics on failure
+        if: failure() || cancelled()
+        run: |
+          echo "=== Test timeout or failure detected ==="
+          echo "Collecting diagnostic information..."
+          # List all processes
+          ps auxf || true
+          # Check for hung processes
+          pstree -p || true
+          # Try to get thread info if gdb is available
+          if command -v gdb &> /dev/null; then
+            echo "=== Attempting to get thread info ==="
+            for pid in $(pgrep -f test_integration || true); do
+              echo "Thread info for PID $pid:"
+              gdb -batch -ex "attach $pid" -ex "info threads" -ex "thread apply all bt" -ex "detach" -ex "quit" 2>&1 || true
+            done
+          fi
 
   linux-clang:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -77,7 +101,9 @@ jobs:
             cmake \
             ninja-build \
             clang \
-            liblz4-dev
+            liblz4-dev \
+            gdb \
+            psmisc
 
       - name: Configure CMake (Clang)
         run: |
@@ -92,6 +118,26 @@ jobs:
         run: cmake --build build --config Release
 
       - name: Run tests (skip perf tests)
+        id: run_tests
         run: |
           cd build
-          ctest --output-on-failure -E "Perf.*" --parallel $(nproc)
+          # Each test has 5 minute timeout, job has 30 minute timeout
+          ctest --output-on-failure -E "Perf.*" --parallel $(nproc) --timeout 300
+
+      - name: Collect diagnostics on failure
+        if: failure() || cancelled()
+        run: |
+          echo "=== Test timeout or failure detected ==="
+          echo "Collecting diagnostic information..."
+          # List all processes
+          ps auxf || true
+          # Check for hung processes
+          pstree -p || true
+          # Try to get thread info if gdb is available
+          if command -v gdb &> /dev/null; then
+            echo "=== Attempting to get thread info ==="
+            for pid in $(pgrep -f test_integration || true); do
+              echo "Thread info for PID $pid:"
+              gdb -batch -ex "attach $pid" -ex "info threads" -ex "thread apply all bt" -ex "detach" -ex "quit" 2>&1 || true
+            done
+          fi
