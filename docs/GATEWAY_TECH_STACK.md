@@ -342,6 +342,16 @@ void onOrderResult(OrderCommand* cmd) {
   - PCIe 链路延迟（Gen3×8 约 500~800ns 往返）
   - 硬件成本高
 
+**开源实现参考**：
+- **[Corundum](https://github.com/corundum/corundum)**：开源的 FPGA 网卡（NIC）和网络内计算平台
+  - 支持 10G/25G/100G 以太网
+  - PCIe Gen3，高性能 PCIe DMA 引擎
+  - 支持数千个独立控制的队列（TX/RX/Completion/Event）
+  - 原生 IEEE 1588 PTP 时间戳
+  - 包含 Linux 驱动，集成到 Linux 网络栈
+  - 支持 Xilinx 和 Intel FPGA 设备
+  - 文档：<https://docs.corundum.io/>
+
 ### 关键优化点
 
 #### epoll/io_uring 优化清单
@@ -672,6 +682,7 @@ exchangeCore_->setResultsConsumer([this](OrderCommand* cmd, int64_t seq) {
 - [rapidjson](https://github.com/Tencent/rapidjson)
 - [mimalloc](https://github.com/microsoft/mimalloc)
 - [exchange-gateway-rest](https://github.com/exchange-core/exchange-gateway-rest) (Java 参考实现)
+- [Corundum](https://github.com/corundum/corundum) - 开源 FPGA 网卡和网络内计算平台（支持 10G/25G/100G 以太网，PCIe DMA，PTP 时间戳）
 
 ## 11. 总结
 
