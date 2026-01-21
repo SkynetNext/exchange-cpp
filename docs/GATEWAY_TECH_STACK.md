@@ -54,6 +54,12 @@
 - 无需额外依赖
 - 性能足够好
 
+**注意**：
+- libuv 事件循环是单线程的
+- 需要多线程架构：每个线程运行独立的事件循环
+- 使用 `SO_REUSEPORT` 实现内核级负载均衡
+- 推荐线程数 = CPU 核心数（或 2x 核心数）
+
 ### 2.4 内存分配器
 
 | 库 | 特点 | 性能 | 推荐度 |
@@ -104,6 +110,23 @@ target_link_libraries(gateway mimalloc)
 
 ## 4. 架构设计
 
+### 4.0 多线程架构说明
+
+**libuv 单线程限制**：
+- libuv 事件循环是单线程的，一个 `uv_loop_t` 只能在一个线程中运行
+- 单线程无法充分利用多核 CPU
+- 需要多线程架构：每个线程运行独立的事件循环
+
+**多线程方案**：
+1. **每个线程一个事件循环**：创建 N 个线程，每个线程运行独立的 `uWS::App().run()`
+2. **SO_REUSEPORT 负载均衡**：所有线程绑定同一端口，内核自动分发连接
+3. **无锁设计**：线程间通过 ExchangeCore 的 RingBuffer 通信（已线程安全）
+
+**线程数选择**：
+- **推荐**：线程数 = CPU 核心数
+- **高负载**：线程数 = 2x CPU 核心数（I/O 密集型）
+- **避免过多**：超过 2x 核心数会引入上下文切换开销
+
 ### 4.1 整体架构
 
 ```
@@ -115,11 +138,17 @@ target_link_libraries(gateway mimalloc)
          │ (请求/响应)                │ (订阅/推送)
          ↓                           ↓
 ┌─────────────────────────────────────────────────┐
-│  Gateway (C++)                                   │
-│  ┌─────────────────┐  ┌─────────────────┐      │
-│  │ uWebSockets     │  │ rapidjson       │      │
-│  │ (HTTP/WS Server)│  │ (JSON Parse)    │      │
-│  └─────────────────┘  └─────────────────┘      │
+│  Gateway (C++) - 多线程架构                      │
+│  ┌──────────────┐  ┌──────────────┐            │
+│  │ Thread 0     │  │ Thread 1     │  ...       │
+│  │ uWebSockets  │  │ uWebSockets  │            │
+│  │ (libuv loop) │  │ (libuv loop) │            │
+│  │ rapidjson    │  │ rapidjson    │            │
+│  └──────────────┘  └──────────────┘            │
+│         │                  │                     │
+│         └──────────────────┘                     │
+│              │                                    │
+│              ↓                                    │
 └─────────────────────────────────────────────────┘
          │                           │
          ↓                           ↑
@@ -263,13 +292,28 @@ fs.file-max = 2097152
 
 ```bash
 # /etc/sysctl.conf
+# 连接队列大小（SO_REUSEPORT 需要）
 net.core.somaxconn = 65535
 net.ipv4.tcp_max_syn_backlog = 65535
+
+# TIME_WAIT 优化
 net.ipv4.tcp_tw_reuse = 1
 net.ipv4.tcp_fin_timeout = 30
+
+# 缓冲区大小
 net.core.rmem_max = 16777216
 net.core.wmem_max = 16777216
+
+# SO_REUSEPORT 负载均衡（Linux 3.9+）
+# 默认已启用，无需配置
+# 内核自动将连接分发到不同的监听 socket
 ```
+
+**SO_REUSEPORT 工作原理**：
+1. 多个线程/进程绑定同一端口（`SO_REUSEPORT`）
+2. 内核根据 4-tuple (src_ip, src_port, dst_ip, dst_port) 哈希分发连接
+3. 相同客户端的连接会路由到同一线程（连接亲和性）
+4. 实现无锁负载均衡，性能优于应用层负载均衡
 
 #### 进程内存限制
 
@@ -279,25 +323,171 @@ net.core.wmem_max = 16777216
 * hard memlock unlimited
 ```
 
-### 单机架构
+### 多线程架构
+
+**重要**：libuv 事件循环是单线程的，需要多线程架构以充分利用多核 CPU。
 
 ```
-┌─────────────────────────────────┐
-│  Gateway 进程                    │
-│  - uWebSockets (libuv)           │
-│  - 1M WebSocket 连接            │
-│  - 内存：20-30 GB                │
-└─────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  Gateway 进程                                    │
+│                                                  │
+│  ┌──────────────┐  ┌──────────────┐           │
+│  │ Thread 0     │  │ Thread 1     │  ...      │
+│  │ libuv loop   │  │ libuv loop   │           │
+│  │ Port 8080    │  │ Port 8080    │           │
+│  │ (SO_REUSEPORT)│ │ (SO_REUSEPORT)│          │
+│  └──────────────┘  └──────────────┘           │
+│         │                  │                   │
+│         └──────────────────┘                   │
+│              │                                  │
+│              ↓                                  │
+│    ┌─────────────────────┐                     │
+│    │ ExchangeCore        │                     │
+│    │ (共享，线程安全)     │                     │
+│    └─────────────────────┘                     │
+└─────────────────────────────────────────────────┘
 ```
 
-**性能参考**：
-- 100K 连接：~2 GB 内存，10-20% CPU
-- 500K 连接：~10 GB 内存，30-50% CPU
-- 1M 连接：~20 GB 内存，50-70% CPU
+**多线程实现**：
 
-## 7. 与 ExchangeCore 集成
+```cpp
+#include <thread>
+#include <vector>
+#include <uWebSockets/App.h>
 
-### 7.1 直接调用
+class MultiThreadGateway {
+    std::vector<std::thread> threads_;
+    ExchangeCore* exchangeCore_;
+    
+public:
+    void start(int numThreads, int port) {
+        for (int i = 0; i < numThreads; ++i) {
+            threads_.emplace_back([this, port, i]() {
+                // 每个线程创建独立的事件循环
+                uWS::App app;
+                
+                // 配置路由
+                setupRoutes(&app);
+                
+                // 监听端口（SO_REUSEPORT）
+                app.listen(port, LIBUS_LISTEN_EXCLUSIVE_PORT, [](auto *token) {
+                    if (token) {
+                        std::cout << "Thread listening on port " << port << std::endl;
+                    }
+                });
+                
+                // 运行事件循环（阻塞）
+                app.run();
+            });
+        }
+        
+        // 等待所有线程
+        for (auto& t : threads_) {
+            t.join();
+        }
+    }
+};
+```
+
+**SO_REUSEPORT 配置**：
+
+```cpp
+// uWebSockets 支持 SO_REUSEPORT
+// 使用 LIBUS_LISTEN_EXCLUSIVE_PORT 标志
+app.listen(8080, LIBUS_LISTEN_EXCLUSIVE_PORT, [](auto *token) {
+    // 多个线程/进程可以绑定同一端口
+    // 内核自动负载均衡连接
+});
+```
+
+**系统配置（SO_REUSEPORT）**：
+
+```bash
+# /etc/sysctl.conf
+# SO_REUSEPORT 需要 Linux 3.9+
+# 默认已支持，无需额外配置
+
+# 验证支持
+cat /proc/sys/net/core/somaxconn
+# 应该 >= 65535
+```
+
+**性能参考**（多线程）：
+- **单线程**：100K 连接，~2 GB 内存，10-20% CPU（单核）
+- **4 线程**：400K 连接，~8 GB 内存，40-80% CPU（4 核）
+- **8 线程**：800K 连接，~16 GB 内存，80-100% CPU（8 核）
+- **16 线程**：1M+ 连接，~20-30 GB 内存，充分利用多核
+
+## 7. 多线程实现细节
+
+### 7.1 线程间通信
+
+**ExchangeCore 访问**：
+- ExchangeCore 的 RingBuffer 是线程安全的（MPSC 模式）
+- 多个 Gateway 线程可以并发调用 `ExchangeApi::placeOrder()`
+- 无需额外的锁或同步机制
+
+**WebSocket 推送**：
+- 每个线程维护自己的 WebSocket 连接
+- 结果推送通过线程本地的 uWebSockets Hub
+- 无需跨线程访问其他线程的连接
+
+### 7.2 SO_REUSEPORT 配置
+
+**uWebSockets 配置**：
+
+```cpp
+// 方式1：使用 LIBUS_LISTEN_EXCLUSIVE_PORT（推荐）
+app.listen(8080, LIBUS_LISTEN_EXCLUSIVE_PORT, [](auto *token) {
+    if (token) {
+        std::cout << "Listening with SO_REUSEPORT" << std::endl;
+    }
+});
+
+// 方式2：手动设置 socket 选项
+int fd = socket(AF_INET, SOCK_STREAM, 0);
+int reuseport = 1;
+setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &reuseport, sizeof(reuseport));
+// 然后传递给 uWebSockets
+```
+
+**负载均衡机制**：
+- 内核根据 4-tuple 哈希分发连接
+- 相同客户端的连接会路由到同一线程（连接亲和性）
+- 新连接自动负载均衡到不同线程
+- 无锁、零开销的负载均衡
+
+**优势**：
+- ✅ **内核级负载均衡**：比应用层负载均衡更快
+- ✅ **连接亲和性**：同一客户端的连接在同一线程，缓存友好
+- ✅ **无锁设计**：内核处理，无需应用层同步
+- ✅ **水平扩展**：可以轻松扩展到多进程（多机）
+
+### 7.3 CPU 亲和性（可选）
+
+```cpp
+#include <pthread.h>
+#include <sched.h>
+
+void setThreadAffinity(int threadId, int cpuCore) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(cpuCore, &cpuset);
+    
+    pthread_t thread = pthread_self();
+    pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
+}
+
+// 在每个线程中设置
+void gatewayThread(int threadId) {
+    setThreadAffinity(threadId, threadId % std::thread::hardware_concurrency());
+    // ... 运行事件循环
+}
+```
+
+## 8. 与 ExchangeCore 集成
+
+### 8.1 直接调用
 
 ```cpp
 // Gateway 直接调用 ExchangeCore C++ API
@@ -314,7 +504,7 @@ public:
 };
 ```
 
-### 7.2 结果回调
+### 8.2 结果回调
 
 ```cpp
 // ExchangeCore 处理完成后回调
@@ -324,7 +514,7 @@ exchangeCore_->setResultsConsumer([this](OrderCommand* cmd, int64_t seq) {
 });
 ```
 
-## 8. 开发计划
+## 9. 开发计划
 
 ### Phase 1: 基础框架
 - [ ] 集成 uWebSockets
@@ -336,19 +526,26 @@ exchangeCore_->setResultsConsumer([this](OrderCommand* cmd, int64_t seq) {
 - [ ] 实现 WebSocket 连接管理
 - [ ] 实现结果推送
 
-### Phase 3: 优化
+### Phase 3: 多线程架构
+- [ ] 实现多线程事件循环（每个线程一个 libuv loop）
+- [ ] 配置 SO_REUSEPORT 支持
+- [ ] 实现线程安全的 ExchangeCore 访问
+- [ ] 性能测试（单线程 vs 多线程）
+
+### Phase 4: 优化
 - [ ] 性能优化（内存池、零拷贝）
 - [ ] 集成 mimalloc
+- [ ] CPU 亲和性配置
 - [ ] 压力测试和调优
 
-## 9. 参考资源
+## 10. 参考资源
 
 - [uWebSockets](https://github.com/uNetworking/uWebSockets)
 - [rapidjson](https://github.com/Tencent/rapidjson)
 - [mimalloc](https://github.com/microsoft/mimalloc)
 - [exchange-gateway-rest](https://github.com/exchange-core/exchange-gateway-rest) (Java 参考实现)
 
-## 10. 总结
+## 11. 总结
 
 **推荐技术栈**：
 - **HTTP/WebSocket**: uWebSockets
