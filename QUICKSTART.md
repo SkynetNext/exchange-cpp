@@ -1,5 +1,11 @@
 # Quick Start
 
+## Prerequisites
+
+- **CMake** 3.30+
+- **GCC 14+** or **Clang 19+** (C++26 support required)
+- See [README.md](README.md) for detailed GCC 14 installation instructions
+
 ## Clone and Build
 
 ```bash

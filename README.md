@@ -45,7 +45,7 @@ For detailed performance data, see [PERFORMANCE_BENCHMARK_COMPARISON.md](docs/PE
 
 ## Technology Stack
 
-- **C++20**: Modern C++ features for performance and safety
+- **C++26**: Latest C++ standard for cutting-edge performance and features
 - **disruptor-cpp**: High-performance inter-thread communication ([SkynetNext/disruptor-cpp](https://github.com/SkynetNext/disruptor-cpp.git))
 - **CMake**: Build system
 - **Google Test**: Unit testing framework
@@ -135,9 +135,47 @@ graph TD
 
 ### Prerequisites
 
-- **CMake** 3.20 or higher
-- **C++20** compatible compiler (GCC 10+, Clang 10+, MSVC 2019+)
+- **CMake** 3.30 or higher (required for C++26 support)
+- **C++26** compatible compiler:
+  - **GCC 14+** (recommended) or **Clang 19+**
+  - MSVC 19.40+ (Windows)
 - **Git** (for submodules)
+
+#### Installing GCC 14 on Ubuntu 22.04
+
+If your system doesn't have GCC 14+, you can install it from source:
+
+```bash
+sudo apt install build-essential
+sudo apt install libmpfr-dev libgmp3-dev libmpc-dev -y
+wget http://ftp.gnu.org/gnu/gcc/gcc-14.1.0/gcc-14.1.0.tar.gz
+tar -xf gcc-14.1.0.tar.gz
+cd gcc-14.1.0
+./configure -v --build=$(uname -m)-linux-gnu --host=$(uname -m)-linux-gnu --target=$(uname -m)-linux-gnu --prefix=/usr/local/gcc-14.1.0 --enable-checking=release --enable-languages=c,c++ --disable-multilib --program-suffix=-14.1.0
+make -j$(nproc)
+sudo make install
+
+# Set as default using update-alternatives
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/local/gcc-14.1.0/bin/gcc-14.1.0 100
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/local/gcc-14.1.0/bin/g++-14.1.0 100
+sudo update-alternatives --set gcc /usr/local/gcc-14.1.0/bin/gcc-14.1.0
+sudo update-alternatives --set g++ /usr/local/gcc-14.1.0/bin/g++-14.1.0
+
+# Add GCC 14 libstdc++ to library path (required for running programs)
+echo 'export LD_LIBRARY_PATH=/usr/local/gcc-14.1.0/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
+source ~/.bashrc
+
+# Verify installation
+gcc --version
+g++ --version
+```
+
+**Note**: For Ubuntu 24.04+, GCC 14 is available via package manager:
+```bash
+sudo apt install gcc-14 g++-14
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
+```
 
 ### Build Steps
 
@@ -152,16 +190,16 @@ git submodule update --init --recursive
 # Build
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
-cmake --build .
+cmake --build . -j$(nproc)
 
 # Optional: Run tests (requires Google Test)
 cmake .. -DBUILD_TESTING=ON
-cmake --build .
+cmake --build . -j$(nproc)
 ctest --output-on-failure
 
 # Optional: Build benchmarks (requires Google Benchmark)
 cmake .. -DBUILD_BENCHMARKS=ON
-cmake --build .
+cmake --build . -j$(nproc)
 ```
 
 ### Third-Party Dependencies
