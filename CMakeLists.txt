@@ -293,6 +293,35 @@ endif()
 
 target_compile_features(exchange-cpp PUBLIC cxx_std_26)
 
+# Sanitizer options: only apply to our own targets, not third-party libraries
+# Third-party libraries should use their own default compile options
+if(DEFINED ENV{ENABLE_SANITIZER_TSAN} AND "$ENV{ENABLE_SANITIZER_TSAN}")
+    target_compile_options(exchange-cpp PRIVATE
+        -fsanitize=thread
+        -fno-omit-frame-pointer
+        -fno-sanitize-recover=all
+    )
+    target_link_options(exchange-cpp PRIVATE -fsanitize=thread)
+    message(STATUS "ThreadSanitizer enabled for exchange-cpp")
+elseif(DEFINED ENV{ENABLE_SANITIZER_ASAN} AND "$ENV{ENABLE_SANITIZER_ASAN}")
+    target_compile_options(exchange-cpp PRIVATE
+        -fsanitize=address,undefined
+        -fno-omit-frame-pointer
+        -fno-sanitize-recover=all
+    )
+    target_link_options(exchange-cpp PRIVATE -fsanitize=address,undefined)
+    message(STATUS "AddressSanitizer+UBSan enabled for exchange-cpp")
+elseif(DEFINED ENV{ENABLE_SANITIZER_MSAN} AND "$ENV{ENABLE_SANITIZER_MSAN}")
+    target_compile_options(exchange-cpp PRIVATE
+        -fsanitize=memory,undefined
+        -fno-omit-frame-pointer
+        -fno-sanitize-recover=all
+        -fsanitize-memory-track-origins
+    )
+    target_link_options(exchange-cpp PRIVATE -fsanitize=memory,undefined)
+    message(STATUS "MemorySanitizer+UBSan enabled for exchange-cpp")
+endif()
+
 # Warning flags: treat warnings as errors, but suppress unused parameter warnings
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(exchange-cpp PRIVATE

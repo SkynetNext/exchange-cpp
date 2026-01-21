@@ -4,6 +4,34 @@ if(BUILD_TESTING AND GTest_FOUND)
     # List of all test executables (will be collected for all_tests target)
     set(ALL_TEST_TARGETS "")
 
+    # Function to apply sanitizer flags to test targets
+    # Tests inherit sanitizer from exchange-cpp, but we ensure they also have it directly
+    function(apply_sanitizer_to_target target_name)
+        if(DEFINED ENV{ENABLE_SANITIZER_TSAN} AND "$ENV{ENABLE_SANITIZER_TSAN}")
+            target_compile_options(${target_name} PRIVATE
+                -fsanitize=thread
+                -fno-omit-frame-pointer
+                -fno-sanitize-recover=all
+            )
+            target_link_options(${target_name} PRIVATE -fsanitize=thread)
+        elseif(DEFINED ENV{ENABLE_SANITIZER_ASAN} AND "$ENV{ENABLE_SANITIZER_ASAN}")
+            target_compile_options(${target_name} PRIVATE
+                -fsanitize=address,undefined
+                -fno-omit-frame-pointer
+                -fno-sanitize-recover=all
+            )
+            target_link_options(${target_name} PRIVATE -fsanitize=address,undefined)
+        elseif(DEFINED ENV{ENABLE_SANITIZER_MSAN} AND "$ENV{ENABLE_SANITIZER_MSAN}")
+            target_compile_options(${target_name} PRIVATE
+                -fsanitize=memory,undefined
+                -fno-omit-frame-pointer
+                -fno-sanitize-recover=all
+                -fsanitize-memory-track-origins
+            )
+            target_link_options(${target_name} PRIVATE -fsanitize=memory,undefined)
+        endif()
+    endfunction()
+
     # ============================================================================
     # Test utility library - shared utilities for tests
     # ============================================================================
@@ -35,6 +63,9 @@ if(BUILD_TESTING AND GTest_FOUND)
         PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}
     )
+    
+    # Apply sanitizer to test_utils (all tests link to it or exchange-cpp)
+    apply_sanitizer_to_target(test_utils)
 
     # ============================================================================
     # Unit Tests

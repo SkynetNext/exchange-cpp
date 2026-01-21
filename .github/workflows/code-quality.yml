@@ -48,6 +48,8 @@ jobs:
 
       - name: Configure CMake (ASan+UBSan)
         shell: bash
+        env:
+          ENABLE_SANITIZER_ASAN: "1"
         run: |
           CMAKE_ARGS=(
             -B build
@@ -59,9 +61,6 @@ jobs:
             -DBUILD_BENCHMARKS=OFF
             -DBUILD_EXAMPLES=ON
             -DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
-            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -g -O1"
-            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -g -O1"
-            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
           )
           cmake "${CMAKE_ARGS[@]}"
 
@@ -117,6 +116,8 @@ jobs:
 
       - name: Configure CMake (MSan+UBSan)
         shell: bash
+        env:
+          ENABLE_SANITIZER_MSAN: "1"
         run: |
           CMAKE_ARGS=(
             -B build
@@ -128,9 +129,6 @@ jobs:
             -DBUILD_BENCHMARKS=OFF
             -DBUILD_EXAMPLES=ON
             -DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
-            -DCMAKE_CXX_FLAGS="-fsanitize=memory,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -g -O1 -fsanitize-memory-track-origins"
-            -DCMAKE_C_FLAGS="-fsanitize=memory,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -g -O1 -fsanitize-memory-track-origins"
-            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=memory,undefined"
           )
           cmake "${CMAKE_ARGS[@]}"
 
@@ -201,6 +199,8 @@ jobs:
 
       - name: Configure CMake (TSan)
         shell: bash
+        env:
+          ENABLE_SANITIZER_TSAN: "1"
         run: |
           CMAKE_ARGS=(
             -B build
@@ -212,9 +212,6 @@ jobs:
             -DBUILD_BENCHMARKS=OFF
             -DBUILD_EXAMPLES=ON
             -DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
-            -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -fno-sanitize-recover=all -g -O1"
-            -DCMAKE_C_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -fno-sanitize-recover=all -g -O1"
-            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
           )
           cmake "${CMAKE_ARGS[@]}"
 
