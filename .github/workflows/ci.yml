@@ -10,9 +10,15 @@ on:
   workflow_dispatch:
 
 jobs:
-  linux-gcc:
-    runs-on: ubuntu-latest
+  test:
+    name: Test - Linux
+    # C++26 requires GCC 14+ / Clang 19+
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -27,13 +33,45 @@ jobs:
           git pull origin main || echo "Warning: Failed to pull latest changes"
           git log -1 --oneline
 
+      - name: Setup GCC
+        if: matrix.compiler == 'gcc'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-14 g++-14
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
+          gcc --version
+          g++ --version
+
+      - name: Setup Clang
+        if: matrix.compiler == 'clang'
+        run: |
+          sudo apt-get update
+          # Install GCC 14 first to get libstdc++ with C++26 support
+          sudo apt-get install -y gcc-14 g++-14
+          # Install Clang 19 from LLVM repository
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main" -y
+          sudo apt-get update
+          sudo apt-get install -y clang-19
+          # Install alternatives and explicitly set them
+          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100
+          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
+          # Explicitly select Clang 19 (--set is required, --install alone doesn't select)
+          sudo update-alternatives --set clang /usr/bin/clang-19
+          sudo update-alternatives --set clang++ /usr/bin/clang++-19
+          # Verify the selection
+          echo "Clang version:"
+          clang++ --version
+          echo "Clang path:"
+          which clang++
+
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
             ninja-build \
-            g++ \
             liblz4-dev \
             gdb \
             psmisc
@@ -41,89 +79,39 @@ jobs:
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
         with:
+          # CMake 3.30+ required for full cxx_std_26 support
           cmake-version: '3.30'
 
-      - name: Configure CMake (GCC)
+      - name: Configure CMake
+        shell: bash
         run: |
-          cmake -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=g++ \
-            -DBUILD_TESTING=ON \
-            -DBUILD_BENCHMARKS=OFF \
+          CMAKE_ARGS=(
+            -B build
+            -G Ninja
+            -DCMAKE_BUILD_TYPE=Release
+            -DBUILD_TESTING=ON
+            -DBUILD_BENCHMARKS=OFF
             -DBUILD_EXAMPLES=ON
-
-      - name: Build
-        run: cmake --build build --config Release
-
-      - name: Run tests (skip perf tests)
-        id: run_tests
-        run: |
-          cd build
-          # Each test has 5 minute timeout, job has 30 minute timeout
-          ctest --output-on-failure -E "Perf.*" --parallel $(nproc) --timeout 300
-
-      - name: Collect diagnostics on failure
-        if: failure() || cancelled()
-        run: |
-          echo "=== Test timeout or failure detected ==="
-          echo "Collecting diagnostic information..."
-          # List all processes
-          ps auxf || true
-          # Check for hung processes
-          pstree -p || true
-          # Try to get thread info if gdb is available
-          if command -v gdb &> /dev/null; then
-            echo "=== Attempting to get thread info ==="
-            for pid in $(pgrep -f test_integration || true); do
-              echo "Thread info for PID $pid:"
-              gdb -batch -ex "attach $pid" -ex "info threads" -ex "thread apply all bt" -ex "detach" -ex "quit" 2>&1 || true
-            done
+          )
+          if [ "${{ matrix.compiler }}" == "gcc" ]; then
+            CMAKE_ARGS+=(-DCMAKE_C_COMPILER=gcc)
+            CMAKE_ARGS+=(-DCMAKE_CXX_COMPILER=g++)
+            echo "Using GCC 14"
+            g++ --version
+          else
+            # Use explicit path to ensure Clang 19 is used
+            CMAKE_ARGS+=(-DCMAKE_C_COMPILER=/usr/bin/clang-19)
+            CMAKE_ARGS+=(-DCMAKE_CXX_COMPILER=/usr/bin/clang++-19)
+            # Ensure Clang uses GCC 14's libstdc++ for C++26 features
+            CMAKE_ARGS+=(-DCMAKE_CXX_FLAGS="-stdlib=libstdc++")
+            echo "Using Clang 19 with GCC 14 libstdc++"
+            /usr/bin/clang++-19 --version
           fi
-
-  linux-clang:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Update disruptor-cpp to latest main
-        run: |
-          cd third_party/disruptor-cpp || exit 1
-          git fetch origin main || echo "Warning: Failed to fetch disruptor-cpp"
-          git checkout main || echo "Warning: Failed to checkout main"
-          git pull origin main || echo "Warning: Failed to pull latest changes"
-          git log -1 --oneline
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            ninja-build \
-            clang \
-            liblz4-dev \
-            gdb \
-            psmisc
-
-      - name: Setup CMake
-        uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: '3.30'
-
-      - name: Configure CMake (Clang)
-        run: |
-          cmake -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DBUILD_TESTING=ON \
-            -DBUILD_BENCHMARKS=OFF \
-            -DBUILD_EXAMPLES=ON
+          # CMakeLists.txt sets CMAKE_CXX_STANDARD=26, CMake will handle the compiler flag
+          cmake "${CMAKE_ARGS[@]}"
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --config Release --parallel
 
       - name: Run tests (skip perf tests)
         id: run_tests
