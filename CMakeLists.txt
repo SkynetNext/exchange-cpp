@@ -184,16 +184,11 @@ else()
         GIT_TAG        v1.0.4
         GIT_SHALLOW    TRUE
     )
-    FetchContent_GetProperties(concurrentqueue)
-    if(NOT concurrentqueue_POPULATED)
-        FetchContent_Populate(concurrentqueue)
-        set(CONCURRENTQUEUE_INCLUDE_DIR ${concurrentqueue_SOURCE_DIR})
-        message(STATUS "Using moodycamel::concurrentqueue from FetchContent")
-    else()
-        # Already populated, get the source directory
-        FetchContent_GetProperties(concurrentqueue SOURCE_DIR concurrentqueue_SOURCE_DIR)
-        set(CONCURRENTQUEUE_INCLUDE_DIR ${concurrentqueue_SOURCE_DIR})
-    endif()
+    FetchContent_MakeAvailable(concurrentqueue)
+    # Get the source directory after MakeAvailable
+    FetchContent_GetProperties(concurrentqueue SOURCE_DIR concurrentqueue_SOURCE_DIR)
+    set(CONCURRENTQUEUE_INCLUDE_DIR ${concurrentqueue_SOURCE_DIR})
+    message(STATUS "Using moodycamel::concurrentqueue from FetchContent")
 endif()
 
 # spdlog: High-performance logging library (header-only, matches Java SLF4J+Logback)
