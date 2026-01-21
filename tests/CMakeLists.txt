@@ -527,6 +527,12 @@ if(BUILD_TESTING AND GTest_FOUND)
     add_test(NAME PerfThroughputJournaling COMMAND test_perf_throughput_journaling)
     list(APPEND ALL_TEST_TARGETS test_perf_throughput_journaling)
 
+    # Apply sanitizer to all test targets
+    # This ensures all test executables are linked with sanitizer libraries
+    foreach(test_target ${ALL_TEST_TARGETS})
+        apply_sanitizer_to_target(${test_target})
+    endforeach()
+
     # Create a custom target that builds all tests
     # This allows CMake Tools to build all tests at once
     add_custom_target(all_tests
