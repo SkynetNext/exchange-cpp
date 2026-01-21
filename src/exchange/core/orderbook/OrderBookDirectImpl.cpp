@@ -641,13 +641,14 @@ int32_t OrderBookDirectImpl::DirectOrder::GetStateHash() const {
   // Objects.hash(orderId, action, price, size, reserveBidPrice, filled, uid)
   // Match Order::GetStateHash() implementation for consistency
   int32_t result = 1;
-  result = result * 31 + static_cast<int32_t>(orderId ^ (orderId >> 32));
+  // XOR high 32 bits with low 32 bits, then cast to int32_t
+  result = result * 31 + static_cast<int32_t>((orderId >> 32) ^ static_cast<uint32_t>(orderId));
   result = result * 31 + static_cast<int32_t>(static_cast<int8_t>(action));
-  result = result * 31 + static_cast<int32_t>(price ^ (price >> 32));
-  result = result * 31 + static_cast<int32_t>(size ^ (size >> 32));
-  result = result * 31 + static_cast<int32_t>(reserveBidPrice ^ (reserveBidPrice >> 32));
-  result = result * 31 + static_cast<int32_t>(filled ^ (filled >> 32));
-  result = result * 31 + static_cast<int32_t>(uid ^ (uid >> 32));
+  result = result * 31 + static_cast<int32_t>((price >> 32) ^ static_cast<uint32_t>(price));
+  result = result * 31 + static_cast<int32_t>((size >> 32) ^ static_cast<uint32_t>(size));
+  result = result * 31 + static_cast<int32_t>((reserveBidPrice >> 32) ^ static_cast<uint32_t>(reserveBidPrice));
+  result = result * 31 + static_cast<int32_t>((filled >> 32) ^ static_cast<uint32_t>(filled));
+  result = result * 31 + static_cast<int32_t>((uid >> 32) ^ static_cast<uint32_t>(uid));
   return result;
 }
 
