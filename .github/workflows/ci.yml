@@ -53,7 +53,8 @@ jobs:
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
           sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main" -y
           sudo apt-get update
-          sudo apt-get install -y clang-19
+          # Install clang-19 and clang-tools-19 (contains clang-scan-deps)
+          sudo apt-get install -y clang-19 clang-tools-19
           # Install alternatives and explicitly set them
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
@@ -65,6 +66,8 @@ jobs:
           clang++ --version
           echo "Clang path:"
           which clang++
+          echo "clang-scan-deps:"
+          which clang-scan-deps || echo "clang-scan-deps not found"
 
       - name: Install dependencies
         run: |
