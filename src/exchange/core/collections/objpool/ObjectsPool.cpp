@@ -23,12 +23,15 @@ namespace exchange::core::collections::objpool {
 
 ObjectsPool* ObjectsPool::CreateDefaultTestPool() {
   std::unordered_map<int, int> config;
-  config[DIRECT_ORDER] = 512;
-  config[DIRECT_BUCKET] = 256;
-  config[ART_NODE_4] = 256;
-  config[ART_NODE_16] = 128;
-  config[ART_NODE_48] = 64;
-  config[ART_NODE_256] = 32;
+  // Increased capacities for tests that create many objects:
+  // - SequentialAsksTest creates ~2000 orders
+  // - ShouldLoadManyItems creates 100,000 ART entries (needs many nodes)
+  config[DIRECT_ORDER] = 4096;      // Increased from 512
+  config[DIRECT_BUCKET] = 2048;    // Increased from 256
+  config[ART_NODE_4] = 8192;        // Increased from 256 (for 100K items)
+  config[ART_NODE_16] = 4096;       // Increased from 128
+  config[ART_NODE_48] = 2048;       // Increased from 64
+  config[ART_NODE_256] = 1024;      // Increased from 32
   return new ObjectsPool(config);
 }
 
