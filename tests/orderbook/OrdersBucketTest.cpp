@@ -266,6 +266,13 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders2) {
     ASSERT_EQ(bucket_->GetNumOrders(), expectedNumOrders);
     ASSERT_EQ(bucket_->GetTotalVolume(), expectedVolume);
 
+    // CRITICAL: Save all orderIds BEFORE any deletion to avoid accessing freed memory
+    // Map order pointer to orderId for safe cleanup later
+    std::unordered_map<Order*, int64_t> orderToIdMap;
+    for (auto* order : orders) {
+      orderToIdMap[order] = order->orderId;
+    }
+
     std::mt19937 rng(1);
     std::shuffle(orders.begin(), orders.end(), rng);
 
@@ -273,11 +280,12 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders2) {
     std::set<int64_t> removedOrderIds;
 
     for (auto* order : orders1) {
-      auto removed = bucket_->Remove(order->orderId, UID_2);
+      int64_t orderId = orderToIdMap[order];  // Use saved orderId, not order->orderId
+      auto removed = bucket_->Remove(orderId, UID_2);
       ASSERT_NE(removed, nullptr);
       int64_t orderSize = removed->size;
       delete removed;
-      removedOrderIds.insert(order->orderId);
+      removedOrderIds.insert(orderId);  // Use saved orderId instead of order->orderId
       expectedNumOrders--;
       expectedVolume -= orderSize;
       ASSERT_EQ(bucket_->GetNumOrders(), expectedNumOrders);
@@ -313,12 +321,14 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders2) {
     // Clean up: only delete orders that were matched (removed from bucket) or
     // already deleted via Remove(). Orders still in bucket are left for
     // TearDown() to clean up to avoid modifying bucket state.
+    // Use saved orderId from map instead of accessing order->orderId (which may be freed)
     for (auto* order : orders) {
-      if (removedOrderIds.find(order->orderId) != removedOrderIds.end()) {
+      int64_t orderId = orderToIdMap[order];  // Use saved orderId, never access order->orderId
+      if (removedOrderIds.find(orderId) != removedOrderIds.end()) {
         // Already deleted via Remove(), skip
         continue;
       }
-      if (matchedOrderIds.find(order->orderId) != matchedOrderIds.end()) {
+      if (matchedOrderIds.find(orderId) != matchedOrderIds.end()) {
         // Matched and removed from bucket - safe to delete
         delete order;
       }
