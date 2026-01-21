@@ -1,8 +1,8 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.30)
 project(exchange-cpp VERSION 0.1.0 LANGUAGES CXX)
 
 # Set C++ standard
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -286,11 +286,16 @@ elseif(lz4_FOUND)
     message(STATUS "Linking system lz4 for compression support")
 endif()
 
-target_compile_features(exchange-cpp PUBLIC cxx_std_20)
+target_compile_features(exchange-cpp PUBLIC cxx_std_26)
 
-# Suppress unused parameter warnings
+# Warning flags: treat warnings as errors, but suppress unused parameter warnings
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    target_compile_options(exchange-cpp PRIVATE -Wno-unused-parameter)
+    target_compile_options(exchange-cpp PRIVATE
+        -Werror
+        -Wno-unused-parameter
+    )
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    target_compile_options(exchange-cpp PRIVATE /WX)
 endif()
 
 # Install rules

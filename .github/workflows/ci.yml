@@ -32,12 +32,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
-            cmake \
             ninja-build \
             g++ \
             liblz4-dev \
             gdb \
             psmisc
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.30'
 
       - name: Configure CMake (GCC)
         run: |
@@ -98,12 +102,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             build-essential \
-            cmake \
             ninja-build \
             clang \
             liblz4-dev \
             gdb \
             psmisc
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.30'
 
       - name: Configure CMake (Clang)
         run: |

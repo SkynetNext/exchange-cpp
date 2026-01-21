@@ -300,15 +300,15 @@ struct Bucket {
 ```cpp
 Bucket *toBucket = buckets.Get(order->price);  // 简单 KV 查询
 if (toBucket != nullptr) {
-    DirectOrder *oldTail = toBucket->lastOrder;
-    DirectOrder *prevOrder = oldTail->prev;
-    
-    toBucket->lastOrder = order;      // 更新 tail 指针
+DirectOrder *oldTail = toBucket->lastOrder;
+DirectOrder *prevOrder = oldTail->prev;
+
+toBucket->lastOrder = order;      // 更新 tail 指针
     oldTail->prev = order;            // 链接新订单
     order->next = oldTail;
     order->prev = prevOrder;
     if (prevOrder) prevOrder->next = order;
-    order->bucket = toBucket;
+order->bucket = toBucket;
 }
 ```
 
