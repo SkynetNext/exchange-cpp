@@ -23,17 +23,16 @@ namespace util {
 
 int TestOrdersGeneratorConfig::CalculateReadySeq() const {
   switch (preFillMode) {
-  case PreFillMode::ORDERS_NUMBER:
-    return targetOrderBookOrdersTotal;
-  case PreFillMode::ORDERS_NUMBER_PLUS_QUARTER:
-    return targetOrderBookOrdersTotal * 5 / 4;
-  default:
-    return targetOrderBookOrdersTotal;
+    case PreFillMode::ORDERS_NUMBER:
+      return targetOrderBookOrdersTotal;
+    case PreFillMode::ORDERS_NUMBER_PLUS_QUARTER:
+      return targetOrderBookOrdersTotal * 5 / 4;
+    default:
+      return targetOrderBookOrdersTotal;
   }
 }
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
-
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

@@ -15,11 +15,11 @@
  */
 
 #include "PerfLatency.h"
-#include "../util/LatencyTestsModule.h"
-#include "../util/TestDataParameters.h"
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
+#include "../util/LatencyTestsModule.h"
+#include "../util/TestDataParameters.h"
 
 using namespace exchange::core::tests::util;
 
@@ -29,8 +29,8 @@ namespace tests {
 namespace perf {
 
 void PerfLatency::TestLatencyMargin() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      LatencyPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::LatencyPerformanceBuilder();
   perfCfg.ringBufferSize = 2 * 1024;
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
@@ -39,15 +39,13 @@ void PerfLatency::TestLatencyMargin() {
   auto testParams = TestDataParameters::SinglePairMargin();
 
   LatencyTestsModule::LatencyTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(),
-      16);
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(), 16);
 }
 
 void PerfLatency::TestLatencyExchange() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      LatencyPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::LatencyPerformanceBuilder();
   perfCfg.ringBufferSize = 2 * 1024;
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
@@ -56,15 +54,13 @@ void PerfLatency::TestLatencyExchange() {
   auto testParams = TestDataParameters::SinglePairExchange();
 
   LatencyTestsModule::LatencyTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(),
-      16);
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(), 16);
 }
 
 void PerfLatency::TestLatencyMultiSymbolMedium() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      LatencyPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::LatencyPerformanceBuilder();
   perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 4;
   perfCfg.riskEnginesNum = 2;
@@ -73,14 +69,13 @@ void PerfLatency::TestLatencyMultiSymbolMedium() {
   auto testParams = TestDataParameters::Medium();
 
   LatencyTestsModule::LatencyTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(), 8);
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(), 8);
 }
 
 void PerfLatency::TestLatencyMultiSymbolLarge() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      LatencyPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::LatencyPerformanceBuilder();
   perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 4;
   perfCfg.riskEnginesNum = 2;
@@ -89,14 +84,13 @@ void PerfLatency::TestLatencyMultiSymbolLarge() {
   auto testParams = TestDataParameters::Large();
 
   LatencyTestsModule::LatencyTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(), 4);
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(), 4);
 }
 
 void PerfLatency::TestLatencyMultiSymbolHuge() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      LatencyPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::LatencyPerformanceBuilder();
   perfCfg.ringBufferSize = 64 * 1024;
   perfCfg.matchingEnginesNum = 4;
   perfCfg.riskEnginesNum = 2;
@@ -105,14 +99,13 @@ void PerfLatency::TestLatencyMultiSymbolHuge() {
   auto testParams = TestDataParameters::Huge();
 
   LatencyTestsModule::LatencyTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(), 2);
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(), 2);
 }
 
 void PerfLatency::TestLatencyMarginFixed8M() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      LatencyPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::LatencyPerformanceBuilder();
   perfCfg.ringBufferSize = 2 * 1024;
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
@@ -121,22 +114,29 @@ void PerfLatency::TestLatencyMarginFixed8M() {
   auto testParams = TestDataParameters::SinglePairMargin();
 
   LatencyTestsModule::LatencyTestFixedTps(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(),
-      8'000'000, // Fixed 6M TPS
-      16);       // 16 warmup cycles
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(),
+    8'000'000,  // Fixed 6M TPS
+    16);        // 16 warmup cycles
 }
 
 // Register tests
-TEST_F(PerfLatency, TestLatencyMargin) { TestLatencyMargin(); }
-TEST_F(PerfLatency, TestLatencyExchange) { TestLatencyExchange(); }
+TEST_F(PerfLatency, TestLatencyMargin) {
+  TestLatencyMargin();
+}
+
+TEST_F(PerfLatency, TestLatencyExchange) {
+  TestLatencyExchange();
+}
+
 TEST_F(PerfLatency, TestLatencyMultiSymbolMedium) {
   TestLatencyMultiSymbolMedium();
 }
+
 TEST_F(PerfLatency, TestLatencyMultiSymbolLarge) {
   TestLatencyMultiSymbolLarge();
 }
+
 // Disabled by default - requires 12+ threads CPU, 32GB RAM, and takes hours to
 // complete Run with: --gtest_also_run_disabled_tests to enable
 TEST_F(PerfLatency, DISABLED_TestLatencyMultiSymbolHuge) {
@@ -144,9 +144,11 @@ TEST_F(PerfLatency, DISABLED_TestLatencyMultiSymbolHuge) {
 }
 
 // Fixed TPS test for accurate flame graph analysis
-TEST_F(PerfLatency, TestLatencyMarginFixed8M) { TestLatencyMarginFixed8M(); }
+TEST_F(PerfLatency, TestLatencyMarginFixed8M) {
+  TestLatencyMarginFixed8M();
+}
 
-} // namespace perf
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace perf
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

@@ -15,17 +15,6 @@
  */
 
 #include "TestOrdersGenerator.h"
-#include "ExecutionTime.h"
-#include "RandomCollectionsMerger.h"
-#include "TestConstants.h"
-#include "TestOrdersGeneratorConfig.h"
-#include "TestOrdersGeneratorSession.h"
-#include "UserCurrencyAccountsGenerator.h"
-#include <algorithm>
-#include <atomic>
-#include <exchange/core/utils/FastNanoTime.h>
-#include <climits>
-#include <cmath>
 #include <exchange/core/common/MatcherEventType.h>
 #include <exchange/core/common/OrderAction.h>
 #include <exchange/core/common/OrderType.h>
@@ -38,10 +27,21 @@
 #include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/orderbook/IOrderBook.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
+#include <exchange/core/utils/FastNanoTime.h>
 #include <exchange/core/utils/Logger.h>
+#include <algorithm>
+#include <atomic>
+#include <climits>
+#include <cmath>
 #include <future>
 #include <memory>
 #include <unordered_map>
+#include "ExecutionTime.h"
+#include "RandomCollectionsMerger.h"
+#include "TestConstants.h"
+#include "TestOrdersGeneratorConfig.h"
+#include "TestOrdersGeneratorSession.h"
+#include "UserCurrencyAccountsGenerator.h"
 
 using namespace exchange::core::common;
 using namespace exchange::core::common::cmd;
@@ -57,23 +57,24 @@ static constexpr double CENTRAL_MOVE_ALPHA = 0.01;
 static constexpr int32_t CHECK_ORDERBOOK_STAT_EVERY_NTH_COMMAND = 512;
 
 // UID mapper: i -> i + 1
-std::function<int32_t(int32_t)> TestOrdersGenerator::UID_PLAIN_MAPPER =
-    [](int32_t i) { return i + 1; };
+std::function<int32_t(int32_t)> TestOrdersGenerator::UID_PLAIN_MAPPER = [](int32_t i) {
+  return i + 1;
+};
 
 // Store combined commands for GetCommands() to return reference
 // Using thread_local to avoid copying OrderCommand (which contains unique_ptr)
 static thread_local std::vector<OrderCommand> g_combinedCommands;
 
-std::vector<OrderCommand> &TestOrdersGenerator::GenResult::GetCommands() const {
+std::vector<OrderCommand>& TestOrdersGenerator::GenResult::GetCommands() const {
   g_combinedCommands.clear();
   g_combinedCommands.reserve(commandsFill.size() + commandsBenchmark.size());
 
   // Use Copy() method to create copies of OrderCommand (which contains
   // unique_ptr)
-  for (const auto &cmd : commandsFill) {
+  for (const auto& cmd : commandsFill) {
     g_combinedCommands.push_back(cmd.Copy());
   }
-  for (const auto &cmd : commandsBenchmark) {
+  for (const auto& cmd : commandsBenchmark) {
     g_combinedCommands.push_back(cmd.Copy());
   }
 
@@ -84,51 +85,45 @@ size_t TestOrdersGenerator::GenResult::Size() const {
   return commandsFill.size() + commandsBenchmark.size();
 }
 
-std::function<void(int64_t)>
-TestOrdersGenerator::CreateAsyncProgressLogger(int64_t total) {
+std::function<void(int64_t)> TestOrdersGenerator::CreateAsyncProgressLogger(int64_t total) {
   // Progress logger that logs every 5 seconds (matching Java implementation)
-  constexpr int64_t progressLogIntervalNs =
-      5'000'000'000LL; // 5 seconds in nanoseconds
+  constexpr int64_t progressLogIntervalNs = 5'000'000'000LL;  // 5 seconds in nanoseconds
   auto nextUpdateTime = std::make_shared<std::atomic<int64_t>>(
-      exchange::core::utils::FastNanoTime::Now() +
-      progressLogIntervalNs);
+    exchange::core::utils::FastNanoTime::Now() + progressLogIntervalNs);
   auto progress = std::make_shared<std::atomic<int64_t>>(0);
 
-  return [total, nextUpdateTime, progress,
-          progressLogIntervalNs](int64_t processed) {
+  return [total, nextUpdateTime, progress, progressLogIntervalNs](int64_t processed) {
     progress->fetch_add(processed);
     int64_t whenLogNext = nextUpdateTime->load();
     const int64_t timeNow = exchange::core::utils::FastNanoTime::Now();
     if (timeNow > whenLogNext) {
       int64_t expected = whenLogNext;
-      if (nextUpdateTime->compare_exchange_strong(
-              expected, timeNow + progressLogIntervalNs)) {
+      if (nextUpdateTime->compare_exchange_strong(expected, timeNow + progressLogIntervalNs)) {
         // Whichever thread won - it should print progress
         const int64_t done = progress->load();
         const float progressPercent = (done * 100.0f) / total;
-        LOG_DEBUG("Generating commands progress: {:.1f}% done ({} of {})...",
-                  progressPercent, done, total);
+        LOG_DEBUG("Generating commands progress: {:.1f}% done ({} of {})...", progressPercent, done,
+                  total);
       }
     }
   };
 }
 
 // Forward declarations for helper functions
-static void MatcherTradeEventEventHandler(TestOrdersGeneratorSession *session,
-                                          const MatcherTradeEvent *ev,
-                                          const OrderCommand *orderCommand);
-static void UpdateOrderBookSizeStat(TestOrdersGeneratorSession *session);
-static OrderCommand GenerateRandomGtcOrder(TestOrdersGeneratorSession *session);
-static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession *session);
-static OrderCommand
-GenerateRandomInstantOrder(TestOrdersGeneratorSession *session);
+static void MatcherTradeEventEventHandler(TestOrdersGeneratorSession* session,
+                                          const MatcherTradeEvent* ev,
+                                          const OrderCommand* orderCommand);
+static void UpdateOrderBookSizeStat(TestOrdersGeneratorSession* session);
+static OrderCommand GenerateRandomGtcOrder(TestOrdersGeneratorSession* session);
+static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession* session);
+static OrderCommand GenerateRandomInstantOrder(TestOrdersGeneratorSession* session);
 
 // Implementation of helper functions
-static void MatcherTradeEventEventHandler(TestOrdersGeneratorSession *session,
-                                          const MatcherTradeEvent *ev,
-                                          const OrderCommand *orderCommand) {
+static void MatcherTradeEventEventHandler(TestOrdersGeneratorSession* session,
+                                          const MatcherTradeEvent* ev,
+                                          const OrderCommand* orderCommand) {
   if (!session || !ev || !orderCommand) {
-    return; // Safety check
+    return;  // Safety check
   }
 
   int32_t activeOrderId = static_cast<int32_t>(orderCommand->orderId);
@@ -143,8 +138,7 @@ static void MatcherTradeEventEventHandler(TestOrdersGeneratorSession *session,
     }
 
     // decrease size (important for reduce operation)
-    auto it =
-        session->orderSizes.find(static_cast<int32_t>(ev->matchedOrderId));
+    auto it = session->orderSizes.find(static_cast<int32_t>(ev->matchedOrderId));
     if (it != session->orderSizes.end()) {
       it->second -= static_cast<int32_t>(ev->size);
       if (it->second < 0) {
@@ -152,8 +146,7 @@ static void MatcherTradeEventEventHandler(TestOrdersGeneratorSession *session,
       }
     }
 
-    session->lastTradePrice =
-        std::min(session->maxPrice, std::max(session->minPrice, ev->price));
+    session->lastTradePrice = std::min(session->maxPrice, std::max(session->minPrice, ev->price));
 
     if (ev->price <= session->minPrice) {
       session->priceDirection = 1;
@@ -178,8 +171,7 @@ static void MatcherTradeEventEventHandler(TestOrdersGeneratorSession *session,
   if (it != session->orderSizes.end()) {
     it->second -= static_cast<int32_t>(ev->size);
     if (it->second < 0) {
-      throw std::runtime_error("Incorrect filled size for order " +
-                               std::to_string(activeOrderId));
+      throw std::runtime_error("Incorrect filled size for order " + std::to_string(activeOrderId));
     }
   }
 
@@ -188,7 +180,7 @@ static void MatcherTradeEventEventHandler(TestOrdersGeneratorSession *session,
   }
 }
 
-static void UpdateOrderBookSizeStat(TestOrdersGeneratorSession *session) {
+static void UpdateOrderBookSizeStat(TestOrdersGeneratorSession* session) {
   int32_t ordersNumAsk = session->orderBook->GetOrdersNum(OrderAction::ASK);
   int32_t ordersNumBid = session->orderBook->GetOrdersNum(OrderAction::BID);
 
@@ -197,14 +189,11 @@ static void UpdateOrderBookSizeStat(TestOrdersGeneratorSession *session) {
   session->lastOrderBookOrdersSizeBid = ordersNumBid;
 
   if (session->initialOrdersPlaced || session->avalancheIOC) {
-    auto l2MarketDataSnapshot =
-        session->orderBook->GetL2MarketDataSnapshot(INT32_MAX);
+    auto l2MarketDataSnapshot = session->orderBook->GetL2MarketDataSnapshot(INT32_MAX);
 
     if (session->avalancheIOC) {
-      session->lastTotalVolumeAsk =
-          l2MarketDataSnapshot->TotalOrderBookVolumeAsk();
-      session->lastTotalVolumeBid =
-          l2MarketDataSnapshot->TotalOrderBookVolumeBid();
+      session->lastTotalVolumeAsk = l2MarketDataSnapshot->TotalOrderBookVolumeAsk();
+      session->lastTotalVolumeBid = l2MarketDataSnapshot->TotalOrderBookVolumeBid();
     }
 
     if (session->initialOrdersPlaced) {
@@ -216,12 +205,10 @@ static void UpdateOrderBookSizeStat(TestOrdersGeneratorSession *session) {
   }
 }
 
-static OrderCommand
-GenerateRandomGtcOrder(TestOrdersGeneratorSession *session) {
+static OrderCommand GenerateRandomGtcOrder(TestOrdersGeneratorSession* session) {
   // Match Java: rand.nextInt(4)
-  OrderAction action = (session->rand.nextInt(4) + session->priceDirection >= 2)
-                           ? OrderAction::BID
-                           : OrderAction::ASK;
+  OrderAction action =
+    (session->rand.nextInt(4) + session->priceDirection >= 2) ? OrderAction::BID : OrderAction::ASK;
 
   // Match Java: rand.nextInt(session.numUsers)
   int32_t uid = session->uidMapper(session->rand.nextInt(session->numUsers));
@@ -229,10 +216,9 @@ GenerateRandomGtcOrder(TestOrdersGeneratorSession *session) {
 
   // Match Java: Math.pow(rand.nextDouble(), 2)
   int32_t dev =
-      1 + static_cast<int32_t>(std::pow(session->rand.nextDouble(), 2) *
-                               session->priceDeviation);
+    1 + static_cast<int32_t>(std::pow(session->rand.nextDouble(), 2) * session->priceDeviation);
   if (dev <= 0) {
-    dev = 1; // Ensure dev is at least 1
+    dev = 1;  // Ensure dev is at least 1
   }
 
   int64_t p = 0;
@@ -249,8 +235,7 @@ GenerateRandomGtcOrder(TestOrdersGeneratorSession *session) {
   int64_t price = session->lastTradePrice + p;
 
   // Match Java: rand.nextInt(6) * rand.nextInt(6) * rand.nextInt(6)
-  int32_t size = 1 + session->rand.nextInt(6) * session->rand.nextInt(6) *
-                         session->rand.nextInt(6);
+  int32_t size = 1 + session->rand.nextInt(6) * session->rand.nextInt(6) * session->rand.nextInt(6);
 
   session->orderPrices[newOrderId] = price;
   session->orderSizes[newOrderId] = size;
@@ -258,25 +243,21 @@ GenerateRandomGtcOrder(TestOrdersGeneratorSession *session) {
   session->counterPlaceLimit++;
   session->seq++;
 
-  return OrderCommand::NewOrder(
-      OrderType::GTC, newOrderId, uid, price,
-      action == OrderAction::BID ? session->maxPrice : 0, size, action);
+  return OrderCommand::NewOrder(OrderType::GTC, newOrderId, uid, price,
+                                action == OrderAction::BID ? session->maxPrice : 0, size, action);
 }
 
-static OrderCommand
-GenerateRandomInstantOrder(TestOrdersGeneratorSession *session) {
+static OrderCommand GenerateRandomInstantOrder(TestOrdersGeneratorSession* session) {
   // Match Java: rand.nextInt(4)
-  OrderAction action = (session->rand.nextInt(4) + session->priceDirection >= 2)
-                           ? OrderAction::BID
-                           : OrderAction::ASK;
+  OrderAction action =
+    (session->rand.nextInt(4) + session->priceDirection >= 2) ? OrderAction::BID : OrderAction::ASK;
 
   // Match Java: rand.nextInt(session.numUsers)
   int32_t uid = session->uidMapper(session->rand.nextInt(session->numUsers));
 
   int32_t newOrderId = session->seq;
 
-  int64_t priceLimit =
-      action == OrderAction::BID ? session->maxPrice : session->minPrice;
+  int64_t priceLimit = action == OrderAction::BID ? session->maxPrice : session->minPrice;
 
   int64_t size;
   OrderType orderType;
@@ -288,9 +269,8 @@ GenerateRandomInstantOrder(TestOrdersGeneratorSession *session) {
     orderType = OrderType::IOC;
     priceOrBudget = priceLimit;
     reserveBidPrice = action == OrderAction::BID ? session->maxPrice : 0;
-    int64_t availableVolume = action == OrderAction::ASK
-                                  ? session->lastTotalVolumeAsk
-                                  : session->lastTotalVolumeBid;
+    int64_t availableVolume =
+      action == OrderAction::ASK ? session->lastTotalVolumeAsk : session->lastTotalVolumeBid;
 
     // Ensure availableVolume is non-negative
     if (availableVolume < 0) {
@@ -304,12 +284,12 @@ GenerateRandomInstantOrder(TestOrdersGeneratorSession *session) {
 
     if (action == OrderAction::ASK) {
       session->lastTotalVolumeAsk =
-          std::max(session->lastTotalVolumeAsk - size, static_cast<int64_t>(0));
+        std::max(session->lastTotalVolumeAsk - size, static_cast<int64_t>(0));
     } else {
       // Match Java bug: should be lastTotalVolumeBid but Java uses
       // lastTotalVolumeAsk
       session->lastTotalVolumeBid =
-          std::max(session->lastTotalVolumeAsk - size, static_cast<int64_t>(0));
+        std::max(session->lastTotalVolumeAsk - size, static_cast<int64_t>(0));
     }
 
   } else {
@@ -318,8 +298,7 @@ GenerateRandomInstantOrder(TestOrdersGeneratorSession *session) {
       // IOC:FOKB = 31:1
       orderType = OrderType::FOK_BUDGET;
       // Match Java: rand.nextInt(8) * rand.nextInt(8) * rand.nextInt(8)
-      size = 1 + session->rand.nextInt(8) * session->rand.nextInt(8) *
-                     session->rand.nextInt(8);
+      size = 1 + session->rand.nextInt(8) * session->rand.nextInt(8) * session->rand.nextInt(8);
       priceOrBudget = size * priceLimit;
       reserveBidPrice = priceOrBudget;
     } else {
@@ -327,8 +306,7 @@ GenerateRandomInstantOrder(TestOrdersGeneratorSession *session) {
       priceOrBudget = priceLimit;
       reserveBidPrice = action == OrderAction::BID ? session->maxPrice : 0;
       // Match Java: rand.nextInt(6) * rand.nextInt(6) * rand.nextInt(6)
-      size = 1 + session->rand.nextInt(6) * session->rand.nextInt(6) *
-                     session->rand.nextInt(6);
+      size = 1 + session->rand.nextInt(6) * session->rand.nextInt(6) * session->rand.nextInt(6);
     }
   }
 
@@ -336,19 +314,18 @@ GenerateRandomInstantOrder(TestOrdersGeneratorSession *session) {
   session->counterPlaceMarket++;
   session->seq++;
 
-  return OrderCommand::NewOrder(orderType, newOrderId, uid, priceOrBudget,
-                                reserveBidPrice, size, action);
+  return OrderCommand::NewOrder(orderType, newOrderId, uid, priceOrBudget, reserveBidPrice, size,
+                                action);
 }
 
-static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession *session) {
+static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession* session) {
   // TODO move to lastOrderBookOrdersSize writer method
   int32_t lackOfOrdersAsk =
-      session->targetOrderBookOrdersHalf - session->lastOrderBookOrdersSizeAsk;
+    session->targetOrderBookOrdersHalf - session->lastOrderBookOrdersSizeAsk;
   int32_t lackOfOrdersBid =
-      session->targetOrderBookOrdersHalf - session->lastOrderBookOrdersSizeBid;
+    session->targetOrderBookOrdersHalf - session->lastOrderBookOrdersSizeBid;
 
-  if (!session->initialOrdersPlaced && lackOfOrdersAsk <= 0 &&
-      lackOfOrdersBid <= 0) {
+  if (!session->initialOrdersPlaced && lackOfOrdersAsk <= 0 && lackOfOrdersBid <= 0) {
     session->initialOrdersPlaced = true;
 
     session->counterPlaceMarket = 0;
@@ -359,15 +336,13 @@ static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession *session) {
   }
 
   // Match Java: rand.nextInt(4)
-  OrderAction action = (session->rand.nextInt(4) + session->priceDirection >= 2)
-                           ? OrderAction::BID
-                           : OrderAction::ASK;
+  OrderAction action =
+    (session->rand.nextInt(4) + session->priceDirection >= 2) ? OrderAction::BID : OrderAction::ASK;
 
-  int32_t lackOfOrders =
-      (action == OrderAction::ASK) ? lackOfOrdersAsk : lackOfOrdersBid;
+  int32_t lackOfOrders = (action == OrderAction::ASK) ? lackOfOrdersAsk : lackOfOrdersBid;
 
-  bool requireFastFill = session->filledAtSeq == -1 ||
-                         lackOfOrders > session->lackOrOrdersFastFillThreshold;
+  bool requireFastFill =
+    session->filledAtSeq == -1 || lackOfOrders > session->lackOrOrdersFastFillThreshold;
 
   bool growOrders = lackOfOrders > 0;
 
@@ -452,8 +427,7 @@ static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession *session) {
     }
     int64_t prevPrice = priceIt->second;
 
-    double priceMove =
-        (session->lastTradePrice - prevPrice) * CENTRAL_MOVE_ALPHA;
+    double priceMove = (session->lastTradePrice - prevPrice) * CENTRAL_MOVE_ALPHA;
     int64_t priceMoveRounded;
     if (prevPrice > session->lastTradePrice) {
       priceMoveRounded = static_cast<int64_t>(std::floor(priceMove));
@@ -464,8 +438,7 @@ static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession *session) {
       priceMoveRounded = session->rand.nextInt(2) * 2 - 1;
     }
 
-    int64_t newPrice =
-        std::min(prevPrice + priceMoveRounded, session->maxPrice);
+    int64_t newPrice = std::min(prevPrice + priceMoveRounded, session->maxPrice);
 
     session->counterMove++;
     session->orderPrices[orderId] = newPrice;
@@ -475,12 +448,16 @@ static OrderCommand GenerateRandomOrder(TestOrdersGeneratorSession *session) {
 }
 
 // Main GenerateCommands implementation
-TestOrdersGenerator::GenResult TestOrdersGenerator::GenerateCommands(
-    int benchmarkTransactionsNumber, int targetOrderBookOrders, int numUsers,
-    std::function<int32_t(int32_t)> uidMapper, int32_t symbol,
-    bool enableSlidingPrice, bool avalancheIOC,
-    std::function<void(int64_t)> asyncProgressConsumer, int seed) {
-
+TestOrdersGenerator::GenResult
+TestOrdersGenerator::GenerateCommands(int benchmarkTransactionsNumber,
+                                      int targetOrderBookOrders,
+                                      int numUsers,
+                                      std::function<int32_t(int32_t)> uidMapper,
+                                      int32_t symbol,
+                                      bool enableSlidingPrice,
+                                      bool avalancheIOC,
+                                      std::function<void(int64_t)> asyncProgressConsumer,
+                                      int seed) {
   GenResult result;
   result.commandsFill.reserve(targetOrderBookOrders);
   result.commandsBenchmark.reserve(benchmarkTransactionsNumber);
@@ -500,19 +477,18 @@ TestOrdersGenerator::GenResult TestOrdersGenerator::GenerateCommands(
     symbolSpec = TestConstants::CreateSymbolSpecEurUsd();
   }
   std::unique_ptr<IOrderBook> orderBook =
-      std::make_unique<OrderBookNaiveImpl>(&symbolSpec, nullptr, nullptr);
+    std::make_unique<OrderBookNaiveImpl>(&symbolSpec, nullptr, nullptr);
 
   // Create session
-  TestOrdersGeneratorSession session(
-      orderBook.get(), benchmarkTransactionsNumber,
-      targetOrderBookOrders / 2, // asks + bids
-      avalancheIOC, numUsers, uidMapper, symbol, enableSlidingPrice, seed);
+  TestOrdersGeneratorSession session(orderBook.get(), benchmarkTransactionsNumber,
+                                     targetOrderBookOrders / 2,  // asks + bids
+                                     avalancheIOC, numUsers, uidMapper, symbol, enableSlidingPrice,
+                                     seed);
 
-  int32_t nextSizeCheck = std::min(CHECK_ORDERBOOK_STAT_EVERY_NTH_COMMAND,
-                                   targetOrderBookOrders + 1);
+  int32_t nextSizeCheck =
+    std::min(CHECK_ORDERBOOK_STAT_EVERY_NTH_COMMAND, targetOrderBookOrders + 1);
 
-  int32_t totalCommandsNumber =
-      benchmarkTransactionsNumber + targetOrderBookOrders;
+  int32_t totalCommandsNumber = benchmarkTransactionsNumber + targetOrderBookOrders;
 
   int32_t lastProgressReported = 0;
 
@@ -538,17 +514,15 @@ TestOrdersGenerator::GenResult TestOrdersGenerator::GenerateCommands(
       result.commandsBenchmark.push_back(cmd.Copy());
     }
 
-    CommandResultCode resultCode =
-        IOrderBook::ProcessCommand(orderBook.get(), &cmd);
+    CommandResultCode resultCode = IOrderBook::ProcessCommand(orderBook.get(), &cmd);
     if (resultCode != CommandResultCode::SUCCESS) {
-      throw std::runtime_error("Unsuccessful result code: " +
-                               std::to_string(static_cast<int>(resultCode)) +
-                               " for command");
+      throw std::runtime_error("Unsuccessful result code: "
+                               + std::to_string(static_cast<int>(resultCode)) + " for command");
     }
 
     // process and cleanup matcher events
     if (cmd.matcherEvent != nullptr) {
-      cmd.ProcessMatcherEvents([&session, &cmd](const MatcherTradeEvent *ev) {
+      cmd.ProcessMatcherEvents([&session, &cmd](const MatcherTradeEvent* ev) {
         if (ev != nullptr) {
           MatcherTradeEventEventHandler(&session, ev, &cmd);
         }
@@ -560,8 +534,7 @@ TestOrdersGenerator::GenResult TestOrdersGenerator::GenerateCommands(
     }
 
     if (i >= nextSizeCheck) {
-      nextSizeCheck += std::min(CHECK_ORDERBOOK_STAT_EVERY_NTH_COMMAND,
-                                targetOrderBookOrders + 1);
+      nextSizeCheck += std::min(CHECK_ORDERBOOK_STAT_EVERY_NTH_COMMAND, targetOrderBookOrders + 1);
       UpdateOrderBookSizeStat(&session);
     }
 
@@ -590,8 +563,7 @@ TestOrdersGenerator::GenResult TestOrdersGenerator::GenerateCommands(
 // Java: ParetoDistribution(new JDKRandomGenerator(seed), scale=0.001,
 // shape=1.5) Pareto distribution: f(x) = (shape * scale^shape) / x^(shape+1)
 // for x >= scale To generate: X = scale / U^(1/shape) where U ~ Uniform(0,1)
-std::vector<double> TestOrdersGenerator::CreateWeightedDistribution(int size,
-                                                                    int seed) {
+std::vector<double> TestOrdersGenerator::CreateWeightedDistribution(int size, int seed) {
   constexpr double scale = 0.001;
   constexpr double shape = 1.5;
 
@@ -628,51 +600,47 @@ std::vector<double> TestOrdersGenerator::CreateWeightedDistribution(int size,
 
 // Generate multiple symbols test commands
 TestOrdersGenerator::MultiSymbolGenResult
-TestOrdersGenerator::GenerateMultipleSymbols(
-    const TestOrdersGeneratorConfig &config) {
+TestOrdersGenerator::GenerateMultipleSymbols(const TestOrdersGeneratorConfig& config) {
   // Use ExecutionTime to log total generation time (matching Java
   // implementation)
-  ExecutionTime executionTime([](const std::string &timeStr) {
-    LOG_DEBUG("All test commands generated in {}", timeStr);
-  });
+  ExecutionTime executionTime(
+    [](const std::string& timeStr) { LOG_DEBUG("All test commands generated in {}", timeStr); });
 
   MultiSymbolGenResult multiResult;
 
   // Match Java: create weighted distribution
-  std::vector<double> distribution = CreateWeightedDistribution(
-      config.coreSymbolSpecifications.size(), config.seed);
+  std::vector<double> distribution =
+    CreateWeightedDistribution(config.coreSymbolSpecifications.size(), config.seed);
 
   int quotaLeft = config.totalTransactionsNumber;
   std::unordered_map<int32_t, GenResult> genResults;
 
   // Match Java: shared progress logger
-  auto sharedProgressLogger = CreateAsyncProgressLogger(
-      config.totalTransactionsNumber + config.targetOrderBookOrdersTotal);
+  auto sharedProgressLogger =
+    CreateAsyncProgressLogger(config.totalTransactionsNumber + config.targetOrderBookOrdersTotal);
 
   // Match Java: iterate from last to first (reverse order)
-  for (int i = static_cast<int>(config.coreSymbolSpecifications.size()) - 1;
-       i >= 0; i--) {
-    const auto &symbolSpec = config.coreSymbolSpecifications[i];
+  for (int i = static_cast<int>(config.coreSymbolSpecifications.size()) - 1; i >= 0; i--) {
+    const auto& symbolSpec = config.coreSymbolSpecifications[i];
 
     // Match Java: orderBookSizeTarget = (int) (targetOrderBookOrdersTotal *
     // distribution[i] + 0.5)
-    int orderBookSizeTarget = static_cast<int>(
-        config.targetOrderBookOrdersTotal * distribution[i] + 0.5);
+    int orderBookSizeTarget =
+      static_cast<int>(config.targetOrderBookOrdersTotal * distribution[i] + 0.5);
 
     // Match Java: commandsNum = (i != 0) ? (int) (totalTransactionsNumber *
     // distribution[i] + 0.5) : Math.max(quotaLeft, 1)
-    int commandsNum =
-        (i != 0) ? static_cast<int>(
-                       config.totalTransactionsNumber * distribution[i] + 0.5)
-                 : std::max(quotaLeft, 1);
+    int commandsNum = (i != 0)
+                        ? static_cast<int>(config.totalTransactionsNumber * distribution[i] + 0.5)
+                        : std::max(quotaLeft, 1);
     quotaLeft -= commandsNum;
 
     // Get users that can trade this symbol
-    auto userList = UserCurrencyAccountsGenerator::CreateUserListForSymbol(
-        config.usersAccounts, symbolSpec, commandsNum);
+    auto userList = UserCurrencyAccountsGenerator::CreateUserListForSymbol(config.usersAccounts,
+                                                                           symbolSpec, commandsNum);
 
     if (userList.empty()) {
-      continue; // Skip symbols with no eligible users
+      continue;  // Skip symbols with no eligible users
     }
 
     // Create UID mapper for this symbol
@@ -680,19 +648,17 @@ TestOrdersGenerator::GenerateMultipleSymbols(
       if (index >= 0 && index < static_cast<int32_t>(userList.size())) {
         return userList[index];
       }
-      return index + 1; // Fallback to plain mapper
+      return index + 1;  // Fallback to plain mapper
     };
 
     // Generate commands for this symbol
-    int targetOrders =
-        (config.preFillMode == util::PreFillMode::ORDERS_NUMBER_PLUS_QUARTER)
-            ? orderBookSizeTarget * 5 / 4
-            : orderBookSizeTarget;
+    int targetOrders = (config.preFillMode == util::PreFillMode::ORDERS_NUMBER_PLUS_QUARTER)
+                         ? orderBookSizeTarget * 5 / 4
+                         : orderBookSizeTarget;
 
     auto genResult = GenerateCommands(
-        commandsNum, orderBookSizeTarget, static_cast<int>(userList.size()),
-        uidMapper, symbolSpec.symbolId, false, config.avalancheIOC,
-        sharedProgressLogger, config.seed);
+      commandsNum, orderBookSizeTarget, static_cast<int>(userList.size()), uidMapper,
+      symbolSpec.symbolId, false, config.avalancheIOC, sharedProgressLogger, config.seed);
 
     // Store per-symbol result
     genResults.emplace(symbolSpec.symbolId, std::move(genResult));
@@ -703,17 +669,15 @@ TestOrdersGenerator::GenerateMultipleSymbols(
   // Note: Java version directly uses OrderCommand objects (which are copyable
   // in Java) C++ version needs to use Copy() because OrderCommand contains
   // unique_ptr
-  std::vector<std::vector<exchange::core::common::cmd::OrderCommand>>
-      fillCommandsLists;
-  std::vector<std::vector<exchange::core::common::cmd::OrderCommand>>
-      benchmarkCommandsLists;
+  std::vector<std::vector<exchange::core::common::cmd::OrderCommand>> fillCommandsLists;
+  std::vector<std::vector<exchange::core::common::cmd::OrderCommand>> benchmarkCommandsLists;
 
-  for (const auto &pair : genResults) {
+  for (const auto& pair : genResults) {
     // For fill commands, we need to copy them since they'll be moved during
     // merge
     std::vector<exchange::core::common::cmd::OrderCommand> fillCmds;
     fillCmds.reserve(pair.second.commandsFill.size());
-    for (const auto &cmd : pair.second.commandsFill) {
+    for (const auto& cmd : pair.second.commandsFill) {
       fillCmds.push_back(cmd.Copy());
     }
     fillCommandsLists.push_back(std::move(fillCmds));
@@ -721,7 +685,7 @@ TestOrdersGenerator::GenerateMultipleSymbols(
     // For benchmark commands, same approach
     std::vector<exchange::core::common::cmd::OrderCommand> benchmarkCmds;
     benchmarkCmds.reserve(pair.second.commandsBenchmark.size());
-    for (const auto &cmd : pair.second.commandsBenchmark) {
+    for (const auto& cmd : pair.second.commandsBenchmark) {
       benchmarkCmds.push_back(cmd.Copy());
     }
     benchmarkCommandsLists.push_back(std::move(benchmarkCmds));
@@ -730,59 +694,51 @@ TestOrdersGenerator::GenerateMultipleSymbols(
   // Merge using RandomCollectionsMerger (matching Java)
   // The merge will move elements from the input vectors, so they'll be consumed
   multiResult.commandsFill =
-      RandomCollectionsMerger::MergeCollections(fillCommandsLists, config.seed);
-  multiResult.commandsBenchmark = RandomCollectionsMerger::MergeCollections(
-      benchmarkCommandsLists, config.seed);
+    RandomCollectionsMerger::MergeCollections(fillCommandsLists, config.seed);
+  multiResult.commandsBenchmark =
+    RandomCollectionsMerger::MergeCollections(benchmarkCommandsLists, config.seed);
 
   // Store genResults
   multiResult.genResults = std::move(genResults);
 
   // Log merging commands
-  LOG_DEBUG("Merging {} commands for {} symbols (preFill)...",
-            multiResult.commandsFill.size(),
+  LOG_DEBUG("Merging {} commands for {} symbols (preFill)...", multiResult.commandsFill.size(),
             config.coreSymbolSpecifications.size());
   LOG_DEBUG("Merging {} commands for {} symbols (benchmark)...",
-            multiResult.commandsBenchmark.size(),
-            config.coreSymbolSpecifications.size());
+            multiResult.commandsBenchmark.size(), config.coreSymbolSpecifications.size());
 
   return multiResult;
 }
 
 // Implementation of MultiSymbolGenResult methods
-std::future<std::vector<exchange::core::common::api::ApiCommand *>>
+std::future<std::vector<exchange::core::common::api::ApiCommand*>>
 TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsFill() const {
   // Convert to ApiCommand* and return as future (for async compatibility)
-  std::promise<std::vector<exchange::core::common::api::ApiCommand *>> promise;
+  std::promise<std::vector<exchange::core::common::api::ApiCommand*>> promise;
   auto future = promise.get_future();
 
   ExecutionTime executionTime;
-  std::vector<exchange::core::common::api::ApiCommand *> apiCommands;
+  std::vector<exchange::core::common::api::ApiCommand*> apiCommands;
   apiCommands.reserve(commandsFill.size());
 
-  for (const auto &cmd : commandsFill) {
-    exchange::core::common::api::ApiCommand *apiCmd = nullptr;
-    if (cmd.command ==
-        exchange::core::common::cmd::OrderCommandType::PLACE_ORDER) {
+  for (const auto& cmd : commandsFill) {
+    exchange::core::common::api::ApiCommand* apiCmd = nullptr;
+    if (cmd.command == exchange::core::common::cmd::OrderCommandType::PLACE_ORDER) {
       apiCmd = new exchange::core::common::api::ApiPlaceOrder(
-          cmd.price, cmd.size, cmd.orderId, cmd.action, cmd.orderType, cmd.uid,
-          cmd.symbol, cmd.userCookie, cmd.reserveBidPrice);
-    } else if (cmd.command ==
-               exchange::core::common::cmd::OrderCommandType::MOVE_ORDER) {
-      apiCmd = new exchange::core::common::api::ApiMoveOrder(
-          cmd.orderId, cmd.price, cmd.uid, cmd.symbol);
-    } else if (cmd.command ==
-               exchange::core::common::cmd::OrderCommandType::CANCEL_ORDER) {
-      apiCmd = new exchange::core::common::api::ApiCancelOrder(
-          cmd.orderId, cmd.uid, cmd.symbol);
-    } else if (cmd.command ==
-               exchange::core::common::cmd::OrderCommandType::REDUCE_ORDER) {
-      apiCmd = new exchange::core::common::api::ApiReduceOrder(
-          cmd.orderId, cmd.uid, cmd.symbol, cmd.size);
+        cmd.price, cmd.size, cmd.orderId, cmd.action, cmd.orderType, cmd.uid, cmd.symbol,
+        cmd.userCookie, cmd.reserveBidPrice);
+    } else if (cmd.command == exchange::core::common::cmd::OrderCommandType::MOVE_ORDER) {
+      apiCmd =
+        new exchange::core::common::api::ApiMoveOrder(cmd.orderId, cmd.price, cmd.uid, cmd.symbol);
+    } else if (cmd.command == exchange::core::common::cmd::OrderCommandType::CANCEL_ORDER) {
+      apiCmd = new exchange::core::common::api::ApiCancelOrder(cmd.orderId, cmd.uid, cmd.symbol);
+    } else if (cmd.command == exchange::core::common::cmd::OrderCommandType::REDUCE_ORDER) {
+      apiCmd =
+        new exchange::core::common::api::ApiReduceOrder(cmd.orderId, cmd.uid, cmd.symbol, cmd.size);
     } else {
       // Match Java: throw exception for unsupported command type
-      throw std::runtime_error(
-          "Unsupported command type in GetApiCommandsFill: " +
-          std::to_string(static_cast<int>(cmd.command)));
+      throw std::runtime_error("Unsupported command type in GetApiCommandsFill: "
+                               + std::to_string(static_cast<int>(cmd.command)));
     }
     if (apiCmd) {
       apiCommands.push_back(apiCmd);
@@ -795,13 +751,13 @@ TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsFill() const {
   return future;
 }
 
-std::future<std::vector<exchange::core::common::api::ApiCommand *>>
+std::future<std::vector<exchange::core::common::api::ApiCommand*>>
 TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsBenchmark() const {
-  std::promise<std::vector<exchange::core::common::api::ApiCommand *>> promise;
+  std::promise<std::vector<exchange::core::common::api::ApiCommand*>> promise;
   auto future = promise.get_future();
 
   ExecutionTime executionTime;
-  std::vector<exchange::core::common::api::ApiCommand *> apiCommands;
+  std::vector<exchange::core::common::api::ApiCommand*> apiCommands;
   apiCommands.reserve(commandsBenchmark.size());
 
   // Count command types for statistics
@@ -813,41 +769,34 @@ TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsBenchmark() const {
   int counterReduce = 0;
   std::unordered_map<int32_t, int> symbolCounters;
 
-  for (const auto &cmd : commandsBenchmark) {
-    exchange::core::common::api::ApiCommand *apiCmd = nullptr;
-    if (cmd.command ==
-        exchange::core::common::cmd::OrderCommandType::PLACE_ORDER) {
+  for (const auto& cmd : commandsBenchmark) {
+    exchange::core::common::api::ApiCommand* apiCmd = nullptr;
+    if (cmd.command == exchange::core::common::cmd::OrderCommandType::PLACE_ORDER) {
       apiCmd = new exchange::core::common::api::ApiPlaceOrder(
-          cmd.price, cmd.size, cmd.orderId, cmd.action, cmd.orderType, cmd.uid,
-          cmd.symbol, cmd.userCookie, cmd.reserveBidPrice);
+        cmd.price, cmd.size, cmd.orderId, cmd.action, cmd.orderType, cmd.uid, cmd.symbol,
+        cmd.userCookie, cmd.reserveBidPrice);
       if (cmd.orderType == exchange::core::common::OrderType::GTC) {
         counterPlaceGTC++;
       } else if (cmd.orderType == exchange::core::common::OrderType::IOC) {
         counterPlaceIOC++;
-      } else if (cmd.orderType ==
-                 exchange::core::common::OrderType::FOK_BUDGET) {
+      } else if (cmd.orderType == exchange::core::common::OrderType::FOK_BUDGET) {
         counterPlaceFOKB++;
       }
-    } else if (cmd.command ==
-               exchange::core::common::cmd::OrderCommandType::MOVE_ORDER) {
-      apiCmd = new exchange::core::common::api::ApiMoveOrder(
-          cmd.orderId, cmd.price, cmd.uid, cmd.symbol);
+    } else if (cmd.command == exchange::core::common::cmd::OrderCommandType::MOVE_ORDER) {
+      apiCmd =
+        new exchange::core::common::api::ApiMoveOrder(cmd.orderId, cmd.price, cmd.uid, cmd.symbol);
       counterMove++;
-    } else if (cmd.command ==
-               exchange::core::common::cmd::OrderCommandType::CANCEL_ORDER) {
-      apiCmd = new exchange::core::common::api::ApiCancelOrder(
-          cmd.orderId, cmd.uid, cmd.symbol);
+    } else if (cmd.command == exchange::core::common::cmd::OrderCommandType::CANCEL_ORDER) {
+      apiCmd = new exchange::core::common::api::ApiCancelOrder(cmd.orderId, cmd.uid, cmd.symbol);
       counterCancel++;
-    } else if (cmd.command ==
-               exchange::core::common::cmd::OrderCommandType::REDUCE_ORDER) {
-      apiCmd = new exchange::core::common::api::ApiReduceOrder(
-          cmd.orderId, cmd.uid, cmd.symbol, cmd.size);
+    } else if (cmd.command == exchange::core::common::cmd::OrderCommandType::REDUCE_ORDER) {
+      apiCmd =
+        new exchange::core::common::api::ApiReduceOrder(cmd.orderId, cmd.uid, cmd.symbol, cmd.size);
       counterReduce++;
     } else {
       // Match Java: throw exception for unsupported command type
-      throw std::runtime_error(
-          "Unsupported command type in GetApiCommandsBenchmark: " +
-          std::to_string(static_cast<int>(cmd.command)));
+      throw std::runtime_error("Unsupported command type in GetApiCommandsBenchmark: "
+                               + std::to_string(static_cast<int>(cmd.command)));
     }
     if (apiCmd) {
       apiCommands.push_back(apiCmd);
@@ -867,27 +816,24 @@ TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsBenchmark() const {
 
     LOG_INFO("GTC:{:.2f}% IOC:{:.2f}% FOKB:{:.2f}% cancel:{:.2f}% move:{:.2f}% "
              "reduce:{:.2f}%",
-             gtcPercent, iocPercent, fokbPercent, cancelPercent, movePercent,
-             reducePercent);
+             gtcPercent, iocPercent, fokbPercent, cancelPercent, movePercent, reducePercent);
 
     // Calculate per-symbol statistics
     if (!symbolCounters.empty()) {
       int maxCommands = 0, minCommands = INT_MAX, sumCommands = 0;
-      for (const auto &pair : symbolCounters) {
+      for (const auto& pair : symbolCounters) {
         maxCommands = std::max(maxCommands, pair.second);
         minCommands = std::min(minCommands, pair.second);
         sumCommands += pair.second;
       }
-      float avgCommands =
-          static_cast<float>(sumCommands) / symbolCounters.size();
+      float avgCommands = static_cast<float>(sumCommands) / symbolCounters.size();
       float maxPercent = (maxCommands * 100.0f) / totalCommands;
       float avgPercent = (avgCommands * 100.0f) / totalCommands;
       float minPercent = (minCommands * 100.0f) / totalCommands;
 
       LOG_INFO("commands per symbol: max:{} ({:.2f}%); avg:{:.0f} ({:.2f}%); "
                "min:{} ({:.2f}%)",
-               maxCommands, maxPercent, avgCommands, avgPercent, minCommands,
-               minPercent);
+               maxCommands, maxPercent, avgCommands, avgPercent, minCommands, minPercent);
     }
   }
 
@@ -897,7 +843,7 @@ TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsBenchmark() const {
   return future;
 }
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

@@ -72,7 +72,7 @@ public:
   /**
    * Get symbol statistics map
    */
-  const std::map<int32_t, StockStat> &GetSymbolStat() const {
+  const std::map<int32_t, StockStat>& GetSymbolStat() const {
     return symbolStat_;
   }
 
@@ -87,7 +87,7 @@ private:
   void UpdateStat(uint8_t msgType, int32_t stockLocate, int64_t longPrice);
 };
 
-} // namespace nasdaq
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace nasdaq
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

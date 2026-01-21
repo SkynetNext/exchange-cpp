@@ -26,25 +26,19 @@ namespace tests {
 namespace util {
 
 void ThroughputTestsModule::ThroughputTestImpl(
-    const exchange::core::common::config::PerformanceConfiguration
-        &performanceCfg,
-    const TestDataParameters &testDataParameters,
-    const exchange::core::common::config::InitialStateConfiguration
-        &initialStateCfg,
-    const exchange::core::common::config::SerializationConfiguration
-        &serializationCfg,
-    int iterations) {
-
+  const exchange::core::common::config::PerformanceConfiguration& performanceCfg,
+  const TestDataParameters& testDataParameters,
+  const exchange::core::common::config::InitialStateConfiguration& initialStateCfg,
+  const exchange::core::common::config::SerializationConfiguration& serializationCfg,
+  int iterations) {
   // Note: This implementation requires ExchangeTestContainer.cpp to be
   // implemented
   // For now, this is a placeholder that will be completed when
   // ExchangeTestContainer is ready
 
-  auto testDataFutures =
-      ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, 1);
+  auto testDataFutures = ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, 1);
 
-  auto container = ExchangeTestContainer::Create(
-      performanceCfg, initialStateCfg, serializationCfg);
+  auto container = ExchangeTestContainer::Create(performanceCfg, initialStateCfg, serializationCfg);
 
   std::vector<float> perfResults;
   perfResults.reserve(iterations);
@@ -75,19 +69,17 @@ void ThroughputTestsModule::ThroughputTestImpl(
     // where tDuration is in milliseconds
     // This gives: (commands / ms) / 1000 = commands / (ms * 1000) = commands /
     // s / 1000000 = MT/s
-    float perfMt =
-        benchmarkCommands.size() / static_cast<float>(tDurationMs) / 1000.0f;
+    float perfMt = benchmarkCommands.size() / static_cast<float>(tDurationMs) / 1000.0f;
     float tDurationS = tDurationMs / 1000.0f;
     perfResults.push_back(perfMt);
 
     // Log performance with debug info (matching Java: log.info("{}. {} MT/s",
     // j, ...))
-    LOG_INFO("{}. {:.3f} MT/s ({} commands in {:.3f}s = {}ms)", j, perfMt,
-             benchmarkCommands.size(), tDurationS,
-             static_cast<long long>(tDurationMs));
+    LOG_INFO("{}. {:.3f} MT/s ({} commands in {:.3f}s = {}ms)", j, perfMt, benchmarkCommands.size(),
+             tDurationS, static_cast<long long>(tDurationMs));
 
     // Clean up ApiCommand objects to prevent memory leak
-    for (auto *cmd : benchmarkCommands) {
+    for (auto* cmd : benchmarkCommands) {
       delete cmd;
     }
 
@@ -98,21 +90,20 @@ void ThroughputTestsModule::ThroughputTestImpl(
       if (!balanceReport->IsGlobalBalancesAllZero()) {
         // Log non-zero balances for debugging
         auto globalBalances = balanceReport->GetGlobalBalancesSum();
-        std::string errorMsg =
-            "Total balance report is not zero. Non-zero balances: ";
+        std::string errorMsg = "Total balance report is not zero. Non-zero balances: ";
         bool first = true;
-        for (const auto &pair : globalBalances) {
+        for (const auto& pair : globalBalances) {
           if (pair.second != 0) {
             if (!first)
               errorMsg += ", ";
-            errorMsg += "currency " + std::to_string(pair.first) + " = " +
-                        std::to_string(pair.second);
+            errorMsg +=
+              "currency " + std::to_string(pair.first) + " = " + std::to_string(pair.second);
             first = false;
           }
         }
 
         // DIAGNOSIS: Log detailed breakdown for non-zero currency
-        for (const auto &pair : globalBalances) {
+        for (const auto& pair : globalBalances) {
           if (pair.second != 0) {
             int32_t currency = pair.first;
             LOG_DEBUG("Balance breakdown for currency {}:", currency);
@@ -156,8 +147,7 @@ void ThroughputTestsModule::ThroughputTestImpl(
               }
             }
             LOG_DEBUG("  Manual sum: {}", manualSum);
-            LOG_DEBUG("  Difference (GetGlobalBalancesSum - manual): {}",
-                      pair.second - manualSum);
+            LOG_DEBUG("  Difference (GetGlobalBalancesSum - manual): {}", pair.second - manualSum);
           }
         }
 
@@ -170,10 +160,10 @@ void ThroughputTestsModule::ThroughputTestImpl(
     // testDataFutures.coreSymbolSpecifications.join().forEach(
     //     symbol -> assertEquals(expected, actual))
     auto coreSymbolSpecs = testDataFutures.coreSymbolSpecifications.get();
-    for (const auto &symbol : coreSymbolSpecs) {
+    for (const auto& symbol : coreSymbolSpecs) {
       auto expectedIt = genResult->genResults.find(symbol.symbolId);
       if (expectedIt != genResult->genResults.end()) {
-        const auto &expectedPtr = expectedIt->second.finalOrderBookSnapshot;
+        const auto& expectedPtr = expectedIt->second.finalOrderBookSnapshot;
 
         // If expected is null, skip comparison (shouldn't happen, but be safe)
         if (!expectedPtr) {
@@ -186,8 +176,8 @@ void ThroughputTestsModule::ThroughputTestImpl(
 
         // If actual is null, that's an error (Java assertEquals would fail)
         if (!actual) {
-          throw std::runtime_error("Failed to get order book for symbol " +
-                                   std::to_string(symbol.symbolId));
+          throw std::runtime_error("Failed to get order book for symbol "
+                                   + std::to_string(symbol.symbolId));
         }
 
         // Compare order book snapshots using operator==
@@ -195,8 +185,8 @@ void ThroughputTestsModule::ThroughputTestImpl(
         // Java version doesn't print anything if they match, only throws on
         // mismatch
         if (*expectedPtr != *actual) {
-          throw std::runtime_error("Order book state mismatch for symbol " +
-                                   std::to_string(symbol.symbolId));
+          throw std::runtime_error("Order book state mismatch for symbol "
+                                   + std::to_string(symbol.symbolId));
         }
       }
     }
@@ -207,13 +197,12 @@ void ThroughputTestsModule::ThroughputTestImpl(
   // Calculate average
   if (!perfResults.empty()) {
     float avgMt =
-        std::accumulate(perfResults.begin(), perfResults.end(), 0.0f) /
-        perfResults.size();
+      std::accumulate(perfResults.begin(), perfResults.end(), 0.0f) / perfResults.size();
     LOG_INFO("Average: {:.3f} MT/s", avgMt);
   }
 }
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

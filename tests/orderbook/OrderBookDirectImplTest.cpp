@@ -15,7 +15,6 @@
  */
 
 #include "OrderBookDirectImplTest.h"
-#include "../util/TestOrdersGenerator.h"
 #include <exchange/core/common/L2MarketData.h>
 #include <exchange/core/common/OrderAction.h>
 #include <exchange/core/common/OrderType.h>
@@ -27,6 +26,7 @@
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
 #include <exchange/core/utils/Logger.h>
 #include <unordered_map>
+#include "../util/TestOrdersGenerator.h"
 
 using namespace exchange::core::common;
 using namespace exchange::core::common::cmd;
@@ -55,16 +55,16 @@ void OrderBookDirectImplTest::TestSequentialAsks() {
 
   // Placing limit bid orders
   for (int64_t price = bottomPrice; price < INITIAL_PRICE; price++) {
-    auto cmd = OrderCommand::NewOrder(OrderType::GTC, orderId++, UID_1, price,
-                                      price * 10, 1, OrderAction::BID);
+    auto cmd = OrderCommand::NewOrder(OrderType::GTC, orderId++, UID_1, price, price * 10, 1,
+                                      OrderAction::BID);
     ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
     results[price] = -1L;
   }
 
   for (int64_t price = topPrice; price >= bottomPrice; price--) {
     int64_t size = price * price;
-    auto cmd = OrderCommand::NewOrder(OrderType::GTC, orderId++, UID_2, price,
-                                      0, size, OrderAction::ASK);
+    auto cmd =
+      OrderCommand::NewOrder(OrderType::GTC, orderId++, UID_2, price, 0, size, OrderAction::ASK);
     ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
     if (results.find(price) != results.end()) {
       results[price] += size;
@@ -84,8 +84,7 @@ void OrderBookDirectImplTest::TestSequentialAsks() {
     int64_t price = snapshot->askPrices[i];
     auto it = results.find(price);
     ASSERT_NE(it, results.end());
-    ASSERT_EQ(snapshot->askVolumes[i], it->second)
-        << "volume mismatch for price " << price;
+    ASSERT_EQ(snapshot->askVolumes[i], it->second) << "volume mismatch for price " << price;
   }
 
   // Obviously no bid records expected
@@ -109,16 +108,16 @@ void OrderBookDirectImplTest::TestSequentialBids() {
 
   // Placing limit ask orders
   for (int64_t price = topPrice; price > INITIAL_PRICE; price--) {
-    auto cmd = OrderCommand::NewOrder(OrderType::GTC, orderId++, UID_1, price,
-                                      0, 1, OrderAction::ASK);
+    auto cmd =
+      OrderCommand::NewOrder(OrderType::GTC, orderId++, UID_1, price, 0, 1, OrderAction::ASK);
     ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
     results[price] = -1L;
   }
 
   for (int64_t price = bottomPrice; price <= topPrice; price++) {
     int64_t size = price * price;
-    auto cmd = OrderCommand::NewOrder(OrderType::GTC, orderId++, UID_2, price,
-                                      price * 10, size, OrderAction::BID);
+    auto cmd = OrderCommand::NewOrder(OrderType::GTC, orderId++, UID_2, price, price * 10, size,
+                                      OrderAction::BID);
     ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
     if (results.find(price) != results.end()) {
       results[price] += size;
@@ -138,8 +137,7 @@ void OrderBookDirectImplTest::TestSequentialBids() {
     int64_t price = snapshot->bidPrices[i];
     auto it = results.find(price);
     ASSERT_NE(it, results.end());
-    ASSERT_EQ(snapshot->bidVolumes[i], it->second)
-        << "volume mismatch for price " << price;
+    ASSERT_EQ(snapshot->bidVolumes[i], it->second) << "volume mismatch for price " << price;
   }
 
   // Obviously no ask records expected (they all should be matched)
@@ -157,30 +155,27 @@ void OrderBookDirectImplTest::TestMultipleCommandsCompare() {
   // Create test orderbook and reference orderbook
   ClearOrderBook();
   // Use member variable symbolSpec_ from base class to ensure proper lifetime
-  auto orderBookRef =
-      std::make_unique<OrderBookNaiveImpl>(&symbolSpec_, nullptr, nullptr);
+  auto orderBookRef = std::make_unique<OrderBookNaiveImpl>(&symbolSpec_, nullptr, nullptr);
 
   ASSERT_EQ(orderBook_->GetStateHash(), orderBookRef->GetStateHash());
 
   // Generate test commands
   auto genResult = TestOrdersGenerator::GenerateCommands(
-      tranNum, targetOrderBookOrders, numUsers,
-      TestOrdersGenerator::UID_PLAIN_MAPPER, 0, true, false,
-      TestOrdersGenerator::CreateAsyncProgressLogger(tranNum), 1825793762);
+    tranNum, targetOrderBookOrders, numUsers, TestOrdersGenerator::UID_PLAIN_MAPPER, 0, true, false,
+    TestOrdersGenerator::CreateAsyncProgressLogger(tranNum), 1825793762);
 
-  auto &allCommands = genResult.GetCommands();
+  auto& allCommands = genResult.GetCommands();
   int64_t i = 0;
   for (size_t idx = 0; idx < allCommands.size(); idx++) {
     i++;
-    auto &cmd = allCommands[idx];
+    auto& cmd = allCommands[idx];
     cmd.orderId += 100;
 
     cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
     IOrderBook::ProcessCommand(orderBook_.get(), &cmd);
 
     cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
-    CommandResultCode commandResultCode =
-        IOrderBook::ProcessCommand(orderBookRef.get(), &cmd);
+    CommandResultCode commandResultCode = IOrderBook::ProcessCommand(orderBookRef.get(), &cmd);
 
     ASSERT_EQ(commandResultCode, CommandResultCode::SUCCESS);
 
@@ -189,15 +184,15 @@ void OrderBookDirectImplTest::TestMultipleCommandsCompare() {
       if (orderBook_->GetStateHash() != orderBookRef->GetStateHash()) {
         LOG_ERROR("\n=== State hash mismatch at command {} ===\n", i);
         // Use base class helper method to print both implementations
-        PrintOrderBookComparison(orderBook_.get(), orderBookRef.get(),
-                                 "OrderBookDirectImpl", "OrderBookNaiveImpl");
+        PrintOrderBookComparison(orderBook_.get(), orderBookRef.get(), "OrderBookDirectImpl",
+                                 "OrderBookNaiveImpl");
       }
       ASSERT_EQ(orderBook_->GetStateHash(), orderBookRef->GetStateHash());
     }
   }
 }
 
-} // namespace orderbook
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace orderbook
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

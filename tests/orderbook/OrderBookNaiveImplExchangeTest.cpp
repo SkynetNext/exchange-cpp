@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#include "../util/TestConstants.h"
-#include "OrderBookBaseTest.h"
 #include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
+#include "../util/TestConstants.h"
+#include "OrderBookBaseTest.h"
 
 using namespace exchange::core::common;
 using namespace exchange::core::orderbook;
@@ -73,38 +73,31 @@ TEST_F(OrderBookNaiveImplExchangeTest, ShouldRemoveOrderAndEmptyBucket) {
   TestShouldRemoveOrderAndEmptyBucket();
 }
 
-TEST_F(OrderBookNaiveImplExchangeTest,
-       ShouldReturnErrorWhenDeletingUnknownOrder) {
+TEST_F(OrderBookNaiveImplExchangeTest, ShouldReturnErrorWhenDeletingUnknownOrder) {
   TestShouldReturnErrorWhenDeletingUnknownOrder();
 }
 
-TEST_F(OrderBookNaiveImplExchangeTest,
-       ShouldReturnErrorWhenDeletingOtherUserOrder) {
+TEST_F(OrderBookNaiveImplExchangeTest, ShouldReturnErrorWhenDeletingOtherUserOrder) {
   TestShouldReturnErrorWhenDeletingOtherUserOrder();
 }
 
-TEST_F(OrderBookNaiveImplExchangeTest,
-       ShouldReturnErrorWhenUpdatingOtherUserOrder) {
+TEST_F(OrderBookNaiveImplExchangeTest, ShouldReturnErrorWhenUpdatingOtherUserOrder) {
   TestShouldReturnErrorWhenUpdatingOtherUserOrder();
 }
 
-TEST_F(OrderBookNaiveImplExchangeTest,
-       ShouldReturnErrorWhenUpdatingUnknownOrder) {
+TEST_F(OrderBookNaiveImplExchangeTest, ShouldReturnErrorWhenUpdatingUnknownOrder) {
   TestShouldReturnErrorWhenUpdatingUnknownOrder();
 }
 
-TEST_F(OrderBookNaiveImplExchangeTest,
-       ShouldReturnErrorWhenReducingUnknownOrder) {
+TEST_F(OrderBookNaiveImplExchangeTest, ShouldReturnErrorWhenReducingUnknownOrder) {
   TestShouldReturnErrorWhenReducingUnknownOrder();
 }
 
-TEST_F(OrderBookNaiveImplExchangeTest,
-       ShouldReturnErrorWhenReducingByZeroOrNegativeSize) {
+TEST_F(OrderBookNaiveImplExchangeTest, ShouldReturnErrorWhenReducingByZeroOrNegativeSize) {
   TestShouldReturnErrorWhenReducingByZeroOrNegativeSize();
 }
 
-TEST_F(OrderBookNaiveImplExchangeTest,
-       ShouldReturnErrorWhenReducingOtherUserOrder) {
+TEST_F(OrderBookNaiveImplExchangeTest, ShouldReturnErrorWhenReducingOtherUserOrder) {
   TestShouldReturnErrorWhenReducingOtherUserOrder();
 }
 
@@ -124,8 +117,7 @@ TEST_F(OrderBookNaiveImplExchangeTest, ShouldMatchIocOrderFullBBO) {
   TestShouldMatchIocOrderFullBBO();
 }
 
-TEST_F(OrderBookNaiveImplExchangeTest,
-       ShouldMatchIocOrderWithTwoLimitOrdersPartial) {
+TEST_F(OrderBookNaiveImplExchangeTest, ShouldMatchIocOrderWithTwoLimitOrdersPartial) {
   TestShouldMatchIocOrderWithTwoLimitOrdersPartial();
 }
 
@@ -149,8 +141,7 @@ TEST_F(OrderBookNaiveImplExchangeTest, ShouldMatchFokBidOrderExtraBudget) {
   TestShouldMatchFokBidOrderExtraBudget();
 }
 
-TEST_F(OrderBookNaiveImplExchangeTest,
-       ShouldRejectFokAskOrderBelowExpectation) {
+TEST_F(OrderBookNaiveImplExchangeTest, ShouldRejectFokAskOrderBelowExpectation) {
   TestShouldRejectFokAskOrderBelowExpectation();
 }
 
@@ -166,18 +157,15 @@ TEST_F(OrderBookNaiveImplExchangeTest, ShouldFullyMatchMarketableGtcOrder) {
   TestShouldFullyMatchMarketableGtcOrder();
 }
 
-TEST_F(OrderBookNaiveImplExchangeTest,
-       ShouldPartiallyMatchMarketableGtcOrderAndPlace) {
+TEST_F(OrderBookNaiveImplExchangeTest, ShouldPartiallyMatchMarketableGtcOrderAndPlace) {
   TestShouldPartiallyMatchMarketableGtcOrderAndPlace();
 }
 
-TEST_F(OrderBookNaiveImplExchangeTest,
-       ShouldFullyMatchMarketableGtcOrder2Prices) {
+TEST_F(OrderBookNaiveImplExchangeTest, ShouldFullyMatchMarketableGtcOrder2Prices) {
   TestShouldFullyMatchMarketableGtcOrder2Prices();
 }
 
-TEST_F(OrderBookNaiveImplExchangeTest,
-       ShouldFullyMatchMarketableGtcOrderWithAllLiquidity) {
+TEST_F(OrderBookNaiveImplExchangeTest, ShouldFullyMatchMarketableGtcOrderWithAllLiquidity) {
   TestShouldFullyMatchMarketableGtcOrderWithAllLiquidity();
 }
 
@@ -185,8 +173,7 @@ TEST_F(OrderBookNaiveImplExchangeTest, ShouldMoveOrderFullyMatchAsMarketable) {
   TestShouldMoveOrderFullyMatchAsMarketable();
 }
 
-TEST_F(OrderBookNaiveImplExchangeTest,
-       ShouldMoveOrderFullyMatchAsMarketable2Prices) {
+TEST_F(OrderBookNaiveImplExchangeTest, ShouldMoveOrderFullyMatchAsMarketable2Prices) {
   TestShouldMoveOrderFullyMatchAsMarketable2Prices();
 }
 
@@ -194,7 +181,7 @@ TEST_F(OrderBookNaiveImplExchangeTest, ShouldMoveOrderMatchesAllLiquidity) {
   TestShouldMoveOrderMatchesAllLiquidity();
 }
 
-} // namespace orderbook
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace orderbook
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

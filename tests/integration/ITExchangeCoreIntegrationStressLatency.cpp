@@ -23,14 +23,14 @@ namespace tests {
 namespace integration {
 
 ITExchangeCoreIntegrationStressLatency::ITExchangeCoreIntegrationStressLatency()
-    : ITExchangeCoreIntegrationStress() {}
+  : ITExchangeCoreIntegrationStress() {}
 
 exchange::core::common::config::PerformanceConfiguration
 ITExchangeCoreIntegrationStressLatency::GetPerformanceConfiguration() {
   return exchange::core::common::config::PerformanceConfiguration::Default();
 }
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

@@ -49,7 +49,7 @@ std::string LatencyTools::FormatNanos(int64_t ns) {
   return oss.str();
 }
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

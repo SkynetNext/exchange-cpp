@@ -42,11 +42,10 @@ public:
   /**
    * Many operations test (matches Java manyOperations method)
    */
-  void ManyOperations(
-      const exchange::core::common::CoreSymbolSpecification &symbolSpec);
+  void ManyOperations(const exchange::core::common::CoreSymbolSpecification& symbolSpec);
 };
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

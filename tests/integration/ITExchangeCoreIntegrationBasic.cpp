@@ -15,9 +15,9 @@
  */
 
 #include "ITExchangeCoreIntegrationBasic.h"
-#include "../util/TestConstants.h"
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <gtest/gtest.h>
+#include "../util/TestConstants.h"
 
 using namespace exchange::core::tests::util;
 
@@ -26,8 +26,7 @@ namespace core {
 namespace tests {
 namespace integration {
 
-ITExchangeCoreIntegrationBasic::ITExchangeCoreIntegrationBasic()
-    : ITExchangeCoreIntegration() {}
+ITExchangeCoreIntegrationBasic::ITExchangeCoreIntegrationBasic() : ITExchangeCoreIntegration() {}
 
 exchange::core::common::config::PerformanceConfiguration
 ITExchangeCoreIntegrationBasic::GetPerformanceConfiguration() {
@@ -47,7 +46,9 @@ TEST_F(ITExchangeCoreIntegrationBasic, ShouldInitSymbols) {
   ShouldInitSymbols();
 }
 
-TEST_F(ITExchangeCoreIntegrationBasic, ShouldInitUsers) { ShouldInitUsers(); }
+TEST_F(ITExchangeCoreIntegrationBasic, ShouldInitUsers) {
+  ShouldInitUsers();
+}
 
 TEST_F(ITExchangeCoreIntegrationBasic, ExchangeRiskBasicTest) {
   ExchangeRiskBasicTest();
@@ -61,7 +62,7 @@ TEST_F(ITExchangeCoreIntegrationBasic, ExchangeRiskMoveTest) {
   ExchangeRiskMoveTest();
 }
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

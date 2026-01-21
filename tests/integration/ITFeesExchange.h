@@ -43,7 +43,7 @@ public:
   // They require ExchangeTestContainer which needs to be implemented first
 };
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

@@ -82,7 +82,7 @@ public:
   void TestThroughputMultiSymbolHuge();
 };
 
-} // namespace perf
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace perf
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

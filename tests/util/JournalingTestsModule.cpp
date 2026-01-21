@@ -15,8 +15,6 @@
  */
 
 #include "JournalingTestsModule.h"
-#include "ExchangeTestContainer.h"
-#include "LatencyTools.h"
 #include <exchange/core/common/api/ApiPersistState.h>
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
@@ -24,6 +22,8 @@
 #include <exchange/core/utils/Logger.h>
 #include <iomanip>
 #include <sstream>
+#include "ExchangeTestContainer.h"
+#include "LatencyTools.h"
 
 namespace exchange {
 namespace core {
@@ -31,33 +31,30 @@ namespace tests {
 namespace util {
 
 void JournalingTestsModule::JournalingTestImpl(
-    const exchange::core::common::config::PerformanceConfiguration
-        &performanceCfg,
-    const TestDataParameters &testDataParameters, int iterations) {
-
+  const exchange::core::common::config::PerformanceConfiguration& performanceCfg,
+  const TestDataParameters& testDataParameters,
+  int iterations) {
   for (int iteration = 0; iteration < iterations; iteration++) {
     // Match Java: log.debug(" ----------- journaling test --- iteration {} of
     // {}
     // ----", iteration, iterations);
-    LOG_DEBUG(" ----------- journaling test --- iteration {} of {} ----",
-              iteration, iterations);
+    LOG_DEBUG(" ----------- journaling test --- iteration {} of {} ----", iteration, iterations);
 
-    auto testDataFutures = ExchangeTestContainer::PrepareTestDataAsync(
-        testDataParameters, iteration);
+    auto testDataFutures =
+      ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, iteration);
 
     const std::string exchangeId = ExchangeTestContainer::TimeBasedExchangeId();
     long stateId;
     long originalFinalStateHash = 0;
 
     // First start: clean start with journaling
-    auto firstStartConfig = exchange::core::common::config::
-        InitialStateConfiguration::CleanStartJournaling(exchangeId);
+    auto firstStartConfig =
+      exchange::core::common::config::InitialStateConfiguration::CleanStartJournaling(exchangeId);
 
     {
       auto container = ExchangeTestContainer::Create(
-          performanceCfg, firstStartConfig,
-          exchange::core::common::config::SerializationConfiguration::
-              DiskJournaling());
+        performanceCfg, firstStartConfig,
+        exchange::core::common::config::SerializationConfiguration::DiskJournaling());
 
       // Load symbols, users and prefill orders
       container->LoadSymbolsUsersAndPrefillOrders(testDataFutures);
@@ -65,16 +62,13 @@ void JournalingTestsModule::JournalingTestImpl(
       // Match Java: log.info("Creating snapshot...");
       LOG_INFO("Creating snapshot...");
       // Match Java: stateId = System.currentTimeMillis() * 1000 + iteration;
-      stateId =
-          exchange::core::utils::FastNanoTime::NowMillis() * 1000 + iteration;
+      stateId = exchange::core::utils::FastNanoTime::NowMillis() * 1000 + iteration;
       // Match Java: try (ExecutionTime ignore = new ExecutionTime(t ->
       // log.debug("Snapshot {} created in {}", stateId, t))) {
       int64_t snapshotStartNs = exchange::core::utils::FastNanoTime::Now();
       auto persistState =
-          std::make_unique<exchange::core::common::api::ApiPersistState>(
-              stateId, false);
-      auto future =
-          container->GetApi()->SubmitCommandAsync(persistState.release());
+        std::make_unique<exchange::core::common::api::ApiPersistState>(stateId, false);
+      auto future = container->GetApi()->SubmitCommandAsync(persistState.release());
       auto result = future.get();
       int64_t snapshotEndNs = exchange::core::utils::FastNanoTime::Now();
       int64_t snapshotDurationNs = snapshotEndNs - snapshotStartNs;
@@ -97,7 +91,7 @@ void JournalingTestsModule::JournalingTestImpl(
         container->GetApi()->SubmitCommandsSync(benchmarkCommands);
       }
       // Clean up ApiCommand objects to prevent memory leak
-      for (auto *cmd : benchmarkCommands) {
+      for (auto* cmd : benchmarkCommands) {
         delete cmd;
       }
       // Match Java:
@@ -108,21 +102,20 @@ void JournalingTestsModule::JournalingTestImpl(
         if (!balanceReport->IsGlobalBalancesAllZero()) {
           // Log non-zero balances for debugging
           auto globalBalances = balanceReport->GetGlobalBalancesSum();
-          std::string errorMsg =
-              "Total balance report is not zero. Non-zero balances: ";
+          std::string errorMsg = "Total balance report is not zero. Non-zero balances: ";
           bool first = true;
-          for (const auto &pair : globalBalances) {
+          for (const auto& pair : globalBalances) {
             if (pair.second != 0) {
               if (!first)
                 errorMsg += ", ";
-              errorMsg += "currency " + std::to_string(pair.first) + " = " +
-                          std::to_string(pair.second);
+              errorMsg +=
+                "currency " + std::to_string(pair.first) + " = " + std::to_string(pair.second);
               first = false;
             }
           }
 
           // DIAGNOSIS: Log detailed breakdown for non-zero currency
-          for (const auto &pair : globalBalances) {
+          for (const auto& pair : globalBalances) {
             if (pair.second != 0) {
               int32_t currency = pair.first;
               LOG_ERROR("Balance breakdown for currency {}:", currency);
@@ -171,8 +164,8 @@ void JournalingTestsModule::JournalingTestImpl(
     // DiskSerializationProcessor
     const long snapshotBaseSeq = 0L;
     auto fromSnapshotConfig =
-        exchange::core::common::config::InitialStateConfiguration::
-            LastKnownStateFromJournal(exchangeId, stateId, snapshotBaseSeq);
+      exchange::core::common::config::InitialStateConfiguration::LastKnownStateFromJournal(
+        exchangeId, stateId, snapshotBaseSeq);
 
     // Match Java: log.debug("Creating new exchange from persisted state...");
     LOG_DEBUG("Creating new exchange from persisted state...");
@@ -180,9 +173,8 @@ void JournalingTestsModule::JournalingTestImpl(
     int64_t tLoadNs = exchange::core::utils::FastNanoTime::Now();
     {
       auto recreatedContainer = ExchangeTestContainer::Create(
-          performanceCfg, fromSnapshotConfig,
-          exchange::core::common::config::SerializationConfiguration::
-              DiskJournaling());
+        performanceCfg, fromSnapshotConfig,
+        exchange::core::common::config::SerializationConfiguration::DiskJournaling());
 
       // Match Java: // simple sync query in order to wait until core is started
       // to respond
@@ -216,25 +208,23 @@ void JournalingTestsModule::JournalingTestImpl(
         if (!balanceReport->IsGlobalBalancesAllZero()) {
           // Log non-zero balances for debugging
           auto globalBalances = balanceReport->GetGlobalBalancesSum();
-          std::string errorMsg =
-              "Restored total balance report is not zero. Non-zero balances: ";
+          std::string errorMsg = "Restored total balance report is not zero. Non-zero balances: ";
           bool first = true;
-          for (const auto &pair : globalBalances) {
+          for (const auto& pair : globalBalances) {
             if (pair.second != 0) {
               if (!first)
                 errorMsg += ", ";
-              errorMsg += "currency " + std::to_string(pair.first) + " = " +
-                          std::to_string(pair.second);
+              errorMsg +=
+                "currency " + std::to_string(pair.first) + " = " + std::to_string(pair.second);
               first = false;
             }
           }
 
           // DIAGNOSIS: Log detailed breakdown for non-zero currency
-          for (const auto &pair : globalBalances) {
+          for (const auto& pair : globalBalances) {
             if (pair.second != 0) {
               int32_t currency = pair.first;
-              LOG_ERROR("Restored balance breakdown for currency {}:",
-                        currency);
+              LOG_ERROR("Restored balance breakdown for currency {}:", currency);
               LOG_ERROR("  GetGlobalBalancesSum() result: {}", pair.second);
 
               // Manual calculation to verify
@@ -275,7 +265,7 @@ void JournalingTestsModule::JournalingTestImpl(
   }
 }
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

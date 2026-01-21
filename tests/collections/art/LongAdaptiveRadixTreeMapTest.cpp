@@ -27,9 +27,9 @@ using namespace exchange::core::collections::art;
 class TestConsumer : public LongObjConsumer<std::string> {
 public:
   std::vector<int64_t> keys;
-  std::vector<std::string *> values;
+  std::vector<std::string*> values;
 
-  void Accept(int64_t key, std::string *value) override {
+  void Accept(int64_t key, std::string* value) override {
     keys.push_back(key);
     values.push_back(value);
   }
@@ -44,9 +44,9 @@ public:
 class TestConsumerInt64 : public LongObjConsumer<int64_t> {
 public:
   std::vector<int64_t> keys;
-  std::vector<int64_t *> values;
+  std::vector<int64_t*> values;
 
-  void Accept(int64_t key, int64_t *value) override {
+  void Accept(int64_t key, int64_t* value) override {
     keys.push_back(key);
     values.push_back(value);
   }
@@ -66,14 +66,14 @@ protected:
 
   void TearDown() override {
     // Clean up string values
-    for (auto &pair : origMap_) {
+    for (auto& pair : origMap_) {
       delete pair.second;
     }
     delete map_;
   }
 
-  void Put(int64_t key, const std::string &value) {
-    std::string *strValue = new std::string(value);
+  void Put(int64_t key, const std::string& value) {
+    std::string* strValue = new std::string(value);
     map_->Put(key, strValue);
     map_->ValidateInternalState();
 
@@ -105,22 +105,18 @@ protected:
     auto artEntries = map_->EntriesList();
     auto artIt = artEntries.begin();
 
-    for (const auto &origEntry : origMap_) {
-      ASSERT_NE(artIt, artEntries.end())
-          << "ART tree has fewer entries than expected";
+    for (const auto& origEntry : origMap_) {
+      ASSERT_NE(artIt, artEntries.end()) << "ART tree has fewer entries than expected";
       EXPECT_EQ(artIt->first, origEntry.first)
-          << "Key mismatch: expected " << origEntry.first << ", got "
-          << artIt->first;
-      EXPECT_EQ(*artIt->second, *origEntry.second)
-          << "Value mismatch for key " << origEntry.first;
+        << "Key mismatch: expected " << origEntry.first << ", got " << artIt->first;
+      EXPECT_EQ(*artIt->second, *origEntry.second) << "Value mismatch for key " << origEntry.first;
       ++artIt;
     }
-    ASSERT_EQ(artIt, artEntries.end())
-        << "ART tree has more entries than expected";
+    ASSERT_EQ(artIt, artEntries.end()) << "ART tree has more entries than expected";
   }
 
-  LongAdaptiveRadixTreeMap<std::string> *map_;
-  std::map<int64_t, std::string *> origMap_;
+  LongAdaptiveRadixTreeMap<std::string>* map_;
+  std::map<int64_t, std::string*> origMap_;
 };
 
 TEST_F(LongAdaptiveRadixTreeMapTest, ShouldPerformBasicOperations) {
@@ -156,10 +152,9 @@ TEST_F(LongAdaptiveRadixTreeMapTest, ShouldCallForEach) {
   Put(40023, "40023");
 
   TestConsumer consumer;
-  std::vector<int64_t> expectedKeys = {533,   573,   38234, 38251,
-                                       38255, 40001, 40021, 40023};
-  std::vector<std::string> expectedValues = {
-      "533", "573", "38234", "38251", "38255", "40001", "40021", "40023"};
+  std::vector<int64_t> expectedKeys = {533, 573, 38234, 38251, 38255, 40001, 40021, 40023};
+  std::vector<std::string> expectedValues = {"533",   "573",   "38234", "38251",
+                                             "38255", "40001", "40021", "40023"};
 
   // Test forEach with unlimited
   map_->ForEach(&consumer, INT_MAX);
@@ -198,10 +193,8 @@ TEST_F(LongAdaptiveRadixTreeMapTest, ShouldCallForEach) {
   consumer.Clear();
 
   // Test forEachDesc with unlimited
-  std::vector<int64_t> expectedKeysRev(expectedKeys.rbegin(),
-                                       expectedKeys.rend());
-  std::vector<std::string> expectedValuesRev(expectedValues.rbegin(),
-                                             expectedValues.rend());
+  std::vector<int64_t> expectedKeysRev(expectedKeys.rbegin(), expectedKeys.rend());
+  std::vector<std::string> expectedValuesRev(expectedValues.rbegin(), expectedValues.rend());
 
   map_->ForEachDesc(&consumer, INT_MAX);
   ASSERT_EQ(consumer.keys.size(), expectedKeysRev.size());
@@ -245,29 +238,29 @@ TEST_F(LongAdaptiveRadixTreeMapTest, ShouldFindHigherKeys) {
   Put(37, "37");
 
   for (int x = 37; x < 273; x++) {
-    std::string *result = map_->GetHigherValue(x);
+    std::string* result = map_->GetHigherValue(x);
     ASSERT_NE(result, nullptr);
     EXPECT_EQ(*result, "273");
   }
 
   for (int x = 273; x < 100000; x++) {
-    std::string *result = map_->GetHigherValue(x);
+    std::string* result = map_->GetHigherValue(x);
     ASSERT_NE(result, nullptr);
     EXPECT_EQ(*result, "182736400230");
   }
 
-  std::string *result = map_->GetHigherValue(182736388198LL);
+  std::string* result = map_->GetHigherValue(182736388198LL);
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(*result, "182736400230");
 
   for (int64_t x = 182736300230LL; x < 182736400229LL; x++) {
-    std::string *result = map_->GetHigherValue(x);
+    std::string* result = map_->GetHigherValue(x);
     ASSERT_NE(result, nullptr);
     EXPECT_EQ(*result, "182736400230");
   }
 
   for (int64_t x = 182736400230LL; x < 182736487234LL; x++) {
-    std::string *result = map_->GetHigherValue(x);
+    std::string* result = map_->GetHigherValue(x);
     ASSERT_NE(result, nullptr);
     EXPECT_EQ(*result, "182736487234");
   }
@@ -284,7 +277,7 @@ TEST_F(LongAdaptiveRadixTreeMapTest, ShouldFindLowerKeys) {
   Put(182736487234LL, "182736487234");
   Put(37, "37");
 
-  std::string *result = map_->GetLowerValue(63120LL);
+  std::string* result = map_->GetLowerValue(63120LL);
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(*result, "273");
 
@@ -416,7 +409,7 @@ TEST_F(LongAdaptiveRadixTreeMapTest, ShouldExtendTo48andReduceTo16) {
   Remove(0);
   Remove(16);
   Remove(13);
-  Remove(17); // nothing
+  Remove(17);  // nothing
   Remove(3);
   Remove(5);
   Remove(255);
@@ -499,7 +492,7 @@ TEST_F(LongAdaptiveRadixTreeMapTest, ShouldLoadManyItems) {
   std::vector<int64_t> forEachValuesBst;
 
   LongAdaptiveRadixTreeMap<int64_t> art;
-  std::map<int64_t, int64_t *> bst;
+  std::map<int64_t, int64_t*> bst;
 
   int num = 100000;
   std::vector<int64_t> list;
@@ -536,7 +529,7 @@ TEST_F(LongAdaptiveRadixTreeMapTest, ShouldLoadManyItems) {
 
   // Get (hit) from ART
   for (int64_t x : list) {
-    int64_t *result = art.Get(x);
+    int64_t* result = art.Get(x);
     ASSERT_NE(result, nullptr);
     sum += *result;
   }
@@ -564,16 +557,16 @@ TEST_F(LongAdaptiveRadixTreeMapTest, ShouldLoadManyItems) {
 
   // Validate getHigherValue
   for (int64_t x : list) {
-    int64_t *v1 = art.GetHigherValue(x);
+    int64_t* v1 = art.GetHigherValue(x);
     auto it = bst.upper_bound(x);
-    int64_t *v2 = (it != bst.end()) ? it->second : nullptr;
+    int64_t* v2 = (it != bst.end()) ? it->second : nullptr;
 
     if (v1 == nullptr && v2 == nullptr) {
       continue;
     }
     if (v1 == nullptr || v2 == nullptr) {
-      FAIL() << "Mismatch: ART=" << (v1 ? *v1 : -1)
-             << ", BST=" << (v2 ? *v2 : -1) << " for key " << x;
+      FAIL() << "Mismatch: ART=" << (v1 ? *v1 : -1) << ", BST=" << (v2 ? *v2 : -1) << " for key "
+             << x;
     }
     if (v1 != nullptr && v2 != nullptr) {
       EXPECT_EQ(*v1, *v2) << "getHigherValue mismatch for key " << x;
@@ -582,21 +575,21 @@ TEST_F(LongAdaptiveRadixTreeMapTest, ShouldLoadManyItems) {
 
   // Validate getLowerValue
   for (int64_t x : list) {
-    int64_t *v1 = art.GetLowerValue(x);
+    int64_t* v1 = art.GetLowerValue(x);
     auto it = bst.lower_bound(x);
     if (it != bst.begin()) {
       --it;
     } else {
       it = bst.end();
     }
-    int64_t *v2 = (it != bst.end()) ? it->second : nullptr;
+    int64_t* v2 = (it != bst.end()) ? it->second : nullptr;
 
     if (v1 == nullptr && v2 == nullptr) {
       continue;
     }
     if (v1 == nullptr || v2 == nullptr) {
-      FAIL() << "Mismatch: ART=" << (v1 ? *v1 : -1)
-             << ", BST=" << (v2 ? *v2 : -1) << " for key " << x;
+      FAIL() << "Mismatch: ART=" << (v1 ? *v1 : -1) << ", BST=" << (v2 ? *v2 : -1) << " for key "
+             << x;
     }
     if (v1 != nullptr && v2 != nullptr) {
       EXPECT_EQ(*v1, *v2) << "getLowerValue mismatch for key " << x;
@@ -610,7 +603,7 @@ TEST_F(LongAdaptiveRadixTreeMapTest, ShouldLoadManyItems) {
   forEachKeysBst.clear();
   forEachValuesBst.clear();
   int count = 0;
-  for (const auto &entry : bst) {
+  for (const auto& entry : bst) {
     if (count++ >= forEachSize)
       break;
     forEachKeysBst.push_back(entry.first);
@@ -632,8 +625,7 @@ TEST_F(LongAdaptiveRadixTreeMapTest, ShouldLoadManyItems) {
   forEachKeysBst.clear();
   forEachValuesBst.clear();
   count = 0;
-  for (auto it = bst.rbegin(); it != bst.rend() && count < forEachSize;
-       ++it, ++count) {
+  for (auto it = bst.rbegin(); it != bst.rend() && count < forEachSize; ++it, ++count) {
     forEachKeysBst.push_back(it->first);
     forEachValuesBst.push_back(*it->second);
   }
@@ -677,7 +669,7 @@ TEST_F(LongAdaptiveRadixTreeMapTest, ShouldLoadManyItems) {
   EXPECT_EQ(bstIt, bst.end());
 
   // Clean up ART values
-  for (auto &entry : artEntries) {
+  for (auto& entry : artEntries) {
     delete entry.second;
   }
 }

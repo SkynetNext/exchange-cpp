@@ -43,8 +43,7 @@ public:
   /**
    * Basic full cycle test - tests complete order lifecycle
    */
-  void BasicFullCycleTest(
-      const exchange::core::common::CoreSymbolSpecification &symbolSpec);
+  void BasicFullCycleTest(const exchange::core::common::CoreSymbolSpecification& symbolSpec);
 
   /**
    * Test initialization of symbols
@@ -72,7 +71,7 @@ public:
   void ExchangeRiskMoveTest();
 };
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

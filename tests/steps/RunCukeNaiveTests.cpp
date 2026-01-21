@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
+#include <exchange/core/common/config/PerformanceConfiguration.h>
+#include <gtest/gtest.h>
 #include "../util/L2MarketDataHelper.h"
 #include "../util/TestConstants.h"
 #include "OrderStepdefs.h"
-#include <exchange/core/common/config/PerformanceConfiguration.h>
-#include <gtest/gtest.h>
 
 using namespace exchange::core::tests::steps;
 using namespace exchange::core::tests::util;
@@ -34,8 +34,7 @@ namespace steps {
 class RunCukeNaiveTests : public ::testing::Test {
 protected:
   void SetUp() override {
-    OrderStepdefs::testPerformanceConfiguration =
-        PerformanceConfiguration::Default();
+    OrderStepdefs::testPerformanceConfiguration = PerformanceConfiguration::Default();
     stepdefs_ = std::make_unique<OrderStepdefs>();
     stepdefs_->Before();
   }
@@ -45,8 +44,7 @@ protected:
       stepdefs_->After();
       stepdefs_.reset();
     }
-    OrderStepdefs::testPerformanceConfiguration =
-        PerformanceConfiguration::Default();
+    OrderStepdefs::testPerformanceConfiguration = PerformanceConfiguration::Default();
   }
 
   std::unique_ptr<OrderStepdefs> stepdefs_;
@@ -67,8 +65,7 @@ TEST_F(RunCukeNaiveTests, BasicRiskCheck) {
   // When A client Alice could not place an BID order 101 at 30000@7 (type:
   // GTC, symbol: ETH_XBT, reservePrice: 30000) due to RISK_NSF
   stepdefs_->ClientCouldNotPlaceOrder(1440001L, "BID", 101L, 30000L, 7L, "GTC",
-                                      TestConstants::SYMBOLSPEC_ETH_XBT(),
-                                      30000L, "RISK_NSF");
+                                      TestConstants::SYMBOLSPEC_ETH_XBT(), 30000L, "RISK_NSF");
 
   // And A balance of a client Alice:
   std::vector<std::pair<std::string, int64_t>> expectedBalance;
@@ -84,15 +81,13 @@ TEST_F(RunCukeNaiveTests, BasicRiskCheck) {
 
   // When A client Alice places an BID order 101 at 30000@7 (type: GTC,
   // symbol: ETH_XBT, reservePrice: 30000)
-  stepdefs_->ClientPlacesOrderWithReservePrice(
-      1440001L, "BID", 101L, 30000L, 7L, "GTC",
-      TestConstants::SYMBOLSPEC_ETH_XBT(), 30000L);
+  stepdefs_->ClientPlacesOrderWithReservePrice(1440001L, "BID", 101L, 30000L, 7L, "GTC",
+                                               TestConstants::SYMBOLSPEC_ETH_XBT(), 30000L);
 
   // Then An ETH_XBT order book is:
   L2MarketDataHelper expectedOrderBook;
   expectedOrderBook.AddBid(30000L, 7L);
-  stepdefs_->OrderBookIs(TestConstants::SYMBOLSPEC_ETH_XBT(),
-                         expectedOrderBook);
+  stepdefs_->OrderBookIs(TestConstants::SYMBOLSPEC_ETH_XBT(), expectedOrderBook);
 
   // And A balance of a client Alice:
   std::vector<std::pair<std::string, int64_t>> expectedBalance2;
@@ -101,19 +96,20 @@ TEST_F(RunCukeNaiveTests, BasicRiskCheck) {
 
   // And A client Alice orders:
   std::vector<std::map<std::string, std::string>> aliceOrders;
-  aliceOrders.push_back({{"id", "101"},
-                         {"price", "30000"},
-                         {"size", "7"},
-                         {"filled", "0"},
-                         {"reservePrice", "30000"},
-                         {"side", "BID"}});
+  aliceOrders.push_back({
+    {          "id",   "101"},
+    {       "price", "30000"},
+    {        "size",     "7"},
+    {      "filled",     "0"},
+    {"reservePrice", "30000"},
+    {        "side",   "BID"}
+  });
   stepdefs_->ClientOrders(1440001L, aliceOrders);
 
   // When A client Bob could not place an ASK order 102 at 30000@7 (type: IOC,
   // symbol: ETH_XBT, reservePrice: 30000) due to RISK_NSF
   stepdefs_->ClientCouldNotPlaceOrder(1440002L, "ASK", 102L, 30000L, 7L, "IOC",
-                                      TestConstants::SYMBOLSPEC_ETH_XBT(),
-                                      30000L, "RISK_NSF");
+                                      TestConstants::SYMBOLSPEC_ETH_XBT(), 30000L, "RISK_NSF");
 
   // Then A balance of a client Bob:
   std::vector<std::pair<std::string, int64_t>> expectedBalance3;
@@ -128,9 +124,8 @@ TEST_F(RunCukeNaiveTests, BasicRiskCheck) {
 
   // When A client Bob places an ASK order 102 at 30000@7 (type: IOC, symbol:
   // ETH_XBT, reservePrice: 30000)
-  stepdefs_->ClientPlacesOrderWithReservePrice(
-      1440002L, "ASK", 102L, 30000L, 7L, "IOC",
-      TestConstants::SYMBOLSPEC_ETH_XBT(), 30000L);
+  stepdefs_->ClientPlacesOrderWithReservePrice(1440002L, "ASK", 102L, 30000L, 7L, "IOC",
+                                               TestConstants::SYMBOLSPEC_ETH_XBT(), 30000L);
 
   // Then The order 101 is fully matched. LastPx: 30000, LastQty: 7
   stepdefs_->OrderIsFullyMatched(101L, 30000L, 7L);
@@ -161,9 +156,8 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // When A client Alice could not place an ASK order 202 at 30000@1001 (type:
   // GTC, symbol: ETH_XBT, reservePrice: 30000) due to RISK_NSF
-  stepdefs_->ClientCouldNotPlaceOrder(
-      1440001L, "ASK", 202L, 30000L, 1001L, "GTC",
-      TestConstants::SYMBOLSPEC_ETH_XBT(), 30000L, "RISK_NSF");
+  stepdefs_->ClientCouldNotPlaceOrder(1440001L, "ASK", 202L, 30000L, 1001L, "GTC",
+                                      TestConstants::SYMBOLSPEC_ETH_XBT(), 30000L, "RISK_NSF");
 
   // Then A balance of a client Alice:
   std::vector<std::pair<std::string, int64_t>> expectedBalance;
@@ -175,9 +169,8 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // When A client Alice places an ASK order 202 at 30000@1000 (type: GTC,
   // symbol: ETH_XBT, reservePrice: 30000)
-  stepdefs_->ClientPlacesOrderWithReservePrice(
-      1440001L, "ASK", 202L, 30000L, 1000L, "GTC",
-      TestConstants::SYMBOLSPEC_ETH_XBT(), 30000L);
+  stepdefs_->ClientPlacesOrderWithReservePrice(1440001L, "ASK", 202L, 30000L, 1000L, "GTC",
+                                               TestConstants::SYMBOLSPEC_ETH_XBT(), 30000L);
 
   // Then A balance of a client Alice:
   std::vector<std::pair<std::string, int64_t>> expectedBalance2;
@@ -186,12 +179,14 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // And A client Alice orders:
   std::vector<std::map<std::string, std::string>> aliceOrders;
-  aliceOrders.push_back({{"id", "202"},
-                         {"price", "30000"},
-                         {"size", "1000"},
-                         {"filled", "0"},
-                         {"reservePrice", "30000"},
-                         {"side", "ASK"}});
+  aliceOrders.push_back({
+    {          "id",   "202"},
+    {       "price", "30000"},
+    {        "size",  "1000"},
+    {      "filled",     "0"},
+    {"reservePrice", "30000"},
+    {        "side",   "ASK"}
+  });
   stepdefs_->ClientOrders(1440001L, aliceOrders);
 
   // When A client Alice moves a price to 40000 of the order 202
@@ -202,12 +197,14 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // And A client Alice orders:
   std::vector<std::map<std::string, std::string>> aliceOrders2;
-  aliceOrders2.push_back({{"id", "202"},
-                          {"price", "40000"},
-                          {"size", "1000"},
-                          {"filled", "0"},
-                          {"reservePrice", "30000"},
-                          {"side", "ASK"}});
+  aliceOrders2.push_back({
+    {          "id",   "202"},
+    {       "price", "40000"},
+    {        "size",  "1000"},
+    {      "filled",     "0"},
+    {"reservePrice", "30000"},
+    {        "side",   "ASK"}
+  });
   stepdefs_->ClientOrders(1440001L, aliceOrders2);
 
   // When A client Alice moves a price to 20000 of the order 202
@@ -218,12 +215,14 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // And A client Alice orders:
   std::vector<std::map<std::string, std::string>> aliceOrders3;
-  aliceOrders3.push_back({{"id", "202"},
-                          {"price", "20000"},
-                          {"size", "1000"},
-                          {"filled", "0"},
-                          {"reservePrice", "30000"},
-                          {"side", "ASK"}});
+  aliceOrders3.push_back({
+    {          "id",   "202"},
+    {       "price", "20000"},
+    {        "size",  "1000"},
+    {      "filled",     "0"},
+    {"reservePrice", "30000"},
+    {        "side",   "ASK"}
+  });
   stepdefs_->ClientOrders(1440001L, aliceOrders3);
 
   // Given New client Bob has a balance:
@@ -233,9 +232,8 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // When A client Bob could not place an BID order 203 at 18000@500 (type:
   // GTC, symbol: ETH_XBT, reservePrice: 19000) due to RISK_NSF
-  stepdefs_->ClientCouldNotPlaceOrder(
-      1440002L, "BID", 203L, 18000L, 500L, "GTC",
-      TestConstants::SYMBOLSPEC_ETH_XBT(), 19000L, "RISK_NSF");
+  stepdefs_->ClientCouldNotPlaceOrder(1440002L, "BID", 203L, 18000L, 500L, "GTC",
+                                      TestConstants::SYMBOLSPEC_ETH_XBT(), 19000L, "RISK_NSF");
 
   // Then A balance of a client Bob:
   std::vector<std::pair<std::string, int64_t>> expectedBalance3;
@@ -247,9 +245,8 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // When A client Bob places an BID order 203 at 18000@500 (type: GTC,
   // symbol: ETH_XBT, reservePrice: 18500)
-  stepdefs_->ClientPlacesOrderWithReservePrice(
-      1440002L, "BID", 203L, 18000L, 500L, "GTC",
-      TestConstants::SYMBOLSPEC_ETH_XBT(), 18500L);
+  stepdefs_->ClientPlacesOrderWithReservePrice(1440002L, "BID", 203L, 18000L, 500L, "GTC",
+                                               TestConstants::SYMBOLSPEC_ETH_XBT(), 18500L);
 
   // Then No trade events
   stepdefs_->NoTradeEvents();
@@ -258,8 +255,7 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
   L2MarketDataHelper expectedOrderBook;
   expectedOrderBook.AddAsk(20000L, 1000L);
   expectedOrderBook.AddBid(18000L, 500L);
-  stepdefs_->OrderBookIs(TestConstants::SYMBOLSPEC_ETH_XBT(),
-                         expectedOrderBook);
+  stepdefs_->OrderBookIs(TestConstants::SYMBOLSPEC_ETH_XBT(), expectedOrderBook);
 
   // And A balance of a client Bob:
   std::vector<std::pair<std::string, int64_t>> expectedBalance4;
@@ -268,18 +264,20 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // And A client Bob orders:
   std::vector<std::map<std::string, std::string>> bobOrders;
-  bobOrders.push_back({{"id", "203"},
-                       {"price", "18000"},
-                       {"size", "500"},
-                       {"filled", "0"},
-                       {"reservePrice", "18500"},
-                       {"side", "BID"}});
+  bobOrders.push_back({
+    {          "id",   "203"},
+    {       "price", "18000"},
+    {        "size",   "500"},
+    {      "filled",     "0"},
+    {"reservePrice", "18500"},
+    {        "side",   "BID"}
+  });
   stepdefs_->ClientOrders(1440002L, bobOrders);
 
   // When A client Bob could not move a price to 18501 of the order 203 due to
   // MATCHING_MOVE_FAILED_PRICE_OVER_RISK_LIMIT
-  stepdefs_->ClientCouldNotMoveOrderPrice(
-      1440002L, 18501L, 203L, "MATCHING_MOVE_FAILED_PRICE_OVER_RISK_LIMIT");
+  stepdefs_->ClientCouldNotMoveOrderPrice(1440002L, 18501L, 203L,
+                                          "MATCHING_MOVE_FAILED_PRICE_OVER_RISK_LIMIT");
 
   // Then A balance of a client Bob:
   stepdefs_->ClientBalanceIs(1440002L, expectedBalance4);
@@ -288,8 +286,7 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
   stepdefs_->ClientOrders(1440002L, bobOrders);
 
   // And An ETH_XBT order book is:
-  stepdefs_->OrderBookIs(TestConstants::SYMBOLSPEC_ETH_XBT(),
-                         expectedOrderBook);
+  stepdefs_->OrderBookIs(TestConstants::SYMBOLSPEC_ETH_XBT(), expectedOrderBook);
 
   // When A client Bob moves a price to 18500 of the order 203
   stepdefs_->ClientMovesOrderPrice(1440002L, 18500L, 203L);
@@ -301,8 +298,7 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
   L2MarketDataHelper expectedOrderBook2;
   expectedOrderBook2.AddAsk(20000L, 1000L);
   expectedOrderBook2.AddBid(18500L, 500L);
-  stepdefs_->OrderBookIs(TestConstants::SYMBOLSPEC_ETH_XBT(),
-                         expectedOrderBook2);
+  stepdefs_->OrderBookIs(TestConstants::SYMBOLSPEC_ETH_XBT(), expectedOrderBook2);
 
   // When A client Bob moves a price to 17500 of the order 203
   stepdefs_->ClientMovesOrderPrice(1440002L, 17500L, 203L);
@@ -314,8 +310,7 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
   L2MarketDataHelper expectedOrderBook3;
   expectedOrderBook3.AddAsk(20000L, 1000L);
   expectedOrderBook3.AddBid(17500L, 500L);
-  stepdefs_->OrderBookIs(TestConstants::SYMBOLSPEC_ETH_XBT(),
-                         expectedOrderBook3);
+  stepdefs_->OrderBookIs(TestConstants::SYMBOLSPEC_ETH_XBT(), expectedOrderBook3);
 
   // When A client Alice moves a price to 16900 of the order 202
   stepdefs_->ClientMovesOrderPrice(1440001L, 16900L, 202L);
@@ -332,19 +327,20 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // And A client Alice orders:
   std::vector<std::map<std::string, std::string>> aliceOrders4;
-  aliceOrders4.push_back({{"id", "202"},
-                          {"price", "16900"},
-                          {"size", "1000"},
-                          {"filled", "500"},
-                          {"reservePrice", "30000"},
-                          {"side", "ASK"}});
+  aliceOrders4.push_back({
+    {          "id",   "202"},
+    {       "price", "16900"},
+    {        "size",  "1000"},
+    {      "filled",   "500"},
+    {"reservePrice", "30000"},
+    {        "side",   "ASK"}
+  });
   stepdefs_->ClientOrders(1440001L, aliceOrders4);
 
   // And An ETH_XBT order book is:
   L2MarketDataHelper expectedOrderBook4;
   expectedOrderBook4.AddAsk(16900L, 500L);
-  stepdefs_->OrderBookIs(TestConstants::SYMBOLSPEC_ETH_XBT(),
-                         expectedOrderBook4);
+  stepdefs_->OrderBookIs(TestConstants::SYMBOLSPEC_ETH_XBT(), expectedOrderBook4);
 
   // Then A balance of a client Bob:
   std::vector<std::pair<std::string, int64_t>> expectedBalance6;
@@ -368,7 +364,7 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
   stepdefs_->ClientHasNoActiveOrders(1440001L);
 }
 
-} // namespace steps
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace steps
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

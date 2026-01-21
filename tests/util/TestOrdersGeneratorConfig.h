@@ -28,18 +28,17 @@ namespace util {
  * PreFillMode - mode for pre-filling order book
  */
 enum class PreFillMode {
-  ORDERS_NUMBER,             // Fill to targetOrderBookOrdersTotal
-  ORDERS_NUMBER_PLUS_QUARTER // Fill to targetOrderBookOrdersTotal * 5 / 4
+  ORDERS_NUMBER,              // Fill to targetOrderBookOrdersTotal
+  ORDERS_NUMBER_PLUS_QUARTER  // Fill to targetOrderBookOrdersTotal * 5 / 4
 };
 
 /**
  * TestOrdersGeneratorConfig - configuration for test order generation
  */
 struct TestOrdersGeneratorConfig {
-  std::vector<exchange::core::common::CoreSymbolSpecification>
-      coreSymbolSpecifications;
+  std::vector<exchange::core::common::CoreSymbolSpecification> coreSymbolSpecifications;
   int totalTransactionsNumber;
-  std::vector<std::vector<bool>> usersAccounts; // BitSet representation
+  std::vector<std::vector<bool>> usersAccounts;  // BitSet representation
   int targetOrderBookOrdersTotal;
   int seed;
   bool avalancheIOC;
@@ -51,7 +50,7 @@ struct TestOrdersGeneratorConfig {
   int CalculateReadySeq() const;
 };
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

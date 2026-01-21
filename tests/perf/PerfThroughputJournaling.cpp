@@ -15,12 +15,12 @@
  */
 
 #include "PerfThroughputJournaling.h"
-#include "../util/ExchangeTestContainer.h"
-#include "../util/TestDataParameters.h"
-#include "../util/ThroughputTestsModule.h"
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
+#include "../util/ExchangeTestContainer.h"
+#include "../util/TestDataParameters.h"
+#include "../util/ThroughputTestsModule.h"
 
 using namespace exchange::core::tests::util;
 
@@ -30,8 +30,8 @@ namespace tests {
 namespace perf {
 
 void PerfThroughputJournaling::TestThroughputMargin() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
@@ -40,17 +40,15 @@ void PerfThroughputJournaling::TestThroughputMargin() {
   auto testParams = TestDataParameters::SinglePairMargin();
 
   ThroughputTestsModule::ThroughputTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::
-          CleanStartJournaling(ExchangeTestContainer::TimeBasedExchangeId()),
-      exchange::core::common::config::SerializationConfiguration::
-          DiskJournaling(),
-      50);
+    perfCfg, testParams,
+    exchange::core::common::config::InitialStateConfiguration::CleanStartJournaling(
+      ExchangeTestContainer::TimeBasedExchangeId()),
+    exchange::core::common::config::SerializationConfiguration::DiskJournaling(), 50);
 }
 
 void PerfThroughputJournaling::TestThroughputExchange() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
@@ -59,79 +57,75 @@ void PerfThroughputJournaling::TestThroughputExchange() {
   auto testParams = TestDataParameters::SinglePairExchange();
 
   ThroughputTestsModule::ThroughputTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::
-          CleanStartJournaling(ExchangeTestContainer::TimeBasedExchangeId()),
-      exchange::core::common::config::SerializationConfiguration::
-          DiskJournaling(),
-      50);
+    perfCfg, testParams,
+    exchange::core::common::config::InitialStateConfiguration::CleanStartJournaling(
+      ExchangeTestContainer::TimeBasedExchangeId()),
+    exchange::core::common::config::SerializationConfiguration::DiskJournaling(), 50);
 }
 
 void PerfThroughputJournaling::TestThroughputMultiSymbolMedium() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
 
   auto testParams = TestDataParameters::Medium();
 
   ThroughputTestsModule::ThroughputTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::
-          CleanStartJournaling(ExchangeTestContainer::TimeBasedExchangeId()),
-      exchange::core::common::config::SerializationConfiguration::
-          DiskJournaling(),
-      25);
+    perfCfg, testParams,
+    exchange::core::common::config::InitialStateConfiguration::CleanStartJournaling(
+      ExchangeTestContainer::TimeBasedExchangeId()),
+    exchange::core::common::config::SerializationConfiguration::DiskJournaling(), 25);
 }
 
 void PerfThroughputJournaling::TestThroughputMultiSymbolLarge() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
 
   auto testParams = TestDataParameters::Large();
 
   ThroughputTestsModule::ThroughputTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::
-          CleanStartJournaling(ExchangeTestContainer::TimeBasedExchangeId()),
-      exchange::core::common::config::SerializationConfiguration::
-          DiskJournaling(),
-      25);
+    perfCfg, testParams,
+    exchange::core::common::config::InitialStateConfiguration::CleanStartJournaling(
+      ExchangeTestContainer::TimeBasedExchangeId()),
+    exchange::core::common::config::SerializationConfiguration::DiskJournaling(), 25);
 }
 
 void PerfThroughputJournaling::TestThroughputMultiSymbolHuge() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
 
   auto testParams = TestDataParameters::Huge();
 
   ThroughputTestsModule::ThroughputTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::
-          CleanStartJournaling(ExchangeTestContainer::TimeBasedExchangeId()),
-      exchange::core::common::config::SerializationConfiguration::
-          DiskJournaling(),
-      25);
+    perfCfg, testParams,
+    exchange::core::common::config::InitialStateConfiguration::CleanStartJournaling(
+      ExchangeTestContainer::TimeBasedExchangeId()),
+    exchange::core::common::config::SerializationConfiguration::DiskJournaling(), 25);
 }
 
 // Register tests
 TEST_F(PerfThroughputJournaling, TestThroughputMargin) {
   TestThroughputMargin();
 }
+
 TEST_F(PerfThroughputJournaling, TestThroughputExchange) {
   TestThroughputExchange();
 }
+
 TEST_F(PerfThroughputJournaling, TestThroughputMultiSymbolMedium) {
   TestThroughputMultiSymbolMedium();
 }
+
 TEST_F(PerfThroughputJournaling, TestThroughputMultiSymbolLarge) {
   TestThroughputMultiSymbolLarge();
 }
+
 // Disabled by default - requires 12+ threads CPU, 32GB RAM, and takes hours to
 // complete Run with: --gtest_also_run_disabled_tests to enable
 TEST_F(PerfThroughputJournaling, DISABLED_TestThroughputMultiSymbolHuge) {
   TestThroughputMultiSymbolHuge();
 }
 
-} // namespace perf
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace perf
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

@@ -76,7 +76,7 @@ public:
   void TestJournalingMultiSymbolHuge();
 };
 
-} // namespace perf
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace perf
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

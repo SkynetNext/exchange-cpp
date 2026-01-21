@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#include "../util/TestConstants.h"
-#include "OrderBookDirectImplTest.h"
 #include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/orderbook/OrderBookDirectImpl.h>
 #include <exchange/core/orderbook/OrderBookEventsHelper.h>
+#include "../util/TestConstants.h"
+#include "OrderBookDirectImplTest.h"
 
 using namespace exchange::core::common;
 using namespace exchange::core::collections::objpool;
@@ -37,8 +37,7 @@ protected:
     // Use member variable symbolSpec_ from base class
     auto pool = ObjectsPool::CreateDefaultTestPool();
     auto eventsHelper = OrderBookEventsHelper::NonPooledEventsHelper();
-    return std::make_unique<OrderBookDirectImpl>(&symbolSpec_, pool,
-                                                 eventsHelper, nullptr);
+    return std::make_unique<OrderBookDirectImpl>(&symbolSpec_, pool, eventsHelper, nullptr);
   }
 
   CoreSymbolSpecification GetCoreSymbolSpec() override {
@@ -79,38 +78,31 @@ TEST_F(OrderBookDirectImplMarginTest, ShouldRemoveOrderAndEmptyBucket) {
   TestShouldRemoveOrderAndEmptyBucket();
 }
 
-TEST_F(OrderBookDirectImplMarginTest,
-       ShouldReturnErrorWhenDeletingUnknownOrder) {
+TEST_F(OrderBookDirectImplMarginTest, ShouldReturnErrorWhenDeletingUnknownOrder) {
   TestShouldReturnErrorWhenDeletingUnknownOrder();
 }
 
-TEST_F(OrderBookDirectImplMarginTest,
-       ShouldReturnErrorWhenDeletingOtherUserOrder) {
+TEST_F(OrderBookDirectImplMarginTest, ShouldReturnErrorWhenDeletingOtherUserOrder) {
   TestShouldReturnErrorWhenDeletingOtherUserOrder();
 }
 
-TEST_F(OrderBookDirectImplMarginTest,
-       ShouldReturnErrorWhenUpdatingOtherUserOrder) {
+TEST_F(OrderBookDirectImplMarginTest, ShouldReturnErrorWhenUpdatingOtherUserOrder) {
   TestShouldReturnErrorWhenUpdatingOtherUserOrder();
 }
 
-TEST_F(OrderBookDirectImplMarginTest,
-       ShouldReturnErrorWhenUpdatingUnknownOrder) {
+TEST_F(OrderBookDirectImplMarginTest, ShouldReturnErrorWhenUpdatingUnknownOrder) {
   TestShouldReturnErrorWhenUpdatingUnknownOrder();
 }
 
-TEST_F(OrderBookDirectImplMarginTest,
-       ShouldReturnErrorWhenReducingUnknownOrder) {
+TEST_F(OrderBookDirectImplMarginTest, ShouldReturnErrorWhenReducingUnknownOrder) {
   TestShouldReturnErrorWhenReducingUnknownOrder();
 }
 
-TEST_F(OrderBookDirectImplMarginTest,
-       ShouldReturnErrorWhenReducingByZeroOrNegativeSize) {
+TEST_F(OrderBookDirectImplMarginTest, ShouldReturnErrorWhenReducingByZeroOrNegativeSize) {
   TestShouldReturnErrorWhenReducingByZeroOrNegativeSize();
 }
 
-TEST_F(OrderBookDirectImplMarginTest,
-       ShouldReturnErrorWhenReducingOtherUserOrder) {
+TEST_F(OrderBookDirectImplMarginTest, ShouldReturnErrorWhenReducingOtherUserOrder) {
   TestShouldReturnErrorWhenReducingOtherUserOrder();
 }
 
@@ -130,8 +122,7 @@ TEST_F(OrderBookDirectImplMarginTest, ShouldMatchIocOrderFullBBO) {
   TestShouldMatchIocOrderFullBBO();
 }
 
-TEST_F(OrderBookDirectImplMarginTest,
-       ShouldMatchIocOrderWithTwoLimitOrdersPartial) {
+TEST_F(OrderBookDirectImplMarginTest, ShouldMatchIocOrderWithTwoLimitOrdersPartial) {
   TestShouldMatchIocOrderWithTwoLimitOrdersPartial();
 }
 
@@ -171,18 +162,15 @@ TEST_F(OrderBookDirectImplMarginTest, ShouldFullyMatchMarketableGtcOrder) {
   TestShouldFullyMatchMarketableGtcOrder();
 }
 
-TEST_F(OrderBookDirectImplMarginTest,
-       ShouldPartiallyMatchMarketableGtcOrderAndPlace) {
+TEST_F(OrderBookDirectImplMarginTest, ShouldPartiallyMatchMarketableGtcOrderAndPlace) {
   TestShouldPartiallyMatchMarketableGtcOrderAndPlace();
 }
 
-TEST_F(OrderBookDirectImplMarginTest,
-       ShouldFullyMatchMarketableGtcOrder2Prices) {
+TEST_F(OrderBookDirectImplMarginTest, ShouldFullyMatchMarketableGtcOrder2Prices) {
   TestShouldFullyMatchMarketableGtcOrder2Prices();
 }
 
-TEST_F(OrderBookDirectImplMarginTest,
-       ShouldFullyMatchMarketableGtcOrderWithAllLiquidity) {
+TEST_F(OrderBookDirectImplMarginTest, ShouldFullyMatchMarketableGtcOrderWithAllLiquidity) {
   TestShouldFullyMatchMarketableGtcOrderWithAllLiquidity();
 }
 
@@ -190,8 +178,7 @@ TEST_F(OrderBookDirectImplMarginTest, ShouldMoveOrderFullyMatchAsMarketable) {
   TestShouldMoveOrderFullyMatchAsMarketable();
 }
 
-TEST_F(OrderBookDirectImplMarginTest,
-       ShouldMoveOrderFullyMatchAsMarketable2Prices) {
+TEST_F(OrderBookDirectImplMarginTest, ShouldMoveOrderFullyMatchAsMarketable2Prices) {
   TestShouldMoveOrderFullyMatchAsMarketable2Prices();
 }
 
@@ -207,7 +194,7 @@ TEST_F(OrderBookDirectImplMarginTest, SequentialBidsTest) {
   TestSequentialBids();
 }
 
-} // namespace orderbook
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace orderbook
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

@@ -35,11 +35,7 @@ namespace integration {
 /**
  * RejectionCause - enum for rejection test causes
  */
-enum class RejectionCause {
-  NO_REJECTION,
-  REJECTION_BY_SIZE,
-  REJECTION_BY_BUDGET
-};
+enum class RejectionCause { NO_REJECTION, REJECTION_BY_SIZE, REJECTION_BY_BUDGET };
 
 /**
  * ITExchangeCoreIntegrationRejection - abstract base class for rejection tests
@@ -60,29 +56,22 @@ protected:
   void SetUp() override;
 
   // Test helper methods
-  void TestMultiBuy(
-      const exchange::core::common::CoreSymbolSpecification &symbolSpec,
-      exchange::core::common::OrderType orderType,
-      RejectionCause rejectionCause);
+  void TestMultiBuy(const exchange::core::common::CoreSymbolSpecification& symbolSpec,
+                    exchange::core::common::OrderType orderType,
+                    RejectionCause rejectionCause);
 
-  void TestMultiSell(
-      const exchange::core::common::CoreSymbolSpecification &symbolSpec,
-      exchange::core::common::OrderType orderType,
-      RejectionCause rejectionCause);
+  void TestMultiSell(const exchange::core::common::CoreSymbolSpecification& symbolSpec,
+                     exchange::core::common::OrderType orderType,
+                     RejectionCause rejectionCause);
 
   // Mock event handler
   class MockEventsHandler : public exchange::core::IEventsHandler {
   public:
-    MOCK_METHOD(void, CommandResult, (const exchange::core::ApiCommandResult &),
-                (override));
-    MOCK_METHOD(void, TradeEvent, (const exchange::core::TradeEvent &),
-                (override));
-    MOCK_METHOD(void, RejectEvent, (const exchange::core::RejectEvent &),
-                (override));
-    MOCK_METHOD(void, ReduceEvent, (const exchange::core::ReduceEvent &),
-                (override));
-    MOCK_METHOD(void, OrderBook, (const exchange::core::OrderBook &),
-                (override));
+    MOCK_METHOD(void, CommandResult, (const exchange::core::ApiCommandResult&), (override));
+    MOCK_METHOD(void, TradeEvent, (const exchange::core::TradeEvent&), (override));
+    MOCK_METHOD(void, RejectEvent, (const exchange::core::RejectEvent&), (override));
+    MOCK_METHOD(void, ReduceEvent, (const exchange::core::ReduceEvent&), (override));
+    MOCK_METHOD(void, OrderBook, (const exchange::core::OrderBook&), (override));
   };
 
   ::testing::StrictMock<MockEventsHandler> mockHandler_;
@@ -90,12 +79,13 @@ protected:
 
 private:
   exchange::core::common::api::ApiPlaceOrder
-  BuilderPlace(int32_t symbolId, int64_t uid,
+  BuilderPlace(int32_t symbolId,
+               int64_t uid,
                exchange::core::common::OrderAction action,
                exchange::core::common::OrderType type);
 };
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

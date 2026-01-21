@@ -31,10 +31,10 @@ namespace tests {
 namespace util {
 // Forward declaration - will be included in .cpp
 struct TestOrdersGeneratorConfig;
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange
 
 namespace exchange {
 namespace core {
@@ -53,15 +53,14 @@ public:
   struct GenResult {
     std::vector<exchange::core::common::cmd::OrderCommand> commandsFill;
     std::vector<exchange::core::common::cmd::OrderCommand> commandsBenchmark;
-    std::shared_ptr<exchange::core::common::L2MarketData>
-        finalOrderBookSnapshot;
+    std::shared_ptr<exchange::core::common::L2MarketData> finalOrderBookSnapshot;
     int64_t finalOrderbookHash;
 
     /**
      * Get all commands (fill + benchmark)
      * Returns reference to allow modification (matching Java version behavior)
      */
-    std::vector<exchange::core::common::cmd::OrderCommand> &GetCommands() const;
+    std::vector<exchange::core::common::cmd::OrderCommand>& GetCommands() const;
 
     /**
      * Get total number of commands
@@ -87,12 +86,15 @@ public:
    * @param seed - random seed
    * @return generated commands result
    */
-  static GenResult
-  GenerateCommands(int benchmarkTransactionsNumber, int targetOrderBookOrders,
-                   int numUsers, std::function<int32_t(int32_t)> uidMapper,
-                   int32_t symbol, bool enableSlidingPrice, bool avalancheIOC,
-                   std::function<void(int64_t)> asyncProgressConsumer,
-                   int seed);
+  static GenResult GenerateCommands(int benchmarkTransactionsNumber,
+                                    int targetOrderBookOrders,
+                                    int numUsers,
+                                    std::function<int32_t(int32_t)> uidMapper,
+                                    int32_t symbol,
+                                    bool enableSlidingPrice,
+                                    bool avalancheIOC,
+                                    std::function<void(int64_t)> asyncProgressConsumer,
+                                    int seed);
 
   /**
    * Create async progress logger
@@ -117,19 +119,20 @@ public:
     /**
      * Get benchmark commands size
      */
-    size_t GetBenchmarkCommandsSize() const { return commandsBenchmark.size(); }
+    size_t GetBenchmarkCommandsSize() const {
+      return commandsBenchmark.size();
+    }
 
     /**
      * Get fill commands (as future for async compatibility with Java version)
      */
-    std::future<std::vector<exchange::core::common::api::ApiCommand *>>
-    GetApiCommandsFill() const;
+    std::future<std::vector<exchange::core::common::api::ApiCommand*>> GetApiCommandsFill() const;
 
     /**
      * Get benchmark commands (as future for async compatibility with Java
      * version)
      */
-    std::future<std::vector<exchange::core::common::api::ApiCommand *>>
+    std::future<std::vector<exchange::core::common::api::ApiCommand*>>
     GetApiCommandsBenchmark() const;
   };
 
@@ -138,8 +141,7 @@ public:
    * @param config - test orders generator configuration
    * @return multi-symbol generation result
    */
-  static MultiSymbolGenResult
-  GenerateMultipleSymbols(const TestOrdersGeneratorConfig &config);
+  static MultiSymbolGenResult GenerateMultipleSymbols(const TestOrdersGeneratorConfig& config);
 
   /**
    * Create weighted distribution for multiple symbols (Pareto distribution)
@@ -150,7 +152,7 @@ public:
   static std::vector<double> CreateWeightedDistribution(int size, int seed);
 };
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

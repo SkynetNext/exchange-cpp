@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include <cstdint>
 #include <exchange/core/common/CoreSymbolSpecification.h>
+#include <cstdint>
 #include <set>
 #include <vector>
 
@@ -41,8 +41,8 @@ public:
    * @return vector of BitSets, where each BitSet represents currencies for a
    * user (index = uid)
    */
-  static std::vector<std::vector<bool>>
-  GenerateUsers(int accountsToCreate, const std::set<int32_t> &currencies);
+  static std::vector<std::vector<bool>> GenerateUsers(int accountsToCreate,
+                                                      const std::set<int32_t>& currencies);
 
   /**
    * Create user list for a specific symbol
@@ -54,13 +54,13 @@ public:
    * symbol
    * @return array of user IDs that can trade this symbol
    */
-  static std::vector<int32_t> CreateUserListForSymbol(
-      const std::vector<std::vector<bool>> &users2currencies,
-      const exchange::core::common::CoreSymbolSpecification &spec,
-      int symbolMessagesExpected);
+  static std::vector<int32_t>
+  CreateUserListForSymbol(const std::vector<std::vector<bool>>& users2currencies,
+                          const exchange::core::common::CoreSymbolSpecification& spec,
+                          int symbolMessagesExpected);
 };
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

@@ -15,12 +15,12 @@
  */
 
 #include "ITExchangeCoreIntegrationRejectionBasic.h"
-#include "../util/TestConstants.h"
-#include "ITExchangeCoreIntegrationRejection.h"
 #include <exchange/core/common/OrderAction.h>
 #include <exchange/core/common/OrderType.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <gtest/gtest.h>
+#include "../util/TestConstants.h"
+#include "ITExchangeCoreIntegrationRejection.h"
 
 using namespace exchange::core::common;
 using namespace exchange::core::tests::util;
@@ -30,9 +30,8 @@ namespace core {
 namespace tests {
 namespace integration {
 
-ITExchangeCoreIntegrationRejectionBasic::
-    ITExchangeCoreIntegrationRejectionBasic()
-    : ITExchangeCoreIntegrationRejection() {}
+ITExchangeCoreIntegrationRejectionBasic::ITExchangeCoreIntegrationRejectionBasic()
+  : ITExchangeCoreIntegrationRejection() {}
 
 exchange::core::common::config::PerformanceConfiguration
 ITExchangeCoreIntegrationRejectionBasic::GetPerformanceConfiguration() {
@@ -43,38 +42,32 @@ ITExchangeCoreIntegrationRejectionBasic::GetPerformanceConfiguration() {
 // -------------------------- buy no rejection tests
 // -----------------------------
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiBuyNoRejectionMarginGtc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiBuyNoRejectionMarginGtc) {
   TestMultiBuy(TestConstants::SYMBOLSPECFEE_USD_JPY(), OrderType::GTC,
                RejectionCause::NO_REJECTION);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiBuyNoRejectionExchangeGtc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiBuyNoRejectionExchangeGtc) {
   TestMultiBuy(TestConstants::SYMBOLSPECFEE_XBT_LTC(), OrderType::GTC,
                RejectionCause::NO_REJECTION);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiBuyNoRejectionExchangeIoc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiBuyNoRejectionExchangeIoc) {
   TestMultiBuy(TestConstants::SYMBOLSPECFEE_XBT_LTC(), OrderType::IOC,
                RejectionCause::NO_REJECTION);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiBuyNoRejectionMarginIoc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiBuyNoRejectionMarginIoc) {
   TestMultiBuy(TestConstants::SYMBOLSPECFEE_USD_JPY(), OrderType::IOC,
                RejectionCause::NO_REJECTION);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiBuyNoRejectionExchangeFokB) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiBuyNoRejectionExchangeFokB) {
   TestMultiBuy(TestConstants::SYMBOLSPECFEE_XBT_LTC(), OrderType::FOK_BUDGET,
                RejectionCause::NO_REJECTION);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiBuyNoRejectionMarginFokB) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiBuyNoRejectionMarginFokB) {
   TestMultiBuy(TestConstants::SYMBOLSPECFEE_USD_JPY(), OrderType::FOK_BUDGET,
                RejectionCause::NO_REJECTION);
 }
@@ -82,50 +75,42 @@ TEST_F(ITExchangeCoreIntegrationRejectionBasic,
 // -------------------------- buy with rejection tests
 // -----------------------------
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiBuyWithRejectionMarginGtc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiBuyWithRejectionMarginGtc) {
   TestMultiBuy(TestConstants::SYMBOLSPECFEE_USD_JPY(), OrderType::GTC,
                RejectionCause::REJECTION_BY_SIZE);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiBuyWithRejectionExchangeGtc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiBuyWithRejectionExchangeGtc) {
   TestMultiBuy(TestConstants::SYMBOLSPECFEE_XBT_LTC(), OrderType::GTC,
                RejectionCause::REJECTION_BY_SIZE);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiBuyWithRejectionExchangeIoc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiBuyWithRejectionExchangeIoc) {
   TestMultiBuy(TestConstants::SYMBOLSPECFEE_XBT_LTC(), OrderType::IOC,
                RejectionCause::REJECTION_BY_SIZE);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiBuyWithRejectionMarginIoc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiBuyWithRejectionMarginIoc) {
   TestMultiBuy(TestConstants::SYMBOLSPECFEE_USD_JPY(), OrderType::IOC,
                RejectionCause::REJECTION_BY_SIZE);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiBuyWithSizeRejectionExchangeFokB) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiBuyWithSizeRejectionExchangeFokB) {
   TestMultiBuy(TestConstants::SYMBOLSPECFEE_XBT_LTC(), OrderType::FOK_BUDGET,
                RejectionCause::REJECTION_BY_SIZE);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiBuyWithSizeRejectionMarginFokB) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiBuyWithSizeRejectionMarginFokB) {
   TestMultiBuy(TestConstants::SYMBOLSPECFEE_USD_JPY(), OrderType::FOK_BUDGET,
                RejectionCause::REJECTION_BY_SIZE);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiBuyWithBudgetRejectionExchangeFokB) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiBuyWithBudgetRejectionExchangeFokB) {
   TestMultiBuy(TestConstants::SYMBOLSPECFEE_XBT_LTC(), OrderType::FOK_BUDGET,
                RejectionCause::REJECTION_BY_BUDGET);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiBuyWithBudgetRejectionMarginFokB) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiBuyWithBudgetRejectionMarginFokB) {
   TestMultiBuy(TestConstants::SYMBOLSPECFEE_USD_JPY(), OrderType::FOK_BUDGET,
                RejectionCause::REJECTION_BY_BUDGET);
 }
@@ -133,38 +118,32 @@ TEST_F(ITExchangeCoreIntegrationRejectionBasic,
 // -------------------------- sell no rejection tests
 // -----------------------------
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiSellNoRejectionMarginGtc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellNoRejectionMarginGtc) {
   TestMultiSell(TestConstants::SYMBOLSPECFEE_USD_JPY(), OrderType::GTC,
                 RejectionCause::NO_REJECTION);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiSellNoRejectionExchangeGtc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellNoRejectionExchangeGtc) {
   TestMultiSell(TestConstants::SYMBOLSPECFEE_XBT_LTC(), OrderType::GTC,
                 RejectionCause::NO_REJECTION);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiSellNoRejectionMarginIoc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellNoRejectionMarginIoc) {
   TestMultiSell(TestConstants::SYMBOLSPECFEE_USD_JPY(), OrderType::IOC,
                 RejectionCause::NO_REJECTION);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiSellNoRejectionExchangeIoc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellNoRejectionExchangeIoc) {
   TestMultiSell(TestConstants::SYMBOLSPECFEE_XBT_LTC(), OrderType::IOC,
                 RejectionCause::NO_REJECTION);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiSellNoRejectionMarginFokB) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellNoRejectionMarginFokB) {
   TestMultiSell(TestConstants::SYMBOLSPECFEE_USD_JPY(), OrderType::FOK_BUDGET,
                 RejectionCause::NO_REJECTION);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiSellNoRejectionExchangeFokB) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellNoRejectionExchangeFokB) {
   TestMultiSell(TestConstants::SYMBOLSPECFEE_XBT_LTC(), OrderType::FOK_BUDGET,
                 RejectionCause::NO_REJECTION);
 }
@@ -172,55 +151,47 @@ TEST_F(ITExchangeCoreIntegrationRejectionBasic,
 // -------------------------- sell with rejection tests
 // -----------------------------
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiSellWithRejectionMarginGtc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellWithRejectionMarginGtc) {
   TestMultiSell(TestConstants::SYMBOLSPECFEE_USD_JPY(), OrderType::GTC,
                 RejectionCause::REJECTION_BY_SIZE);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiSellWithRejectionExchangeGtc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellWithRejectionExchangeGtc) {
   TestMultiSell(TestConstants::SYMBOLSPECFEE_XBT_LTC(), OrderType::GTC,
                 RejectionCause::REJECTION_BY_SIZE);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiSellWithRejectionMarginIoc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellWithRejectionMarginIoc) {
   TestMultiSell(TestConstants::SYMBOLSPECFEE_USD_JPY(), OrderType::IOC,
                 RejectionCause::REJECTION_BY_SIZE);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiSellWithRejectionExchangeIoc) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellWithRejectionExchangeIoc) {
   TestMultiSell(TestConstants::SYMBOLSPECFEE_XBT_LTC(), OrderType::IOC,
                 RejectionCause::REJECTION_BY_SIZE);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiSellWithSizeRejectionMarginFokB) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellWithSizeRejectionMarginFokB) {
   TestMultiSell(TestConstants::SYMBOLSPECFEE_USD_JPY(), OrderType::FOK_BUDGET,
                 RejectionCause::REJECTION_BY_SIZE);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiSellWithSizeRejectionExchangeFokB) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellWithSizeRejectionExchangeFokB) {
   TestMultiSell(TestConstants::SYMBOLSPECFEE_XBT_LTC(), OrderType::FOK_BUDGET,
                 RejectionCause::REJECTION_BY_SIZE);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiSellWithExpectationRejectionMarginFokB) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellWithExpectationRejectionMarginFokB) {
   TestMultiSell(TestConstants::SYMBOLSPECFEE_USD_JPY(), OrderType::FOK_BUDGET,
                 RejectionCause::REJECTION_BY_BUDGET);
 }
 
-TEST_F(ITExchangeCoreIntegrationRejectionBasic,
-       TestMultiSellWithExpectationRejectionExchangeFokB) {
+TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellWithExpectationRejectionExchangeFokB) {
   TestMultiSell(TestConstants::SYMBOLSPECFEE_XBT_LTC(), OrderType::FOK_BUDGET,
                 RejectionCause::REJECTION_BY_BUDGET);
 }
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

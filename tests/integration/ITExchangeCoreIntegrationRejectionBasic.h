@@ -27,16 +27,14 @@ namespace integration {
  * ITExchangeCoreIntegrationRejectionBasic - rejection tests with basic
  * performance configuration
  */
-class ITExchangeCoreIntegrationRejectionBasic
-    : public ITExchangeCoreIntegrationRejection {
+class ITExchangeCoreIntegrationRejectionBasic : public ITExchangeCoreIntegrationRejection {
 public:
   ITExchangeCoreIntegrationRejectionBasic();
 
-  exchange::core::common::config::PerformanceConfiguration
-  GetPerformanceConfiguration() override;
+  exchange::core::common::config::PerformanceConfiguration GetPerformanceConfiguration() override;
 };
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

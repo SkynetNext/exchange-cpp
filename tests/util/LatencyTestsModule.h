@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "TestDataParameters.h"
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
+#include "TestDataParameters.h"
 
 namespace exchange {
 namespace core {
@@ -40,14 +40,11 @@ public:
    * @param warmupCycles - number of warmup cycles
    */
   static void LatencyTestImpl(
-      const exchange::core::common::config::PerformanceConfiguration
-          &performanceCfg,
-      const TestDataParameters &testDataParameters,
-      const exchange::core::common::config::InitialStateConfiguration
-          &initialStateCfg,
-      const exchange::core::common::config::SerializationConfiguration
-          &serializationCfg,
-      int warmupCycles);
+    const exchange::core::common::config::PerformanceConfiguration& performanceCfg,
+    const TestDataParameters& testDataParameters,
+    const exchange::core::common::config::InitialStateConfiguration& initialStateCfg,
+    const exchange::core::common::config::SerializationConfiguration& serializationCfg,
+    int warmupCycles);
 
   /**
    * Run hiccup test implementation (latency jitter testing)
@@ -57,11 +54,9 @@ public:
    * @param warmupCycles - number of warmup cycles
    */
   static void
-  HiccupTestImpl(const exchange::core::common::config::PerformanceConfiguration
-                     &performanceCfg,
-                 const TestDataParameters &testDataParameters,
-                 const exchange::core::common::config::InitialStateConfiguration
-                     &initialStateCfg,
+  HiccupTestImpl(const exchange::core::common::config::PerformanceConfiguration& performanceCfg,
+                 const TestDataParameters& testDataParameters,
+                 const exchange::core::common::config::InitialStateConfiguration& initialStateCfg,
                  int warmupCycles);
 
   /**
@@ -74,17 +69,15 @@ public:
    * @param warmupCycles - number of warmup cycles (using same fixed TPS)
    */
   static void LatencyTestFixedTps(
-      const exchange::core::common::config::PerformanceConfiguration
-          &performanceCfg,
-      const TestDataParameters &testDataParameters,
-      const exchange::core::common::config::InitialStateConfiguration
-          &initialStateCfg,
-      const exchange::core::common::config::SerializationConfiguration
-          &serializationCfg,
-      int fixedTps, int warmupCycles);
+    const exchange::core::common::config::PerformanceConfiguration& performanceCfg,
+    const TestDataParameters& testDataParameters,
+    const exchange::core::common::config::InitialStateConfiguration& initialStateCfg,
+    const exchange::core::common::config::SerializationConfiguration& serializationCfg,
+    int fixedTps,
+    int warmupCycles);
 };
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

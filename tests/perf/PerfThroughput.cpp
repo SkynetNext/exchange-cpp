@@ -33,8 +33,8 @@ namespace tests {
 namespace perf {
 
 void PerfThroughput::TestThroughputMargin() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
@@ -42,16 +42,15 @@ void PerfThroughput::TestThroughputMargin() {
   auto testParams = TestDataParameters::SinglePairMargin();
 
   ThroughputTestsModule::ThroughputTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(),
-      5); // Reduced from 50 to 5 for faster C++ test execution (industry
-          // standard: 5 iterations for simple tests)
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(),
+    5);  // Reduced from 50 to 5 for faster C++ test execution (industry
+         // standard: 5 iterations for simple tests)
 }
 
 void PerfThroughput::TestThroughputExchange() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
@@ -59,16 +58,15 @@ void PerfThroughput::TestThroughputExchange() {
   auto testParams = TestDataParameters::SinglePairExchange();
 
   ThroughputTestsModule::ThroughputTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(),
-      5); // Reduced from 50 to 5 for faster C++ test execution (industry
-          // standard: 5 iterations for simple tests)
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(),
+    5);  // Reduced from 50 to 5 for faster C++ test execution (industry
+         // standard: 5 iterations for simple tests)
 }
 
 void PerfThroughput::TestThroughputPeak() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 4;
   perfCfg.riskEnginesNum = 2;
@@ -84,74 +82,81 @@ void PerfThroughput::TestThroughputPeak() {
   testParams.preFillMode = PreFillMode::ORDERS_NUMBER;
 
   ThroughputTestsModule::ThroughputTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(),
-      5); // Reduced from 50 to 5 for faster C++ test execution (industry
-          // standard: 5 iterations for simple tests)
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(),
+    5);  // Reduced from 50 to 5 for faster C++ test execution (industry
+         // standard: 5 iterations for simple tests)
 }
 
 void PerfThroughput::TestThroughputMultiSymbolMedium() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
 
   auto testParams = TestDataParameters::Medium();
 
   ThroughputTestsModule::ThroughputTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(),
-      3); // Reduced from 25 to 3 for faster C++ test execution (industry
-          // standard: 3 iterations for complex multi-symbol tests)
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(),
+    3);  // Reduced from 25 to 3 for faster C++ test execution (industry
+         // standard: 3 iterations for complex multi-symbol tests)
 }
 
 void PerfThroughput::TestThroughputMultiSymbolLarge() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
 
   auto testParams = TestDataParameters::Large();
 
   ThroughputTestsModule::ThroughputTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(),
-      3); // Reduced from 25 to 3 for faster C++ test execution (industry
-          // standard: 3 iterations for complex multi-symbol tests)
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(),
+    3);  // Reduced from 25 to 3 for faster C++ test execution (industry
+         // standard: 3 iterations for complex multi-symbol tests)
 }
 
 void PerfThroughput::TestThroughputMultiSymbolHuge() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.matchingEnginesNum = 4;
   perfCfg.riskEnginesNum = 2;
 
   auto testParams = TestDataParameters::Huge();
 
   ThroughputTestsModule::ThroughputTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(),
-      3); // Reduced from 25 to 3 for faster C++ test execution (industry
-          // standard: 3 iterations for complex multi-symbol tests)
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(),
+    3);  // Reduced from 25 to 3 for faster C++ test execution (industry
+         // standard: 3 iterations for complex multi-symbol tests)
 }
 
 // Register tests
-TEST_F(PerfThroughput, TestThroughputMargin) { TestThroughputMargin(); }
-TEST_F(PerfThroughput, TestThroughputExchange) { TestThroughputExchange(); }
-TEST_F(PerfThroughput, TestThroughputPeak) { TestThroughputPeak(); }
+TEST_F(PerfThroughput, TestThroughputMargin) {
+  TestThroughputMargin();
+}
+
+TEST_F(PerfThroughput, TestThroughputExchange) {
+  TestThroughputExchange();
+}
+
+TEST_F(PerfThroughput, TestThroughputPeak) {
+  TestThroughputPeak();
+}
+
 TEST_F(PerfThroughput, TestThroughputMultiSymbolMedium) {
   TestThroughputMultiSymbolMedium();
 }
+
 TEST_F(PerfThroughput, TestThroughputMultiSymbolLarge) {
   TestThroughputMultiSymbolLarge();
 }
+
 // Disabled by default - requires 12+ threads CPU, 32GB RAM, and takes hours to
 // complete Run with: --gtest_also_run_disabled_tests to enable
 TEST_F(PerfThroughput, DISABLED_TestThroughputMultiSymbolHuge) {
   TestThroughputMultiSymbolHuge();
 }
 
-} // namespace perf
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace perf
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

@@ -15,13 +15,12 @@
  */
 
 #include "PersistenceTestsModule.h"
-#include "ExchangeTestContainer.h"
 #include <exchange/core/common/api/ApiPersistState.h>
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
 #include <exchange/core/utils/FastNanoTime.h>
 #include <thread>
-
+#include "ExchangeTestContainer.h"
 
 namespace exchange {
 namespace core {
@@ -29,45 +28,38 @@ namespace tests {
 namespace util {
 
 void PersistenceTestsModule::PersistenceTestImpl(
-    const exchange::core::common::config::PerformanceConfiguration
-        &performanceCfg,
-    const TestDataParameters &testDataParameters, int iterations) {
-
+  const exchange::core::common::config::PerformanceConfiguration& performanceCfg,
+  const TestDataParameters& testDataParameters,
+  int iterations) {
   for (int iteration = 0; iteration < iterations; iteration++) {
-    auto testDataFutures = ExchangeTestContainer::PrepareTestDataAsync(
-        testDataParameters, iteration);
+    auto testDataFutures =
+      ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, iteration);
 
-    const long stateId =
-        exchange::core::utils::FastNanoTime::NowMillis() * 1000 + iteration;
+    const long stateId = exchange::core::utils::FastNanoTime::NowMillis() * 1000 + iteration;
 
     char exchangeIdBuffer[32];
     snprintf(exchangeIdBuffer, sizeof(exchangeIdBuffer), "%012llX",
-             static_cast<unsigned long long>(
-                 exchange::core::utils::FastNanoTime::NowMillis()));
+             static_cast<unsigned long long>(exchange::core::utils::FastNanoTime::NowMillis()));
     std::string exchangeId(exchangeIdBuffer);
 
     auto firstStartConfig =
-        exchange::core::common::config::InitialStateConfiguration::CleanStart(
-            exchangeId);
+      exchange::core::common::config::InitialStateConfiguration::CleanStart(exchangeId);
 
     long originalPrefillStateHash;
     float originalPerfMt;
 
     {
       auto container = ExchangeTestContainer::Create(
-          performanceCfg, firstStartConfig,
-          exchange::core::common::config::SerializationConfiguration::
-              DiskSnapshotOnly());
+        performanceCfg, firstStartConfig,
+        exchange::core::common::config::SerializationConfiguration::DiskSnapshotOnly());
 
       // Load symbols, users and prefill orders
       container->LoadSymbolsUsersAndPrefillOrders(testDataFutures);
 
       // Create snapshot
       auto persistState =
-          std::make_unique<exchange::core::common::api::ApiPersistState>(
-              stateId, false);
-      auto future =
-          container->GetApi()->SubmitCommandAsync(persistState.release());
+        std::make_unique<exchange::core::common::api::ApiPersistState>(stateId, false);
+      auto future = container->GetApi()->SubmitCommandAsync(persistState.release());
       auto result = future.get();
       if (result != exchange::core::common::cmd::CommandResultCode::SUCCESS) {
         throw std::runtime_error("Failed to create snapshot");
@@ -85,13 +77,11 @@ void PersistenceTestsModule::PersistenceTestImpl(
       if (!benchmarkCommands.empty()) {
         container->GetApi()->SubmitCommandsSync(benchmarkCommands);
       }
-      int64_t tDuration =
-          (exchange::core::utils::FastNanoTime::Now() - tStartNs) / 1'000'000LL;
-      originalPerfMt =
-          benchmarkCommands.size() / static_cast<float>(tDuration) / 1000.0f;
+      int64_t tDuration = (exchange::core::utils::FastNanoTime::Now() - tStartNs) / 1'000'000LL;
+      originalPerfMt = benchmarkCommands.size() / static_cast<float>(tDuration) / 1000.0f;
 
       // Clean up ApiCommand objects to prevent memory leak
-      for (auto *cmd : benchmarkCommands) {
+      for (auto* cmd : benchmarkCommands) {
         delete cmd;
       }
 
@@ -101,7 +91,7 @@ void PersistenceTestsModule::PersistenceTestImpl(
         // Check all balances are zero
         bool allZero = true;
         if (balanceReport->accountBalances) {
-          for (const auto &pair : *balanceReport->accountBalances) {
+          for (const auto& pair : *balanceReport->accountBalances) {
             if (pair.second != 0) {
               allZero = false;
               break;
@@ -109,7 +99,7 @@ void PersistenceTestsModule::PersistenceTestImpl(
           }
         }
         if (allZero && balanceReport->fees) {
-          for (const auto &pair : *balanceReport->fees) {
+          for (const auto& pair : *balanceReport->fees) {
             if (pair.second != 0) {
               allZero = false;
               break;
@@ -117,7 +107,7 @@ void PersistenceTestsModule::PersistenceTestImpl(
           }
         }
         if (allZero && balanceReport->ordersBalances) {
-          for (const auto &pair : *balanceReport->ordersBalances) {
+          for (const auto& pair : *balanceReport->ordersBalances) {
             if (pair.second != 0) {
               allZero = false;
               break;
@@ -133,14 +123,14 @@ void PersistenceTestsModule::PersistenceTestImpl(
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     // Recreate from snapshot
-    auto fromSnapshotConfig = exchange::core::common::config::
-        InitialStateConfiguration::FromSnapshotOnly(exchangeId, stateId, 0);
+    auto fromSnapshotConfig =
+      exchange::core::common::config::InitialStateConfiguration::FromSnapshotOnly(exchangeId,
+                                                                                  stateId, 0);
 
     {
       auto recreatedContainer = ExchangeTestContainer::Create(
-          performanceCfg, fromSnapshotConfig,
-          exchange::core::common::config::SerializationConfiguration::
-              DiskSnapshotOnly());
+        performanceCfg, fromSnapshotConfig,
+        exchange::core::common::config::SerializationConfiguration::DiskSnapshotOnly());
 
       // Wait for core to be ready
       recreatedContainer->TotalBalanceReport();
@@ -157,7 +147,7 @@ void PersistenceTestsModule::PersistenceTestImpl(
         // Check all balances are zero
         bool allZero = true;
         if (balanceReport->accountBalances) {
-          for (const auto &pair : *balanceReport->accountBalances) {
+          for (const auto& pair : *balanceReport->accountBalances) {
             if (pair.second != 0) {
               allZero = false;
               break;
@@ -165,7 +155,7 @@ void PersistenceTestsModule::PersistenceTestImpl(
           }
         }
         if (allZero && balanceReport->fees) {
-          for (const auto &pair : *balanceReport->fees) {
+          for (const auto& pair : *balanceReport->fees) {
             if (pair.second != 0) {
               allZero = false;
               break;
@@ -173,7 +163,7 @@ void PersistenceTestsModule::PersistenceTestImpl(
           }
         }
         if (allZero && balanceReport->ordersBalances) {
-          for (const auto &pair : *balanceReport->ordersBalances) {
+          for (const auto& pair : *balanceReport->ordersBalances) {
             if (pair.second != 0) {
               allZero = false;
               break;
@@ -194,27 +184,24 @@ void PersistenceTestsModule::PersistenceTestImpl(
       if (!benchmarkCommands2.empty()) {
         recreatedContainer->GetApi()->SubmitCommandsSync(benchmarkCommands2);
       }
-      int64_t tDuration2 =
-          (exchange::core::utils::FastNanoTime::Now() - tStart2Ns) /
-          1'000'000LL;
-      float perfMt =
-          benchmarkCommands2.size() / static_cast<float>(tDuration2) / 1000.0f;
+      int64_t tDuration2 = (exchange::core::utils::FastNanoTime::Now() - tStart2Ns) / 1'000'000LL;
+      float perfMt = benchmarkCommands2.size() / static_cast<float>(tDuration2) / 1000.0f;
       float perfRatioPerc = perfMt / originalPerfMt * 100.0f;
 
       // Clean up ApiCommand objects to prevent memory leak
-      for (auto *cmd : benchmarkCommands2) {
+      for (auto* cmd : benchmarkCommands2) {
         delete cmd;
       }
 
       // Log performance comparison (can be used for reporting)
-      (void)perfRatioPerc; // Suppress unused variable warning for now
+      (void)perfRatioPerc;  // Suppress unused variable warning for now
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
   }
 }
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

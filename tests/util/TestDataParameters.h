@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include "TestOrdersGeneratorConfig.h"
 #include <cstdint>
 #include <set>
+#include "TestOrdersGeneratorConfig.h"
 
 namespace exchange {
 namespace core {
@@ -28,11 +28,7 @@ namespace util {
 /**
  * AllowedSymbolTypes - types of symbols allowed in test
  */
-enum class AllowedSymbolTypes {
-  FUTURES_CONTRACT,
-  CURRENCY_EXCHANGE_PAIR,
-  BOTH
-};
+enum class AllowedSymbolTypes { FUTURES_CONTRACT, CURRENCY_EXCHANGE_PAIR, BOTH };
 
 /**
  * TestDataParameters - parameters for test data generation
@@ -82,7 +78,7 @@ struct TestDataParameters {
   static TestDataParameters Huge();
 };
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

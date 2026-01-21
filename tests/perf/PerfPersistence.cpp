@@ -15,10 +15,10 @@
  */
 
 #include "PerfPersistence.h"
+#include <exchange/core/common/config/PerformanceConfiguration.h>
 #include "../util/PersistenceTestsModule.h"
 #include "../util/TestDataParameters.h"
 #include "../util/TestOrdersGeneratorConfig.h"
-#include <exchange/core/common/config/PerformanceConfiguration.h>
 
 using namespace exchange::core::tests::util;
 
@@ -28,8 +28,8 @@ namespace tests {
 namespace perf {
 
 void PerfPersistence::TestPersistenceMargin() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
@@ -42,8 +42,8 @@ void PerfPersistence::TestPersistenceMargin() {
 }
 
 void PerfPersistence::TestPersistenceExchange() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
@@ -56,8 +56,8 @@ void PerfPersistence::TestPersistenceExchange() {
 }
 
 void PerfPersistence::TestPersistenceMultiSymbolMedium() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 4;
   perfCfg.riskEnginesNum = 2;
@@ -71,8 +71,8 @@ void PerfPersistence::TestPersistenceMultiSymbolMedium() {
 }
 
 void PerfPersistence::TestPersistenceMultiSymbolLarge() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 4;
   perfCfg.riskEnginesNum = 4;
@@ -85,8 +85,8 @@ void PerfPersistence::TestPersistenceMultiSymbolLarge() {
 }
 
 void PerfPersistence::TestPersistenceMultiSymbolHuge() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.ringBufferSize = 32 * 1024;
   perfCfg.matchingEnginesNum = 4;
   perfCfg.riskEnginesNum = 4;
@@ -99,21 +99,29 @@ void PerfPersistence::TestPersistenceMultiSymbolHuge() {
 }
 
 // Register tests
-TEST_F(PerfPersistence, TestPersistenceMargin) { TestPersistenceMargin(); }
-TEST_F(PerfPersistence, TestPersistenceExchange) { TestPersistenceExchange(); }
+TEST_F(PerfPersistence, TestPersistenceMargin) {
+  TestPersistenceMargin();
+}
+
+TEST_F(PerfPersistence, TestPersistenceExchange) {
+  TestPersistenceExchange();
+}
+
 TEST_F(PerfPersistence, TestPersistenceMultiSymbolMedium) {
   TestPersistenceMultiSymbolMedium();
 }
+
 TEST_F(PerfPersistence, TestPersistenceMultiSymbolLarge) {
   TestPersistenceMultiSymbolLarge();
 }
+
 // Disabled by default - requires 12+ threads CPU, 32GB RAM, and takes hours to
 // complete Run with: --gtest_also_run_disabled_tests to enable
 TEST_F(PerfPersistence, DISABLED_TestPersistenceMultiSymbolHuge) {
   TestPersistenceMultiSymbolHuge();
 }
 
-} // namespace perf
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace perf
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

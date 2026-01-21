@@ -15,24 +15,25 @@
  */
 
 #include "ExecutionTime.h"
-#include "LatencyTools.h"
 #include <exchange/core/utils/FastNanoTime.h>
+#include "LatencyTools.h"
 
 namespace exchange {
 namespace core {
 namespace tests {
 namespace util {
 
-ExecutionTime::ExecutionTime(
-    std::function<void(const std::string &)> executionTimeConsumer)
-    : executionTimeConsumer_(std::move(executionTimeConsumer)),
-      startTimeNs_(exchange::core::utils::FastNanoTime::Now()), elapsedNs_(0),
-      timeCalculated_(false) {}
+ExecutionTime::ExecutionTime(std::function<void(const std::string&)> executionTimeConsumer)
+  : executionTimeConsumer_(std::move(executionTimeConsumer))
+  , startTimeNs_(exchange::core::utils::FastNanoTime::Now())
+  , elapsedNs_(0)
+  , timeCalculated_(false) {}
 
 ExecutionTime::ExecutionTime()
-    : executionTimeConsumer_([](const std::string &) {}),
-      startTimeNs_(exchange::core::utils::FastNanoTime::Now()), elapsedNs_(0),
-      timeCalculated_(false) {}
+  : executionTimeConsumer_([](const std::string&) {})
+  , startTimeNs_(exchange::core::utils::FastNanoTime::Now())
+  , elapsedNs_(0)
+  , timeCalculated_(false) {}
 
 ExecutionTime::~ExecutionTime() {
   if (executionTimeConsumer_) {
@@ -42,7 +43,7 @@ ExecutionTime::~ExecutionTime() {
 
 std::string ExecutionTime::GetTimeFormatted() {
   if (!timeCalculated_) {
-    GetTimeNs(); // Calculate elapsed time
+    GetTimeNs();  // Calculate elapsed time
   }
   return LatencyTools::FormatNanos(elapsedNs_);
 }
@@ -56,7 +57,7 @@ int64_t ExecutionTime::GetTimeNs() const {
   return elapsedNs_;
 }
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

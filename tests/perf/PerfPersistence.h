@@ -64,7 +64,7 @@ public:
   void TestPersistenceMultiSymbolHuge();
 };
 
-} // namespace perf
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace perf
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

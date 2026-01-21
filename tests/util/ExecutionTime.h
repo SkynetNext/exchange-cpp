@@ -34,8 +34,7 @@ public:
    * Constructor with custom consumer callback
    * @param executionTimeConsumer - callback to receive formatted time string
    */
-  explicit ExecutionTime(
-      std::function<void(const std::string &)> executionTimeConsumer);
+  explicit ExecutionTime(std::function<void(const std::string&)> executionTimeConsumer);
 
   /**
    * Default constructor (no-op consumer)
@@ -60,13 +59,13 @@ public:
   int64_t GetTimeNs() const;
 
 private:
-  std::function<void(const std::string &)> executionTimeConsumer_;
+  std::function<void(const std::string&)> executionTimeConsumer_;
   int64_t startTimeNs_;
   mutable int64_t elapsedNs_;
   mutable bool timeCalculated_;
 };
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

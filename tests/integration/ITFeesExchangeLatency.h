@@ -31,11 +31,10 @@ class ITFeesExchangeLatency : public ITFeesExchange {
 public:
   ITFeesExchangeLatency();
 
-  exchange::core::common::config::PerformanceConfiguration
-  GetPerformanceConfiguration() override;
+  exchange::core::common::config::PerformanceConfiguration GetPerformanceConfiguration() override;
 };
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

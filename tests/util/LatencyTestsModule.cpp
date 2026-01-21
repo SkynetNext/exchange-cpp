@@ -15,8 +15,8 @@
  */
 
 #include "LatencyTestsModule.h"
-#include "ExchangeTestContainer.h"
-#include "LatencyTools.h"
+#include <exchange/core/utils/FastNanoTime.h>
+#include <exchange/core/utils/Logger.h>
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -24,8 +24,6 @@
 #include <cmath>
 #include <condition_variable>
 #include <ctime>
-#include <exchange/core/utils/FastNanoTime.h>
-#include <exchange/core/utils/Logger.h>
 #include <fstream>
 #include <iomanip>
 #include <limits>
@@ -34,6 +32,8 @@
 #include <sstream>
 #include <thread>
 #include <vector>
+#include "ExchangeTestContainer.h"
+#include "LatencyTools.h"
 
 namespace exchange {
 namespace core {
@@ -55,7 +55,7 @@ public:
   void countDown() {
     // Use atomic decrement (fast path, no lock needed for most cases)
     int64_t old = count_.fetch_sub(1, std::memory_order_acq_rel);
-    if (old == 1) { // Count reached 0, need to notify waiting thread
+    if (old == 1) {  // Count reached 0, need to notify waiting thread
       std::lock_guard<std::mutex> lock(mu_);
       cv_.notify_all();
     }
@@ -63,8 +63,7 @@ public:
 
   void await() {
     std::unique_lock<std::mutex> lock(mu_);
-    cv_.wait(lock,
-             [this] { return count_.load(std::memory_order_acquire) == 0; });
+    cv_.wait(lock, [this] { return count_.load(std::memory_order_acquire) == 0; });
   }
 
 private:
@@ -82,10 +81,9 @@ private:
  * @param outputValueUnitScalingRatio - scaling ratio (1000.0 = convert ns to
  * µs)
  */
-static void
-OutputPercentileDistribution(const std::vector<int64_t> &latencies,
-                             const std::string &filename,
-                             double outputValueUnitScalingRatio = 1000.0) {
+static void OutputPercentileDistribution(const std::vector<int64_t>& latencies,
+                                         const std::string& filename,
+                                         double outputValueUnitScalingRatio = 1000.0) {
   if (latencies.empty()) {
     return;
   }
@@ -141,8 +139,7 @@ OutputPercentileDistribution(const std::vector<int64_t> &latencies,
 
   // Sort and remove duplicates
   std::sort(percentiles.begin(), percentiles.end());
-  percentiles.erase(std::unique(percentiles.begin(), percentiles.end()),
-                    percentiles.end());
+  percentiles.erase(std::unique(percentiles.begin(), percentiles.end()), percentiles.end());
 
   // Helper function to get value at percentile
   auto getValueAtPercentile = [&latencies](double percentile) -> int64_t {
@@ -152,8 +149,7 @@ OutputPercentileDistribution(const std::vector<int64_t> &latencies,
     if (percentile >= 100.0) {
       return latencies.back();
     }
-    size_t index = static_cast<size_t>(
-        std::round((percentile / 100.0) * (latencies.size() - 1)));
+    size_t index = static_cast<size_t>(std::round((percentile / 100.0) * (latencies.size() - 1)));
     return latencies[std::min(index, latencies.size() - 1)];
   };
 
@@ -161,19 +157,16 @@ OutputPercentileDistribution(const std::vector<int64_t> &latencies,
   for (double percentile : percentiles) {
     int64_t value = getValueAtPercentile(percentile);
     // Apply scaling (convert nanoseconds to microseconds)
-    double scaledValue =
-        static_cast<double>(value) / outputValueUnitScalingRatio;
+    double scaledValue = static_cast<double>(value) / outputValueUnitScalingRatio;
 
     // Calculate 1/(1-Percentile) for display
-    double invOneMinusPercentile = (percentile >= 100.0)
-                                       ? std::numeric_limits<double>::infinity()
-                                       : (1.0 / (1.0 - percentile / 100.0));
+    double invOneMinusPercentile = (percentile >= 100.0) ? std::numeric_limits<double>::infinity()
+                                                         : (1.0 / (1.0 - percentile / 100.0));
 
     // Match Java format: "Value     Percentile TotalCount 1/(1-Percentile)"
-    file << std::fixed << std::setprecision(2) << std::setw(10) << scaledValue
-         << " " << std::setprecision(12) << std::setw(18) << percentile / 100.0
-         << " " << std::setw(11) << totalCount << " " << std::setprecision(12)
-         << std::setw(18);
+    file << std::fixed << std::setprecision(2) << std::setw(10) << scaledValue << " "
+         << std::setprecision(12) << std::setw(18) << percentile / 100.0 << " " << std::setw(11)
+         << totalCount << " " << std::setprecision(12) << std::setw(18);
 
     if (std::isinf(invOneMinusPercentile)) {
       file << "inf";
@@ -188,24 +181,18 @@ OutputPercentileDistribution(const std::vector<int64_t> &latencies,
 }
 
 void LatencyTestsModule::LatencyTestImpl(
-    const exchange::core::common::config::PerformanceConfiguration
-        &performanceCfg,
-    const TestDataParameters &testDataParameters,
-    const exchange::core::common::config::InitialStateConfiguration
-        &initialStateCfg,
-    const exchange::core::common::config::SerializationConfiguration
-        &serializationCfg,
-    int warmupCycles) {
-
-  const int targetTps = 200'000; // transactions per second
+  const exchange::core::common::config::PerformanceConfiguration& performanceCfg,
+  const TestDataParameters& testDataParameters,
+  const exchange::core::common::config::InitialStateConfiguration& initialStateCfg,
+  const exchange::core::common::config::SerializationConfiguration& serializationCfg,
+  int warmupCycles) {
+  const int targetTps = 200'000;  // transactions per second
   const int targetTpsStep = 100'000;
   const int warmupTps = 1'000'000;
 
-  auto testDataFutures =
-      ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, 1);
+  auto testDataFutures = ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, 1);
 
-  auto container = ExchangeTestContainer::Create(
-      performanceCfg, initialStateCfg, serializationCfg);
+  auto container = ExchangeTestContainer::Create(performanceCfg, initialStateCfg, serializationCfg);
 
   // Helper function to get absolute nanoseconds (matching Java
   // System.nanoTime())
@@ -216,9 +203,7 @@ void LatencyTestsModule::LatencyTestImpl(
   // Helper function to get current time in milliseconds (matching Java
   // System.currentTimeMillis())
   // Use FastNanoTime for better performance
-  auto getCurrentTimeMillis = []() -> int64_t {
-    return utils::FastNanoTime::NowMillis();
-  };
+  auto getCurrentTimeMillis = []() -> int64_t { return utils::FastNanoTime::NowMillis(); };
 
   // Match Java: testIteration function
   // BiFunction<Integer, Boolean, Boolean> testIteration = (tps, warmup) -> {
@@ -237,8 +222,7 @@ void LatencyTestsModule::LatencyTestImpl(
 
     // Match Java: CountDownLatch latchBenchmark = new
     // CountDownLatch(genResult.getBenchmarkCommandsSize());
-    CountDownLatch latchBenchmark(
-        static_cast<int64_t>(benchmarkCommands.size()));
+    CountDownLatch latchBenchmark(static_cast<int64_t>(benchmarkCommands.size()));
 
     // Match Java: container.setConsumer((cmd, seq) -> {
     //     final long latency = System.nanoTime() - cmd.timestamp;
@@ -246,8 +230,7 @@ void LatencyTestsModule::LatencyTestImpl(
     //     latchBenchmark.countDown();
     // });
     container->SetConsumer([&latencies, &latchBenchmark, getNanoTime](
-                               exchange::core::common::cmd::OrderCommand *cmd,
-                               int64_t seq) {
+                             exchange::core::common::cmd::OrderCommand* cmd, int64_t seq) {
       // Match Java: final long latency = System.nanoTime() - cmd.timestamp;
       auto nowNs = getNanoTime();
       auto latency = nowNs - cmd->timestamp;
@@ -276,7 +259,7 @@ void LatencyTestsModule::LatencyTestImpl(
     // Match Java: cmd.timestamp = plannedTimestamp;
     // Match Java: api.submitCommand(cmd);
     // Match Java: plannedTimestamp += nanosPerCmd;
-    for (auto *cmd : benchmarkCommands) {
+    for (auto* cmd : benchmarkCommands) {
       // Match Java: while (System.nanoTime() < plannedTimestamp) {
       //     // spin until its time to send next command
       // }
@@ -302,10 +285,9 @@ void LatencyTestsModule::LatencyTestImpl(
     // Match Java: final float perfMt = (float)
     // genResult.getBenchmarkCommandsSize() / (float) processingTimeMs /
     // 1000.0f;
-    float perfMt = (processingTimeMs > 0)
-                       ? (static_cast<float>(benchmarkCommands.size()) /
-                          static_cast<float>(processingTimeMs) / 1000.0f)
-                       : 0.0f;
+    float perfMt = (processingTimeMs > 0) ? (static_cast<float>(benchmarkCommands.size())
+                                             / static_cast<float>(processingTimeMs) / 1000.0f)
+                                          : 0.0f;
     // Match Java: String tag = String.format("%.3f MT/s", perfMt);
     std::ostringstream tagStream;
     tagStream << std::fixed << std::setprecision(3) << perfMt << " MT/s";
@@ -317,10 +299,9 @@ void LatencyTestsModule::LatencyTestImpl(
     // Calculate percentiles (match Java HDR histogram percentiles)
     auto getPercentile = [&latencies](double percentile) -> int64_t {
       if (latencies.empty())
-        return 0; // Match Java: histogram.getValueAtPercentile returns 0 if no
-                  // records
-      size_t index = static_cast<size_t>(
-          std::round((percentile / 100.0) * (latencies.size() - 1)));
+        return 0;  // Match Java: histogram.getValueAtPercentile returns 0 if no
+                   // records
+      size_t index = static_cast<size_t>(std::round((percentile / 100.0) * (latencies.size() - 1)));
       return latencies[std::min(index, latencies.size() - 1)];
     };
 
@@ -360,8 +341,8 @@ void LatencyTestsModule::LatencyTestImpl(
       // Match Java: System.currentTimeMillis() + "-" + perfMt + ".perc"
       auto currentTimeMs = getCurrentTimeMillis();
       std::ostringstream filenameStream;
-      filenameStream << currentTimeMs << "-" << std::fixed
-                     << std::setprecision(3) << perfMt << ".perc";
+      filenameStream << currentTimeMs << "-" << std::fixed << std::setprecision(3) << perfMt
+                     << ".perc";
       std::string filename = filenameStream.str();
 
       // Match Java: histogram.outputPercentileDistribution(printStream,
@@ -373,7 +354,7 @@ void LatencyTestsModule::LatencyTestImpl(
     container->ResetExchangeCore();
 
     // Clean up ApiCommand objects to prevent memory leak
-    for (auto *cmd : benchmarkCommands) {
+    for (auto* cmd : benchmarkCommands) {
       delete cmd;
     }
 
@@ -414,27 +395,22 @@ void LatencyTestsModule::LatencyTestImpl(
   for (int i = 0; i < 10000; i++) {
     int tps = targetTps + targetTpsStep * i;
     if (!testIteration(tps, false)) {
-      break; // Match Java: .allMatch(x -> x) - stop if any iteration returns
-             // false
+      break;  // Match Java: .allMatch(x -> x) - stop if any iteration returns
+              // false
     }
   }
 }
 
 void LatencyTestsModule::LatencyTestFixedTps(
-    const exchange::core::common::config::PerformanceConfiguration
-        &performanceCfg,
-    const TestDataParameters &testDataParameters,
-    const exchange::core::common::config::InitialStateConfiguration
-        &initialStateCfg,
-    const exchange::core::common::config::SerializationConfiguration
-        &serializationCfg,
-    int fixedTps, int warmupCycles) {
+  const exchange::core::common::config::PerformanceConfiguration& performanceCfg,
+  const TestDataParameters& testDataParameters,
+  const exchange::core::common::config::InitialStateConfiguration& initialStateCfg,
+  const exchange::core::common::config::SerializationConfiguration& serializationCfg,
+  int fixedTps,
+  int warmupCycles) {
+  auto testDataFutures = ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, 1);
 
-  auto testDataFutures =
-      ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, 1);
-
-  auto container = ExchangeTestContainer::Create(
-      performanceCfg, initialStateCfg, serializationCfg);
+  auto container = ExchangeTestContainer::Create(performanceCfg, initialStateCfg, serializationCfg);
 
   // Helper function to get absolute nanoseconds (matching Java
   // System.nanoTime())
@@ -445,9 +421,7 @@ void LatencyTestsModule::LatencyTestFixedTps(
   // Helper function to get current time in milliseconds (matching Java
   // System.currentTimeMillis())
   // Use FastNanoTime for better performance
-  auto getCurrentTimeMillis = []() -> int64_t {
-    return utils::FastNanoTime::NowMillis();
-  };
+  auto getCurrentTimeMillis = []() -> int64_t { return utils::FastNanoTime::NowMillis(); };
 
   // Match Java: testIteration function
   // BiFunction<Integer, Boolean, Boolean> testIteration = (tps, warmup) -> {
@@ -466,8 +440,7 @@ void LatencyTestsModule::LatencyTestFixedTps(
 
     // Match Java: CountDownLatch latchBenchmark = new
     // CountDownLatch(genResult.getBenchmarkCommandsSize());
-    CountDownLatch latchBenchmark(
-        static_cast<int64_t>(benchmarkCommands.size()));
+    CountDownLatch latchBenchmark(static_cast<int64_t>(benchmarkCommands.size()));
 
     // Match Java: container.setConsumer((cmd, seq) -> {
     //     final long latency = System.nanoTime() - cmd.timestamp;
@@ -475,8 +448,7 @@ void LatencyTestsModule::LatencyTestFixedTps(
     //     latchBenchmark.countDown();
     // });
     container->SetConsumer([&latencies, &latchBenchmark, getNanoTime](
-                               exchange::core::common::cmd::OrderCommand *cmd,
-                               int64_t seq) {
+                             exchange::core::common::cmd::OrderCommand* cmd, int64_t seq) {
       // Match Java: final long latency = System.nanoTime() - cmd.timestamp;
       auto nowNs = getNanoTime();
       auto latency = nowNs - cmd->timestamp;
@@ -501,13 +473,13 @@ void LatencyTestsModule::LatencyTestFixedTps(
     // This reduces ring buffer overhead (next(n) + publish(lo, hi) instead of
     // n calls to next() + publish())
     constexpr int BATCH_SIZE = 16;
-    std::vector<exchange::core::common::api::ApiCommand *> batch;
+    std::vector<exchange::core::common::api::ApiCommand*> batch;
     batch.reserve(BATCH_SIZE);
 
     // Use counter instead of modulo to avoid expensive % operation
     int batchCounter = 0;
     for (size_t i = 0; i < benchmarkCommands.size(); i++) {
-      auto *cmd = benchmarkCommands[i];
+      auto* cmd = benchmarkCommands[i];
 
       // Check time and limit rate only for the first command in each batch
       if (batchCounter == 0) {
@@ -547,10 +519,9 @@ void LatencyTestsModule::LatencyTestFixedTps(
     // Match Java: final float perfMt = (float)
     // genResult.getBenchmarkCommandsSize() / (float) processingTimeMs /
     // 1000.0f;
-    float perfMt = (processingTimeMs > 0)
-                       ? (static_cast<float>(benchmarkCommands.size()) /
-                          static_cast<float>(processingTimeMs) / 1000.0f)
-                       : 0.0f;
+    float perfMt = (processingTimeMs > 0) ? (static_cast<float>(benchmarkCommands.size())
+                                             / static_cast<float>(processingTimeMs) / 1000.0f)
+                                          : 0.0f;
     // Match Java: String tag = String.format("%.3f MT/s", perfMt);
     std::ostringstream tagStream;
     tagStream << std::fixed << std::setprecision(3) << perfMt << " MT/s";
@@ -562,10 +533,9 @@ void LatencyTestsModule::LatencyTestFixedTps(
     // Calculate percentiles (match Java HDR histogram percentiles)
     auto getPercentile = [&latencies](double percentile) -> int64_t {
       if (latencies.empty())
-        return 0; // Match Java: histogram.getValueAtPercentile returns 0 if no
-                  // records
-      size_t index = static_cast<size_t>(
-          std::round((percentile / 100.0) * (latencies.size() - 1)));
+        return 0;  // Match Java: histogram.getValueAtPercentile returns 0 if no
+                   // records
+      size_t index = static_cast<size_t>(std::round((percentile / 100.0) * (latencies.size() - 1)));
       return latencies[std::min(index, latencies.size() - 1)];
     };
 
@@ -605,8 +575,8 @@ void LatencyTestsModule::LatencyTestFixedTps(
       // Match Java: System.currentTimeMillis() + "-" + perfMt + ".perc"
       auto currentTimeMs = getCurrentTimeMillis();
       std::ostringstream filenameStream;
-      filenameStream << currentTimeMs << "-" << std::fixed
-                     << std::setprecision(3) << perfMt << ".perc";
+      filenameStream << currentTimeMs << "-" << std::fixed << std::setprecision(3) << perfMt
+                     << ".perc";
       std::string filename = filenameStream.str();
 
       // Match Java: histogram.outputPercentileDistribution(printStream,
@@ -618,7 +588,7 @@ void LatencyTestsModule::LatencyTestFixedTps(
     container->ResetExchangeCore();
 
     // Clean up ApiCommand objects to prevent memory leak
-    for (auto *cmd : benchmarkCommands) {
+    for (auto* cmd : benchmarkCommands) {
       delete cmd;
     }
 
@@ -646,24 +616,20 @@ void LatencyTestsModule::LatencyTestFixedTps(
 }
 
 void LatencyTestsModule::HiccupTestImpl(
-    const exchange::core::common::config::PerformanceConfiguration
-        &performanceCfg,
-    const TestDataParameters &testDataParameters,
-    const exchange::core::common::config::InitialStateConfiguration
-        &initialStateCfg,
-    int warmupCycles) {
-
-  const int targetTps = 500'000; // transactions per second
+  const exchange::core::common::config::PerformanceConfiguration& performanceCfg,
+  const TestDataParameters& testDataParameters,
+  const exchange::core::common::config::InitialStateConfiguration& initialStateCfg,
+  int warmupCycles) {
+  const int targetTps = 500'000;  // transactions per second
 
   // will print each occurrence if latency>0.2ms
   const long hiccupThresholdNs = 200'000;
 
-  auto testDataFutures =
-      ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, 1);
+  auto testDataFutures = ExchangeTestContainer::PrepareTestDataAsync(testDataParameters, 1);
 
   auto container = ExchangeTestContainer::Create(
-      performanceCfg, initialStateCfg,
-      exchange::core::common::config::SerializationConfiguration::Default());
+    performanceCfg, initialStateCfg,
+    exchange::core::common::config::SerializationConfiguration::Default());
 
   // Helper function to get absolute nanoseconds (matching Java
   // System.nanoTime())
@@ -674,9 +640,7 @@ void LatencyTestsModule::HiccupTestImpl(
   // Helper function to get current time in milliseconds (matching Java
   // System.currentTimeMillis())
   // Use FastNanoTime for better performance
-  auto getCurrentTimeMillis = []() -> int64_t {
-    return utils::FastNanoTime::NowMillis();
-  };
+  auto getCurrentTimeMillis = []() -> int64_t { return utils::FastNanoTime::NowMillis(); };
 
   // Match Java: IntFunction<TreeMap<ZonedDateTime, Long>> testIteration = tps
   // -> {
@@ -693,8 +657,7 @@ void LatencyTestsModule::HiccupTestImpl(
 
     // Match Java: final CountDownLatch latchBenchmark = new
     // CountDownLatch(genResult.getBenchmarkCommandsSize());
-    CountDownLatch latchBenchmark(
-        static_cast<int64_t>(benchmarkCommands.size()));
+    CountDownLatch latchBenchmark(static_cast<int64_t>(benchmarkCommands.size()));
 
     // Match Java: final MutableLong nextHiccupAcceptTimestampNs = new
     // MutableLong(0);
@@ -716,43 +679,42 @@ void LatencyTestsModule::HiccupTestImpl(
     //     latchBenchmark.countDown();
     // });
     container->SetConsumer(
-        [&hiccupTimestampsNs, &nextHiccupAcceptTimestampNs, hiccupThresholdNs,
-         &latchBenchmark, getNanoTime](
-            exchange::core::common::cmd::OrderCommand *cmd, int64_t seq) {
-          // Match Java: long now = System.nanoTime();
-          int64_t now = getNanoTime();
-          // Match Java: // skip other messages in delayed group
-          // Match Java: if (now < nextHiccupAcceptTimestampNs.value) {
-          //     return;
-          // }
-          // Note: No lock needed - ResultsHandler is single-threaded (matches
-          // Java)
-          if (now < nextHiccupAcceptTimestampNs) {
-            return;
+      [&hiccupTimestampsNs, &nextHiccupAcceptTimestampNs, hiccupThresholdNs, &latchBenchmark,
+       getNanoTime](exchange::core::common::cmd::OrderCommand* cmd, int64_t seq) {
+        // Match Java: long now = System.nanoTime();
+        int64_t now = getNanoTime();
+        // Match Java: // skip other messages in delayed group
+        // Match Java: if (now < nextHiccupAcceptTimestampNs.value) {
+        //     return;
+        // }
+        // Note: No lock needed - ResultsHandler is single-threaded (matches
+        // Java)
+        if (now < nextHiccupAcceptTimestampNs) {
+          return;
+        }
+        // Match Java: long diffNs = now - cmd.timestamp;
+        int64_t diffNs = now - cmd->timestamp;
+        // Match Java: // register hiccup timestamps
+        // Match Java: if (diffNs > hiccupThresholdNs) {
+        //     hiccupTimestampsNs.put(cmd.timestamp, diffNs);
+        //     nextHiccupAcceptTimestampNs.value = cmd.timestamp + diffNs;
+        // }
+        if (diffNs > hiccupThresholdNs) {
+          // Match Java: hiccupTimestampsNs.put(cmd.timestamp, diffNs);
+          // Use max for merging (match Java: Math::max)
+          auto it = hiccupTimestampsNs.find(cmd->timestamp);
+          if (it != hiccupTimestampsNs.end()) {
+            it->second = std::max(it->second, diffNs);
+          } else {
+            hiccupTimestampsNs[cmd->timestamp] = diffNs;
           }
-          // Match Java: long diffNs = now - cmd.timestamp;
-          int64_t diffNs = now - cmd->timestamp;
-          // Match Java: // register hiccup timestamps
-          // Match Java: if (diffNs > hiccupThresholdNs) {
-          //     hiccupTimestampsNs.put(cmd.timestamp, diffNs);
-          //     nextHiccupAcceptTimestampNs.value = cmd.timestamp + diffNs;
-          // }
-          if (diffNs > hiccupThresholdNs) {
-            // Match Java: hiccupTimestampsNs.put(cmd.timestamp, diffNs);
-            // Use max for merging (match Java: Math::max)
-            auto it = hiccupTimestampsNs.find(cmd->timestamp);
-            if (it != hiccupTimestampsNs.end()) {
-              it->second = std::max(it->second, diffNs);
-            } else {
-              hiccupTimestampsNs[cmd->timestamp] = diffNs;
-            }
-            // Match Java: nextHiccupAcceptTimestampNs.value = cmd.timestamp +
-            // diffNs;
-            nextHiccupAcceptTimestampNs = cmd->timestamp + diffNs;
-          }
-          // Match Java: latchBenchmark.countDown();
-          latchBenchmark.countDown();
-        });
+          // Match Java: nextHiccupAcceptTimestampNs.value = cmd.timestamp +
+          // diffNs;
+          nextHiccupAcceptTimestampNs = cmd->timestamp + diffNs;
+        }
+        // Match Java: latchBenchmark.countDown();
+        latchBenchmark.countDown();
+      });
 
     // Match Java: final long startTimeNs = System.nanoTime();
     int64_t startTimeNs = getNanoTime();
@@ -771,7 +733,7 @@ void LatencyTestsModule::HiccupTestImpl(
     // Match Java: cmd.timestamp = plannedTimestamp;
     // Match Java: api.submitCommand(cmd);
     // Match Java: plannedTimestamp += nanosPerCmd;
-    for (auto *cmd : benchmarkCommands) {
+    for (auto* cmd : benchmarkCommands) {
       // Match Java: // spin until its time to send next command
       // Match Java: while (System.nanoTime() < plannedTimestamp) ;
       while (getNanoTime() < plannedTimestamp) {
@@ -792,7 +754,7 @@ void LatencyTestsModule::HiccupTestImpl(
     container->SetConsumer(nullptr);
 
     // Clean up ApiCommand objects to prevent memory leak
-    for (auto *cmd : benchmarkCommands) {
+    for (auto* cmd : benchmarkCommands) {
       delete cmd;
     }
 
@@ -812,13 +774,12 @@ void LatencyTestsModule::HiccupTestImpl(
     // (matching the Java TreeMap<ZonedDateTime, Long> behavior)
     // Note: No lock needed - ResultsHandler is single-threaded (matches Java)
     std::map<int64_t, int64_t> sorted;
-    for (const auto &pair : hiccupTimestampsNs) {
+    for (const auto& pair : hiccupTimestampsNs) {
       int64_t eventTimestampNs = pair.first;
       int64_t delay = pair.second;
       // Match Java: Instant.ofEpochMilli(startTimeMs + (eventTimestampNs -
       // startTimeNs) / 1_000_000)
-      int64_t eventTimestampMs =
-          startTimeMs + (eventTimestampNs - startTimeNs) / 1'000'000;
+      int64_t eventTimestampMs = startTimeMs + (eventTimestampNs - startTimeNs) / 1'000'000;
       // Match Java: sorted.merge(..., delay, Math::max)
       auto it = sorted.find(eventTimestampMs);
       if (it != sorted.end()) {
@@ -875,16 +836,15 @@ void LatencyTestsModule::HiccupTestImpl(
     if (res.empty()) {
       LOG_DEBUG("no hiccups");
     } else {
-      LOG_DEBUG("------------------ {} hiccups -------------------",
-                res.size());
-      for (const auto &pair : res) {
+      LOG_DEBUG("------------------ {} hiccups -------------------", res.size());
+      for (const auto& pair : res) {
         int64_t timestampMs = pair.first;
         int64_t delay = pair.second;
         // Match Java: log.debug("{}: {}µs", timestamp.toLocalTime(), delay /
         // 1000);
         // Convert timestampMs to local time for display
-        auto timePoint = std::chrono::system_clock::time_point(
-            std::chrono::milliseconds(timestampMs));
+        auto timePoint =
+          std::chrono::system_clock::time_point(std::chrono::milliseconds(timestampMs));
         auto timeT = std::chrono::system_clock::to_time_t(timePoint);
         std::tm localTime;
 #ifdef _WIN32
@@ -893,16 +853,15 @@ void LatencyTestsModule::HiccupTestImpl(
         localtime_r(&timeT, &localTime);
 #endif
         std::ostringstream timeStr;
-        timeStr << std::setfill('0') << std::setw(2) << localTime.tm_hour << ":"
-                << std::setw(2) << localTime.tm_min << ":" << std::setw(2)
-                << localTime.tm_sec;
+        timeStr << std::setfill('0') << std::setw(2) << localTime.tm_hour << ":" << std::setw(2)
+                << localTime.tm_min << ":" << std::setw(2) << localTime.tm_sec;
         LOG_DEBUG("{}: {}µs", timeStr.str(), delay / 1000);
       }
     }
   }
 }
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

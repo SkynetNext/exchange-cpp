@@ -15,11 +15,10 @@
  */
 
 #include "ITCH50StatListener.h"
+#include <exchange/core/utils/Logger.h>
 #include <algorithm>
 #include <cmath>
-#include <exchange/core/utils/Logger.h>
 #include <sstream>
-
 
 namespace exchange {
 namespace core {
@@ -28,23 +27,22 @@ namespace nasdaq {
 
 std::string StockDescr::ToString() const {
   std::ostringstream oss;
-  oss << name << " ETP=" << static_cast<char>(etpFlag) << " LF"
-      << etpLeverageFactor;
+  oss << name << " ETP=" << static_cast<char>(etpFlag) << " LF" << etpLeverageFactor;
   return oss.str();
 }
 
 std::string StockStat::ToString() const {
   std::ostringstream oss;
-  oss << stockLocate << " p:" << minPrice << "-" << static_cast<int>(priceAvg)
-      << "-" << maxPrice << " s:" << priceStep << " c:" << counter << " ca:";
-  for (const auto &[k, v] : counters) {
+  oss << stockLocate << " p:" << minPrice << "-" << static_cast<int>(priceAvg) << "-" << maxPrice
+      << " s:" << priceStep << " c:" << counter << " ca:";
+  for (const auto& [k, v] : counters) {
     oss << static_cast<char>(k) << v << ' ';
   }
   return oss.str();
 }
 
 void ITCH50StatListener::PrintStat() const {
-  for (const auto &[k, v] : symbolStat_) {
+  for (const auto& [k, v] : symbolStat_) {
     if (v.counter > 500000) {
       auto it = symbolDescr_.find(k);
       if (it != symbolDescr_.end()) {
@@ -58,9 +56,8 @@ void ITCH50StatListener::UpdateStat(uint8_t msgType, int32_t stockLocate) {
   UpdateStat(msgType, stockLocate, INT64_MIN);
 }
 
-void ITCH50StatListener::UpdateStat(uint8_t msgType, int32_t stockLocate,
-                                    int64_t longPrice) {
-  auto &stockStat = symbolStat_[stockLocate];
+void ITCH50StatListener::UpdateStat(uint8_t msgType, int32_t stockLocate, int64_t longPrice) {
+  auto& stockStat = symbolStat_[stockLocate];
   stockStat.counter++;
   stockStat.counters[msgType]++;
 
@@ -82,13 +79,13 @@ void ITCH50StatListener::UpdateStat(uint8_t msgType, int32_t stockLocate,
     if (std::isnan(stockStat.priceAvg)) {
       stockStat.priceAvg = msgPrice;
     } else {
-      stockStat.priceAvg = (stockStat.priceAvg * stockStat.counter + msgPrice) /
-                           static_cast<float>(stockStat.counter + 1);
+      stockStat.priceAvg = (stockStat.priceAvg * stockStat.counter + msgPrice)
+                           / static_cast<float>(stockStat.counter + 1);
     }
   }
 }
 
-} // namespace nasdaq
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace nasdaq
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

@@ -40,7 +40,7 @@ public:
   // Will be implemented when needed for performance tests
 };
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

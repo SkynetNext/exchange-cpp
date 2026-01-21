@@ -46,7 +46,7 @@ public:
   static int64_t ConvertTime(int32_t high, int64_t low);
 };
 
-} // namespace nasdaq
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace nasdaq
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

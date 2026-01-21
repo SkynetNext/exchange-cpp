@@ -31,11 +31,10 @@ class ITExchangeCoreIntegrationBasic : public ITExchangeCoreIntegration {
 public:
   ITExchangeCoreIntegrationBasic();
 
-  exchange::core::common::config::PerformanceConfiguration
-  GetPerformanceConfiguration() override;
+  exchange::core::common::config::PerformanceConfiguration GetPerformanceConfiguration() override;
 };
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

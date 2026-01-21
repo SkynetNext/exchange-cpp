@@ -15,11 +15,11 @@
  */
 
 #include "PerfJournaling.h"
+#include <exchange/core/common/config/PerformanceConfiguration.h>
 #include "../util/JournalingTestsModule.h"
 #include "../util/TestConstants.h"
 #include "../util/TestDataParameters.h"
 #include "../util/TestOrdersGeneratorConfig.h"
-#include <exchange/core/common/config/PerformanceConfiguration.h>
 
 using namespace exchange::core::tests::util;
 
@@ -29,8 +29,8 @@ namespace tests {
 namespace perf {
 
 void PerfJournaling::TestJournalingMargin() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
 
@@ -41,8 +41,8 @@ void PerfJournaling::TestJournalingMargin() {
 }
 
 void PerfJournaling::TestJournalingExchange() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.matchingEnginesNum = 1;
   perfCfg.riskEnginesNum = 1;
 
@@ -53,8 +53,8 @@ void PerfJournaling::TestJournalingExchange() {
 }
 
 void PerfJournaling::TestJournalingMultiSymbolSmall() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.matchingEnginesNum = 2;
   perfCfg.riskEnginesNum = 2;
 
@@ -72,8 +72,8 @@ void PerfJournaling::TestJournalingMultiSymbolSmall() {
 }
 
 void PerfJournaling::TestJournalingMultiSymbolMedium() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.matchingEnginesNum = 4;
   perfCfg.riskEnginesNum = 2;
 
@@ -84,8 +84,8 @@ void PerfJournaling::TestJournalingMultiSymbolMedium() {
 }
 
 void PerfJournaling::TestJournalingMultiSymbolLarge() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.matchingEnginesNum = 4;
   perfCfg.riskEnginesNum = 4;
 
@@ -96,8 +96,8 @@ void PerfJournaling::TestJournalingMultiSymbolLarge() {
 }
 
 void PerfJournaling::TestJournalingMultiSymbolHuge() {
-  auto perfCfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto perfCfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   perfCfg.ringBufferSize = 128 * 1024;
   perfCfg.matchingEnginesNum = 4;
   perfCfg.riskEnginesNum = 4;
@@ -110,24 +110,33 @@ void PerfJournaling::TestJournalingMultiSymbolHuge() {
 }
 
 // Register tests
-TEST_F(PerfJournaling, TestJournalingMargin) { TestJournalingMargin(); }
-TEST_F(PerfJournaling, TestJournalingExchange) { TestJournalingExchange(); }
+TEST_F(PerfJournaling, TestJournalingMargin) {
+  TestJournalingMargin();
+}
+
+TEST_F(PerfJournaling, TestJournalingExchange) {
+  TestJournalingExchange();
+}
+
 TEST_F(PerfJournaling, TestJournalingMultiSymbolSmall) {
   TestJournalingMultiSymbolSmall();
 }
+
 TEST_F(PerfJournaling, TestJournalingMultiSymbolMedium) {
   TestJournalingMultiSymbolMedium();
 }
+
 TEST_F(PerfJournaling, TestJournalingMultiSymbolLarge) {
   TestJournalingMultiSymbolLarge();
 }
+
 // Disabled by default - requires 12+ threads CPU, 32GB RAM, and takes hours to
 // complete Run with: --gtest_also_run_disabled_tests to enable
 TEST_F(PerfJournaling, DISABLED_TestJournalingMultiSymbolHuge) {
   TestJournalingMultiSymbolHuge();
 }
 
-} // namespace perf
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace perf
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

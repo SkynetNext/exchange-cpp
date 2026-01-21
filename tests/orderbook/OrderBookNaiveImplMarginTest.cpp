@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-#include "../util/TestConstants.h"
-#include "OrderBookBaseTest.h"
 #include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
-
+#include "../util/TestConstants.h"
+#include "OrderBookBaseTest.h"
 
 using namespace exchange::core::common;
 using namespace exchange::core::orderbook;
@@ -74,38 +73,31 @@ TEST_F(OrderBookNaiveImplMarginTest, ShouldRemoveOrderAndEmptyBucket) {
   TestShouldRemoveOrderAndEmptyBucket();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest,
-       ShouldReturnErrorWhenDeletingUnknownOrder) {
+TEST_F(OrderBookNaiveImplMarginTest, ShouldReturnErrorWhenDeletingUnknownOrder) {
   TestShouldReturnErrorWhenDeletingUnknownOrder();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest,
-       ShouldReturnErrorWhenDeletingOtherUserOrder) {
+TEST_F(OrderBookNaiveImplMarginTest, ShouldReturnErrorWhenDeletingOtherUserOrder) {
   TestShouldReturnErrorWhenDeletingOtherUserOrder();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest,
-       ShouldReturnErrorWhenUpdatingOtherUserOrder) {
+TEST_F(OrderBookNaiveImplMarginTest, ShouldReturnErrorWhenUpdatingOtherUserOrder) {
   TestShouldReturnErrorWhenUpdatingOtherUserOrder();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest,
-       ShouldReturnErrorWhenUpdatingUnknownOrder) {
+TEST_F(OrderBookNaiveImplMarginTest, ShouldReturnErrorWhenUpdatingUnknownOrder) {
   TestShouldReturnErrorWhenUpdatingUnknownOrder();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest,
-       ShouldReturnErrorWhenReducingUnknownOrder) {
+TEST_F(OrderBookNaiveImplMarginTest, ShouldReturnErrorWhenReducingUnknownOrder) {
   TestShouldReturnErrorWhenReducingUnknownOrder();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest,
-       ShouldReturnErrorWhenReducingByZeroOrNegativeSize) {
+TEST_F(OrderBookNaiveImplMarginTest, ShouldReturnErrorWhenReducingByZeroOrNegativeSize) {
   TestShouldReturnErrorWhenReducingByZeroOrNegativeSize();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest,
-       ShouldReturnErrorWhenReducingOtherUserOrder) {
+TEST_F(OrderBookNaiveImplMarginTest, ShouldReturnErrorWhenReducingOtherUserOrder) {
   TestShouldReturnErrorWhenReducingOtherUserOrder();
 }
 
@@ -125,8 +117,7 @@ TEST_F(OrderBookNaiveImplMarginTest, ShouldMatchIocOrderFullBBO) {
   TestShouldMatchIocOrderFullBBO();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest,
-       ShouldMatchIocOrderWithTwoLimitOrdersPartial) {
+TEST_F(OrderBookNaiveImplMarginTest, ShouldMatchIocOrderWithTwoLimitOrdersPartial) {
   TestShouldMatchIocOrderWithTwoLimitOrdersPartial();
 }
 
@@ -166,18 +157,15 @@ TEST_F(OrderBookNaiveImplMarginTest, ShouldFullyMatchMarketableGtcOrder) {
   TestShouldFullyMatchMarketableGtcOrder();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest,
-       ShouldPartiallyMatchMarketableGtcOrderAndPlace) {
+TEST_F(OrderBookNaiveImplMarginTest, ShouldPartiallyMatchMarketableGtcOrderAndPlace) {
   TestShouldPartiallyMatchMarketableGtcOrderAndPlace();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest,
-       ShouldFullyMatchMarketableGtcOrder2Prices) {
+TEST_F(OrderBookNaiveImplMarginTest, ShouldFullyMatchMarketableGtcOrder2Prices) {
   TestShouldFullyMatchMarketableGtcOrder2Prices();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest,
-       ShouldFullyMatchMarketableGtcOrderWithAllLiquidity) {
+TEST_F(OrderBookNaiveImplMarginTest, ShouldFullyMatchMarketableGtcOrderWithAllLiquidity) {
   TestShouldFullyMatchMarketableGtcOrderWithAllLiquidity();
 }
 
@@ -185,8 +173,7 @@ TEST_F(OrderBookNaiveImplMarginTest, ShouldMoveOrderFullyMatchAsMarketable) {
   TestShouldMoveOrderFullyMatchAsMarketable();
 }
 
-TEST_F(OrderBookNaiveImplMarginTest,
-       ShouldMoveOrderFullyMatchAsMarketable2Prices) {
+TEST_F(OrderBookNaiveImplMarginTest, ShouldMoveOrderFullyMatchAsMarketable2Prices) {
   TestShouldMoveOrderFullyMatchAsMarketable2Prices();
 }
 
@@ -194,7 +181,7 @@ TEST_F(OrderBookNaiveImplMarginTest, ShouldMoveOrderMatchesAllLiquidity) {
   TestShouldMoveOrderMatchesAllLiquidity();
 }
 
-} // namespace orderbook
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace orderbook
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include <cstdint>
 #include <exchange/core/common/CoreSymbolSpecification.h>
 #include <exchange/core/common/SymbolType.h>
+#include <cstdint>
 #include <set>
 #include <string>
 
@@ -70,9 +70,9 @@ struct TestConstants {
   static constexpr int32_t CURRENCY_ZAR = 710;
 
   // Cryptocurrencies
-  static constexpr int32_t CURRENCY_XBT = 3762; // satoshi, 1E-8
-  static constexpr int32_t CURRENCY_ETH = 3928; // szabo, 1E-6
-  static constexpr int32_t CURRENCY_LTC = 4141; // litoshi, 1E-8
+  static constexpr int32_t CURRENCY_XBT = 3762;  // satoshi, 1E-8
+  static constexpr int32_t CURRENCY_ETH = 3928;  // szabo, 1E-6
+  static constexpr int32_t CURRENCY_LTC = 4141;  // litoshi, 1E-8
   static constexpr int32_t CURRENCY_XDG = 4142;
   static constexpr int32_t CURRENCY_GRC = 4143;
   static constexpr int32_t CURRENCY_XPM = 4144;
@@ -84,58 +84,49 @@ struct TestConstants {
   static constexpr int32_t CURRENCY_ZEC = 4150;
 
   // Currency sets (for integration and performance tests)
-  static const std::set<int32_t> &GetCurrenciesFutures();
-  static const std::set<int32_t> &GetCurrenciesExchange();
-  static const std::set<int32_t> &GetAllCurrencies();
+  static const std::set<int32_t>& GetCurrenciesFutures();
+  static const std::set<int32_t>& GetCurrenciesExchange();
+  static const std::set<int32_t>& GetAllCurrencies();
 
   // Create SYMBOLSPEC_EUR_USD
-  static exchange::core::common::CoreSymbolSpecification
-  CreateSymbolSpecEurUsd();
+  static exchange::core::common::CoreSymbolSpecification CreateSymbolSpecEurUsd();
 
   // Create SYMBOLSPECFEE_USD_JPY
-  static exchange::core::common::CoreSymbolSpecification
-  CreateSymbolSpecFeeUsdJpy();
+  static exchange::core::common::CoreSymbolSpecification CreateSymbolSpecFeeUsdJpy();
 
   // Create SYMBOLSPEC_ETH_XBT
-  static exchange::core::common::CoreSymbolSpecification
-  CreateSymbolSpecEthXbt();
+  static exchange::core::common::CoreSymbolSpecification CreateSymbolSpecEthXbt();
 
   // Create SYMBOLSPECFEE_XBT_LTC
-  static exchange::core::common::CoreSymbolSpecification
-  CreateSymbolSpecFeeXbtLtc();
+  static exchange::core::common::CoreSymbolSpecification CreateSymbolSpecFeeXbtLtc();
 
-  static int32_t GetCurrency(const std::string &currency);
+  static int32_t GetCurrency(const std::string& currency);
 
   // Static symbol specifications (for convenience, matching Java version)
-  static const exchange::core::common::CoreSymbolSpecification &
-  GetSymbolSpecEurUsd();
-  static const exchange::core::common::CoreSymbolSpecification &
-  GetSymbolSpecEthXbt();
-  static const exchange::core::common::CoreSymbolSpecification &
-  GetSymbolSpecFeeUsdJpy();
-  static const exchange::core::common::CoreSymbolSpecification &
-  GetSymbolSpecFeeXbtLtc();
+  static const exchange::core::common::CoreSymbolSpecification& GetSymbolSpecEurUsd();
+  static const exchange::core::common::CoreSymbolSpecification& GetSymbolSpecEthXbt();
+  static const exchange::core::common::CoreSymbolSpecification& GetSymbolSpecFeeUsdJpy();
+  static const exchange::core::common::CoreSymbolSpecification& GetSymbolSpecFeeXbtLtc();
 
   // Aliases matching Java naming
-  static const exchange::core::common::CoreSymbolSpecification &
-  SYMBOLSPEC_EUR_USD() {
+  static const exchange::core::common::CoreSymbolSpecification& SYMBOLSPEC_EUR_USD() {
     return GetSymbolSpecEurUsd();
   }
-  static const exchange::core::common::CoreSymbolSpecification &
-  SYMBOLSPEC_ETH_XBT() {
+
+  static const exchange::core::common::CoreSymbolSpecification& SYMBOLSPEC_ETH_XBT() {
     return GetSymbolSpecEthXbt();
   }
-  static const exchange::core::common::CoreSymbolSpecification &
-  SYMBOLSPECFEE_USD_JPY() {
+
+  static const exchange::core::common::CoreSymbolSpecification& SYMBOLSPECFEE_USD_JPY() {
     return GetSymbolSpecFeeUsdJpy();
   }
-  static const exchange::core::common::CoreSymbolSpecification &
-  SYMBOLSPECFEE_XBT_LTC() {
+
+  static const exchange::core::common::CoreSymbolSpecification& SYMBOLSPECFEE_XBT_LTC() {
     return GetSymbolSpecFeeXbtLtc();
   }
 };
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

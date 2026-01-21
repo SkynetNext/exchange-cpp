@@ -16,11 +16,11 @@
 
 #pragma once
 
-#include "ExchangeTestContainer.h"
-#include "TestDataParameters.h"
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
+#include "ExchangeTestContainer.h"
+#include "TestDataParameters.h"
 
 namespace exchange {
 namespace core {
@@ -41,17 +41,14 @@ public:
    * @param iterations - number of test iterations
    */
   static void ThroughputTestImpl(
-      const exchange::core::common::config::PerformanceConfiguration
-          &performanceCfg,
-      const TestDataParameters &testDataParameters,
-      const exchange::core::common::config::InitialStateConfiguration
-          &initialStateCfg,
-      const exchange::core::common::config::SerializationConfiguration
-          &serializationCfg,
-      int iterations);
+    const exchange::core::common::config::PerformanceConfiguration& performanceCfg,
+    const TestDataParameters& testDataParameters,
+    const exchange::core::common::config::InitialStateConfiguration& initialStateCfg,
+    const exchange::core::common::config::SerializationConfiguration& serializationCfg,
+    int iterations);
 };
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

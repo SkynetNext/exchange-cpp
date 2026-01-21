@@ -16,9 +16,6 @@
 
 #pragma once
 
-#include "TestDataParameters.h"
-#include "TestOrdersGenerator.h"
-#include <cstdint>
 #include <exchange/core/ExchangeApi.h>
 #include <exchange/core/ExchangeCore.h>
 #include <exchange/core/common/CoreSymbolSpecification.h>
@@ -42,12 +39,15 @@
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
+#include <cstdint>
 #include <functional>
 #include <future>
 #include <memory>
 #include <set>
 #include <string>
 #include <vector>
+#include "TestDataParameters.h"
+#include "TestOrdersGenerator.h"
 
 namespace exchange {
 namespace core {
@@ -68,12 +68,10 @@ namespace util {
  * return a pointer copy instead of trying to copy the entire structure.
  */
 struct TestDataFutures {
-  std::shared_future<
-      std::vector<exchange::core::common::CoreSymbolSpecification>>
-      coreSymbolSpecifications;
+  std::shared_future<std::vector<exchange::core::common::CoreSymbolSpecification>>
+    coreSymbolSpecifications;
   std::shared_future<std::vector<std::vector<bool>>> usersAccounts;
-  std::shared_future<std::shared_ptr<TestOrdersGenerator::MultiSymbolGenResult>>
-      genResult;
+  std::shared_future<std::shared_ptr<TestOrdersGenerator::MultiSymbolGenResult>> genResult;
 };
 
 /**
@@ -85,30 +83,28 @@ public:
   /**
    * Create container with default initial state and serialization config
    */
-  static std::unique_ptr<ExchangeTestContainer> Create(
-      const exchange::core::common::config::PerformanceConfiguration &perfCfg);
+  static std::unique_ptr<ExchangeTestContainer>
+  Create(const exchange::core::common::config::PerformanceConfiguration& perfCfg);
 
   /**
    * Create container with custom configuration
    */
-  static std::unique_ptr<ExchangeTestContainer> Create(
-      const exchange::core::common::config::PerformanceConfiguration &perfCfg,
-      const exchange::core::common::config::InitialStateConfiguration
-          &initStateCfg,
-      const exchange::core::common::config::SerializationConfiguration
-          &serializationCfg);
+  static std::unique_ptr<ExchangeTestContainer>
+  Create(const exchange::core::common::config::PerformanceConfiguration& perfCfg,
+         const exchange::core::common::config::InitialStateConfiguration& initStateCfg,
+         const exchange::core::common::config::SerializationConfiguration& serializationCfg);
 
   /**
    * Prepare test data asynchronously
    */
-  static TestDataFutures
-  PrepareTestDataAsync(const TestDataParameters &parameters, int seed);
+  static TestDataFutures PrepareTestDataAsync(const TestDataParameters& parameters, int seed);
 
   /**
    * Generate random symbols for testing
    */
   static std::vector<exchange::core::common::CoreSymbolSpecification>
-  GenerateRandomSymbols(int num, const std::set<int32_t> &currenciesAllowed,
+  GenerateRandomSymbols(int num,
+                        const std::set<int32_t>& currenciesAllowed,
                         AllowedSymbolTypes allowedSymbolTypes);
 
   /**
@@ -119,8 +115,7 @@ public:
   /**
    * Check success callback for command validation
    */
-  static void
-  CheckSuccess(const exchange::core::common::cmd::OrderCommand &cmd);
+  static void CheckSuccess(const exchange::core::common::cmd::OrderCommand& cmd);
 
   /**
    * Destructor - automatically shuts down exchange core
@@ -128,17 +123,19 @@ public:
   ~ExchangeTestContainer();
 
   // Non-copyable
-  ExchangeTestContainer(const ExchangeTestContainer &) = delete;
-  ExchangeTestContainer &operator=(const ExchangeTestContainer &) = delete;
+  ExchangeTestContainer(const ExchangeTestContainer&) = delete;
+  ExchangeTestContainer& operator=(const ExchangeTestContainer&) = delete;
 
   // Movable
-  ExchangeTestContainer(ExchangeTestContainer &&) noexcept;
-  ExchangeTestContainer &operator=(ExchangeTestContainer &&) noexcept;
+  ExchangeTestContainer(ExchangeTestContainer&&) noexcept;
+  ExchangeTestContainer& operator=(ExchangeTestContainer&&) noexcept;
 
   /**
    * Get ExchangeApi
    */
-  exchange::core::IExchangeApi *GetApi() const { return api_; }
+  exchange::core::IExchangeApi* GetApi() const {
+    return api_;
+  }
 
   /**
    * Initialize basic symbols (EUR_USD, ETH_XBT)
@@ -183,32 +180,29 @@ public:
   /**
    * Add symbol to exchange
    */
-  void AddSymbol(const exchange::core::common::CoreSymbolSpecification &symbol);
+  void AddSymbol(const exchange::core::common::CoreSymbolSpecification& symbol);
 
   /**
    * Add multiple symbols to exchange
    */
-  void
-  AddSymbols(const std::vector<exchange::core::common::CoreSymbolSpecification>
-                 &symbols);
+  void AddSymbols(const std::vector<exchange::core::common::CoreSymbolSpecification>& symbols);
 
   /**
    * Send binary data command synchronously
    */
   void SendBinaryDataCommandSync(
-      std::unique_ptr<exchange::core::common::api::binary::BinaryDataCommand>
-          data,
-      int timeOutMs);
+    std::unique_ptr<exchange::core::common::api::binary::BinaryDataCommand> data,
+    int timeOutMs);
 
   /**
    * Initialize user accounts from currency BitSets
    */
-  void UserAccountsInit(const std::vector<std::vector<bool>> &userCurrencies);
+  void UserAccountsInit(const std::vector<std::vector<bool>>& userCurrencies);
 
   /**
    * Initialize users with currencies
    */
-  void UsersInit(int numUsers, const std::set<int32_t> &currencies);
+  void UsersInit(int numUsers, const std::set<int32_t>& currencies);
 
   /**
    * Reset exchange core
@@ -218,32 +212,28 @@ public:
   /**
    * Submit command synchronously and validate result code
    */
-  void SubmitCommandSync(
-      std::unique_ptr<exchange::core::common::api::ApiCommand> apiCommand,
-      exchange::core::common::cmd::CommandResultCode expectedResultCode);
+  void SubmitCommandSync(std::unique_ptr<exchange::core::common::api::ApiCommand> apiCommand,
+                         exchange::core::common::cmd::CommandResultCode expectedResultCode);
 
   /**
    * Submit command synchronously and validate with custom validator
    */
   void SubmitCommandSync(
-      std::unique_ptr<exchange::core::common::api::ApiCommand> apiCommand,
-      std::function<void(const exchange::core::common::cmd::OrderCommand &)>
-          validator);
+    std::unique_ptr<exchange::core::common::api::ApiCommand> apiCommand,
+    std::function<void(const exchange::core::common::cmd::OrderCommand&)> validator);
 
   /**
    * Request current order book
    */
-  std::shared_ptr<exchange::core::common::L2MarketData>
-  RequestCurrentOrderBook(int32_t symbol);
+  std::shared_ptr<exchange::core::common::L2MarketData> RequestCurrentOrderBook(int32_t symbol);
 
   /**
    * Validate user state
    */
   void ValidateUserState(
-      int64_t uid,
-      std::function<void(
-          const exchange::core::common::api::reports::SingleUserReportResult &)>
-          resultValidator);
+    int64_t uid,
+    std::function<void(const exchange::core::common::api::reports::SingleUserReportResult&)>
+      resultValidator);
 
   /**
    * Get user profile
@@ -254,8 +244,7 @@ public:
   /**
    * Get total balance report
    */
-  std::unique_ptr<
-      exchange::core::common::api::reports::TotalCurrencyBalanceReportResult>
+  std::unique_ptr<exchange::core::common::api::reports::TotalCurrencyBalanceReportResult>
   TotalBalanceReport();
 
   /**
@@ -266,45 +255,39 @@ public:
   /**
    * Load symbols, users and prefill orders from test data futures
    */
-  void LoadSymbolsUsersAndPrefillOrders(const TestDataFutures &testDataFutures);
+  void LoadSymbolsUsersAndPrefillOrders(const TestDataFutures& testDataFutures);
 
   /**
    * Load symbols, users and prefill orders (no logging)
    */
-  void
-  LoadSymbolsUsersAndPrefillOrdersNoLog(const TestDataFutures &testDataFutures);
+  void LoadSymbolsUsersAndPrefillOrdersNoLog(const TestDataFutures& testDataFutures);
 
   /**
    * Set command consumer callback
    */
-  void SetConsumer(
-      std::function<void(exchange::core::common::cmd::OrderCommand *, int64_t)>
-          consumer);
+  void
+  SetConsumer(std::function<void(exchange::core::common::cmd::OrderCommand*, int64_t)> consumer);
 
 private:
   ExchangeTestContainer(
-      const exchange::core::common::config::PerformanceConfiguration &perfCfg,
-      const exchange::core::common::config::InitialStateConfiguration
-          &initStateCfg,
-      const exchange::core::common::config::SerializationConfiguration
-          &serializationCfg);
+    const exchange::core::common::config::PerformanceConfiguration& perfCfg,
+    const exchange::core::common::config::InitialStateConfiguration& initStateCfg,
+    const exchange::core::common::config::SerializationConfiguration& serializationCfg);
 
   int32_t GetRandomTransferId();
   int64_t GetRandomTransactionId();
 
-  void CreateUserAccountsRegular(
-      const std::vector<std::vector<bool>> &userCurrencies,
-      const std::map<int32_t, int64_t> &amountPerAccount);
+  void CreateUserAccountsRegular(const std::vector<std::vector<bool>>& userCurrencies,
+                                 const std::map<int32_t, int64_t>& amountPerAccount);
 
   std::unique_ptr<exchange::core::ExchangeCore> exchangeCore_;
-  exchange::core::IExchangeApi *api_;
+  exchange::core::IExchangeApi* api_;
   std::atomic<int64_t> uniqueIdCounterLong_;
   std::atomic<int32_t> uniqueIdCounterInt_;
-  std::function<void(exchange::core::common::cmd::OrderCommand *, int64_t)>
-      consumer_;
+  std::function<void(exchange::core::common::cmd::OrderCommand*, int64_t)> consumer_;
 };
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

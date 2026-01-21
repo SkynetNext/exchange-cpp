@@ -15,9 +15,9 @@
  */
 
 #include "ITExchangeCoreIntegrationLatency.h"
-#include "../util/TestConstants.h"
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <gtest/gtest.h>
+#include "../util/TestConstants.h"
 
 using namespace exchange::core::tests::util;
 
@@ -27,13 +27,12 @@ namespace tests {
 namespace integration {
 
 ITExchangeCoreIntegrationLatency::ITExchangeCoreIntegrationLatency()
-    : ITExchangeCoreIntegration() {}
+  : ITExchangeCoreIntegration() {}
 
 exchange::core::common::config::PerformanceConfiguration
 ITExchangeCoreIntegrationLatency::GetPerformanceConfiguration() {
   // Match Java: PerformanceConfiguration.latencyPerformanceBuilder().build()
-  return exchange::core::common::config::PerformanceConfiguration::
-      LatencyPerformanceBuilder();
+  return exchange::core::common::config::PerformanceConfiguration::LatencyPerformanceBuilder();
 }
 
 // Register tests (same as Basic version but with latency configuration)
@@ -49,7 +48,9 @@ TEST_F(ITExchangeCoreIntegrationLatency, ShouldInitSymbols) {
   ShouldInitSymbols();
 }
 
-TEST_F(ITExchangeCoreIntegrationLatency, ShouldInitUsers) { ShouldInitUsers(); }
+TEST_F(ITExchangeCoreIntegrationLatency, ShouldInitUsers) {
+  ShouldInitUsers();
+}
 
 TEST_F(ITExchangeCoreIntegrationLatency, ExchangeRiskBasicTest) {
   ExchangeRiskBasicTest();
@@ -63,7 +64,7 @@ TEST_F(ITExchangeCoreIntegrationLatency, ExchangeRiskMoveTest) {
   ExchangeRiskMoveTest();
 }
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

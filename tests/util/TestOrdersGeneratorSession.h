@@ -16,13 +16,12 @@
 
 #pragma once
 
-#include "JavaRandom.h"
 #include <exchange/core/common/OrderAction.h>
 #include <exchange/core/orderbook/IOrderBook.h>
 #include <functional>
 #include <unordered_map>
 #include <vector>
-
+#include "JavaRandom.h"
 
 namespace exchange {
 namespace core {
@@ -35,7 +34,7 @@ namespace util {
  */
 class TestOrdersGeneratorSession {
 public:
-  core::orderbook::IOrderBook *orderBook;
+  core::orderbook::IOrderBook* orderBook;
 
   const int transactionsNumber;
   const int targetOrderBookOrdersHalf;
@@ -53,7 +52,7 @@ public:
 
   std::unordered_map<int32_t, int64_t> orderPrices;
   std::unordered_map<int32_t, int32_t> orderSizes;
-  std::unordered_map<int32_t, int32_t> orderUids; // orderId -> uid
+  std::unordered_map<int32_t, int32_t> orderUids;  // orderId -> uid
 
   std::vector<int32_t> orderBookSizeAskStat;
   std::vector<int32_t> orderBookSizeBidStat;
@@ -84,7 +83,7 @@ public:
 
   int32_t seq = 1;
 
-  int32_t filledAtSeq = -1; // -1 means null
+  int32_t filledAtSeq = -1;  // -1 means null
 
   // statistics (updated every 256 orders)
   int32_t lastOrderBookOrdersSizeAsk = 0;
@@ -92,15 +91,18 @@ public:
   int64_t lastTotalVolumeAsk = 0;
   int64_t lastTotalVolumeBid = 0;
 
-  TestOrdersGeneratorSession(core::orderbook::IOrderBook *orderBook,
+  TestOrdersGeneratorSession(core::orderbook::IOrderBook* orderBook,
                              int transactionsNumber,
-                             int targetOrderBookOrdersHalf, bool avalancheIOC,
+                             int targetOrderBookOrdersHalf,
+                             bool avalancheIOC,
                              int numUsers,
                              std::function<int32_t(int32_t)> uidMapper,
-                             int32_t symbol, bool enableSlidingPrice, int seed);
+                             int32_t symbol,
+                             bool enableSlidingPrice,
+                             int seed);
 };
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

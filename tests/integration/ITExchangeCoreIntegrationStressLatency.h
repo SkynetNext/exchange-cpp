@@ -27,16 +27,14 @@ namespace integration {
  * ITExchangeCoreIntegrationStressLatency - stress tests with latency
  * performance configuration
  */
-class ITExchangeCoreIntegrationStressLatency
-    : public ITExchangeCoreIntegrationStress {
+class ITExchangeCoreIntegrationStressLatency : public ITExchangeCoreIntegrationStress {
 public:
   ITExchangeCoreIntegrationStressLatency();
 
-  exchange::core::common::config::PerformanceConfiguration
-  GetPerformanceConfiguration() override;
+  exchange::core::common::config::PerformanceConfiguration GetPerformanceConfiguration() override;
 };
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

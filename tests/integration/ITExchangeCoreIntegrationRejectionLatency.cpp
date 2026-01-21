@@ -22,21 +22,19 @@ namespace core {
 namespace tests {
 namespace integration {
 
-ITExchangeCoreIntegrationRejectionLatency::
-    ITExchangeCoreIntegrationRejectionLatency()
-    : ITExchangeCoreIntegrationRejection() {}
+ITExchangeCoreIntegrationRejectionLatency::ITExchangeCoreIntegrationRejectionLatency()
+  : ITExchangeCoreIntegrationRejection() {}
 
 exchange::core::common::config::PerformanceConfiguration
 ITExchangeCoreIntegrationRejectionLatency::GetPerformanceConfiguration() {
   // Note: latencyPerformanceBuilder() equivalent - use Default() with
   // latency-optimized settings
-  auto cfg =
-      exchange::core::common::config::PerformanceConfiguration::Default();
+  auto cfg = exchange::core::common::config::PerformanceConfiguration::Default();
   // Latency-optimized settings would be applied here if needed
   return cfg;
 }
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

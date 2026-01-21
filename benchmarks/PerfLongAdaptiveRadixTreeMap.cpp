@@ -779,4 +779,5 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Lower)(benchmark::State& state) {
 
 BENCHMARK_REGISTER_F(ArtTreeBenchmark, Lower)->Iterations(kNumIterations);
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
 BENCHMARK_MAIN();

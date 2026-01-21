@@ -15,8 +15,8 @@
  */
 
 #include "OrdersBucketTest.h"
-#include <algorithm>
 #include <exchange/core/common/MatcherTradeEvent.h>
+#include <algorithm>
 #include <random>
 #include <set>
 
@@ -31,8 +31,7 @@ namespace tests {
 namespace orderbook {
 
 void OrdersBucketTest::SetUp() {
-  eventsHelper_ = std::make_unique<OrderBookEventsHelper>(
-      []() { return new MatcherTradeEvent(); });
+  eventsHelper_ = std::make_unique<OrderBookEventsHelper>([]() { return new MatcherTradeEvent(); });
 
   bucket_ = std::make_unique<OrdersBucket>(PRICE);
 
@@ -74,21 +73,20 @@ void OrdersBucketTest::SetUp() {
 void OrdersBucketTest::TearDown() {
   // Clean up orders
   auto orders = bucket_->GetAllOrders();
-  for (auto *order : orders) {
+  for (auto* order : orders) {
     delete order;
   }
   bucket_.reset();
   eventsHelper_.reset();
 }
 
-exchange::core::common::Order *
+exchange::core::common::Order*
 OrdersBucketTest::CreateOrder(int64_t orderId, int64_t uid, int64_t size) {
   return new Order(orderId, PRICE, size, 0, 0, OrderAction::ASK, uid, 0);
 }
 
-std::vector<exchange::core::common::MatcherTradeEvent *>
-OrdersBucketTest::EventChainToList(
-    exchange::core::common::MatcherTradeEvent *head) {
+std::vector<exchange::core::common::MatcherTradeEvent*>
+OrdersBucketTest::EventChainToList(exchange::core::common::MatcherTradeEvent* head) {
   return MatcherTradeEvent::AsList(head);
 }
 
@@ -145,7 +143,7 @@ TEST_F(OrdersBucketTest, ShouldAddAndRemoveManyOrders) {
   int64_t expectedVolume = bucket_->GetTotalVolume();
   int expectedNumOrders = bucket_->GetNumOrders() + numOrdersToAdd;
 
-  std::vector<Order *> orders;
+  std::vector<Order*> orders;
   orders.reserve(numOrdersToAdd);
   for (int i = 0; i < numOrdersToAdd; i++) {
     auto order = CreateOrder(i + 5, UID_2, i);
@@ -160,7 +158,7 @@ TEST_F(OrdersBucketTest, ShouldAddAndRemoveManyOrders) {
   std::mt19937 rng(1);
   std::shuffle(orders.begin(), orders.end(), rng);
 
-  for (auto *order : orders) {
+  for (auto* order : orders) {
     auto removed = bucket_->Remove(order->orderId, UID_2);
     ASSERT_NE(removed, nullptr);
     int64_t orderSize = removed->size;
@@ -181,7 +179,7 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders) {
 
   int orderId = 5;
 
-  std::vector<Order *> orders;
+  std::vector<Order*> orders;
   orders.reserve(numOrdersToAdd);
   for (int i = 0; i < numOrdersToAdd; i++) {
     auto order = CreateOrder(orderId++, UID_2, i);
@@ -196,10 +194,10 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders) {
   std::mt19937 rng(1);
   std::shuffle(orders.begin(), orders.end(), rng);
 
-  std::vector<Order *> orders1(orders.begin(), orders.begin() + 80);
+  std::vector<Order*> orders1(orders.begin(), orders.begin() + 80);
   std::set<int64_t> removedOrderIds;
 
-  for (auto *order : orders1) {
+  for (auto* order : orders1) {
     auto removed = bucket_->Remove(order->orderId, UID_2);
     ASSERT_NE(removed, nullptr);
     int64_t orderSize = removed->size;
@@ -212,8 +210,7 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders) {
   }
 
   auto triggerOrd = OrderCommand::Update(8182, UID_9, 1000);
-  auto matcherResult =
-      bucket_->Match(expectedVolume, &triggerOrd, eventsHelper_.get());
+  auto matcherResult = bucket_->Match(expectedVolume, &triggerOrd, eventsHelper_.get());
 
   auto events = EventChainToList(matcherResult.eventsChainHead);
   ASSERT_EQ(events.size(), static_cast<size_t>(expectedNumOrders));
@@ -222,7 +219,7 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders) {
   ASSERT_EQ(bucket_->GetTotalVolume(), 0L);
 
   // Clean up remaining orders (those that were matched, not removed)
-  for (auto *order : orders) {
+  for (auto* order : orders) {
     if (removedOrderIds.find(order->orderId) == removedOrderIds.end()) {
       delete order;
     }
@@ -238,7 +235,7 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders2) {
   int orderId = 5;
 
   for (int j = 0; j < 100; j++) {
-    std::vector<Order *> orders;
+    std::vector<Order*> orders;
     orders.reserve(numOrdersToAdd);
     for (int i = 0; i < numOrdersToAdd; i++) {
       auto order = CreateOrder(orderId++, UID_2, i);
@@ -257,10 +254,10 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders2) {
     std::mt19937 rng(1);
     std::shuffle(orders.begin(), orders.end(), rng);
 
-    std::vector<Order *> orders1(orders.begin(), orders.begin() + 900);
+    std::vector<Order*> orders1(orders.begin(), orders.begin() + 900);
     std::set<int64_t> removedOrderIds;
 
-    for (auto *order : orders1) {
+    for (auto* order : orders1) {
       auto removed = bucket_->Remove(order->orderId, UID_2);
       ASSERT_NE(removed, nullptr);
       int64_t orderSize = removed->size;
@@ -278,8 +275,7 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders2) {
 
     auto triggerOrd = OrderCommand::Update(119283900, UID_9, 1000);
 
-    auto matcherResult =
-        bucket_->Match(toMatch, &triggerOrd, eventsHelper_.get());
+    auto matcherResult = bucket_->Match(toMatch, &triggerOrd, eventsHelper_.get());
     int64_t totalVolume = matcherResult.volume;
     ASSERT_EQ(totalVolume, toMatch);
     expectedVolume -= totalVolume;
@@ -295,14 +291,14 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders2) {
     // Get orders still in bucket - these will be cleaned up by TearDown()
     auto remainingOrders = bucket_->GetAllOrders();
     std::set<int64_t> remainingOrderIds;
-    for (auto *order : remainingOrders) {
+    for (auto* order : remainingOrders) {
       remainingOrderIds.insert(order->orderId);
     }
 
     // Clean up: only delete orders that were matched (removed from bucket) or
     // already deleted via Remove(). Orders still in bucket are left for
     // TearDown() to clean up to avoid modifying bucket state.
-    for (auto *order : orders) {
+    for (auto* order : orders) {
       if (removedOrderIds.find(order->orderId) != removedOrderIds.end()) {
         // Already deleted via Remove(), skip
         continue;
@@ -318,8 +314,7 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders2) {
 
   auto triggerOrd = OrderCommand::Update(1238729387, UID_9, 1000);
 
-  auto matcherResult =
-      bucket_->Match(expectedVolume, &triggerOrd, eventsHelper_.get());
+  auto matcherResult = bucket_->Match(expectedVolume, &triggerOrd, eventsHelper_.get());
 
   auto events = EventChainToList(matcherResult.eventsChainHead);
   ASSERT_EQ(events.size(), static_cast<size_t>(expectedNumOrders));
@@ -328,7 +323,7 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders2) {
   ASSERT_EQ(bucket_->GetTotalVolume(), 0L);
 }
 
-} // namespace orderbook
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace orderbook
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-#include "../util/TestConstants.h"
-#include "../util/TestDataParameters.h"
-#include "../util/TestOrdersGeneratorConfig.h"
-#include "../util/ThroughputTestsModule.h"
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
 #include <gtest/gtest.h>
+#include "../util/TestConstants.h"
+#include "../util/TestDataParameters.h"
+#include "../util/TestOrdersGeneratorConfig.h"
+#include "../util/ThroughputTestsModule.h"
 
 using namespace exchange::core::tests::util;
 
@@ -35,8 +35,8 @@ static exchange::core::common::config::PerformanceConfiguration
 CreateThroughputPerfCfg(int matchingEnginesNum, int riskEnginesNum) {
   // Use ThroughputPerformanceBuilder() to get AffinityThreadFactory (matches
   // Java version)
-  auto cfg = exchange::core::common::config::PerformanceConfiguration::
-      ThroughputPerformanceBuilder();
+  auto cfg =
+    exchange::core::common::config::PerformanceConfiguration::ThroughputPerformanceBuilder();
   cfg.matchingEnginesNum = matchingEnginesNum;
   cfg.riskEnginesNum = riskEnginesNum;
   return cfg;
@@ -65,9 +65,8 @@ TEST(ITMultiOperation, ShouldPerformMarginOperations) {
   testParams.avalancheIOC = false;
 
   ThroughputTestsModule::ThroughputTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(), 2);
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(), 2);
 }
 
 TEST(ITMultiOperation, ShouldPerformExchangeOperations) {
@@ -93,9 +92,8 @@ TEST(ITMultiOperation, ShouldPerformExchangeOperations) {
   testParams.avalancheIOC = false;
 
   ThroughputTestsModule::ThroughputTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(), 2);
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(), 2);
 }
 
 TEST(ITMultiOperation, ShouldPerformSharded) {
@@ -121,12 +119,11 @@ TEST(ITMultiOperation, ShouldPerformSharded) {
   testParams.avalancheIOC = false;
 
   ThroughputTestsModule::ThroughputTestImpl(
-      perfCfg, testParams,
-      exchange::core::common::config::InitialStateConfiguration::CleanTest(),
-      exchange::core::common::config::SerializationConfiguration::Default(), 2);
+    perfCfg, testParams, exchange::core::common::config::InitialStateConfiguration::CleanTest(),
+    exchange::core::common::config::SerializationConfiguration::Default(), 2);
 }
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

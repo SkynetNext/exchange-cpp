@@ -36,23 +36,21 @@ protected:
   static constexpr int64_t UID_2 = 413;
   static constexpr int64_t UID_9 = 419;
 
-  std::unique_ptr<exchange::core::orderbook::OrderBookEventsHelper>
-      eventsHelper_;
+  std::unique_ptr<exchange::core::orderbook::OrderBookEventsHelper> eventsHelper_;
   std::unique_ptr<exchange::core::orderbook::OrdersBucket> bucket_;
 
   void SetUp() override;
   void TearDown() override;
 
   // Helper to create Order
-  exchange::core::common::Order *CreateOrder(int64_t orderId, int64_t uid,
-                                             int64_t size);
+  exchange::core::common::Order* CreateOrder(int64_t orderId, int64_t uid, int64_t size);
 
   // Helper to convert MatcherTradeEvent chain to vector
-  std::vector<exchange::core::common::MatcherTradeEvent *>
-  EventChainToList(exchange::core::common::MatcherTradeEvent *head);
+  std::vector<exchange::core::common::MatcherTradeEvent*>
+  EventChainToList(exchange::core::common::MatcherTradeEvent* head);
 };
 
-} // namespace orderbook
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace orderbook
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

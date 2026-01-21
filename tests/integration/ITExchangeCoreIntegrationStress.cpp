@@ -15,20 +15,20 @@
  */
 
 #include "ITExchangeCoreIntegrationStress.h"
-#include "../util/ExchangeTestContainer.h"
-#include "../util/TestConstants.h"
-#include "../util/TestOrdersGenerator.h"
-#include "ITExchangeCoreIntegrationStressBasic.h"
-#include <atomic>
-#include <chrono>
 #include <exchange/core/common/L2MarketData.h>
 #include <exchange/core/common/api/ApiCancelOrder.h>
 #include <exchange/core/common/api/ApiMoveOrder.h>
 #include <exchange/core/common/api/ApiPlaceOrder.h>
 #include <exchange/core/common/api/ApiReduceOrder.h>
 #include <gtest/gtest.h>
+#include <atomic>
+#include <chrono>
 #include <set>
 #include <thread>
+#include "../util/ExchangeTestContainer.h"
+#include "../util/TestConstants.h"
+#include "../util/TestOrdersGenerator.h"
+#include "ITExchangeCoreIntegrationStressBasic.h"
 
 using namespace exchange::core::tests::util;
 
@@ -38,7 +38,7 @@ namespace tests {
 namespace integration {
 
 void ITExchangeCoreIntegrationStress::ManyOperations(
-    const exchange::core::common::CoreSymbolSpecification &symbolSpec) {
+  const exchange::core::common::CoreSymbolSpecification& symbolSpec) {
   auto container = ExchangeTestContainer::Create(GetPerformanceConfiguration());
   container->InitBasicSymbols();
 
@@ -48,40 +48,39 @@ void ITExchangeCoreIntegrationStress::ManyOperations(
 
   // Generate commands
   auto genResult = TestOrdersGenerator::GenerateCommands(
-      numOrders, targetOrderBookOrders, numUsers,
-      TestOrdersGenerator::UID_PLAIN_MAPPER, symbolSpec.symbolId, false, false,
-      TestOrdersGenerator::CreateAsyncProgressLogger(numOrders), 288379917);
+    numOrders, targetOrderBookOrders, numUsers, TestOrdersGenerator::UID_PLAIN_MAPPER,
+    symbolSpec.symbolId, false, false, TestOrdersGenerator::CreateAsyncProgressLogger(numOrders),
+    288379917);
 
   // Get all commands (fill + benchmark)
-  auto &allCommands = genResult.GetCommands();
+  auto& allCommands = genResult.GetCommands();
 
   // Convert to ApiCommand*
-  std::vector<exchange::core::common::api::ApiCommand *> apiCommands;
+  std::vector<exchange::core::common::api::ApiCommand*> apiCommands;
   apiCommands.reserve(allCommands.size());
 
-  for (const auto &cmd : allCommands) {
-    exchange::core::common::api::ApiCommand *apiCmd = nullptr;
+  for (const auto& cmd : allCommands) {
+    exchange::core::common::api::ApiCommand* apiCmd = nullptr;
     switch (cmd.command) {
-    case exchange::core::common::cmd::OrderCommandType::PLACE_ORDER:
-      apiCmd = new exchange::core::common::api::ApiPlaceOrder(
-          cmd.price, cmd.size, cmd.orderId, cmd.action, cmd.orderType, cmd.uid,
-          cmd.symbol, cmd.userCookie, cmd.reserveBidPrice);
-      break;
-    case exchange::core::common::cmd::OrderCommandType::MOVE_ORDER:
-      apiCmd = new exchange::core::common::api::ApiMoveOrder(
-          cmd.orderId, cmd.price, cmd.uid, cmd.symbol);
-      break;
-    case exchange::core::common::cmd::OrderCommandType::CANCEL_ORDER:
-      apiCmd = new exchange::core::common::api::ApiCancelOrder(
-          cmd.orderId, cmd.uid, cmd.symbol);
-      break;
-    case exchange::core::common::cmd::OrderCommandType::REDUCE_ORDER:
-      apiCmd = new exchange::core::common::api::ApiReduceOrder(
-          cmd.orderId, cmd.uid, cmd.symbol, cmd.size);
-      break;
-    default:
-      throw std::runtime_error("Unsupported command type: " +
-                               std::to_string(static_cast<int>(cmd.command)));
+      case exchange::core::common::cmd::OrderCommandType::PLACE_ORDER:
+        apiCmd = new exchange::core::common::api::ApiPlaceOrder(
+          cmd.price, cmd.size, cmd.orderId, cmd.action, cmd.orderType, cmd.uid, cmd.symbol,
+          cmd.userCookie, cmd.reserveBidPrice);
+        break;
+      case exchange::core::common::cmd::OrderCommandType::MOVE_ORDER:
+        apiCmd = new exchange::core::common::api::ApiMoveOrder(cmd.orderId, cmd.price, cmd.uid,
+                                                               cmd.symbol);
+        break;
+      case exchange::core::common::cmd::OrderCommandType::CANCEL_ORDER:
+        apiCmd = new exchange::core::common::api::ApiCancelOrder(cmd.orderId, cmd.uid, cmd.symbol);
+        break;
+      case exchange::core::common::cmd::OrderCommandType::REDUCE_ORDER:
+        apiCmd = new exchange::core::common::api::ApiReduceOrder(cmd.orderId, cmd.uid, cmd.symbol,
+                                                                 cmd.size);
+        break;
+      default:
+        throw std::runtime_error("Unsupported command type: "
+                                 + std::to_string(static_cast<int>(cmd.command)));
     }
     if (apiCmd) {
       apiCommands.push_back(apiCmd);
@@ -97,28 +96,28 @@ void ITExchangeCoreIntegrationStress::ManyOperations(
   container->UsersInit(numUsers, allowedCurrencies);
 
   // Helper to get clients balances sum (matches Java getClientsBalancesSum)
-  auto GetClientsBalancesSum = [](const exchange::core::common::api::reports::
-                                      TotalCurrencyBalanceReportResult &result)
-      -> ankerl::unordered_dense::map<int32_t, int64_t> {
+  auto GetClientsBalancesSum =
+    [](const exchange::core::common::api::reports::TotalCurrencyBalanceReportResult& result)
+    -> ankerl::unordered_dense::map<int32_t, int64_t> {
     ankerl::unordered_dense::map<int32_t, int64_t> sum;
 
     // Add accountBalances
     if (result.accountBalances) {
-      for (const auto &[currency, balance] : *result.accountBalances) {
+      for (const auto& [currency, balance] : *result.accountBalances) {
         sum[currency] += balance;
       }
     }
 
     // Add ordersBalances (locked balances from orders)
     if (result.ordersBalances) {
-      for (const auto &[currency, balance] : *result.ordersBalances) {
+      for (const auto& [currency, balance] : *result.ordersBalances) {
         sum[currency] += balance;
       }
     }
 
     // Add suspends
     if (result.suspends) {
-      for (const auto &[currency, balance] : *result.suspends) {
+      for (const auto& [currency, balance] : *result.suspends) {
         sum[currency] += balance;
       }
     }
@@ -129,7 +128,7 @@ void ITExchangeCoreIntegrationStress::ManyOperations(
   // Validate total balance as a sum of loaded funds
   auto totalBal1 = container->TotalBalanceReport();
   ASSERT_NE(totalBal1, nullptr);
-  const auto &clientsBal1 = GetClientsBalancesSum(*totalBal1);
+  const auto& clientsBal1 = GetClientsBalancesSum(*totalBal1);
   for (int32_t currency : allowedCurrencies) {
     auto it = clientsBal1.find(currency);
     if (it != clientsBal1.end()) {
@@ -142,21 +141,19 @@ void ITExchangeCoreIntegrationStress::ManyOperations(
   // Set up consumer to track command completion
   std::atomic<int64_t> commandsCompleted{0};
   container->SetConsumer(
-      [&commandsCompleted](exchange::core::common::cmd::OrderCommand *cmd,
-                           int64_t seq) {
-        (void)cmd; // unused
-        (void)seq; // unused
-        commandsCompleted.fetch_add(1);
-      });
+    [&commandsCompleted](exchange::core::common::cmd::OrderCommand* cmd, int64_t seq) {
+      (void)cmd;  // unused
+      (void)seq;  // unused
+      commandsCompleted.fetch_add(1);
+    });
 
   // Submit all commands
   auto api = container->GetApi();
   auto startTime = std::chrono::system_clock::now();
-  for (auto *cmd : apiCommands) {
+  for (auto* cmd : apiCommands) {
     auto now = std::chrono::system_clock::now();
-    auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-                         now.time_since_epoch())
-                         .count();
+    auto timestamp =
+      std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     cmd->timestamp = timestamp;
     api->SubmitCommand(cmd);
   }
@@ -181,7 +178,7 @@ void ITExchangeCoreIntegrationStress::ManyOperations(
   // Verify that total balance was not changed (using getClientsBalancesSum)
   auto totalBal2 = container->TotalBalanceReport();
   ASSERT_NE(totalBal2, nullptr);
-  const auto &clientsBal2 = GetClientsBalancesSum(*totalBal2);
+  const auto& clientsBal2 = GetClientsBalancesSum(*totalBal2);
   for (int32_t currency : allowedCurrencies) {
     auto it1 = clientsBal1.find(currency);
     auto it2 = clientsBal2.find(currency);
@@ -201,7 +198,7 @@ TEST_F(ITExchangeCoreIntegrationStressBasic, ManyOperationsExchange) {
   ManyOperations(TestConstants::SYMBOLSPEC_ETH_XBT());
 }
 
-} // namespace integration
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace integration
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

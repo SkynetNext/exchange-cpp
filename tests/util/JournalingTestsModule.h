@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "TestDataParameters.h"
 #include <exchange/core/common/config/PerformanceConfiguration.h>
+#include "TestDataParameters.h"
 
 namespace exchange {
 namespace core {
@@ -35,13 +35,13 @@ public:
    * @param testDataParameters - test data parameters
    * @param iterations - number of test iterations
    */
-  static void JournalingTestImpl(
-      const exchange::core::common::config::PerformanceConfiguration
-          &performanceCfg,
-      const TestDataParameters &testDataParameters, int iterations);
+  static void
+  JournalingTestImpl(const exchange::core::common::config::PerformanceConfiguration& performanceCfg,
+                     const TestDataParameters& testDataParameters,
+                     int iterations);
 };
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

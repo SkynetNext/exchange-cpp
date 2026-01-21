@@ -32,21 +32,23 @@ public:
   }
 
   // Generate next int (32 bits)
-  int32_t nextInt() { return next(32); }
+  int32_t nextInt() {
+    return next(32);
+  }
 
   // Generate next int in range [0, n)
   int32_t nextInt(int32_t n) {
     if (n <= 0) {
-      return 0; // Match Java behavior
+      return 0;  // Match Java behavior
     }
 
-    if ((n & -n) == n) { // n is a power of 2
+    if ((n & -n) == n) {  // n is a power of 2
       return static_cast<int32_t>((n * static_cast<int64_t>(next(31))) >> 31);
     }
 
     int32_t bits, val;
     do {
-      bits = next(31); // Returns unsigned 31-bit value
+      bits = next(31);  // Returns unsigned 31-bit value
       val = bits % n;
     } while (bits - val + (n - 1) < 0);
     return val;
@@ -54,8 +56,7 @@ public:
 
   // Generate next double in range [0.0, 1.0)
   double nextDouble() {
-    return (((static_cast<int64_t>(next(26)) << 27) + next(27)) /
-            static_cast<double>(1LL << 53));
+    return ((static_cast<int64_t>(next(26)) << 27) + next(27)) / static_cast<double>(1LL << 53);
   }
 
   // Generate next long (64 bits)
@@ -78,7 +79,7 @@ private:
   }
 };
 
-} // namespace util
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace util
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange

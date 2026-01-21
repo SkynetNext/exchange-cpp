@@ -35,7 +35,7 @@ protected:
   void TestMultipleCommandsCompare();
 };
 
-} // namespace orderbook
-} // namespace tests
-} // namespace core
-} // namespace exchange
+}  // namespace orderbook
+}  // namespace tests
+}  // namespace core
+}  // namespace exchange
