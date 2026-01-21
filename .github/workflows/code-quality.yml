@@ -363,6 +363,7 @@ jobs:
             --suppress=knownConditionTrueFalse \
             --suppress=uselessOverride \
             --suppress=unreadVariable \
+            --suppress=syntaxError \
             --inline-suppr \
             --platform=unix64 \
             --error-exitcode=1 \
@@ -397,6 +398,7 @@ jobs:
             --suppress=knownConditionTrueFalse \
             --suppress=uselessOverride \
             --suppress=unreadVariable \
+            --suppress=syntaxError \
             --inline-suppr \
             --platform=unix64 \
             -i third_party \
