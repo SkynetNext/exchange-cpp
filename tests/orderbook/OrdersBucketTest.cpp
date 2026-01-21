@@ -198,11 +198,12 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders) {
   std::set<int64_t> removedOrderIds;
 
   for (auto* order : orders1) {
-    auto removed = bucket_->Remove(order->orderId, UID_2);
+    int64_t orderId = order->orderId;  // Save orderId before removal
+    auto removed = bucket_->Remove(orderId, UID_2);
     ASSERT_NE(removed, nullptr);
     int64_t orderSize = removed->size;
     delete removed;
-    removedOrderIds.insert(order->orderId);
+    removedOrderIds.insert(orderId);  // Use saved orderId instead of order->orderId
     expectedNumOrders--;
     expectedVolume -= orderSize;
     ASSERT_EQ(bucket_->GetNumOrders(), expectedNumOrders);

@@ -18,6 +18,7 @@
 #include <disruptor/BlockingWaitStrategy.h>
 #include <disruptor/BusySpinWaitStrategy.h>
 #include <disruptor/YieldingWaitStrategy.h>
+#include <disruptor/util/TsanAnnotations.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/processors/TwoStepSlaveProcessor.h>
 #include <exchange/core/processors/WaitSpinningHelper.h>
@@ -73,10 +74,21 @@ void TwoStepSlaveProcessor<WaitStrategyT>::run() {
   }
 
   nextSequence_ = sequence_.get() + 1L;
+  // TSan annotation: nextSequence_ is written in run() (slave thread) and read in HandlingCycle()
+  // (master thread) The happens-before relationship is established by master processor waiting for
+  // slave to be running via isRunning() check before calling HandlingCycle()
+#if DISRUPTOR_TSAN_ENABLED
+  __tsan_release(&nextSequence_);
+#endif
 }
 
 template <typename WaitStrategyT>
 void TwoStepSlaveProcessor<WaitStrategyT>::HandlingCycle(int64_t processUpToSequence) {
+  // TSan annotation: acquire nextSequence_ before reading it
+  // This establishes happens-before relationship with run() that releases it
+#if DISRUPTOR_TSAN_ENABLED
+  __tsan_acquire(&nextSequence_);
+#endif
   while (true) {
     common::cmd::OrderCommand* event = nullptr;
     try {
