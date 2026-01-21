@@ -19,11 +19,7 @@
 #include <cstdint>
 #include "../../WriteBytesMarshallable.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
-namespace binary {
+namespace exchange::core::common::api::binary {
 
 /**
  * BinaryDataCommand - interface for binary data commands
@@ -39,8 +35,4 @@ public:
   virtual int32_t GetBinaryCommandTypeCode() const = 0;
 };
 
-}  // namespace binary
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api::binary

@@ -21,13 +21,10 @@
 #include "ReportQuery.h"
 #include "ReportType.h"
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 class BytesIn;
 
-namespace api {
-namespace reports {
+namespace api::reports {
 
 // Forward declaration
 template <typename T>
@@ -70,8 +67,6 @@ struct ReportQueryTypeRegistrar {
   static detail::ReportQueryTypeRegistrar QueryType##_registrar( \
     EnumType, [](BytesIn& bytes) -> ReportQueryBase* { return new QueryType(bytes); })
 
-}  // namespace reports
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace api::reports
+
+}  // namespace exchange::core::common

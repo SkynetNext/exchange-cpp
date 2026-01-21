@@ -20,9 +20,7 @@
 #include <memory>
 #include <vector>
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 /**
  * L2 Market Data carrier object
@@ -72,6 +70,4 @@ public:
   bool operator==(const L2MarketData& other) const;
 };
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

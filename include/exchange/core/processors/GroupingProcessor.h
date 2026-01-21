@@ -27,9 +27,7 @@
 #include "SharedPool.h"
 #include "WaitSpinningHelper.h"
 
-namespace exchange {
-namespace core {
-namespace processors {
+namespace exchange::core::processors {
 
 /**
  * GroupingProcessor - groups small orders and identifies cancel-replace
@@ -72,6 +70,4 @@ private:
   void ProcessEvents();
 };
 
-}  // namespace processors
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::processors

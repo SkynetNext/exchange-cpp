@@ -22,13 +22,10 @@
 #include "BinaryCommandType.h"
 #include "BinaryDataCommand.h"
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 class BytesIn;
 
-namespace api {
-namespace binary {
+namespace api::binary {
 
 using BinaryDataCommandConstructor = std::function<std::unique_ptr<BinaryDataCommand>(BytesIn&)>;
 
@@ -68,8 +65,6 @@ struct BinaryCommandTypeRegistrar {
       return std::make_unique<CommandType>(bytes);                       \
     })
 
-}  // namespace binary
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace api::binary
+
+}  // namespace exchange::core::common

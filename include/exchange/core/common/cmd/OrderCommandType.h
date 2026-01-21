@@ -19,12 +19,8 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
-#include <unordered_map>
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace cmd {
+namespace exchange::core::common::cmd {
 
 enum class OrderCommandType : int8_t {
   PLACE_ORDER = 1,
@@ -120,7 +116,4 @@ inline int8_t OrderCommandTypeToCode(OrderCommandType type) {
   return static_cast<int8_t>(type);
 }
 
-}  // namespace cmd
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::cmd

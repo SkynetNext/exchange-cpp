@@ -26,9 +26,7 @@
 #include "IOrderBook.h"
 #include "OrderBookEventsHelper.h"
 
-namespace exchange {
-namespace core {
-namespace orderbook {
+namespace exchange::core::orderbook {
 
 /**
  * OrderBookDirectImpl - direct order book implementation using ART tree
@@ -72,7 +70,7 @@ public:
     /**
      * Constructor from BytesIn (deserialization)
      */
-    DirectOrder(common::BytesIn& bytes);
+    explicit DirectOrder(common::BytesIn& bytes);
 
     // IOrder interface
     int64_t GetOrderId() const override {
@@ -190,6 +188,4 @@ private:
   bool isBudgetLimitSatisfied(common::OrderAction orderAction, int64_t calculated, int64_t limit);
 };
 
-}  // namespace orderbook
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::orderbook

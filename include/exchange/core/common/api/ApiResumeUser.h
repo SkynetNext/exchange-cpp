@@ -19,10 +19,7 @@
 #include <cstdint>
 #include "ApiCommand.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
+namespace exchange::core::common::api {
 
 /**
  * ApiResumeUser - resume a suspended user
@@ -34,7 +31,4 @@ public:
   explicit ApiResumeUser(int64_t uid) : uid(uid) {}
 };
 
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api

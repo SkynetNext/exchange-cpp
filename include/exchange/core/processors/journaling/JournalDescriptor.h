@@ -17,12 +17,8 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 
-namespace exchange {
-namespace core {
-namespace processors {
-namespace journaling {
+namespace exchange::core::processors::journaling {
 
 // Forward declaration
 struct SnapshotDescriptor;
@@ -34,31 +30,23 @@ struct SnapshotDescriptor;
 struct JournalDescriptor {
   int64_t timestampNs;
   int64_t seqFirst;
-  int64_t seqLast;  // -1 if not finished yet
+  int64_t seqLast = -1;  // -1 if not finished yet
 
   SnapshotDescriptor* baseSnapshot;
 
   // Linked list structure
-  JournalDescriptor* prev;  // can be null
-  JournalDescriptor* next;  // can be null
+  JournalDescriptor* prev;            // can be null
+  JournalDescriptor* next = nullptr;  // can be null
 
   JournalDescriptor(int64_t timestampNs,
                     int64_t seqFirst,
                     SnapshotDescriptor* baseSnapshot,
                     JournalDescriptor* prev)
-    : timestampNs(timestampNs)
-    , seqFirst(seqFirst)
-    , seqLast(-1)
-    , baseSnapshot(baseSnapshot)
-    , prev(prev)
-    , next(nullptr) {
+    : timestampNs(timestampNs), seqFirst(seqFirst), baseSnapshot(baseSnapshot), prev(prev) {
     if (prev) {
       prev->next = this;
     }
   }
 };
 
-}  // namespace journaling
-}  // namespace processors
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::processors::journaling

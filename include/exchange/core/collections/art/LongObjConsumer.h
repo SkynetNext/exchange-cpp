@@ -18,10 +18,7 @@
 
 #include <cstdint>
 
-namespace exchange {
-namespace core {
-namespace collections {
-namespace art {
+namespace exchange::core::collections::art {
 
 /**
  * LongObjConsumer - functional interface for consuming key-value pairs
@@ -56,7 +53,4 @@ private:
   F f_;
 };
 
-}  // namespace art
-}  // namespace collections
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::collections::art

@@ -23,10 +23,7 @@
 #include "ReportsQueriesConfiguration.h"
 #include "SerializationConfiguration.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace config {
+namespace exchange::core::common::config {
 
 /**
  * ExchangeConfiguration - main exchange configuration
@@ -61,7 +58,4 @@ public:
   }
 };
 
-}  // namespace config
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::config

@@ -19,9 +19,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 /**
  * BytesIn - interface for reading binary data
@@ -62,6 +60,4 @@ public:
   virtual void Read(void* buffer, size_t length) = 0;
 };
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

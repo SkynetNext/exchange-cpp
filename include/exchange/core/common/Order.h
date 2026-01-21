@@ -24,9 +24,7 @@
 #include "StateHash.h"
 #include "WriteBytesMarshallable.h"
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 /**
  * Extending OrderCommand allows to avoid creating new objects
@@ -75,7 +73,7 @@ public:
   /**
    * Constructor from BytesIn (deserialization)
    */
-  Order(BytesIn& bytes);
+  explicit Order(BytesIn& bytes);
 
   // IOrder interface implementation
   int64_t GetPrice() const override {
@@ -127,6 +125,4 @@ public:
   std::string ToString() const;
 };
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

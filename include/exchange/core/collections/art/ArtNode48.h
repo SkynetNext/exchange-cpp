@@ -17,8 +17,8 @@
 #pragma once
 
 #include <exchange/core/collections/objpool/ObjectsPool.h>
+#include <array>
 #include <cstdint>
-#include <cstring>
 #include <list>
 #include <stdexcept>
 #include <string>
@@ -26,10 +26,7 @@
 #include "IArtNode.h"
 #include "LongObjConsumer.h"
 
-namespace exchange {
-namespace core {
-namespace collections {
-namespace art {
+namespace exchange::core::collections::art {
 
 // Forward declarations
 template <typename V>
@@ -56,13 +53,9 @@ public:
 
   explicit ArtNode48(::exchange::core::collections::objpool::ObjectsPool* objectsPool)
     : IArtNode<V>(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_48)
-    , objectsPool_(objectsPool)
-    , nodeKey_(0)
-    , nodeLevel_(0)
-    , numChildren_(0)
-    , freeBitMask_(0) {
-    std::memset(indexes_, -1, sizeof(indexes_));
-    std::memset(nodes_, 0, sizeof(nodes_));
+    , objectsPool_(objectsPool) {
+    indexes_.fill(-1);
+    nodes_.fill(nullptr);
   }
 
   V* GetValue(int64_t key, int level) override {
@@ -102,13 +95,13 @@ public:
   friend class ArtNode256;
 
 private:
-  int8_t indexes_[256];
-  void* nodes_[48];
+  std::array<int8_t, 256> indexes_{};
+  std::array<void*, 48> nodes_{};
   ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;
-  int64_t nodeKey_;
-  int nodeLevel_;
-  uint8_t numChildren_;
-  int64_t freeBitMask_;
+  int64_t nodeKey_ = 0;
+  int nodeLevel_ = 0;
+  uint8_t numChildren_ = 0;
+  int64_t freeBitMask_ = 0;
 
   std::vector<int16_t> CreateKeysArray() {
     std::vector<int16_t> keys;
@@ -124,8 +117,8 @@ private:
 
 template <typename V>
 void ArtNode48<V>::InitFromNode16(ArtNode16<V>* node16, int16_t subKey, void* newElement) {
-  std::memset(indexes_, -1, sizeof(indexes_));
-  std::memset(nodes_, 0, sizeof(nodes_));
+  indexes_.fill(-1);
+  nodes_.fill(nullptr);
   numChildren_ = node16->numChildren_ + 1;
   nodeLevel_ = node16->nodeLevel_;
   nodeKey_ = node16->nodeKey_;
@@ -140,8 +133,8 @@ void ArtNode48<V>::InitFromNode16(ArtNode16<V>* node16, int16_t subKey, void* ne
 
 template <typename V>
 void ArtNode48<V>::InitFromNode256(ArtNode256<V>* node256) {
-  std::memset(indexes_, -1, sizeof(indexes_));
-  std::memset(nodes_, 0, sizeof(nodes_));
+  indexes_.fill(-1);
+  nodes_.fill(nullptr);
   numChildren_ = node256->numChildren_;
   nodeLevel_ = node256->nodeLevel_;
   nodeKey_ = node256->nodeKey_;
@@ -382,7 +375,4 @@ std::list<std::pair<int64_t, V*>> ArtNode48<V>::Entries() {
   return list;
 }
 
-}  // namespace art
-}  // namespace collections
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::collections::art

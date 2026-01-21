@@ -21,11 +21,7 @@
 #include "ReportQuery.h"
 #include "ReportResult.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
-namespace reports {
+namespace exchange::core::common::api::reports {
 
 /**
  * ReportQueriesHandler - interface for handling report queries
@@ -67,8 +63,4 @@ protected:
   }
 };
 
-}  // namespace reports
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api::reports

@@ -25,16 +25,13 @@
 #include "ReportType.h"
 #include "SingleUserReportResult.h"
 
-namespace exchange {
-namespace core {
+namespace exchange::core {
 namespace processors {
 class MatchingEngineRouter;
 class RiskEngine;
 }  // namespace processors
 
-namespace common {
-namespace api {
-namespace reports {
+namespace common::api::reports {
 
 /**
  * SingleUserReportQuery - single user report query
@@ -66,8 +63,6 @@ public:
   void WriteMarshallable(BytesOut& bytes) const override;
 };
 
-}  // namespace reports
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace common::api::reports
+
+}  // namespace exchange::core

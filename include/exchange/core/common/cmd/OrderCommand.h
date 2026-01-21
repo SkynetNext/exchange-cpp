@@ -22,18 +22,15 @@
 #include <vector>
 
 // Forward declarations
-namespace exchange {
-namespace core {
-namespace common {
+
+namespace exchange::core::common {
 class IOrder;
 class StateHash;
 class L2MarketData;
 struct MatcherTradeEvent;
 enum class OrderAction : uint8_t;
 enum class OrderType : uint8_t;
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common
 
 #include "../IOrder.h"
 #include "../L2MarketData.h"
@@ -44,10 +41,7 @@ enum class OrderType : uint8_t;
 #include "CommandResultCode.h"
 #include "OrderCommandType.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace cmd {
+namespace exchange::core::common::cmd {
 
 /**
  * OrderCommand - Disruptor event core structure
@@ -174,7 +168,4 @@ struct alignas(64) OrderCommand : public IOrder, public StateHash {
   }
 };
 
-}  // namespace cmd
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::cmd

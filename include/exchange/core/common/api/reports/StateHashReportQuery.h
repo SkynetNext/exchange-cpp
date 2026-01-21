@@ -23,24 +23,21 @@
 #include "ReportType.h"
 #include "StateHashReportResult.h"
 
-namespace exchange {
-namespace core {
+namespace exchange::core {
 // Forward declarations
 namespace processors {
 class MatchingEngineRouter;
 class RiskEngine;
 }  // namespace processors
 
-namespace common {
-namespace api {
-namespace reports {
+namespace common::api::reports {
 
 /**
  * StateHashReportQuery - state hash report query
  */
 class StateHashReportQuery : public ReportQuery<StateHashReportResult> {
 public:
-  StateHashReportQuery() {}
+  StateHashReportQuery() = default;
 
   explicit StateHashReportQuery(BytesIn& bytesIn) {
     // do nothing
@@ -63,8 +60,6 @@ public:
   void WriteMarshallable(BytesOut& bytes) const override;
 };
 
-}  // namespace reports
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace common::api::reports
+
+}  // namespace exchange::core

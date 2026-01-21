@@ -20,11 +20,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
-namespace binary {
+namespace exchange::core::common::api::binary {
 
 /**
  * BinaryCommandType - binary command type enumeration
@@ -46,8 +42,4 @@ inline int32_t BinaryCommandTypeToCode(BinaryCommandType type) {
   return static_cast<int32_t>(type);
 }
 
-}  // namespace binary
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api::binary

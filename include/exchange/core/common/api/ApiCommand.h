@@ -18,10 +18,7 @@
 
 #include <cstdint>
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
+namespace exchange::core::common::api {
 
 /**
  * ApiCommand - base class for all API commands
@@ -35,7 +32,4 @@ public:
   virtual ~ApiCommand() = default;
 };
 
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api

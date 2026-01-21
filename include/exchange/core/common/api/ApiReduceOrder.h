@@ -19,10 +19,7 @@
 #include <cstdint>
 #include "ApiCommand.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
+namespace exchange::core::common::api {
 
 /**
  * ApiReduceOrder - reduce size of an existing order
@@ -38,7 +35,4 @@ public:
     : orderId(orderId), uid(uid), symbol(symbol), reduceSize(reduceSize) {}
 };
 
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api

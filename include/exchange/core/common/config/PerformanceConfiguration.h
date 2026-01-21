@@ -23,23 +23,19 @@
 #include "../../orderbook/IOrderBook.h"
 #include "../CoreWaitStrategy.h"
 
-namespace exchange {
-namespace core {
+namespace exchange::core {
 // Forward declarations
 class CoreSymbolSpecification;
 
-namespace collections {
-namespace objpool {
+namespace collections::objpool {
 class ObjectsPool;
 }
-}  // namespace collections
 
 namespace orderbook {
 class OrderBookEventsHelper;
 }
 
-namespace common {
-namespace config {
+namespace common::config {
 
 /**
  * PerformanceConfiguration - exchange performance configuration
@@ -109,7 +105,6 @@ public:
   static PerformanceConfiguration ThroughputPerformanceBuilder();
 };
 
-}  // namespace config
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace common::config
+
+}  // namespace exchange::core

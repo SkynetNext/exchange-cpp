@@ -19,10 +19,7 @@
 #include <cstdint>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace processors {
-namespace journaling {
+namespace exchange::core::processors::journaling {
 
 /**
  * DiskSerializationProcessorConfiguration - configuration for disk
@@ -38,10 +35,11 @@ public:
   int64_t journalFileMaxSize;
   int32_t journalBatchCompressThreshold;
 
-  DiskSerializationProcessorConfiguration(const std::string& storageFolder = DEFAULT_FOLDER,
-                                          int32_t journalBufferSize = 256 * 1024,  // 256 KB default
-                                          int64_t journalFileMaxSize = 1024 * 1024 * 1024,
-                                          int32_t journalBatchCompressThreshold = 4096)
+  explicit DiskSerializationProcessorConfiguration(
+    const std::string& storageFolder = DEFAULT_FOLDER,
+    int32_t journalBufferSize = 256 * 1024,  // 256 KB default
+    int64_t journalFileMaxSize = 1024 * 1024 * 1024,
+    int32_t journalBatchCompressThreshold = 4096)
     : storageFolder(storageFolder)
     , journalBufferSize(journalBufferSize)
     , journalBufferFlushTrigger(journalBufferSize - 256)
@@ -50,7 +48,4 @@ public:
     , journalBatchCompressThreshold(journalBatchCompressThreshold) {}
 };
 
-}  // namespace journaling
-}  // namespace processors
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::processors::journaling

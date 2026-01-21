@@ -24,8 +24,7 @@
 #include "../common/Wire.h"
 #include "../common/cmd/OrderCommand.h"
 
-namespace exchange {
-namespace core {
+namespace exchange::core {
 // Forward declaration
 namespace common {
 struct MatcherTradeEvent;
@@ -105,5 +104,4 @@ private:
 };
 
 }  // namespace orderbook
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core

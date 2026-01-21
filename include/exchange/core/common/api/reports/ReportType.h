@@ -20,11 +20,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
-namespace reports {
+namespace exchange::core::common::api::reports {
 
 /**
  * ReportType - report type enumeration
@@ -52,8 +48,4 @@ inline int32_t ReportTypeToCode(ReportType type) {
   return static_cast<int32_t>(type);
 }
 
-}  // namespace reports
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api::reports

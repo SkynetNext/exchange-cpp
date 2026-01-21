@@ -16,10 +16,7 @@
 
 #pragma once
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace config {
+namespace exchange::core::common::config {
 
 /**
  * OrdersProcessingConfiguration - order processing configuration
@@ -49,7 +46,4 @@ public:
   }
 };
 
-}  // namespace config
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::config

@@ -26,9 +26,7 @@
 #include "../common/Order.h"
 #include "../common/WriteBytesMarshallable.h"
 
-namespace exchange {
-namespace core {
-namespace orderbook {
+namespace exchange::core::orderbook {
 
 class OrderBookEventsHelper;
 
@@ -43,7 +41,7 @@ public:
   /**
    * Constructor from BytesIn (deserialization)
    */
-  OrdersBucket(common::BytesIn* bytes);
+  explicit OrdersBucket(common::BytesIn* bytes);
 
   int64_t GetPrice() const {
     return price_;
@@ -128,6 +126,4 @@ private:
     orderMap_;
 };
 
-}  // namespace orderbook
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::orderbook

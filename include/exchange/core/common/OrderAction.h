@@ -20,9 +20,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 enum class OrderAction : uint8_t { ASK = 0, BID = 1 };
 
@@ -45,6 +43,4 @@ inline OrderAction Opposite(OrderAction action) {
   return action == OrderAction::ASK ? OrderAction::BID : OrderAction::ASK;
 }
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

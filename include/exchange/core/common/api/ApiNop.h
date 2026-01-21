@@ -18,17 +18,11 @@
 
 #include "ApiCommand.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
+namespace exchange::core::common::api {
 
 /**
  * ApiNop - no operation command
  */
 class ApiNop : public ApiCommand {};
 
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api

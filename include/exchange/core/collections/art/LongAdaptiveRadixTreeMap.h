@@ -28,9 +28,7 @@
 #include "IArtNode.h"
 #include "LongObjConsumer.h"
 
-namespace exchange {
-namespace core {
-namespace collections {
+namespace exchange::core::collections {
 
 namespace objpool {
 class ObjectsPool;
@@ -130,9 +128,7 @@ private:
 };
 
 }  // namespace art
-}  // namespace collections
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::collections
 
 // Include implementations
 #include "ArtNode16.h"
@@ -140,10 +136,7 @@ private:
 #include "ArtNode4.h"
 #include "ArtNode48.h"
 
-namespace exchange {
-namespace core {
-namespace collections {
-namespace art {
+namespace exchange::core::collections::art {
 
 // --- Global Utilities Implementation ---
 
@@ -361,7 +354,4 @@ std::string LongAdaptiveRadixTreeMap<V>::PrintDiagram(const std::string& prefix,
   return sb.str();
 }
 
-}  // namespace art
-}  // namespace collections
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::collections::art

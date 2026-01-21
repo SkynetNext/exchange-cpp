@@ -20,14 +20,11 @@
 #include <cstdint>
 #include "ReportResult.h"
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 class BytesIn;
 class BytesOut;
 
-namespace api {
-namespace reports {
+namespace api::reports {
 
 /**
  * TotalCurrencyBalanceReportResult - total currency balance report result
@@ -94,8 +91,6 @@ public:
   void WriteMarshallable(BytesOut& bytes) const;
 };
 
-}  // namespace reports
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace api::reports
+
+}  // namespace exchange::core::common

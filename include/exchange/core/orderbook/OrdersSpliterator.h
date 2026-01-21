@@ -19,9 +19,7 @@
 #include <cstdint>
 #include <functional>
 
-namespace exchange {
-namespace core {
-namespace orderbook {
+namespace exchange::core::orderbook {
 
 // Forward declaration
 class OrderBookDirectImpl;
@@ -59,6 +57,4 @@ private:
   DirectOrder pointer_;
 };
 
-}  // namespace orderbook
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::orderbook

@@ -20,9 +20,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 enum class SymbolType : uint8_t { CURRENCY_EXCHANGE_PAIR = 0, FUTURES_CONTRACT = 1, OPTION = 2 };
 
@@ -43,6 +41,4 @@ inline uint8_t SymbolTypeToCode(SymbolType type) {
   return static_cast<uint8_t>(type);
 }
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

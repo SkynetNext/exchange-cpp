@@ -21,10 +21,7 @@
 #include "../OrderType.h"
 #include "ApiCommand.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
+namespace exchange::core::common::api {
 
 /**
  * ApiPlaceOrder - place a new order command
@@ -61,7 +58,4 @@ public:
     , reservePrice(reservePrice) {}
 };
 
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api

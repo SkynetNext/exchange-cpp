@@ -19,9 +19,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 /**
  * BytesOut - interface for writing binary data
@@ -62,6 +60,4 @@ public:
   virtual int64_t WritePosition() const = 0;
 };
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

@@ -19,10 +19,7 @@
 #include <cstdint>
 #include "ApiCommand.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
+namespace exchange::core::common::api {
 
 /**
  * ApiPersistState - persist exchange state
@@ -35,7 +32,4 @@ public:
   ApiPersistState(int64_t dumpId, bool seal) : dumpId(dumpId), seal(seal) {}
 };
 
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api

@@ -18,9 +18,7 @@
 
 #include <cstdint>
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 class StateHash {
 public:
@@ -28,6 +26,4 @@ public:
   virtual int32_t GetStateHash() const = 0;
 };
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

@@ -18,9 +18,7 @@
 
 #include "BytesOut.h"
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 /**
  * WriteBytesMarshallable - interface for objects that can be serialized
@@ -37,6 +35,4 @@ public:
   virtual void WriteMarshallable(BytesOut& bytes) const = 0;
 };
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

@@ -20,9 +20,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 enum class MatcherEventType : uint8_t { TRADE = 0, REDUCE = 1, REJECT = 2, BINARY_EVENT = 3 };
 
@@ -45,6 +43,4 @@ inline uint8_t MatcherEventTypeToCode(MatcherEventType type) {
   return static_cast<uint8_t>(type);
 }
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

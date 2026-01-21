@@ -23,10 +23,7 @@
 class ExchangeApi;
 class IExchangeApi;
 
-namespace exchange {
-namespace core {
-namespace processors {
-namespace journaling {
+namespace exchange::core::processors::journaling {
 
 /**
  * DummySerializationProcessor - dummy implementation that does nothing
@@ -71,7 +68,4 @@ private:
   DummySerializationProcessor() = default;
 };
 
-}  // namespace journaling
-}  // namespace processors
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::processors::journaling

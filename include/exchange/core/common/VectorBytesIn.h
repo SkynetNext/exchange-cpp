@@ -22,9 +22,7 @@
 
 #include "BytesIn.h"
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 using runtime_error = std::runtime_error;
 
@@ -35,10 +33,10 @@ using runtime_error = std::runtime_error;
 class VectorBytesIn : public BytesIn {
 private:
   const std::vector<uint8_t>& data_;
-  size_t position_;
+  size_t position_ = 0;
 
 public:
-  explicit VectorBytesIn(const std::vector<uint8_t>& data) : data_(data), position_(0) {}
+  explicit VectorBytesIn(const std::vector<uint8_t>& data) : data_(data) {}
 
   int8_t ReadByte() override {
     if (position_ >= data_.size()) {
@@ -95,6 +93,4 @@ public:
   }
 };
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

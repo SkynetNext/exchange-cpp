@@ -20,9 +20,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 enum class BalanceAdjustmentType : uint8_t { ADJUSTMENT = 0, SUSPEND = 1 };
 
@@ -41,6 +39,4 @@ inline uint8_t BalanceAdjustmentTypeToCode(BalanceAdjustmentType type) {
   return static_cast<uint8_t>(type);
 }
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

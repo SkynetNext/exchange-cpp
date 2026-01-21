@@ -28,8 +28,7 @@
 #include "../orderbook/OrderBookEventsHelper.h"
 #include "SharedPool.h"
 
-namespace exchange {
-namespace core {
+namespace exchange::core {
 namespace common {
 class BytesIn;
 
@@ -92,5 +91,4 @@ private:
 };
 
 }  // namespace processors
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core

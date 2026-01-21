@@ -18,10 +18,7 @@
 
 #include <set>
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace config {
+namespace exchange::core::common::config {
 
 /**
  * LoggingConfiguration - logging configuration
@@ -32,7 +29,7 @@ public:
 
   std::set<LoggingLevel> loggingLevels;
 
-  LoggingConfiguration(std::set<LoggingLevel> loggingLevels)
+  explicit LoggingConfiguration(std::set<LoggingLevel> loggingLevels)
     : loggingLevels(std::move(loggingLevels)) {}
 
   static LoggingConfiguration Default() {
@@ -44,7 +41,4 @@ public:
   }
 };
 
-}  // namespace config
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::config

@@ -19,41 +19,39 @@
 #include <cstdint>
 #include <vector>
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 enum class MatcherEventType : uint8_t;
 
 struct MatcherTradeEvent {
-  MatcherEventType eventType;  // TRADE, REDUCE, REJECT (rare) or BINARY_EVENT (reports data)
+  MatcherEventType eventType{};  // TRADE, REDUCE, REJECT (rare) or BINARY_EVENT (reports data)
 
-  int32_t section;
+  int32_t section{};
 
   // false, except when activeOrder is completely filled, removed or rejected
   // it is always true for REJECT event
   // it is true for REDUCE event if reduce was triggered by COMMAND
-  bool activeOrderCompleted;
+  bool activeOrderCompleted{};
 
   // maker (for TRADE event type only)
-  int64_t matchedOrderId;
-  int64_t matchedOrderUid;     // 0 for rejection
-  bool matchedOrderCompleted;  // false, except when matchedOrder is completely
-                               // filled
+  int64_t matchedOrderId{};
+  int64_t matchedOrderUid{};     // 0 for rejection
+  bool matchedOrderCompleted{};  // false, except when matchedOrder is completely
+                                 // filled
 
   // actual price of the deal (from maker order), 0 for rejection
-  int64_t price;
+  int64_t price{};
 
   // TRADE - trade size
   // REDUCE - effective reduce size of REDUCE command, or not filled size for
   // CANCEL command REJECT - unmatched size of rejected order
-  int64_t size;
+  int64_t size{};
 
   // frozen price from BID order owner (depends on activeOrderAction)
-  int64_t bidderHoldPrice;
+  int64_t bidderHoldPrice{};
 
   // reference to next event in chain
-  MatcherTradeEvent* nextEvent = nullptr;
+  MatcherTradeEvent* nextEvent{};
 
   // testing only
   MatcherTradeEvent Copy() const;
@@ -73,6 +71,4 @@ struct MatcherTradeEvent {
   static std::vector<MatcherTradeEvent*> AsList(MatcherTradeEvent* head);
 };
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

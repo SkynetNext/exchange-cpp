@@ -20,10 +20,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace exchange {
-namespace core {
-namespace collections {
-namespace objpool {
+namespace exchange::core::collections::objpool {
 
 /**
  * ObjectsPool - Object pool for reducing allocations
@@ -152,7 +149,4 @@ private:
   void* Pop(int type);
 };
 
-}  // namespace objpool
-}  // namespace collections
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::collections::objpool

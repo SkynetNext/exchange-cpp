@@ -18,17 +18,14 @@
 
 #include <functional>
 
-namespace exchange {
-namespace core {
+namespace exchange::core {
 // Forward declaration for ISerializationProcessor (outside config namespace)
-namespace processors {
-namespace journaling {
+
+namespace processors::journaling {
 class ISerializationProcessor;
 }
-}  // namespace processors
 
-namespace common {
-namespace config {
+namespace common::config {
 
 // Forward declarations
 class ExchangeConfiguration;
@@ -57,7 +54,6 @@ public:
   static SerializationConfiguration DiskJournaling();
 };
 
-}  // namespace config
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace common::config
+
+}  // namespace exchange::core

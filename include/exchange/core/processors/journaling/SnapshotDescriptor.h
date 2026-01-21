@@ -20,10 +20,7 @@
 #include <map>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace processors {
-namespace journaling {
+namespace exchange::core::processors::journaling {
 
 // Forward declaration
 struct JournalDescriptor;
@@ -39,8 +36,8 @@ struct SnapshotDescriptor {
   std::string path;
 
   // Linked list structure
-  SnapshotDescriptor* prev;
-  SnapshotDescriptor* next;
+  SnapshotDescriptor* prev;            // can be null
+  SnapshotDescriptor* next = nullptr;  // can be null
 
   int32_t numMatchingEngines;
   int32_t numRiskEngines;
@@ -59,7 +56,6 @@ struct SnapshotDescriptor {
     , seq(seq)
     , timestampNs(timestampNs)
     , prev(prev)
-    , next(nullptr)
     , numMatchingEngines(numMatchingEngines)
     , numRiskEngines(numRiskEngines) {
     if (prev) {
@@ -83,7 +79,4 @@ struct SnapshotDescriptor {
   }
 };
 
-}  // namespace journaling
-}  // namespace processors
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::processors::journaling

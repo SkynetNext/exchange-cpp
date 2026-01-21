@@ -27,9 +27,7 @@
 #include "OrderBookEventsHelper.h"
 #include "OrdersBucket.h"
 
-namespace exchange {
-namespace core {
-namespace orderbook {
+namespace exchange::core::orderbook {
 
 /**
  * Naive implementation of OrderBook using std::map for price indexing
@@ -38,9 +36,10 @@ namespace orderbook {
  */
 class OrderBookNaiveImpl : public IOrderBook {
 public:
-  OrderBookNaiveImpl(const common::CoreSymbolSpecification* symbolSpec,
-                     ::exchange::core::collections::objpool::ObjectsPool* objectsPool = nullptr,
-                     OrderBookEventsHelper* eventsHelper = nullptr);
+  explicit OrderBookNaiveImpl(
+    const common::CoreSymbolSpecification* symbolSpec,
+    ::exchange::core::collections::objpool::ObjectsPool* objectsPool = nullptr,
+    OrderBookEventsHelper* eventsHelper = nullptr);
 
   /**
    * Constructor from BytesIn (deserialization)
@@ -184,6 +183,4 @@ private:
   bool IsBudgetLimitSatisfied(common::OrderAction orderAction, int64_t calculated, int64_t limit);
 };
 
-}  // namespace orderbook
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::orderbook

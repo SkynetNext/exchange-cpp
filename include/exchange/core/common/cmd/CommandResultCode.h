@@ -20,10 +20,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace cmd {
+namespace exchange::core::common::cmd {
 
 enum class CommandResultCode : int32_t {
   NEW = 0,
@@ -97,7 +94,4 @@ inline CommandResultCode MergeToFirstFailed(const std::vector<CommandResultCode>
   return hasSuccess ? CommandResultCode::SUCCESS : CommandResultCode::ACCEPTED;
 }
 
-}  // namespace cmd
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::cmd

@@ -24,9 +24,7 @@
 #include "UserStatus.h"
 #include "WriteBytesMarshallable.h"
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 class UserProfile : public StateHash, public WriteBytesMarshallable {
 public:
@@ -65,6 +63,4 @@ public:
   std::string ToString() const;
 };
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

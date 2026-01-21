@@ -21,9 +21,7 @@
 #include <functional>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace processors {
+namespace exchange::core::processors {
 
 /**
  * DisruptorExceptionHandler - exception handler for Disruptor
@@ -54,6 +52,4 @@ private:
   OnExceptionHandler onException_;
 };
 
-}  // namespace processors
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::processors

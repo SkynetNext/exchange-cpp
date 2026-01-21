@@ -19,9 +19,7 @@
 #include <cstdint>
 #include "OrderAction.h"
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 // Forward declarations
 class StateHash;
@@ -40,6 +38,4 @@ public:
   virtual int64_t GetReserveBidPrice() const = 0;
 };
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

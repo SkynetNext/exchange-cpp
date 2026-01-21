@@ -35,9 +35,7 @@
 #include "SymbolSpecificationProvider.h"
 #include "journaling/ISerializationProcessor.h"
 
-namespace exchange {
-namespace core {
-namespace processors {
+namespace exchange::core::processors {
 
 // Forward declarations
 class SharedPool;
@@ -190,6 +188,4 @@ private:
   }
 };
 
-}  // namespace processors
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::processors

@@ -24,17 +24,14 @@
 #include "../../WriteBytesMarshallable.h"
 #include "ReportResult.h"
 
-namespace exchange {
-namespace core {
+namespace exchange::core {
 // Forward declarations
 namespace processors {
 class MatchingEngineRouter;
 class RiskEngine;
 }  // namespace processors
 
-namespace common {
-namespace api {
-namespace reports {
+namespace common::api::reports {
 
 /**
  * ReportQueryBase - non-template base class for type erasure
@@ -139,8 +136,6 @@ public:
   }
 };
 
-}  // namespace reports
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace common::api::reports
+
+}  // namespace exchange::core

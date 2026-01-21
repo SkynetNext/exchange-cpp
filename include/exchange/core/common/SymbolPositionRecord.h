@@ -22,19 +22,13 @@
 #include "StateHash.h"
 #include "WriteBytesMarshallable.h"
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 class BytesIn;
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common
 
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 // Forward declarations
 class CoreSymbolSpecification;
@@ -128,6 +122,4 @@ private:
   void OpenPositionMargin(OrderAction action, int64_t sizeToOpen, int64_t tradePrice);
 };
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

@@ -20,9 +20,7 @@
 #include <vector>
 #include "BytesOut.h"
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 /**
  * VectorBytesOut - BytesOut implementation using std::vector<uint8_t>
@@ -31,10 +29,10 @@ namespace common {
 class VectorBytesOut : public BytesOut {
 private:
   std::vector<uint8_t>& data_;
-  size_t position_;
+  size_t position_ = 0;
 
 public:
-  explicit VectorBytesOut(std::vector<uint8_t>& data) : data_(data), position_(0) {}
+  explicit VectorBytesOut(std::vector<uint8_t>& data) : data_(data) {}
 
   BytesOut& WriteByte(int8_t value) override {
     if (position_ >= data_.size()) {
@@ -101,6 +99,4 @@ public:
   }
 };
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

@@ -21,10 +21,7 @@
 #include "ApiCommand.h"
 #include "binary/BinaryDataCommand.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
+namespace exchange::core::common::api {
 
 /**
  * ApiBinaryDataCommand - binary data command wrapper
@@ -42,7 +39,4 @@ public:
     : transferId(transferId), data(std::move(data)) {}
 };
 
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api

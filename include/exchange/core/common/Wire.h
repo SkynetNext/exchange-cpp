@@ -21,9 +21,7 @@
 #include "BytesIn.h"
 #include "VectorBytesIn.h"
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 /**
  * Wire - simple wrapper for BytesIn
@@ -37,7 +35,7 @@ private:
 
 public:
   // Default constructor (required for std::map::operator[])
-  Wire() : bytes_(), bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
+  Wire() : bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
 
   explicit Wire(std::vector<uint8_t> bytes)
     : bytes_(std::move(bytes)), bytesIn_(std::make_shared<VectorBytesIn>(bytes_)) {}
@@ -93,6 +91,4 @@ public:
   }
 };
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

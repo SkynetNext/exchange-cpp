@@ -20,10 +20,7 @@
 #include "../BalanceAdjustmentType.h"
 #include "ApiCommand.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
+namespace exchange::core::common::api {
 
 /**
  * ApiAdjustUserBalance - adjust user balance
@@ -48,7 +45,4 @@ public:
     , adjustmentType(adjustmentType) {}
 };
 
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api

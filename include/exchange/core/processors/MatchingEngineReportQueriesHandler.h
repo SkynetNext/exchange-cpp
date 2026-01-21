@@ -24,9 +24,7 @@
 #include "../utils/Logger.h"
 #include "MatchingEngineRouter.h"
 
-namespace exchange {
-namespace core {
-namespace processors {
+namespace exchange::core::processors {
 
 /**
  * MatchingEngineReportQueriesHandler - adapter to connect
@@ -57,6 +55,4 @@ private:
   MatchingEngineRouter* matchingEngine_;
 };
 
-}  // namespace processors
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::processors

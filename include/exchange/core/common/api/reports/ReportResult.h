@@ -16,11 +16,7 @@
 
 #pragma once
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
-namespace reports {
+namespace exchange::core::common::api::reports {
 
 /**
  * ReportResult - reports result interface
@@ -30,8 +26,4 @@ public:
   virtual ~ReportResult() = default;
 };
 
-}  // namespace reports
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api::reports

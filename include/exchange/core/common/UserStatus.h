@@ -20,9 +20,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 enum class UserStatus : uint8_t {
   ACTIVE = 0,    // normal user
@@ -44,6 +42,4 @@ inline uint8_t UserStatusToCode(UserStatus status) {
   return static_cast<uint8_t>(status);
 }
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

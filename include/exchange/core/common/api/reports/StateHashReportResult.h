@@ -22,14 +22,11 @@
 #include <vector>
 #include "ReportResult.h"
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 class BytesIn;
 class BytesOut;
 
-namespace api {
-namespace reports {
+namespace api::reports {
 
 /**
  * StateHashReportResult - state hash report result
@@ -62,7 +59,7 @@ public:
     /**
      * Constructor from BytesIn (deserialization)
      */
-    SubmoduleKey(BytesIn& bytes);
+    explicit SubmoduleKey(BytesIn& bytes);
 
     bool operator<(const SubmoduleKey& other) const {
       if (submodule != other.submodule) {
@@ -102,8 +99,6 @@ public:
   static const StateHashReportResult EMPTY;
 };
 
-}  // namespace reports
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace api::reports
+
+}  // namespace exchange::core::common

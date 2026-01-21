@@ -24,16 +24,13 @@
 #include "ReportType.h"
 #include "TotalCurrencyBalanceReportResult.h"
 
-namespace exchange {
-namespace core {
+namespace exchange::core {
 namespace processors {
 class MatchingEngineRouter;
 class RiskEngine;
 }  // namespace processors
 
-namespace common {
-namespace api {
-namespace reports {
+namespace common::api::reports {
 
 /**
  * TotalCurrencyBalanceReportQuery - total currency balance report query
@@ -41,7 +38,7 @@ namespace reports {
  */
 class TotalCurrencyBalanceReportQuery : public ReportQuery<TotalCurrencyBalanceReportResult> {
 public:
-  TotalCurrencyBalanceReportQuery() {}
+  TotalCurrencyBalanceReportQuery() = default;
 
   explicit TotalCurrencyBalanceReportQuery(BytesIn& bytesIn) {
     // do nothing
@@ -65,8 +62,6 @@ public:
   void WriteMarshallable(BytesOut& bytes) const override;
 };
 
-}  // namespace reports
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace common::api::reports
+
+}  // namespace exchange::core

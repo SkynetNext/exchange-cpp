@@ -19,10 +19,7 @@
 #include <cstdint>
 #include "ApiCommand.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
+namespace exchange::core::common::api {
 
 /**
  * ApiOrderBookRequest - request order book snapshot
@@ -35,7 +32,4 @@ public:
   ApiOrderBookRequest(int32_t symbol, int32_t size) : symbol(symbol), size(size) {}
 };
 
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api

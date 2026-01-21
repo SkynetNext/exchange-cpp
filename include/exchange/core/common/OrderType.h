@@ -20,9 +20,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 enum class OrderType : uint8_t {
   // Good till Cancel - equivalent to regular limit order
@@ -58,6 +56,4 @@ inline uint8_t OrderTypeToCode(OrderType type) {
   return static_cast<uint8_t>(type);
 }
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

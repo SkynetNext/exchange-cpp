@@ -22,11 +22,7 @@
 #include "BinaryCommandType.h"
 #include "BinaryDataCommand.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
-namespace binary {
+namespace exchange::core::common::api::binary {
 
 /**
  * BatchAddAccountsCommand - batch add accounts command
@@ -51,8 +47,4 @@ public:
   void WriteMarshallable(BytesOut& bytes) const override;
 };
 
-}  // namespace binary
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api::binary

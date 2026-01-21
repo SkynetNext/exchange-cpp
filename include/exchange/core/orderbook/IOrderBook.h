@@ -27,8 +27,7 @@
 #include "../common/cmd/CommandResultCode.h"
 #include "../common/cmd/OrderCommand.h"
 
-namespace exchange {
-namespace core {
+namespace exchange::core {
 namespace common {
 class CoreSymbolSpecification;
 class BytesIn;
@@ -39,11 +38,9 @@ class LoggingConfiguration;
 }
 }  // namespace common
 
-namespace collections {
-namespace objpool {
+namespace collections::objpool {
 class ObjectsPool;
 }
-}  // namespace collections
 
 namespace orderbook {
 
@@ -192,5 +189,4 @@ public:
 };
 
 }  // namespace orderbook
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core

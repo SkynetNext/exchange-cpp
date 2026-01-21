@@ -17,8 +17,8 @@
 #pragma once
 
 #include <exchange/core/collections/objpool/ObjectsPool.h>
+#include <array>
 #include <cstdint>
-#include <cstring>
 #include <list>
 #include <stdexcept>
 #include <string>
@@ -26,10 +26,7 @@
 #include "IArtNode.h"
 #include "LongObjConsumer.h"
 
-namespace exchange {
-namespace core {
-namespace collections {
-namespace art {
+namespace exchange::core::collections::art {
 
 // Forward declarations
 template <typename V>
@@ -54,11 +51,8 @@ public:
 
   explicit ArtNode256(::exchange::core::collections::objpool::ObjectsPool* objectsPool)
     : IArtNode<V>(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_256)
-    , objectsPool_(objectsPool)
-    , nodeKey_(0)
-    , nodeLevel_(0)
-    , numChildren_(0) {
-    std::memset(nodes_, 0, sizeof(nodes_));
+    , objectsPool_(objectsPool) {
+    nodes_.fill(nullptr);
   }
 
   V* GetValue(int64_t key, int level) override {
@@ -93,11 +87,11 @@ public:
   friend class ArtNode48;
 
 private:
-  void* nodes_[256];
+  std::array<void*, 256> nodes_{};
   ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;
-  int64_t nodeKey_;
-  int nodeLevel_;
-  int16_t numChildren_;
+  int64_t nodeKey_ = 0;
+  int nodeLevel_ = 0;
+  int16_t numChildren_ = 0;
 
   std::vector<int16_t> CreateKeysArray() {
     std::vector<int16_t> keys;
@@ -113,7 +107,7 @@ private:
 
 template <typename V>
 void ArtNode256<V>::InitFromNode48(ArtNode48<V>* node48, int16_t subKey, void* newElement) {
-  std::memset(nodes_, 0, sizeof(nodes_));
+  nodes_.fill(nullptr);
   nodeLevel_ = node48->nodeLevel_;
   nodeKey_ = node48->nodeKey_;
   numChildren_ = node48->numChildren_ + 1;
@@ -314,7 +308,4 @@ std::list<std::pair<int64_t, V*>> ArtNode256<V>::Entries() {
   return list;
 }
 
-}  // namespace art
-}  // namespace collections
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::collections::art

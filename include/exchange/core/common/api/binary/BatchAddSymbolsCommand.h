@@ -24,11 +24,7 @@
 #include "BinaryCommandType.h"
 #include "BinaryDataCommand.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
-namespace binary {
+namespace exchange::core::common::api::binary {
 
 /**
  * BatchAddSymbolsCommand - batch add symbols command
@@ -38,7 +34,7 @@ public:
   // symbol ID -> CoreSymbolSpecification
   ankerl::unordered_dense::map<int32_t, const CoreSymbolSpecification*> symbols;
 
-  BatchAddSymbolsCommand(
+  explicit BatchAddSymbolsCommand(
     const ankerl::unordered_dense::map<int32_t, const CoreSymbolSpecification*>& symbols)
     : symbols(symbols) {}
 
@@ -48,7 +44,7 @@ public:
     }
   }
 
-  BatchAddSymbolsCommand(const std::vector<const CoreSymbolSpecification*>& collection) {
+  explicit BatchAddSymbolsCommand(const std::vector<const CoreSymbolSpecification*>& collection) {
     for (const auto* spec : collection) {
       if (spec != nullptr) {
         symbols[spec->symbolId] = spec;
@@ -65,8 +61,4 @@ public:
   void WriteMarshallable(BytesOut& bytes) const override;
 };
 
-}  // namespace binary
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api::binary

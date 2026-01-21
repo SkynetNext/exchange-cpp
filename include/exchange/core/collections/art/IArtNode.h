@@ -20,9 +20,7 @@
 #include <list>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace collections {
+namespace exchange::core::collections {
 namespace objpool {
 class ObjectsPool;
 }  // namespace objpool
@@ -158,6 +156,4 @@ protected:
 };
 
 }  // namespace art
-}  // namespace collections
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::collections

@@ -19,10 +19,7 @@
 #include <cstdint>
 #include "ApiCommand.h"
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
+namespace exchange::core::common::api {
 
 /**
  * ApiMoveOrder - move (update price) of an existing order
@@ -38,7 +35,4 @@ public:
     : orderId(orderId), newPrice(newPrice), uid(uid), symbol(symbol) {}
 };
 
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api

@@ -16,10 +16,7 @@
 
 #pragma once
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace config {
+namespace exchange::core::common::config {
 
 /**
  * ReportsQueriesConfiguration - reports and queries configuration
@@ -27,14 +24,11 @@ namespace config {
  */
 class ReportsQueriesConfiguration {
 public:
-  ReportsQueriesConfiguration() {}
+  ReportsQueriesConfiguration() = default;
 
   static ReportsQueriesConfiguration Default() {
     return ReportsQueriesConfiguration();
   }
 };
 
-}  // namespace config
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::config

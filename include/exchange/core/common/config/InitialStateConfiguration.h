@@ -20,10 +20,7 @@
 #include <limits>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace config {
+namespace exchange::core::common::config {
 
 /**
  * InitialStateConfiguration - exchange initialization configuration
@@ -102,7 +99,4 @@ public:
   }
 };
 
-}  // namespace config
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::config

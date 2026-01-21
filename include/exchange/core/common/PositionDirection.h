@@ -21,9 +21,7 @@
 #include <string>
 #include "OrderAction.h"
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 enum class PositionDirection : int8_t { LONG = 1, SHORT = -1, EMPTY = 0 };
 
@@ -58,6 +56,4 @@ inline bool IsSameAsAction(PositionDirection direction, OrderAction action) {
          || (direction == PositionDirection::SHORT && action == OrderAction::ASK);
 }
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

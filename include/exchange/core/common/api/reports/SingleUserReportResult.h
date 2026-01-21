@@ -25,20 +25,12 @@
 #include "../../UserStatus.h"
 #include "ReportResult.h"
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 class BytesIn;
 class BytesOut;
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common
 
-namespace exchange {
-namespace core {
-namespace common {
-namespace api {
-namespace reports {
+namespace exchange::core::common::api::reports {
 
 /**
  * SingleUserReportResult - single user report result
@@ -84,7 +76,7 @@ public:
     /**
      * Constructor from BytesIn (deserialization)
      */
-    Position(BytesIn& bytes);
+    explicit Position(BytesIn& bytes);
 
     // Serialization method (not inheriting WriteBytesMarshallable)
     void WriteMarshallable(BytesOut& bytes) const;
@@ -137,8 +129,4 @@ public:
   void WriteMarshallable(BytesOut& bytes) const;
 };
 
-}  // namespace reports
-}  // namespace api
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common::api::reports

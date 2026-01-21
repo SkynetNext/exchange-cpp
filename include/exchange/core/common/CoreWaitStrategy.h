@@ -18,9 +18,7 @@
 
 #include <cstdint>
 
-namespace exchange {
-namespace core {
-namespace common {
+namespace exchange::core::common {
 
 /**
  * Wait strategy types for Disruptor
@@ -45,6 +43,4 @@ inline bool IsNoWait(CoreWaitStrategy strategy) {
   return strategy == CoreWaitStrategy::SECOND_STEP_NO_WAIT;
 }
 
-}  // namespace common
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::common

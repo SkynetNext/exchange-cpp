@@ -21,9 +21,7 @@
 #include "../common/cmd/OrderCommand.h"
 #include "../common/cmd/OrderCommandType.h"
 
-namespace exchange {
-namespace core {
-namespace processors {
+namespace exchange::core::processors {
 
 /**
  * ResultsHandler - handles results from the pipeline
@@ -33,7 +31,7 @@ public:
   using ResultsConsumer = std::function<void(common::cmd::OrderCommand*, int64_t)>;
 
   explicit ResultsHandler(ResultsConsumer resultsConsumer)
-    : resultsConsumer_(std::move(resultsConsumer)), processingEnabled_(true) {}
+    : resultsConsumer_(std::move(resultsConsumer)) {}
 
   void OnEvent(common::cmd::OrderCommand* cmd, int64_t sequence, bool endOfBatch) {
     if (cmd->command == common::cmd::OrderCommandType::GROUPING_CONTROL) {
@@ -47,9 +45,7 @@ public:
 
 private:
   ResultsConsumer resultsConsumer_;
-  bool processingEnabled_;
+  bool processingEnabled_ = true;
 };
 
-}  // namespace processors
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::processors

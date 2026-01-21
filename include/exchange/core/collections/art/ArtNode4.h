@@ -18,6 +18,7 @@
 
 #include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <list>
@@ -26,10 +27,7 @@
 #include "IArtNode.h"
 #include "LongObjConsumer.h"
 
-namespace exchange {
-namespace core {
-namespace collections {
-namespace art {
+namespace exchange::core::collections::art {
 
 // Forward declarations
 template <typename V>
@@ -50,12 +48,9 @@ class ArtNode4 : public IArtNode<V> {
 public:
   explicit ArtNode4(::exchange::core::collections::objpool::ObjectsPool* objectsPool)
     : IArtNode<V>(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4)
-    , objectsPool_(objectsPool)
-    , nodeKey_(0)
-    , nodeLevel_(0)
-    , numChildren_(0) {
-    std::memset(keys_, 0, sizeof(keys_));
-    std::memset(nodes_, 0, sizeof(nodes_));
+    , objectsPool_(objectsPool) {
+    keys_.fill(0);
+    nodes_.fill(nullptr);
   }
 
   V* GetValue(int64_t key, int level) override {
@@ -90,8 +85,8 @@ public:
   }
 
   void InitFirstKey(int64_t key, V* value) {
-    std::memset(keys_, 0, sizeof(keys_));
-    std::memset(nodes_, 0, sizeof(nodes_));
+    keys_.fill(0);
+    nodes_.fill(nullptr);
     numChildren_ = 1;
     keys_[0] = static_cast<int16_t>(key & 0xFF);
     nodes_[0] = value;
@@ -100,8 +95,8 @@ public:
   }
 
   void InitTwoKeys(int64_t key1, void* value1, int64_t key2, void* value2, int level) {
-    std::memset(keys_, 0, sizeof(keys_));
-    std::memset(nodes_, 0, sizeof(nodes_));
+    keys_.fill(0);
+    nodes_.fill(nullptr);
     numChildren_ = 2;
     const int16_t idx1 = static_cast<int16_t>((key1 >> level) & 0xFF);
     const int16_t idx2 = static_cast<int16_t>((key2 >> level) & 0xFF);
@@ -121,11 +116,11 @@ public:
   }
 
   void InitFromNode16(ArtNode16<V>* node16) {
-    std::memset(keys_, 0, sizeof(keys_));
-    std::memset(nodes_, 0, sizeof(nodes_));
+    keys_.fill(0);
+    nodes_.fill(nullptr);
     numChildren_ = node16->numChildren_;
-    std::memcpy(keys_, node16->keys_, numChildren_ * sizeof(int16_t));
-    std::memcpy(nodes_, node16->nodes_, numChildren_ * sizeof(void*));
+    std::copy_n(node16->keys_.begin(), numChildren_, keys_.begin());
+    std::copy_n(node16->nodes_.begin(), numChildren_, nodes_.begin());
     nodeLevel_ = node16->nodeLevel_;
     nodeKey_ = node16->nodeKey_;
     for (int i = numChildren_; i < 4; i++)
@@ -137,18 +132,19 @@ public:
   friend class ArtNode16;
 
 private:
-  int16_t keys_[4];
-  void* nodes_[4];
+  std::array<int16_t, 4> keys_{};
+  std::array<void*, 4> nodes_{};
   ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;
-  int64_t nodeKey_;
-  int nodeLevel_;
-  uint8_t numChildren_;
+  int64_t nodeKey_ = 0;
+  int nodeLevel_ = 0;
+  uint8_t numChildren_ = 0;
 
   void RemoveElementAtPos(int pos) {
     const int copyLength = numChildren_ - (pos + 1);
     if (copyLength > 0) {
-      std::memmove(keys_ + pos, keys_ + pos + 1, copyLength * sizeof(int16_t));
-      std::memmove(nodes_ + pos, nodes_ + pos + 1, copyLength * sizeof(void*));
+      std::move(keys_.begin() + pos + 1, keys_.begin() + pos + 1 + copyLength, keys_.begin() + pos);
+      std::move(nodes_.begin() + pos + 1, nodes_.begin() + pos + 1 + copyLength,
+                nodes_.begin() + pos);
     }
     numChildren_--;
     nodes_[numChildren_] = nullptr;
@@ -186,8 +182,10 @@ IArtNode<V>* ArtNode4<V>::Put(int64_t key, int level, V* value) {
   if (numChildren_ < 4) {
     const int copyLength = numChildren_ - pos;
     if (copyLength > 0) {
-      std::memmove(keys_ + pos + 1, keys_ + pos, copyLength * sizeof(int16_t));
-      std::memmove(nodes_ + pos + 1, nodes_ + pos, copyLength * sizeof(void*));
+      std::move_backward(keys_.begin() + pos, keys_.begin() + pos + copyLength,
+                         keys_.begin() + pos + copyLength + 1);
+      std::move_backward(nodes_.begin() + pos, nodes_.begin() + pos + copyLength,
+                         nodes_.begin() + pos + copyLength + 1);
     }
     keys_[pos] = nodeIndex;
     if (nodeLevel_ == 0)
@@ -395,7 +393,4 @@ std::list<std::pair<int64_t, V*>> ArtNode4<V>::Entries() {
   return list;
 }
 
-}  // namespace art
-}  // namespace collections
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::collections::art
