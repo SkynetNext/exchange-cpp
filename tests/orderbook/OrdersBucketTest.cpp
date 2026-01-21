@@ -197,13 +197,17 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders) {
   std::vector<Order*> orders1(orders.begin(), orders.begin() + 80);
   std::set<int64_t> removedOrderIds;
 
+  // Collect all orderIds from orders1 BEFORE deletion to avoid accessing freed memory
+  for (auto* order : orders1) {
+    removedOrderIds.insert(order->orderId);
+  }
+
   for (auto* order : orders1) {
     int64_t orderId = order->orderId;  // Save orderId before removal
     auto removed = bucket_->Remove(orderId, UID_2);
     ASSERT_NE(removed, nullptr);
     int64_t orderSize = removed->size;
     delete removed;
-    removedOrderIds.insert(orderId);  // Use saved orderId instead of order->orderId
     expectedNumOrders--;
     expectedVolume -= orderSize;
     ASSERT_EQ(bucket_->GetNumOrders(), expectedNumOrders);

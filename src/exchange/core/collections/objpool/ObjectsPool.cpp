@@ -26,14 +26,16 @@ ObjectsPool* ObjectsPool::CreateDefaultTestPool() {
   // Increased capacities for tests that create many objects:
   // - SequentialAsksTest creates ~2000 orders
   // - MultipleCommandsCompareTest processes 100,000 transactions (needs large DIRECT_ORDER pool)
+  //   Peak usage can be high as orders are created and matched/removed throughout the test
   // - ShouldLoadManyItems creates 100,000 ART entries (needs many nodes)
+  //   During insertion, nodes split frequently, requiring more nodes than final count
   // Note: Objects are reused during test execution, but peak usage can exceed these values
-  config[DIRECT_ORDER] = 16384;  // Increased from 4096 (for 100K transaction test)
+  config[DIRECT_ORDER] = 32768;  // Increased from 16384 (for 100K transaction test with peak usage)
   config[DIRECT_BUCKET] = 4096;  // Increased from 2048
-  config[ART_NODE_4] = 32768;    // Increased from 8192 (for 100K ART items)
-  config[ART_NODE_16] = 16384;   // Increased from 4096
-  config[ART_NODE_48] = 8192;    // Increased from 2048
-  config[ART_NODE_256] = 4096;   // Increased from 1024
+  config[ART_NODE_4] = 131072;   // Increased from 32768 (for 100K ART items with splits)
+  config[ART_NODE_16] = 65536;   // Increased from 16384
+  config[ART_NODE_48] = 32768;   // Increased from 8192
+  config[ART_NODE_256] = 16384;  // Increased from 4096
   return new ObjectsPool(config);
 }
 
