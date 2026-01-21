@@ -315,6 +315,8 @@ if(BUILD_TESTING AND GTest_FOUND)
             GTest::gmock
     )
     add_test(NAME ITExchangeCoreIntegrationRejectionBasic COMMAND test_integration_rejection_basic)
+    # These tests process many transactions and run slower under TSan
+    set_tests_properties(ITExchangeCoreIntegrationRejectionBasic PROPERTIES TIMEOUT 600)
     list(APPEND ALL_TEST_TARGETS test_integration_rejection_basic)
 
     # ITExchangeCoreIntegrationRejectionLatency
@@ -363,6 +365,8 @@ if(BUILD_TESTING AND GTest_FOUND)
             GTest::gtest_main
     )
     add_test(NAME ITExchangeCoreIntegrationStressLatency COMMAND test_integration_stress_latency)
+    # These tests process many transactions and run slower under TSan
+    set_tests_properties(ITExchangeCoreIntegrationStressLatency PROPERTIES TIMEOUT 600)
     list(APPEND ALL_TEST_TARGETS test_integration_stress_latency)
 
     # ITMultiOperation
@@ -377,6 +381,8 @@ if(BUILD_TESTING AND GTest_FOUND)
             GTest::gtest_main
     )
     add_test(NAME ITMultiOperation COMMAND test_integration_multi_operation)
+    # These tests process 1M transactions and run significantly slower under TSan
+    set_tests_properties(ITMultiOperation PROPERTIES TIMEOUT 900)
     list(APPEND ALL_TEST_TARGETS test_integration_multi_operation)
 
     # ============================================================================

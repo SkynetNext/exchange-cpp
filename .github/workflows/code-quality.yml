@@ -223,7 +223,9 @@ jobs:
           TSAN_OPTIONS: "halt_on_error=1:history_size=7"
         run: |
           cd build
-          ctest --output-on-failure -E "Perf.*" --parallel 2 --timeout 300
+          # Use longer timeout for TSan tests (they run slower due to instrumentation)
+          # Individual test timeouts are set in CMakeLists.txt for long-running tests
+          ctest --output-on-failure -E "Perf.*" --parallel 2 --timeout 1000
 
   # Static Analysis: clang-tidy
   static-analysis:
@@ -535,8 +537,8 @@ jobs:
             -DBUILD_BENCHMARKS=OFF
             -DBUILD_EXAMPLES=ON
             -DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=OFF
-            -DCMAKE_CXX_FLAGS="--coverage -g -O0"
-            -DCMAKE_C_FLAGS="--coverage -g -O0"
+            -DCMAKE_CXX_FLAGS="--coverage -g -O0 -fprofile-update=atomic"
+            -DCMAKE_C_FLAGS="--coverage -g -O0 -fprofile-update=atomic"
             -DCMAKE_EXE_LINKER_FLAGS="--coverage"
           )
           cmake "${CMAKE_ARGS[@]}"
@@ -567,9 +569,10 @@ jobs:
           # Collect coverage data using geninfo directly for better error control
           # --ignore-errors mismatch: Ignore line number mismatches (common with modern GCC/Clang)
           # --ignore-errors gcov: Ignore gcov parsing warnings (unexecuted blocks, etc.)
-          # --ignore-errors negative: Ignore negative counts (can occur with multi-threaded code)
+          # --ignore-errors negative: Ignore negative counts (should be fixed by -fprofile-update=atomic, but keep for safety)
+          # --ignore-errors source: Ignore missing source file errors (third-party headers, etc.)
           geninfo . --output-filename coverage.info --gcov-tool "$GCOV_TOOL" \
-            --ignore-errors mismatch,gcov,negative || {
+            --ignore-errors mismatch,gcov,negative,source || {
             echo "::warning::Some coverage data collection warnings occurred, but continuing..."
             # If geninfo fails completely, try to continue with partial data
             if [ ! -f coverage.info ]; then
@@ -577,8 +580,20 @@ jobs:
               exit 1
             fi
           }
+          # Check if coverage.info has any valid data
+          if [ -f coverage.info ] && [ -s coverage.info ]; then
+            # Check if file contains actual coverage data (not just headers)
+            if grep -q "^SF:" coverage.info && grep -q "^DA:" coverage.info; then
+              echo "✓ Coverage data collected successfully"
+            else
+              echo "::warning::Coverage file exists but contains no valid coverage records"
+            fi
+          else
+            echo "::error::Coverage file is empty or missing after geninfo"
+            exit 1
+          fi
           # Remove coverage for third-party code, reference code, and test files
-          # --ignore-errors empty: Allow empty records (if all data is filtered out)
+          # --ignore-errors empty,unused: Allow empty records and unused patterns
           lcov --remove coverage.info \
             '*/third_party/*' \
             '*/reference/*' \
@@ -587,13 +602,18 @@ jobs:
             '*/examples/*' \
             '*/benchmarks/*' \
             --output-file coverage.info \
-            --ignore-errors empty || {
-            echo "::warning::Coverage filtering produced empty results, but continuing..."
+            --ignore-errors empty,unused || {
+            echo "::warning::Coverage filtering produced warnings, but continuing..."
             # Check if file exists and has some content
             if [ -f coverage.info ] && [ -s coverage.info ]; then
-              echo "Coverage file exists with content, continuing..."
+              # Verify it still has coverage data after filtering
+              if grep -q "^SF:" coverage.info && grep -q "^DA:" coverage.info; then
+                echo "✓ Coverage file filtered successfully"
+              else
+                echo "::warning::Coverage file exists but contains no valid records after filtering"
+              fi
             else
-              echo "::warning::Coverage file is empty or missing, but not failing the build"
+              echo "::warning::Coverage file is empty or missing after filtering"
             fi
           }
           # Generate HTML report (ignore errors if file is empty)
