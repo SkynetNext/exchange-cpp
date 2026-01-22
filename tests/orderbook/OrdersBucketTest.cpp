@@ -18,8 +18,6 @@
 #include <exchange/core/common/MatcherTradeEvent.h>
 #include <algorithm>
 #include <random>
-#include <set>
-#include <unordered_map>
 
 using namespace exchange::core::common;
 using namespace exchange::core::common::cmd;
@@ -72,11 +70,9 @@ void OrdersBucketTest::SetUp() {
 }
 
 void OrdersBucketTest::TearDown() {
-  // Clean up orders
-  auto orders = bucket_->GetAllOrders();
-  for (auto* order : orders) {
-    delete order;
-  }
+  // OrdersBucket::~OrdersBucket() is responsible for deleting all orders
+  // it contains, so we only need to reset the bucket here.
+  // DO NOT manually delete orders - that causes double-free!
   bucket_.reset();
   eventsHelper_.reset();
 }
@@ -195,24 +191,10 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders) {
   std::mt19937 rng(1);
   std::shuffle(orders.begin(), orders.end(), rng);
 
-  std::vector<Order*> orders1(orders.begin(), orders.begin() + 80);
-  std::set<int64_t> removedOrderIds;
-
-  // CRITICAL: Save all orderIds BEFORE any deletion to avoid accessing freed memory
-  // Map order pointer to orderId for safe cleanup later
-  std::unordered_map<Order*, int64_t> orderToIdMap;
-  for (auto* order : orders) {
-    orderToIdMap[order] = order->orderId;
-  }
-
-  // Collect orderIds from orders1 that will be removed
-  for (auto* order : orders1) {
-    removedOrderIds.insert(orderToIdMap[order]);
-  }
-
-  for (auto* order : orders1) {
-    int64_t orderId = orderToIdMap[order];  // Use saved orderId, not order->orderId
-    auto removed = bucket_->Remove(orderId, UID_2);
+  // Remove first 80 orders
+  for (int i = 0; i < 80; i++) {
+    Order* order = orders[i];
+    auto removed = bucket_->Remove(order->orderId, UID_2);
     ASSERT_NE(removed, nullptr);
     int64_t orderSize = removed->size;
     delete removed;
@@ -231,14 +213,10 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders) {
   ASSERT_EQ(bucket_->GetNumOrders(), 0);
   ASSERT_EQ(bucket_->GetTotalVolume(), 0L);
 
-  // Clean up remaining orders (those that were matched, not removed)
-  // Use saved orderId from map instead of accessing order->orderId (which may be freed)
-  for (auto* order : orders) {
-    int64_t orderId = orderToIdMap[order];  // Use saved orderId, never access order->orderId
-    if (removedOrderIds.find(orderId) == removedOrderIds.end()) {
-      delete order;
-    }
-  }
+  // NOTE: Orders that were fully matched are already deleted by Match().
+  // Orders that were removed via Remove() were already deleted above.
+  // Orders still in bucket (partially matched) will be deleted by TearDown().
+  // DO NOT manually delete any orders here - it causes double-free!
 }
 
 TEST_F(OrdersBucketTest, ShouldMatchAllOrders2) {
@@ -266,26 +244,16 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders2) {
     ASSERT_EQ(bucket_->GetNumOrders(), expectedNumOrders);
     ASSERT_EQ(bucket_->GetTotalVolume(), expectedVolume);
 
-    // CRITICAL: Save all orderIds BEFORE any deletion to avoid accessing freed memory
-    // Map order pointer to orderId for safe cleanup later
-    std::unordered_map<Order*, int64_t> orderToIdMap;
-    for (auto* order : orders) {
-      orderToIdMap[order] = order->orderId;
-    }
-
     std::mt19937 rng(1);
     std::shuffle(orders.begin(), orders.end(), rng);
 
-    std::vector<Order*> orders1(orders.begin(), orders.begin() + 900);
-    std::set<int64_t> removedOrderIds;
-
-    for (auto* order : orders1) {
-      int64_t orderId = orderToIdMap[order];  // Use saved orderId, not order->orderId
-      auto removed = bucket_->Remove(orderId, UID_2);
+    // Remove first 900 orders
+    for (int i = 0; i < 900; i++) {
+      Order* order = orders[i];
+      auto removed = bucket_->Remove(order->orderId, UID_2);
       ASSERT_NE(removed, nullptr);
       int64_t orderSize = removed->size;
       delete removed;
-      removedOrderIds.insert(orderId);  // Use saved orderId instead of order->orderId
       expectedNumOrders--;
       expectedVolume -= orderSize;
       ASSERT_EQ(bucket_->GetNumOrders(), expectedNumOrders);
@@ -307,34 +275,10 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders2) {
 
     bucket_->Validate();
 
-    // Track orders that were matched and removed from bucket
-    std::set<int64_t> matchedOrderIds(matcherResult.ordersToRemove.begin(),
-                                      matcherResult.ordersToRemove.end());
-
-    // Get orders still in bucket - these will be cleaned up by TearDown()
-    auto remainingOrders = bucket_->GetAllOrders();
-    std::set<int64_t> remainingOrderIds;
-    for (auto* order : remainingOrders) {
-      remainingOrderIds.insert(order->orderId);
-    }
-
-    // Clean up: only delete orders that were matched (removed from bucket) or
-    // already deleted via Remove(). Orders still in bucket are left for
-    // TearDown() to clean up to avoid modifying bucket state.
-    // Use saved orderId from map instead of accessing order->orderId (which may be freed)
-    for (auto* order : orders) {
-      int64_t orderId = orderToIdMap[order];  // Use saved orderId, never access order->orderId
-      if (removedOrderIds.find(orderId) != removedOrderIds.end()) {
-        // Already deleted via Remove(), skip
-        continue;
-      }
-      if (matchedOrderIds.find(orderId) != matchedOrderIds.end()) {
-        // Matched and removed from bucket - safe to delete
-        delete order;
-      }
-      // Orders still in bucket are left for TearDown() - don't delete them here
-      // to avoid modifying bucket state and affecting expectedNumOrders
-    }
+    // NOTE: Orders that were fully matched are already deleted by Match().
+    // Orders that were removed via Remove() were already deleted above.
+    // Orders still in bucket (partially matched) will be deleted by TearDown().
+    // DO NOT manually delete any orders here - it causes double-free!
   }
 
   auto triggerOrd = OrderCommand::Update(1238729387, UID_9, 1000);
