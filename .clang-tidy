@@ -107,8 +107,3 @@ CheckOptions:
     value: 1
   - key: performance-inefficient-vector-operation.VectorLikeClasses
     value: "::std::vector;::std::basic_string"
-
-ExtraArgs:
-  # b/382774818: disable unknown pragma warnings until we can figure out why
-  # unknown pragmas are being warned about.
-  - -Wno-unknown-pragmas
