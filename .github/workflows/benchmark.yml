@@ -1,0 +1,81 @@
+name: Benchmark
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    name: Run ART Benchmark
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Update disruptor-cpp to latest main
+        run: |
+          cd third_party/disruptor-cpp || exit 1
+          git fetch origin main || echo "Warning: Failed to fetch disruptor-cpp"
+          git checkout main || echo "Warning: Failed to checkout main"
+          git pull origin main || echo "Warning: Failed to pull latest changes"
+          git log -1 --oneline
+
+      - name: Setup GCC
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-14 g++-14
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
+          gcc --version
+          g++ --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            ninja-build \
+            liblz4-dev \
+            libpthread-stubs0-dev
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: "3.30"
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_CXX_COMPILER=g++ \
+            -DBUILD_TESTING=OFF \
+            -DBUILD_BENCHMARKS=ON \
+            -DBUILD_EXAMPLES=OFF
+
+      - name: Build benchmarks
+        run: cmake --build build --config Release --target PerfLongAdaptiveRadixTreeMap --parallel 2
+
+      - name: Run ART benchmark
+        run: |
+          echo "=== Running LongAdaptiveRadixTreeMap Benchmark ==="
+          ./build/benchmarks/PerfLongAdaptiveRadixTreeMap \
+            --benchmark_format=console \
+            --benchmark_counters_tabular=true
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            build/benchmarks/*.json
+          if-no-files-found: ignore

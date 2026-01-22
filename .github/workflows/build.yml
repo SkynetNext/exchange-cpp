@@ -1,4 +1,4 @@
-name: CI
+name: Build
 
 on:
   push:
@@ -84,7 +84,7 @@ jobs:
         uses: jwlawson/actions-setup-cmake@v2
         with:
           # CMake 3.30+ required for full cxx_std_26 support
-          cmake-version: '3.30'
+          cmake-version: "3.30"
 
       - name: Configure CMake
         shell: bash
