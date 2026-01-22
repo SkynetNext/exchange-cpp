@@ -269,34 +269,34 @@ void onOrderResult(OrderCommand* cmd) {
 
 **收包→转发到Ring Buffer（不含写数据）的业界典型时延（单向），按方案从高到低：**
 
-**epoll(10~50μs) > io_uring(3~15μs) > DPDK(0.5~5μs) > FPGA(20~500ns)**
+**epoll(10 ~ 50μs) > io_uring(3 ~ 15μs) > DPDK(0.5 ~ 5μs) > FPGA(20 ~ 500ns)**
 
 ### 各方案典型时延对比表
 
 | 方案 | 典型值（单向） | 极致优化值（单向） | 纯转发路径（单向） | 瓶颈因素 | 备注 |
 |------|--------|-----------|-----------|---------|------|
-| **epoll** | 10~50μs | 5~20μs | - | 内核协议栈、系统调用、上下文切换、调度抖动 | 很难低于 5μs，破 1μs 几乎不可能 |
-| **io_uring** | 3~15μs | 2~8μs | - | 内核态操作、内存拷贝（零拷贝可优化） | 减少上下文切换，但破 1μs 依然极难 |
-| **DPDK** | 0.5~5μs | 0.3~2μs | 0.5~2μs | PCIe DMA、用户态指令开销 | 绕开内核，UIO/PMD+大页+绑核，1μs 是多数场景下限；数据为单向收包延迟 |
-| **FPGA** | 20~500ns | 20~100ns (片上) | 100~300ns (PCIe DMA) | 硬件时钟周期、PCIe 链路延迟 | 无软件开销，延迟确定性极高；PCIe DMA 往返延迟约 500~800ns（Gen3×8） |
+| **epoll** | 10 ~ 50μs | 5 ~ 20μs | - | 内核协议栈、系统调用、上下文切换、调度抖动 | 很难低于 5μs，破 1μs 几乎不可能 |
+| **io_uring** | 3 ~ 15μs | 2 ~ 8μs | - | 内核态操作、内存拷贝（零拷贝可优化） | 减少上下文切换，但破 1μs 依然极难 |
+| **DPDK** | 0.5 ~ 5μs | 0.3 ~ 2μs | 0.5 ~ 2μs | PCIe DMA、用户态指令开销 | 绕开内核，UIO/PMD+大页+绑核，1μs 是多数场景下限；数据为单向收包延迟 |
+| **FPGA** | 20 ~ 500ns | 20 ~ 100ns (片上) | 100 ~ 300ns (PCIe DMA) | 硬件时钟周期、PCIe 链路延迟 | 无软件开销，延迟确定性极高；PCIe DMA 往返延迟约 500 ~ 800ns（Gen3×8） |
 
 ### 详细说明
 
 #### 1. epoll（Linux 标准异步 I/O）
 
-- **典型场景**：10~50μs
-- **极致优化**（绑核/关中断/大页）：5~20μs
+- **典型场景**：10 ~ 50μs
+- **极致优化**（绑核/关中断/大页）：5 ~ 20μs
 - **瓶颈**：
   - 内核协议栈处理开销
   - 系统调用上下文切换（~0.67μs 直接开销）
-  - 调度抖动和缓存失效（总开销可达 3.3~333μs）
+  - 调度抖动和缓存失效（总开销可达 3.3 ~ 333μs）
   - 内存拷贝（零拷贝可部分缓解）
 - **限制**：很难低于 5μs，破 1μs 几乎不可能
 
 #### 2. io_uring（Linux 5.1+ 异步 I/O）
 
-- **典型场景**：3~15μs
-- **极致优化**（SQPOLL/IOPOLL/零拷贝）：2~8μs
+- **典型场景**：3 ~ 15μs
+- **极致优化**（SQPOLL/IOPOLL/零拷贝）：2 ~ 8μs
 - **优势**：
   - 减少系统调用和上下文切换
   - 支持批处理提交
@@ -308,9 +308,9 @@ void onOrderResult(OrderCommand* cmd) {
 
 #### 3. DPDK（用户态网络栈）
 
-- **典型场景**：0.5~5μs
-- **极致优化**（专用核/大页/零拷贝/轮询）：0.3~2μs
-- **纯转发路径**：0.5~2μs
+- **典型场景**：0.5 ~ 5μs
+- **极致优化**（专用核/大页/零拷贝/轮询）：0.3 ~ 2μs
+- **纯转发路径**：0.5 ~ 2μs
 - **优势**：
   - 完全绕过内核协议栈
   - UIO/VFIO 直接访问网卡
@@ -318,28 +318,28 @@ void onOrderResult(OrderCommand* cmd) {
   - 大页内存减少 TLB miss
   - CPU 亲和性绑定
 - **瓶颈**：
-  - PCIe DMA 延迟（~500~800ns）
+  - PCIe DMA 延迟（~500 ~ 800ns）
   - 用户态指令开销
 - **限制**：1μs 是多数场景的下限，亚微秒级需要极简处理逻辑
 
 #### 4. FPGA（硬件加速）
 
-- **典型场景**：20~500ns
-- **片上 BRAM/URAM 实现**：20~100ns
+- **典型场景**：20 ~ 500ns
+- **片上 BRAM/URAM 实现**：20 ~ 100ns
   - 纯硬件无锁 Ring Buffer
   - 无 CPU 介入
   - 延迟仅几十纳秒
-- **PCIe DMA 直写主机内存**：100~300ns（**单向**）
+- **PCIe DMA 直写主机内存**：100 ~ 300ns（**单向**）
   - 通过 PCIe DMA 直写主机内存的 Disruptor Ring Buffer
   - 更新 Sequence 用硬件操作替代 CAS
   - 全程无 CPU 介入
-  - 注意：往返延迟（RTT）约为 200~600ns，取决于 PCIe 版本和配置
+  - 注意：往返延迟（RTT）约为 200 ~ 600ns，取决于 PCIe 版本和配置
 - **优势**：
   - 无软件开销
   - 延迟确定性极高
   - 可直写 Ring Buffer
 - **限制**：
-  - PCIe 链路延迟（Gen3×8 约 500~800ns 往返）
+  - PCIe 链路延迟（Gen3×8 约 500 ~ 800ns 往返）
   - 硬件成本高
 
 **开源实现参考**：
@@ -392,13 +392,13 @@ void onOrderResult(OrderCommand* cmd) {
   - 说明：这是 Host → FPGA → Host 的往返延迟（RTT），单向延迟约为 ~400-500ns（假设对称路径）
   - 注意：FPGA 的 822ns 往返延迟与 DPDK 的 0.3-0.8μs 单向延迟不在同一维度，FPGA 单向延迟约为 DPDK 的 50-60%
   
-- **io_uring 实测**：相比 epoll 可减少 30~50% 延迟（P99 尾延迟）
+- **io_uring 实测**：相比 epoll 可减少 30 ~ 50% 延迟（P99 尾延迟）
   - 来源：
     - [flashQ 基准测试](https://dev.to/egeominotti/iouring-how-flashq-achieves-kernel-level-async-io-performance-15d2) - P99 延迟降低 ~50%
     - [Alibaba Cloud io_uring 分析](https://www.alibabacloud.com/blog/io-uring-vs--epoll-which-is-better-in-network-programming_599544) - 高并发场景下吞吐量提升 ~10%
     - [Swoole 6.2 io_uring 升级](https://medium.com/@mariasocute/swoole-6-2-revolutionary-upgrade-iouring-replaces-epoll-asynchronous-io-performance-soars-to-3-c42ffd76eeba) - 平均延迟从 2.81ms 降至 1.36ms（约 50%）
   
-- **epoll 实测**：典型 HTTP 服务器延迟 200~700μs（包含应用处理），纯收包路径 10~50μs
+- **epoll 实测**：典型 HTTP 服务器延迟 200 ~ 700μs（包含应用处理），纯收包路径 10 ~ 50μs
   - 来源：[Linux Kernel vs DPDK HTTP Performance](https://talawah.io/blog/linux-kernel-vs-dpdk-http-performance-showdown/)
 
 ## 6.1 百万级连接支持
