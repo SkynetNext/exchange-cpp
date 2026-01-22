@@ -119,7 +119,7 @@ public:
                                   int nodeLevel,
                                   int64_t nodeKey,
                                   int numChildren,
-                                  std::function<int16_t(int)> getSubKey,
+                                  std::function<uint8_t(int)> getSubKey,
                                   std::function<void*(int)> getNode);
 
 private:
@@ -314,7 +314,7 @@ std::string LongAdaptiveRadixTreeMap<V>::PrintDiagram(const std::string& prefix,
                                                       int nodeLevel,
                                                       int64_t nodeKey,
                                                       int numChildren,
-                                                      std::function<int16_t(int)> getSubKey,
+                                                      std::function<uint8_t(int)> getSubKey,
                                                       std::function<void*(int)> getNode) {
   std::string baseKeyPrefix, baseKeyPrefix1;
   const int lvlDiff = level - nodeLevel;
@@ -333,10 +333,10 @@ std::string LongAdaptiveRadixTreeMap<V>::PrintDiagram(const std::string& prefix,
   std::ostringstream sb;
   for (int i = 0; i < numChildren; i++) {
     void* node = getNode(i);
-    int16_t subKey = getSubKey(i);
+    uint8_t subKey = getSubKey(i);
     std::ostringstream keyStream;
     keyStream << baseKeyPrefix << std::hex << std::uppercase << std::setfill('0') << std::setw(2)
-              << subKey;
+              << static_cast<int>(subKey);
     std::string key = keyStream.str();
     std::string x =
       (i == 0) ? (numChildren == 1 ? "──" : "┬─") : (prefix + (i + 1 == numChildren ? "└─" : "├─"));

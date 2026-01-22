@@ -61,7 +61,7 @@ public:
   V* GetValue(int64_t key, int level) override {
     if (level != nodeLevel_ && ((key ^ nodeKey_) & (-1LL << (nodeLevel_ + 8))) != 0)
       return nullptr;
-    const int16_t idx = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+    const uint8_t idx = static_cast<uint8_t>((key >> nodeLevel_) & 0xFF);
     const int8_t nodeIndex = indexes_[idx];
     if (nodeIndex != -1) {
       void* node = nodes_[nodeIndex];
@@ -86,7 +86,7 @@ public:
     return objectsPool_;
   }
 
-  void InitFromNode16(ArtNode16<V>* node16, int16_t subKey, void* newElement);
+  void InitFromNode16(ArtNode16<V>* node16, uint8_t subKey, void* newElement);
   void InitFromNode256(ArtNode256<V>* node256);
 
   template <typename U>
@@ -103,8 +103,8 @@ private:
   uint8_t numChildren_ = 0;
   int64_t freeBitMask_ = 0;
 
-  std::vector<int16_t> CreateKeysArray() {
-    std::vector<int16_t> keys;
+  std::vector<uint8_t> CreateKeysArray() {
+    std::vector<uint8_t> keys;
     keys.reserve(numChildren_);
     for (int i = 0; i < 256; i++)
       if (indexes_[i] != -1)
@@ -116,7 +116,7 @@ private:
 // --- Implementation ---
 
 template <typename V>
-void ArtNode48<V>::InitFromNode16(ArtNode16<V>* node16, int16_t subKey, void* newElement) {
+void ArtNode48<V>::InitFromNode16(ArtNode16<V>* node16, uint8_t subKey, void* newElement) {
   indexes_.fill(-1);
   nodes_.fill(nullptr);
   numChildren_ = node16->numChildren_ + 1;
@@ -156,7 +156,7 @@ IArtNode<V>* ArtNode48<V>::Put(int64_t key, int level, V* value) {
     if (branch)
       return branch;
   }
-  const int16_t subKey = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+  const uint8_t subKey = static_cast<uint8_t>((key >> nodeLevel_) & 0xFF);
   const int8_t pos = indexes_[subKey];
   if (pos != -1) {
     if (nodeLevel_ == 0)
@@ -209,7 +209,7 @@ template <typename V>
 IArtNode<V>* ArtNode48<V>::Remove(int64_t key, int level) {
   if (level != nodeLevel_ && ((key ^ nodeKey_) & (-1LL << (nodeLevel_ + 8))) != 0)
     return this;
-  const int16_t subKey = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+  const uint8_t subKey = static_cast<uint8_t>((key >> nodeLevel_) & 0xFF);
   const int8_t pos = indexes_[subKey];
   if (pos == -1)
     return this;
@@ -250,7 +250,7 @@ V* ArtNode48<V>::GetCeilingValue(int64_t key, int level) {
     if ((key & mask) != (nodeKey_ & mask))
       key = 0;
   }
-  int16_t subKey = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+  int subKey = static_cast<int>((key >> nodeLevel_) & 0xFF);
   for (; subKey < 256; subKey++) {
     int8_t pos = indexes_[subKey];
     if (pos != -1) {
@@ -274,7 +274,7 @@ V* ArtNode48<V>::GetFloorValue(int64_t key, int level) {
     if ((key & mask) != (nodeKey_ & mask))
       key = INT64_MAX;
   }
-  int16_t subKey = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+  int subKey = static_cast<int>((key >> nodeLevel_) & 0xFF);
   for (; subKey >= 0; subKey--) {
     int8_t pos = indexes_[subKey];
     if (pos != -1) {

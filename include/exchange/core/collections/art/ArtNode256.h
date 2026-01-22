@@ -58,7 +58,7 @@ public:
   V* GetValue(int64_t key, int level) override {
     if (level != nodeLevel_ && ((key ^ nodeKey_) & (-1LL << (nodeLevel_ + 8))) != 0)
       return nullptr;
-    const int16_t idx = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+    const uint8_t idx = static_cast<uint8_t>((key >> nodeLevel_) & 0xFF);
     void* node = nodes_[idx];
     if (node)
       return nodeLevel_ == 0 ? static_cast<V*>(node)
@@ -81,7 +81,7 @@ public:
     return objectsPool_;
   }
 
-  void InitFromNode48(ArtNode48<V>* node48, int16_t subKey, void* newElement);
+  void InitFromNode48(ArtNode48<V>* node48, uint8_t subKey, void* newElement);
 
   template <typename U>
   friend class ArtNode48;
@@ -91,10 +91,10 @@ private:
   ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;
   int64_t nodeKey_ = 0;
   int nodeLevel_ = 0;
-  int16_t numChildren_ = 0;
+  uint16_t numChildren_ = 0;
 
-  std::vector<int16_t> CreateKeysArray() {
-    std::vector<int16_t> keys;
+  std::vector<uint8_t> CreateKeysArray() {
+    std::vector<uint8_t> keys;
     keys.reserve(numChildren_);
     for (int i = 0; i < 256; i++)
       if (nodes_[i])
@@ -106,7 +106,7 @@ private:
 // --- Implementation ---
 
 template <typename V>
-void ArtNode256<V>::InitFromNode48(ArtNode48<V>* node48, int16_t subKey, void* newElement) {
+void ArtNode256<V>::InitFromNode48(ArtNode48<V>* node48, uint8_t subKey, void* newElement) {
   nodes_.fill(nullptr);
   nodeLevel_ = node48->nodeLevel_;
   nodeKey_ = node48->nodeKey_;
@@ -124,7 +124,7 @@ IArtNode<V>* ArtNode256<V>::Put(int64_t key, int level, V* value) {
     if (branch)
       return branch;
   }
-  const int16_t idx = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+  const uint8_t idx = static_cast<uint8_t>((key >> nodeLevel_) & 0xFF);
   if (!nodes_[idx]) {
     numChildren_++;
     if (nodeLevel_ == 0)
@@ -154,7 +154,7 @@ template <typename V>
 IArtNode<V>* ArtNode256<V>::Remove(int64_t key, int level) {
   if (level != nodeLevel_ && ((key ^ nodeKey_) & (-1LL << (nodeLevel_ + 8))) != 0)
     return this;
-  const int16_t idx = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+  const uint8_t idx = static_cast<uint8_t>((key >> nodeLevel_) & 0xFF);
   if (!nodes_[idx])
     return this;
   if (nodeLevel_ == 0) {
@@ -189,7 +189,7 @@ V* ArtNode256<V>::GetCeilingValue(int64_t key, int level) {
     if ((key & mask) != (nodeKey_ & mask))
       key = 0;
   }
-  int16_t idx = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+  int idx = static_cast<int>((key >> nodeLevel_) & 0xFF);
   for (; idx < 256; idx++) {
     if (nodes_[idx]) {
       V* res = nodeLevel_ == 0
@@ -212,7 +212,7 @@ V* ArtNode256<V>::GetFloorValue(int64_t key, int level) {
     if ((key & mask) != (nodeKey_ & mask))
       key = INT64_MAX;
   }
-  int16_t idx = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+  int idx = static_cast<int>((key >> nodeLevel_) & 0xFF);
   for (; idx >= 0; idx--) {
     if (nodes_[idx]) {
       V* res = nodeLevel_ == 0

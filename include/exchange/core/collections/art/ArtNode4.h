@@ -55,7 +55,7 @@ public:
   V* GetValue(int64_t key, int level) override {
     if (level != nodeLevel_ && ((key ^ nodeKey_) & (-1LL << (nodeLevel_ + 8))) != 0)
       return nullptr;
-    const int16_t nodeIndex = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+    const uint8_t nodeIndex = static_cast<uint8_t>((key >> nodeLevel_) & 0xFF);
     for (int i = 0; i < numChildren_; i++) {
       if (keys_[i] == nodeIndex) {
         void* node = nodes_[i];
@@ -87,7 +87,7 @@ public:
     keys_.fill(0);
     nodes_.fill(nullptr);
     numChildren_ = 1;
-    keys_[0] = static_cast<int16_t>(key & 0xFF);
+    keys_[0] = static_cast<uint8_t>(key & 0xFF);
     nodes_[0] = value;
     nodeKey_ = key;
     nodeLevel_ = 0;
@@ -97,8 +97,8 @@ public:
     keys_.fill(0);
     nodes_.fill(nullptr);
     numChildren_ = 2;
-    const int16_t idx1 = static_cast<int16_t>((key1 >> level) & 0xFF);
-    const int16_t idx2 = static_cast<int16_t>((key2 >> level) & 0xFF);
+    const uint8_t idx1 = static_cast<uint8_t>((key1 >> level) & 0xFF);
+    const uint8_t idx2 = static_cast<uint8_t>((key2 >> level) & 0xFF);
     if (idx1 < idx2) {
       keys_[0] = idx1;
       nodes_[0] = value1;
@@ -131,7 +131,7 @@ public:
   friend class ArtNode16;
 
 private:
-  std::array<int16_t, 4> keys_{};
+  std::array<uint8_t, 4> keys_{};
   std::array<void*, 4> nodes_{};
   ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;
   int64_t nodeKey_ = 0;
@@ -159,7 +159,7 @@ IArtNode<V>* ArtNode4<V>::Put(int64_t key, int level, V* value) {
     if (branch)
       return branch;
   }
-  const int16_t nodeIndex = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+  const uint8_t nodeIndex = static_cast<uint8_t>((key >> nodeLevel_) & 0xFF);
   int pos = 0;
   while (pos < numChildren_) {
     if (nodeIndex == keys_[pos]) {
@@ -222,7 +222,7 @@ template <typename V>
 IArtNode<V>* ArtNode4<V>::Remove(int64_t key, int level) {
   if (level != nodeLevel_ && ((key ^ nodeKey_) & (-1LL << (nodeLevel_ + 8))) != 0)
     return this;
-  const int16_t nodeIndex = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+  const uint8_t nodeIndex = static_cast<uint8_t>((key >> nodeLevel_) & 0xFF);
   int pos = 0;
   while (pos < numChildren_ && keys_[pos] != nodeIndex)
     pos++;
@@ -262,7 +262,7 @@ V* ArtNode4<V>::GetCeilingValue(int64_t key, int level) {
     if ((key & mask) != (nodeKey_ & mask))
       key = 0;
   }
-  const int16_t nodeIndex = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+  const uint8_t nodeIndex = static_cast<uint8_t>((key >> nodeLevel_) & 0xFF);
   for (int i = 0; i < numChildren_; i++) {
     if (keys_[i] == nodeIndex) {
       V* res = nodeLevel_ == 0
@@ -288,7 +288,7 @@ V* ArtNode4<V>::GetFloorValue(int64_t key, int level) {
     if ((key & mask) != (nodeKey_ & mask))
       key = INT64_MAX;
   }
-  const int16_t nodeIndex = static_cast<int16_t>((key >> nodeLevel_) & 0xFF);
+  const uint8_t nodeIndex = static_cast<uint8_t>((key >> nodeLevel_) & 0xFF);
   for (int i = numChildren_ - 1; i >= 0; i--) {
     if (keys_[i] == nodeIndex) {
       V* res = nodeLevel_ == 0
@@ -353,13 +353,11 @@ void ArtNode4<V>::ValidateInternalState(int level) {
     throw std::runtime_error("unexpected nodeLevel");
   if (numChildren_ > 4 || numChildren_ < 1)
     throw std::runtime_error("unexpected numChildren");
-  int16_t last = -1;
+  int last = -1;
   for (int i = 0; i < 4; i++) {
     if (i < numChildren_) {
       if (!nodes_[i])
         throw std::runtime_error("null node");
-      if (keys_[i] < 0 || keys_[i] >= 256)
-        throw std::runtime_error("key out of range");
       if (i > 0 && keys_[i] <= last)
         throw std::runtime_error("wrong key order/duplicate");
       last = keys_[i];
@@ -383,7 +381,7 @@ std::list<std::pair<int64_t, V*>> ArtNode4<V>::Entries() {
   std::list<std::pair<int64_t, V*>> list;
   for (int i = 0; i < numChildren_; i++) {
     if (nodeLevel_ == 0)
-      list.push_back({keyPrefix + (keys_[i] & 0xFF), static_cast<V*>(nodes_[i])});
+      list.push_back({keyPrefix + keys_[i], static_cast<V*>(nodes_[i])});
     else {
       auto sub = static_cast<IArtNode<V>*>(nodes_[i])->Entries();
       list.splice(list.end(), sub);
