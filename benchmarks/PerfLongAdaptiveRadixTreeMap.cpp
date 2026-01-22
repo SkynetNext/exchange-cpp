@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <flat_map>
 #include <map>
 // On Windows, mimalloc-static doesn't automatically override C++ new/delete,
 // so we need to include mimalloc-new-delete.h explicitly.
@@ -125,8 +126,8 @@ public:
     unordered_map_ = new std::unordered_map<int64_t, int64_t>();
     // 4. ankerl::unordered_dense::map
     dense_map_ = new ankerl::unordered_dense::map<int64_t, int64_t>();
-    // 5. std::set (for ordered operations comparison)
-    set_ = new std::set<int64_t>();
+    // 5. std::flat_map (C++23)
+    flat_map_ = new std::flat_map<int64_t, int64_t>();
 
     // Generate test data
     DataGenerator gen(1);
@@ -151,7 +152,7 @@ public:
     delete bst_;
     delete unordered_map_;
     delete dense_map_;
-    delete set_;
+    delete flat_map_;
     delete objectsPool_;
   }
 
@@ -161,13 +162,13 @@ public:
                       int64_t bstTime,
                       int64_t uoTime,
                       int64_t deTime,
-                      int64_t setTime = -1) {
+                      int64_t flatTime = -1) {
     state.counters["1_art"] = benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["2_bst"] = benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
     state.counters["3_uo"] = benchmark::Counter(uoTime, benchmark::Counter::kAvgIterations);
     state.counters["4_de"] = benchmark::Counter(deTime, benchmark::Counter::kAvgIterations);
-    if (setTime >= 0) {
-      state.counters["5_set"] = benchmark::Counter(setTime, benchmark::Counter::kAvgIterations);
+    if (flatTime >= 0) {
+      state.counters["5_flat"] = benchmark::Counter(flatTime, benchmark::Counter::kAvgIterations);
     }
     // Improvement percentages (ART vs others)
     state.counters["vs_bst%"] = benchmark::Counter(
@@ -176,9 +177,9 @@ public:
       PercentImprovement(uoTime, artTime) * kNumIterations, benchmark::Counter::kAvgIterations);
     state.counters["vs_de%"] = benchmark::Counter(
       PercentImprovement(deTime, artTime) * kNumIterations, benchmark::Counter::kAvgIterations);
-    if (setTime >= 0) {
-      state.counters["vs_set%"] = benchmark::Counter(
-        PercentImprovement(setTime, artTime) * kNumIterations, benchmark::Counter::kAvgIterations);
+    if (flatTime >= 0) {
+      state.counters["vs_flat%"] = benchmark::Counter(
+        PercentImprovement(flatTime, artTime) * kNumIterations, benchmark::Counter::kAvgIterations);
     }
   }
 
@@ -191,8 +192,8 @@ public:
   std::unordered_map<int64_t, int64_t>* unordered_map_{};
   // 4. ankerl::unordered_dense::map
   ankerl::unordered_dense::map<int64_t, int64_t>* dense_map_{};
-  // 5. std::set (for ordered ops)
-  std::set<int64_t>* set_{};
+  // 5. std::flat_map (C++23)
+  std::flat_map<int64_t, int64_t>* flat_map_{};
 
   std::vector<int64_t> data_;
   std::vector<int64_t*> values_;
@@ -219,7 +220,7 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Put)(benchmark::State& state) {
     bst_->clear();
     unordered_map_->clear();
     dense_map_->clear();
-    set_->clear();
+    flat_map_->clear();
 
     // Shuffle data
     std::vector<int64_t> shuffled = data_;
@@ -257,22 +258,21 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Put)(benchmark::State& state) {
     end = std::chrono::high_resolution_clock::now();
     auto deTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    // 5. Measure std::set (insert key only, no value)
+    // 5. Measure std::flat_map (C++23)
     start = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < shuffled.size(); ++i) {
-      set_->insert(shuffled[i]);
+      (*flat_map_)[shuffled[i]] = shuffled[i];
     }
     end = std::chrono::high_resolution_clock::now();
-    auto setTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    auto flatTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    ReportCounters(state, artTime, bstTime, uoTime, deTime, setTime);
+    ReportCounters(state, artTime, bstTime, uoTime, deTime, flatTime);
   }
 }
 
 BENCHMARK_REGISTER_F(ArtTreeBenchmark, Put)->Iterations(kNumIterations);
 
 // Benchmark: GET_HIT - Point lookup for existing keys
-// Note: std::set doesn't store values, so not included
 BENCHMARK_DEFINE_F(ArtTreeBenchmark, GetHit)(benchmark::State& state) {
   // Pre-populate all structures
   for (size_t i = 0; i < data_.size(); ++i) {
@@ -280,6 +280,7 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, GetHit)(benchmark::State& state) {
     (*bst_)[data_[i]] = data_[i];
     (*unordered_map_)[data_[i]] = data_[i];
     (*dense_map_)[data_[i]] = data_[i];
+    (*flat_map_)[data_[i]] = data_[i];
   }
 
   std::mt19937 rng(1);
@@ -332,9 +333,20 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, GetHit)(benchmark::State& state) {
     end = std::chrono::high_resolution_clock::now();
     auto deTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    ReportCounters(state, artTime, bstTime, uoTime, deTime);
-    state.counters["sum"] =
-      benchmark::Counter(artSum + bstSum + uoSum + deSum, benchmark::Counter::kAvgIterations);
+    // 5. std::flat_map (C++23)
+    int64_t flatSum = 0;
+    start = std::chrono::high_resolution_clock::now();
+    for (int64_t key : shuffled) {
+      auto it = flat_map_->find(key);
+      if (it != flat_map_->end())
+        flatSum += it->second;
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto flatTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+    ReportCounters(state, artTime, bstTime, uoTime, deTime, flatTime);
+    state.counters["sum"] = benchmark::Counter(
+      artSum + bstSum + uoSum + deSum + flatSum, benchmark::Counter::kAvgIterations);
   }
 }
 
@@ -348,6 +360,7 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, GetMiss)(benchmark::State& state) {
     (*bst_)[data_[i]] = data_[i];
     (*unordered_map_)[data_[i]] = data_[i];
     (*dense_map_)[data_[i]] = data_[i];
+    (*flat_map_)[data_[i]] = data_[i];
   }
 
   // Generate non-existent keys
@@ -404,9 +417,19 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, GetMiss)(benchmark::State& state) {
     end = std::chrono::high_resolution_clock::now();
     auto deTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    ReportCounters(state, artTime, bstTime, uoTime, deTime);
-    state.counters["miss"] =
-      benchmark::Counter(artMiss + bstMiss + uoMiss + deMiss, benchmark::Counter::kAvgIterations);
+    // 5. std::flat_map (C++23)
+    int64_t flatMiss = 0;
+    start = std::chrono::high_resolution_clock::now();
+    for (int64_t key : shuffled) {
+      if (flat_map_->find(key) == flat_map_->end())
+        flatMiss++;
+    }
+    end = std::chrono::high_resolution_clock::now();
+    auto flatTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+
+    ReportCounters(state, artTime, bstTime, uoTime, deTime, flatTime);
+    state.counters["miss"] = benchmark::Counter(
+      artMiss + bstMiss + uoMiss + deMiss + flatMiss, benchmark::Counter::kAvgIterations);
   }
 }
 
@@ -422,13 +445,13 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Remove)(benchmark::State& state) {
     bst_->clear();
     unordered_map_->clear();
     dense_map_->clear();
-    set_->clear();
+    flat_map_->clear();
     for (size_t i = 0; i < data_.size(); ++i) {
       art_->Put(data_[i], values_[i]);
       (*bst_)[data_[i]] = data_[i];
       (*unordered_map_)[data_[i]] = data_[i];
       (*dense_map_)[data_[i]] = data_[i];
-      set_->insert(data_[i]);
+      (*flat_map_)[data_[i]] = data_[i];
     }
 
     std::vector<int64_t> shuffled = data_;
@@ -466,15 +489,15 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Remove)(benchmark::State& state) {
     end = std::chrono::high_resolution_clock::now();
     auto deTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    // 5. std::set
+    // 5. std::flat_map (C++23)
     start = std::chrono::high_resolution_clock::now();
     for (int64_t key : shuffled) {
-      set_->erase(key);
+      flat_map_->erase(key);
     }
     end = std::chrono::high_resolution_clock::now();
-    auto setTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    auto flatTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    ReportCounters(state, artTime, bstTime, uoTime, deTime, setTime);
+    ReportCounters(state, artTime, bstTime, uoTime, deTime, flatTime);
   }
 }
 
@@ -490,7 +513,7 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, ForEach)(benchmark::State& state) {
     (*bst_)[data_[i]] = data_[i];
     (*dense_map_)[data_[i]] = data_[i];
     (*unordered_map_)[data_[i]] = data_[i];
-    set_->insert(data_[i]);
+    (*flat_map_)[data_[i]] = data_[i];
   }
 
   for (auto _ : state) {
@@ -543,23 +566,23 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, ForEach)(benchmark::State& state) {
     end = std::chrono::high_resolution_clock::now();
     auto deTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    // 5. std::set (ordered)
-    std::vector<int64_t> setKeys;
-    setKeys.reserve(forEachSize);
+    // 5. std::flat_map (ordered, C++23)
+    std::vector<int64_t> flatKeys;
+    flatKeys.reserve(forEachSize);
     start = std::chrono::high_resolution_clock::now();
     count = 0;
-    for (int64_t key : *set_) {
+    for (const auto& pair : *flat_map_) {
       if (count >= forEachSize)
         break;
-      setKeys.push_back(key);
+      flatKeys.push_back(pair.first);
       count++;
     }
     end = std::chrono::high_resolution_clock::now();
-    auto setTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    auto flatTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    ReportCounters(state, artTime, bstTime, uoTime, deTime, setTime);
+    ReportCounters(state, artTime, bstTime, uoTime, deTime, flatTime);
     state.counters["cnt"] = benchmark::Counter(
-      artConsumer.keys.size() + bstKeys.size() + uoKeys.size() + deKeys.size() + setKeys.size(),
+      artConsumer.keys.size() + bstKeys.size() + uoKeys.size() + deKeys.size() + flatKeys.size(),
       benchmark::Counter::kAvgIterations);
   }
 }
@@ -576,7 +599,7 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, ForEachDesc)(benchmark::State& state) {
     (*bst_)[data_[i]] = data_[i];
     (*dense_map_)[data_[i]] = data_[i];
     (*unordered_map_)[data_[i]] = data_[i];
-    set_->insert(data_[i]);
+    (*flat_map_)[data_[i]] = data_[i];
   }
 
   for (auto _ : state) {
@@ -627,33 +650,33 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, ForEachDesc)(benchmark::State& state) {
     end = std::chrono::high_resolution_clock::now();
     auto deTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    // 5. std::set (ordered descending via rbegin)
-    std::vector<int64_t> setKeys;
-    setKeys.reserve(forEachSize);
+    // 5. std::flat_map (ordered descending via rbegin, C++23)
+    std::vector<int64_t> flatKeys;
+    flatKeys.reserve(forEachSize);
     start = std::chrono::high_resolution_clock::now();
     count = 0;
-    for (auto it = set_->rbegin(); it != set_->rend() && count < forEachSize; ++it) {
-      setKeys.push_back(*it);
+    for (auto it = flat_map_->rbegin(); it != flat_map_->rend() && count < forEachSize; ++it) {
+      flatKeys.push_back(it->first);
       count++;
     }
     end = std::chrono::high_resolution_clock::now();
-    auto setTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    auto flatTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    ReportCounters(state, artTime, bstTime, uoTime, deTime, setTime);
+    ReportCounters(state, artTime, bstTime, uoTime, deTime, flatTime);
   }
 }
 
 BENCHMARK_REGISTER_F(ArtTreeBenchmark, ForEachDesc)->Iterations(kNumIterations);
 
 // Benchmark: HIGHER (upper_bound - find first key strictly greater than given)
-// Only ordered structures support this: ART, std::map, std::set
+// Only ordered structures support this: ART, std::map, std::flat_map
 // Hash maps do NOT support upper_bound
 BENCHMARK_DEFINE_F(ArtTreeBenchmark, Higher)(benchmark::State& state) {
   // Pre-populate ordered structures only
   for (size_t i = 0; i < data_.size(); ++i) {
     art_->Put(data_[i], values_[i]);
     (*bst_)[data_[i]] = data_[i];
-    set_->insert(data_[i]);
+    (*flat_map_)[data_[i]] = data_[i];
   }
 
   std::mt19937 rng(1);
@@ -684,41 +707,41 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Higher)(benchmark::State& state) {
     end = std::chrono::high_resolution_clock::now();
     auto bstTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    // 3. std::set (upper_bound returns key only)
-    int64_t setSum = 0;
+    // 3. std::flat_map (upper_bound returns key+value, C++23)
+    int64_t flatSum = 0;
     start = std::chrono::high_resolution_clock::now();
     for (int64_t key : shuffled) {
-      auto it = set_->upper_bound(key);
-      if (it != set_->end())
-        setSum += *it;
+      auto it = flat_map_->upper_bound(key);
+      if (it != flat_map_->end())
+        flatSum += it->second;
     }
     end = std::chrono::high_resolution_clock::now();
-    auto setTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    auto flatTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     // Report (no hash maps - they don't support ordered ops)
     state.counters["1_art"] = benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["2_bst"] = benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
-    state.counters["3_set"] = benchmark::Counter(setTime, benchmark::Counter::kAvgIterations);
+    state.counters["3_flat"] = benchmark::Counter(flatTime, benchmark::Counter::kAvgIterations);
     state.counters["vs_bst%"] = benchmark::Counter(
       PercentImprovement(bstTime, artTime) * kNumIterations, benchmark::Counter::kAvgIterations);
-    state.counters["vs_set%"] = benchmark::Counter(
-      PercentImprovement(setTime, artTime) * kNumIterations, benchmark::Counter::kAvgIterations);
+    state.counters["vs_flat%"] = benchmark::Counter(
+      PercentImprovement(flatTime, artTime) * kNumIterations, benchmark::Counter::kAvgIterations);
     state.counters["sum"] =
-      benchmark::Counter(artSum + bstSum + setSum, benchmark::Counter::kAvgIterations);
+      benchmark::Counter(artSum + bstSum + flatSum, benchmark::Counter::kAvgIterations);
   }
 }
 
 BENCHMARK_REGISTER_F(ArtTreeBenchmark, Higher)->Iterations(kNumIterations);
 
 // Benchmark: LOWER (find first key strictly less than given)
-// Only ordered structures support this: ART, std::map, std::set
+// Only ordered structures support this: ART, std::map, std::flat_map
 // Hash maps do NOT support lower_bound
 BENCHMARK_DEFINE_F(ArtTreeBenchmark, Lower)(benchmark::State& state) {
   // Pre-populate ordered structures only
   for (size_t i = 0; i < data_.size(); ++i) {
     art_->Put(data_[i], values_[i]);
     (*bst_)[data_[i]] = data_[i];
-    set_->insert(data_[i]);
+    (*flat_map_)[data_[i]] = data_[i];
   }
 
   std::mt19937 rng(1);
@@ -751,29 +774,29 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Lower)(benchmark::State& state) {
     end = std::chrono::high_resolution_clock::now();
     auto bstTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
-    // 3. std::set (lower_bound - 1, key only)
-    int64_t setSum = 0;
+    // 3. std::flat_map (lower_bound - 1, C++23)
+    int64_t flatSum = 0;
     start = std::chrono::high_resolution_clock::now();
     for (int64_t key : shuffled) {
-      auto it = set_->lower_bound(key);
-      if (it != set_->begin()) {
+      auto it = flat_map_->lower_bound(key);
+      if (it != flat_map_->begin()) {
         --it;
-        setSum += *it;
+        flatSum += it->second;
       }
     }
     end = std::chrono::high_resolution_clock::now();
-    auto setTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    auto flatTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     // Report (no hash maps - they don't support ordered ops)
     state.counters["1_art"] = benchmark::Counter(artTime, benchmark::Counter::kAvgIterations);
     state.counters["2_bst"] = benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
-    state.counters["3_set"] = benchmark::Counter(setTime, benchmark::Counter::kAvgIterations);
+    state.counters["3_flat"] = benchmark::Counter(flatTime, benchmark::Counter::kAvgIterations);
     state.counters["vs_bst%"] = benchmark::Counter(
       PercentImprovement(bstTime, artTime) * kNumIterations, benchmark::Counter::kAvgIterations);
-    state.counters["vs_set%"] = benchmark::Counter(
-      PercentImprovement(setTime, artTime) * kNumIterations, benchmark::Counter::kAvgIterations);
+    state.counters["vs_flat%"] = benchmark::Counter(
+      PercentImprovement(flatTime, artTime) * kNumIterations, benchmark::Counter::kAvgIterations);
     state.counters["sum"] =
-      benchmark::Counter(artSum + bstSum + setSum, benchmark::Counter::kAvgIterations);
+      benchmark::Counter(artSum + bstSum + flatSum, benchmark::Counter::kAvgIterations);
   }
 }
 
