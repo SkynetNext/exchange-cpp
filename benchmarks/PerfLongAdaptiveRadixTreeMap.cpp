@@ -26,10 +26,10 @@
 
 // std::flat_map (C++23) - conditionally include if available
 #if __has_include(<flat_map>)
-#include <flat_map>
-#define HAS_STD_FLAT_MAP 1
+#  include <flat_map>
+#  define HAS_STD_FLAT_MAP 1
 #else
-#define HAS_STD_FLAT_MAP 0
+#  define HAS_STD_FLAT_MAP 0
 #endif
 // On Windows, mimalloc-static doesn't automatically override C++ new/delete,
 // so we need to include mimalloc-new-delete.h explicitly.
