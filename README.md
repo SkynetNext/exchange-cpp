@@ -2,55 +2,19 @@
 
 A high-performance, low-latency cryptocurrency exchange matching engine written in C++, 1:1 ported from [exchange-core](https://github.com/exchange-core/exchange-core).
 
-**Key Performance**: P50: 0.49µs, P99: 0.72µs @ 1M TPS | Up to 9.4M TPS | P99 latency 3.6x-6.5x better than Java
-
 ## Performance
 
-### Comparison with Java Implementation
+| Metric | C++ | Java | Improvement |
+|--------|-----|------|-------------|
+| **Max Stable TPS** | 9.4M | 6M | 1.57x |
+| **P50 @ 1M TPS** | 0.49µs | 0.51µs | 1.04x |
+| **P99 @ 1M TPS** | 0.72µs | 4.7µs | **6.5x** |
+| **P99 @ 4M TPS** | 1.44µs | 8.0µs | **5.6x** |
+| **P99 @ 6M TPS** | 3.2µs | 11.5µs | **3.6x** |
 
-Our test configuration matches the original Java `exchange-core` reference implementation:
-- Single symbol (Margin mode)
-- ~1K active users (2K currency accounts)
-- 1K pending limit orders
-- 3M benchmark commands
-- Ring buffer size: 2,048
-- Messages in group limit: 256
+**Highlights**: P99 latency 3.6-6.5x better than Java | Stable up to 9.4M TPS | Exceeds Tier 1 exchange standards (CME, NASDAQ, ICE)
 
-**Key Performance Highlights**:
-
-| Metric | C++ | Java | Winner |
-|--------|-----|------|--------|
-| **Max Stable TPS** | 9.4M TPS | 6M TPS | ✅ C++ (1.57x) |
-| **P50 @ 1M TPS** | 0.49µs | 0.51µs | ✅ C++ (1.04x) |
-| **P99 @ 1M TPS** | 0.72µs | 4.7µs | ✅ C++ (6.5x) |
-| **P50 @ 4M TPS** | 0.79µs | 0.6µs | ✅ Java (1.32x) |
-| **P99 @ 4M TPS** | 1.44µs | 8.0µs | ✅ C++ (5.6x) |
-| **P50 @ 6M TPS** | 1.15µs | 1.37µs | ✅ C++ (1.19x) |
-| **P99 @ 6M TPS** | 3.2µs | 11.5µs | ✅ C++ (3.6x) |
-| **P50 @ 8M TPS** | 3.2µs | N/A | ✅ C++ |
-| **P99 @ 8M TPS** | 12µs | N/A | ✅ C++ |
-
-**Summary**: C++ shows dramatically better P99 latency (tail latency) across all TPS rates, with improvements of 3.6-6.5x. After optimizing `orderIdIndex_` from ART to `ankerl::unordered_dense::map` (2026-01-16) and `keys_` from `int16_t` to `uint8_t` (2026-01-22), C++ now achieves better P50 at 6M TPS and maintains stable performance up to 9.4M TPS. Maximum stable throughput improved from 9M to 9.4M TPS (+4.4%).
-
-### Industry Standards Comparison
-
-Measures end-to-end order processing: `Order Submission → Ring Buffer → Grouping → Risk → Matching → Results`
-
-| Metric | Tier 1 Standard | C++ @ 200K TPS | C++ @ 1M TPS | C++ @ 2M TPS | C++ @ 4M TPS | Status |
-|--------|----------------|----------------|--------------|--------------|--------------|--------|
-| **Median (P50)** | < 1µs | **0.51µs** | **0.49µs** | **0.48µs** | **0.79µs** | ✅ **Exceeds** |
-| **P99** | < 5µs | 0.86µs | 0.72µs | 0.71µs | 1.44µs | ✅ **Exceeds** |
-| **P99.9** | < 20µs | 5.2µs | 6.3µs | 7.1µs | 9.4µs | ✅ **Exceeds** |
-| **Stable TPS** | > 1M TPS | ✅ | ✅ | ✅ | ✅ | ✅ **9.4x** |
-
-**Examples**: CME, NASDAQ, ICE (co-located)
-
-✅ **Median latency (0.48-0.79µs) significantly exceeds Tier 1 exchange standards** (< 1µs) up to 4M TPS  
-✅ **P99 latency (0.72-1.44µs) significantly exceeds Tier 1 exchange standards** (< 5µs) up to 4M TPS  
-✅ **Stable throughput (9.4M TPS) exceeds industry standard** (1M TPS) by 9.4x  
-✅ **P99.9 latency (5.2-9.4µs) significantly exceeds Tier 1 exchange standards** (< 20µs) up to 4M TPS
-
-For detailed performance data, see [PERFORMANCE_BENCHMARK_COMPARISON.md](docs/PERFORMANCE_BENCHMARK_COMPARISON.md).
+For detailed benchmarks, see [PERFORMANCE_BENCHMARK_COMPARISON.md](docs/PERFORMANCE_BENCHMARK_COMPARISON.md).
 
 ## Features
 
@@ -151,108 +115,17 @@ graph TD
 
 ## Building
 
-### Prerequisites
-
-- **CMake** 3.30 or higher (required for C++26 support)
-- **C++26** compatible compiler:
-  - **GCC 14+** (recommended) or **Clang 19+**
-  - MSVC 19.40+ (Windows)
-- **Git** (for submodules)
-
-#### Installing GCC 14 on Ubuntu 22.04
-
-If your system doesn't have GCC 14+, you can install it from source:
-
 ```bash
-sudo apt install build-essential
-sudo apt install libmpfr-dev libgmp3-dev libmpc-dev -y
-wget http://ftp.gnu.org/gnu/gcc/gcc-14.1.0/gcc-14.1.0.tar.gz
-tar -xf gcc-14.1.0.tar.gz
-cd gcc-14.1.0
-./configure -v --build=$(uname -m)-linux-gnu --host=$(uname -m)-linux-gnu --target=$(uname -m)-linux-gnu --prefix=/usr/local/gcc-14.1.0 --enable-checking=release --enable-languages=c,c++ --disable-multilib --program-suffix=-14.1.0
-make -j$(nproc)
-sudo make install
-
-# Set as default using update-alternatives
-sudo update-alternatives --install /usr/bin/gcc gcc /usr/local/gcc-14.1.0/bin/gcc-14.1.0 100
-sudo update-alternatives --install /usr/bin/g++ g++ /usr/local/gcc-14.1.0/bin/g++-14.1.0 100
-sudo update-alternatives --set gcc /usr/local/gcc-14.1.0/bin/gcc-14.1.0
-sudo update-alternatives --set g++ /usr/local/gcc-14.1.0/bin/g++-14.1.0
-
-# Add GCC 14 libstdc++ to library path (required for running programs)
-echo 'export LD_LIBRARY_PATH=/usr/local/gcc-14.1.0/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
-source ~/.bashrc
-
-# Verify installation
-gcc --version
-g++ --version
-```
-
-**Note**: For Ubuntu 24.04+, GCC 14 is available via package manager:
-```bash
-sudo apt install gcc-14 g++-14
-sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100
-sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100
-```
-
-### Build Steps
-
-```bash
-# Clone with submodules (recommended)
 git clone --recursive <repository-url>
 cd exchange-cpp
-
-# If you already cloned without --recursive, initialize submodules:
-git submodule update --init --recursive
-
-# Build
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . -j$(nproc)
-
-# Optional: Run tests (requires Google Test)
-cmake .. -DBUILD_TESTING=ON
-cmake --build . -j$(nproc)
-ctest --output-on-failure
-
-# Optional: Build benchmarks (requires Google Benchmark)
-cmake .. -DBUILD_BENCHMARKS=ON
-cmake --build . -j$(nproc)
 ```
 
-### Third-Party Dependencies
+**Requirements**: CMake 3.30+, GCC 14+ / Clang 19+ / MSVC 19.40+
 
-The project uses the following submodules:
-
-- **`reference/exchange-core`**: Original Java implementation for reference
-- **`third_party/disruptor-cpp`**: [disruptor-cpp](https://github.com/SkynetNext/disruptor-cpp.git) - High-performance inter-thread communication library
-
-Both are automatically initialized when cloning with `--recursive` or running `git submodule update --init --recursive`.
-
-## System Optimization
-
-For better performance, configure CPU isolation to reduce kernel scheduler overhead.
-
-```bash
-sudo nano /etc/default/grub
-# Add to GRUB_CMDLINE_LINUX: isolcpus=8-15 nohz_full=8-15 rcu_nocbs=8-15
-sudo update-grub
-sudo reboot
-```
-
-**Verify:** `cat /sys/devices/system/cpu/isolated` should show `8-15`
-
-**Note:** Reserve some CPUs (e.g., 0-7) for system use. Never isolate all CPUs.
-
-## Testing & Benchmarks
-
-```bash
-cd build
-ctest --output-on-failure  # Run all tests
-./tests/perf/PerfLatency   # Run latency benchmarks
-```
-
-See [PERFORMANCE_BENCHMARK_COMPARISON.md](docs/PERFORMANCE_BENCHMARK_COMPARISON.md) for detailed results.
+For detailed build instructions, GCC installation, and system optimization, see [BUILD.md](docs/BUILD.md).
 
 ## References
 
