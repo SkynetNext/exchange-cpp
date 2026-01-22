@@ -110,21 +110,6 @@ void OrderBookBaseTest::ClearOrderBook() {
   orderBook_->ValidateInternalState();
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(INT32_MAX);
 
-  // Collect all orders before matching to delete them after
-  // Note: We need to collect orders before matching because matching removes them
-  // from the order book but doesn't delete the Order objects
-  std::vector<const common::IOrder*> ordersToDelete;
-  orderBook_->ProcessAskOrders([&ordersToDelete](const common::IOrder* order) {
-    if (order != nullptr) {
-      ordersToDelete.push_back(order);
-    }
-  });
-  orderBook_->ProcessBidOrders([&ordersToDelete](const common::IOrder* order) {
-    if (order != nullptr) {
-      ordersToDelete.push_back(order);
-    }
-  });
-
   // Match all asks
   int64_t askSum = std::accumulate(snapshot->askVolumes.begin(),
                                    snapshot->askVolumes.begin() + snapshot->askSize, 0LL);
@@ -147,12 +132,11 @@ void OrderBookBaseTest::ClearOrderBook() {
 
   orderBook_->ValidateInternalState();
 
-  // Delete all collected orders to prevent memory leaks
-  // Cast away const because we need to delete them (they're no longer in the order book)
-  // IOrder has a virtual destructor, so deletion through IOrder* is safe
-  for (const common::IOrder* order : ordersToDelete) {
-    delete const_cast<common::IOrder*>(order);
-  }
+  // Note: Order memory management is handled by the OrderBook implementations:
+  // - NaiveImpl: Orders are deleted in OrdersBucket::Match when fully matched,
+  //              and remaining orders are cleaned up in OrdersBucket destructor
+  // - DirectImpl: Orders are returned to ObjectsPool when matched
+  // No manual deletion needed here.
 }
 
 void OrderBookBaseTest::ProcessAndValidate(OrderCommand& cmd, CommandResultCode expectedCmdState) {

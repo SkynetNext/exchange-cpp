@@ -39,6 +39,11 @@ public:
   explicit OrdersBucket(int64_t price);
 
   /**
+   * Destructor - cleans up remaining orders
+   */
+  ~OrdersBucket();
+
+  /**
    * Constructor from BytesIn (deserialization)
    */
   explicit OrdersBucket(common::BytesIn* bytes);

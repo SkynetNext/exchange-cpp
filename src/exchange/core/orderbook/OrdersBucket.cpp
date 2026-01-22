@@ -30,6 +30,15 @@ namespace exchange::core::orderbook {
 
 OrdersBucket::OrdersBucket(int64_t price) : price_(price), totalVolume_(0) {}
 
+OrdersBucket::~OrdersBucket() {
+  // Clean up any remaining orders to prevent memory leaks
+  for (auto* order : orderList_) {
+    delete order;
+  }
+  orderList_.clear();
+  orderMap_.clear();
+}
+
 OrdersBucket::OrdersBucket(common::BytesIn* bytes) {
   if (bytes == nullptr) {
     throw std::invalid_argument("BytesIn cannot be nullptr");
@@ -120,6 +129,9 @@ OrdersBucket::MatcherResult OrdersBucket::Match(int64_t volumeToCollect,
       auto nextIt = std::next(it);
       orderMap_.erase(order->orderId);
       orderList_.erase(it);
+      // Delete the order object to prevent memory leak
+      // Note: Event was already created with order's data before this point
+      delete order;
       it = nextIt;
     } else {
       ++it;
