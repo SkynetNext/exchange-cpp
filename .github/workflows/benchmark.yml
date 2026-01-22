@@ -63,12 +63,12 @@ jobs:
             -DBUILD_EXAMPLES=OFF
 
       - name: Build benchmarks
-        run: cmake --build build --config Release --target PerfLongAdaptiveRadixTreeMap --parallel 2
+        run: cmake --build build --config Release --target perf_long_adaptive_radix_tree_map --parallel 2
 
       - name: Run ART benchmark
         run: |
           echo "=== Running LongAdaptiveRadixTreeMap Benchmark ==="
-          ./build/benchmarks/PerfLongAdaptiveRadixTreeMap \
+          ./build/benchmarks/perf_long_adaptive_radix_tree_map \
             --benchmark_format=console \
             --benchmark_counters_tabular=true
 
