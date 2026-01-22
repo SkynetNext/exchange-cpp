@@ -17,13 +17,9 @@
 #include "ITExchangeCoreIntegrationRejectionLatency.h"
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
-ITExchangeCoreIntegrationRejectionLatency::ITExchangeCoreIntegrationRejectionLatency()
-  : ITExchangeCoreIntegrationRejection() {}
+ITExchangeCoreIntegrationRejectionLatency::ITExchangeCoreIntegrationRejectionLatency() = default;
 
 exchange::core::common::config::PerformanceConfiguration
 ITExchangeCoreIntegrationRejectionLatency::GetPerformanceConfiguration() {
@@ -34,7 +30,4 @@ ITExchangeCoreIntegrationRejectionLatency::GetPerformanceConfiguration() {
   return cfg;
 }
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

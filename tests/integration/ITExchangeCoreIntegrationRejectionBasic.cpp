@@ -25,13 +25,9 @@
 using namespace exchange::core::common;
 using namespace exchange::core::tests::util;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
-ITExchangeCoreIntegrationRejectionBasic::ITExchangeCoreIntegrationRejectionBasic()
-  : ITExchangeCoreIntegrationRejection() {}
+ITExchangeCoreIntegrationRejectionBasic::ITExchangeCoreIntegrationRejectionBasic() = default;
 
 exchange::core::common::config::PerformanceConfiguration
 ITExchangeCoreIntegrationRejectionBasic::GetPerformanceConfiguration() {
@@ -191,7 +187,4 @@ TEST_F(ITExchangeCoreIntegrationRejectionBasic, TestMultiSellWithExpectationReje
                 RejectionCause::REJECTION_BY_BUDGET);
 }
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

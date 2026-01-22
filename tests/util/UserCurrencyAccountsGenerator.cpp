@@ -23,10 +23,7 @@
 #include <set>
 #include "ExecutionTime.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 std::vector<std::vector<bool>>
 UserCurrencyAccountsGenerator::GenerateUsers(int accountsToCreate,
@@ -36,7 +33,7 @@ UserCurrencyAccountsGenerator::GenerateUsers(int accountsToCreate,
   ExecutionTime executionTime;
 
   std::vector<std::vector<bool>> result;
-  result.push_back({});  // uid=0 no accounts
+  result.emplace_back();  // uid=0 no accounts
 
   std::mt19937 rng(1);
   std::vector<int32_t> currencyCodes(currencies.begin(), currencies.end());
@@ -120,7 +117,4 @@ std::vector<int32_t> UserCurrencyAccountsGenerator::CreateUserListForSymbol(
   return uids;
 }
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

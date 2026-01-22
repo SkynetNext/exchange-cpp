@@ -41,7 +41,7 @@ public:
   /**
    * Destructor - cleans up remaining orders
    */
-  ~OrdersBucket();
+  ~OrdersBucket() override;
 
   /**
    * Constructor from BytesIn (deserialization)

@@ -24,10 +24,7 @@ using namespace exchange::core::tests::steps;
 using namespace exchange::core::tests::util;
 using namespace exchange::core::common::config;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace steps {
+namespace exchange::core::tests::steps {
 
 // Matches Java: RunCukesDirectThroughputTests
 // Runs tests with throughput performance configuration
@@ -269,7 +266,4 @@ TEST_F(RunCukesDirectThroughputTests, CancelBidOrder) {
   stepdefs_->ClientBalanceIs(1440003L, expectedBalance2);
 }
 
-}  // namespace steps
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::steps

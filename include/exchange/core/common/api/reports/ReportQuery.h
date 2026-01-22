@@ -40,7 +40,7 @@ namespace common::api::reports {
  */
 class ReportQueryBase : public WriteBytesMarshallable {
 public:
-  virtual ~ReportQueryBase() = default;
+  ~ReportQueryBase() override = default;
 
   /**
    * @return report type code (integer)

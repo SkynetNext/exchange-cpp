@@ -33,10 +33,7 @@ using namespace exchange::core::common::cmd;
 using namespace exchange::core::orderbook;
 using namespace exchange::core::tests::util;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace orderbook {
+namespace exchange::core::tests::orderbook {
 
 void OrderBookDirectImplTest::TestSequentialAsks() {
   // Empty order book
@@ -198,7 +195,4 @@ void OrderBookDirectImplTest::TestMultipleCommandsCompare() {
   }
 }
 
-}  // namespace orderbook
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::orderbook

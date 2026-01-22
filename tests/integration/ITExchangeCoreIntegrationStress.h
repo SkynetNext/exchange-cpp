@@ -19,10 +19,7 @@
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <gtest/gtest.h>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
 /**
  * ITExchangeCoreIntegrationStress - abstract base class for stress tests
@@ -45,7 +42,4 @@ public:
   void ManyOperations(const exchange::core::common::CoreSymbolSpecification& symbolSpec);
 };
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

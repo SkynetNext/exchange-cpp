@@ -22,10 +22,7 @@
 
 using namespace exchange::core::tests::util;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace perf {
+namespace exchange::core::tests::perf {
 
 void PerfPersistence::TestPersistenceMargin() {
   auto perfCfg =
@@ -121,7 +118,4 @@ TEST_F(PerfPersistence, DISABLED_TestPersistenceMultiSymbolHuge) {
   TestPersistenceMultiSymbolHuge();
 }
 
-}  // namespace perf
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::perf

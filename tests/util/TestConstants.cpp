@@ -18,10 +18,7 @@
 #include <set>
 #include <stdexcept>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 exchange::core::common::CoreSymbolSpecification TestConstants::CreateSymbolSpecEurUsd() {
   exchange::core::common::CoreSymbolSpecification spec;
@@ -179,7 +176,4 @@ const exchange::core::common::CoreSymbolSpecification& TestConstants::GetSymbolS
   return GetSymbolSpecFeeXbtLtcImpl();
 }
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

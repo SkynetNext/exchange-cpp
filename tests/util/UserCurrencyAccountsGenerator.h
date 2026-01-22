@@ -21,10 +21,7 @@
 #include <set>
 #include <vector>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * UserCurrencyAccountsGenerator - generates user currency accounts for testing
@@ -60,7 +57,4 @@ public:
                           int symbolMessagesExpected);
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

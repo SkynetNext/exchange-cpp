@@ -30,10 +30,7 @@ using namespace exchange::core::tests::util;
 using namespace exchange::core::common;
 using namespace exchange::core::common::cmd;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
 using namespace exchange::core::common;
 using namespace exchange::core::common::cmd;
@@ -573,7 +570,4 @@ TEST_F(ITFeesMarginBasic, ShouldNotTakeFeesForCancelAsk) {
   }
 }
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

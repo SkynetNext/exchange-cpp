@@ -20,10 +20,7 @@
 #include <cmath>
 #include <sstream>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace nasdaq {
+namespace exchange::core::tests::nasdaq {
 
 std::string StockDescr::ToString() const {
   std::ostringstream oss;
@@ -85,7 +82,4 @@ void ITCH50StatListener::UpdateStat(uint8_t msgType, int32_t stockLocate, int64_
   }
 }
 
-}  // namespace nasdaq
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::nasdaq

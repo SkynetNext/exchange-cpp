@@ -21,12 +21,9 @@
 
 using namespace exchange::core::tests::util;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
-ITExchangeCoreIntegrationBasic::ITExchangeCoreIntegrationBasic() : ITExchangeCoreIntegration() {}
+ITExchangeCoreIntegrationBasic::ITExchangeCoreIntegrationBasic() = default;
 
 exchange::core::common::config::PerformanceConfiguration
 ITExchangeCoreIntegrationBasic::GetPerformanceConfiguration() {
@@ -62,7 +59,4 @@ TEST_F(ITExchangeCoreIntegrationBasic, ExchangeRiskMoveTest) {
   ExchangeRiskMoveTest();
 }
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

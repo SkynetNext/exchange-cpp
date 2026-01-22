@@ -7,10 +7,7 @@
 
 #include <cstdint>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * JavaRandom - C++ implementation matching Java's Random class
@@ -79,7 +76,4 @@ private:
   }
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

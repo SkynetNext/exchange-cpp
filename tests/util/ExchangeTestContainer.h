@@ -49,10 +49,7 @@
 #include "TestDataParameters.h"
 #include "TestOrdersGenerator.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * TestDataFutures - futures for async test data preparation
@@ -287,7 +284,4 @@ private:
   std::function<void(exchange::core::common::cmd::OrderCommand*, int64_t)> consumer_;
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

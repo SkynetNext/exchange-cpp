@@ -35,10 +35,7 @@
 #include "ExchangeTestContainer.h"
 #include "LatencyTools.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 // Match Java: private static final boolean WRITE_HDR_HISTOGRAMS = false;
 static constexpr bool WRITE_HDR_HISTOGRAMS = false;
@@ -846,7 +843,7 @@ void LatencyTestsModule::HiccupTestImpl(
         auto timePoint =
           std::chrono::system_clock::time_point(std::chrono::milliseconds(timestampMs));
         auto timeT = std::chrono::system_clock::to_time_t(timePoint);
-        std::tm localTime;
+        std::tm localTime = {};
 #ifdef _WIN32
         localtime_s(&localTime, &timeT);
 #else
@@ -861,7 +858,4 @@ void LatencyTestsModule::HiccupTestImpl(
   }
 }
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

@@ -10,12 +10,8 @@
 #include <future>
 #include <sstream>
 #include <stdexcept>
-#include <string>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * Helper function to get future value with detailed error reporting (move version)
@@ -105,7 +101,4 @@ T GetFutureWithDebugRef(std::future<T>& future,
   exchange::core::tests::util::GetFutureWithDebugRef(future, __FILE__, __LINE__, __FUNCTION__, \
                                                      context)
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

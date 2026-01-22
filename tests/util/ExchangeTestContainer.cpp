@@ -41,15 +41,13 @@
 #include <exchange/core/common/config/ReportsQueriesConfiguration.h>
 #include <exchange/core/utils/AffinityThreadFactory.h>
 #include <exchange/core/utils/FastNanoTime.h>
+#include <array>
 #include <random>
 #include <unordered_map>
 #include "TestConstants.h"
 #include "UserCurrencyAccountsGenerator.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 // Static helper for CHECK_SUCCESS callback
 void ExchangeTestContainer::CheckSuccess(const exchange::core::common::cmd::OrderCommand& cmd) {
@@ -742,12 +740,9 @@ ExchangeTestContainer::GenerateRandomSymbols(int num,
 
 std::string ExchangeTestContainer::TimeBasedExchangeId() {
   auto ms = exchange::core::utils::FastNanoTime::NowMillis();
-  char buffer[32];
-  snprintf(buffer, sizeof(buffer), "%012llX", static_cast<unsigned long long>(ms));
-  return std::string(buffer);
+  std::array<char, 32> buffer{};
+  snprintf(buffer.data(), buffer.size(), "%012llX", static_cast<unsigned long long>(ms));
+  return std::string(buffer.data());
 }
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

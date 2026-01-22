@@ -24,10 +24,7 @@ using namespace exchange::core::common::cmd;
 using namespace exchange::core::orderbook;
 using namespace exchange::core::tests::orderbook;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace orderbook {
+namespace exchange::core::tests::orderbook {
 
 void OrdersBucketTest::SetUp() {
   eventsHelper_ = std::make_unique<OrderBookEventsHelper>([]() { return new MatcherTradeEvent(); });
@@ -292,7 +289,4 @@ TEST_F(OrdersBucketTest, ShouldMatchAllOrders2) {
   ASSERT_EQ(bucket_->GetTotalVolume(), 0L);
 }
 
-}  // namespace orderbook
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::orderbook

@@ -18,10 +18,7 @@
 
 #include "OrderBookBaseTest.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace orderbook {
+namespace exchange::core::tests::orderbook {
 
 /**
  * OrderBookDirectImplTest - base class for Direct implementation tests
@@ -35,7 +32,4 @@ protected:
   void TestMultipleCommandsCompare();
 };
 
-}  // namespace orderbook
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::orderbook

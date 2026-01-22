@@ -19,10 +19,7 @@
 #include <exchange/core/common/CoreSymbolSpecification.h>
 #include <vector>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * PreFillMode - mode for pre-filling order book
@@ -50,7 +47,4 @@ struct TestOrdersGeneratorConfig {
   int CalculateReadySeq() const;
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

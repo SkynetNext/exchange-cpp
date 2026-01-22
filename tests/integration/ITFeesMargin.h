@@ -19,10 +19,7 @@
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <gtest/gtest.h>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
 /**
  * ITFeesMargin - abstract base class for margin fees tests
@@ -43,7 +40,4 @@ public:
   // They require ExchangeTestContainer which needs to be implemented first
 };
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

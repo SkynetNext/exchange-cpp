@@ -22,10 +22,7 @@
 #include <set>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 struct TestConstants {
   static constexpr int32_t SYMBOL_MARGIN = 5991;
@@ -126,7 +123,4 @@ struct TestConstants {
   }
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

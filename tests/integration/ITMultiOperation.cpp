@@ -25,10 +25,7 @@
 
 using namespace exchange::core::tests::util;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
 // Helper function to create throughput performance configuration
 static exchange::core::common::config::PerformanceConfiguration
@@ -123,7 +120,4 @@ TEST(ITMultiOperation, ShouldPerformSharded) {
     exchange::core::common::config::SerializationConfiguration::Default(), 2);
 }
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

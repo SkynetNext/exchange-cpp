@@ -18,10 +18,7 @@
 #include <exchange/core/utils/FastNanoTime.h>
 #include "LatencyTools.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 ExecutionTime::ExecutionTime(std::function<void(const std::string&)> executionTimeConsumer)
   : executionTimeConsumer_(std::move(executionTimeConsumer))
@@ -57,7 +54,4 @@ int64_t ExecutionTime::GetTimeNs() const {
   return elapsedNs_;
 }
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

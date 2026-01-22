@@ -25,21 +25,12 @@
 #include <unordered_map>
 #include <vector>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 // Forward declaration - will be included in .cpp
 struct TestOrdersGeneratorConfig;
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * TestOrdersGenerator - generates test order commands for orderbook testing
@@ -152,7 +143,4 @@ public:
   static std::vector<double> CreateWeightedDistribution(int size, int seed);
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

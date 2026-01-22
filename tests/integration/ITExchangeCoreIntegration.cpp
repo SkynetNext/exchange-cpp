@@ -40,10 +40,7 @@ using namespace exchange::core::common::cmd;
 using namespace exchange::core::common::api;
 using namespace exchange::core::common::api::reports;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
 // Helper to check command result code
 static constexpr CommandResultCode CHECK_SUCCESS = CommandResultCode::SUCCESS;
@@ -914,7 +911,4 @@ void ITExchangeCoreIntegration::ExchangeRiskMoveTest() {
   }
 }
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

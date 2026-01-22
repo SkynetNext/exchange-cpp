@@ -24,10 +24,7 @@ using namespace exchange::core::tests::steps;
 using namespace exchange::core::tests::util;
 using namespace exchange::core::common::config;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace steps {
+namespace exchange::core::tests::steps {
 
 // Matches Java: RunCukeNaiveTests
 // Runs tests with base/default performance configuration
@@ -364,7 +361,4 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
   stepdefs_->ClientHasNoActiveOrders(1440001L);
 }
 
-}  // namespace steps
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::steps

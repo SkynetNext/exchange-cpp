@@ -16,10 +16,7 @@
 
 #include "TestOrdersGeneratorConfig.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 int TestOrdersGeneratorConfig::CalculateReadySeq() const {
   switch (preFillMode) {
@@ -32,7 +29,4 @@ int TestOrdersGeneratorConfig::CalculateReadySeq() const {
   }
 }
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

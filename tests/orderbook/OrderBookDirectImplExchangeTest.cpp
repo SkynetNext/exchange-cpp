@@ -26,10 +26,7 @@ using namespace exchange::core::collections::objpool;
 using namespace exchange::core::orderbook;
 using namespace exchange::core::tests::util;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace orderbook {
+namespace exchange::core::tests::orderbook {
 
 class OrderBookDirectImplExchangeTest : public OrderBookDirectImplTest {
 protected:
@@ -198,7 +195,4 @@ TEST_F(OrderBookDirectImplExchangeTest, MultipleCommandsCompareTest) {
   TestMultipleCommandsCompare();
 }
 
-}  // namespace orderbook
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::orderbook

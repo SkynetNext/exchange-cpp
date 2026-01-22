@@ -18,10 +18,7 @@
 #include <cmath>
 #include <sstream>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 std::string LatencyTools::FormatNanos(int64_t ns) {
   float value = ns / 1000.0f;
@@ -49,7 +46,4 @@ std::string LatencyTools::FormatNanos(int64_t ns) {
   return oss.str();
 }
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

@@ -167,7 +167,7 @@ TEST_F(SimpleEventsProcessorTest, ShouldHandleWithReduceCommand) {
     CreateMatcherTradeEvent(MatcherEventType::REDUCE, true, 0, 0, false, 20100L, 8272L);
   cmd.matcherEvent = matcherEvent;
 
-  ReduceEvent capturedReduceEvent;
+  ReduceEvent capturedReduceEvent{};
   EXPECT_CALL(*mockHandler_, CommandResult(_)).WillOnce([=](const ApiCommandResult& result) {
     // Verify immediately since SimpleEventsProcessor deletes the command
     ASSERT_NE(result.command, nullptr);
@@ -315,7 +315,7 @@ TEST_F(SimpleEventsProcessorTest, ShouldHandleWithTwoTradesAndReject) {
   secondTrade->nextEvent = reject;
 
   TradeEvent capturedTradeEvent;
-  RejectEvent capturedRejectEvent;
+  RejectEvent capturedRejectEvent{};
   EXPECT_CALL(*mockHandler_, CommandResult(_)).WillOnce([=](const ApiCommandResult& result) {
     // Verify immediately since SimpleEventsProcessor deletes the command
     ASSERT_NE(result.command, nullptr);
@@ -373,7 +373,7 @@ TEST_F(SimpleEventsProcessorTest, ShouldHandlerWithSingleReject) {
     CreateMatcherTradeEvent(MatcherEventType::REJECT, true, 0, 0, false, 52201L, 8272L);
   cmd.matcherEvent = reject;
 
-  RejectEvent capturedRejectEvent;
+  RejectEvent capturedRejectEvent{};
   EXPECT_CALL(*mockHandler_, CommandResult(_)).WillOnce([=](const ApiCommandResult& result) {
     // Verify immediately since SimpleEventsProcessor deletes the command
     ASSERT_NE(result.command, nullptr);

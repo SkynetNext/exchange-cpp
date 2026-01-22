@@ -17,20 +17,13 @@
 #include "ITExchangeCoreIntegrationStressBasic.h"
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
-ITExchangeCoreIntegrationStressBasic::ITExchangeCoreIntegrationStressBasic()
-  : ITExchangeCoreIntegrationStress() {}
+ITExchangeCoreIntegrationStressBasic::ITExchangeCoreIntegrationStressBasic() = default;
 
 exchange::core::common::config::PerformanceConfiguration
 ITExchangeCoreIntegrationStressBasic::GetPerformanceConfiguration() {
   return exchange::core::common::config::PerformanceConfiguration::Default();
 }
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

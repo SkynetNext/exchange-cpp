@@ -20,10 +20,7 @@
 #include <string>
 #include <vector>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * L2MarketDataHelper - helper class for building and manipulating L2MarketData
@@ -74,7 +71,4 @@ private:
   MaxWidth(int minWidth, const std::vector<int64_t>& arr1, const std::vector<int64_t>& arr2);
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

@@ -27,10 +27,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
 /**
  * RejectionCause - enum for rejection test causes
@@ -85,7 +82,4 @@ private:
                exchange::core::common::OrderType type);
 };
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

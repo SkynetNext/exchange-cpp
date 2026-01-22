@@ -16,10 +16,7 @@
 
 #include "NasdaqReader.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace nasdaq {
+namespace exchange::core::tests::nasdaq {
 
 int32_t NasdaqReader::HashToUid(int64_t orderId, int32_t numUsersMask) {
   int64_t x = ((orderId * 0xcc9e2d51LL) << 15) * 0x1b873593LL;
@@ -30,7 +27,4 @@ int64_t NasdaqReader::ConvertTime(int32_t high, int64_t low) {
   return low + (static_cast<int64_t>(high) << 32);
 }
 
-}  // namespace nasdaq
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::nasdaq

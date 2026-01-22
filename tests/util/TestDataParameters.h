@@ -20,10 +20,7 @@
 #include <set>
 #include "TestOrdersGeneratorConfig.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * AllowedSymbolTypes - types of symbols allowed in test
@@ -78,7 +75,4 @@ struct TestDataParameters {
   static TestDataParameters Huge();
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

@@ -18,10 +18,7 @@
 
 #include <gtest/gtest.h>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace perf {
+namespace exchange::core::tests::perf {
 
 /**
  * Disk Journaling latency tests
@@ -55,7 +52,4 @@ public:
   void TestLatencyMultiSymbolHugeJournaling();
 };
 
-}  // namespace perf
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::perf

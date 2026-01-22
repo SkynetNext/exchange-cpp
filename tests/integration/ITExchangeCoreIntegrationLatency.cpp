@@ -21,13 +21,9 @@
 
 using namespace exchange::core::tests::util;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
-ITExchangeCoreIntegrationLatency::ITExchangeCoreIntegrationLatency()
-  : ITExchangeCoreIntegration() {}
+ITExchangeCoreIntegrationLatency::ITExchangeCoreIntegrationLatency() = default;
 
 exchange::core::common::config::PerformanceConfiguration
 ITExchangeCoreIntegrationLatency::GetPerformanceConfiguration() {
@@ -64,7 +60,4 @@ TEST_F(ITExchangeCoreIntegrationLatency, ExchangeRiskMoveTest) {
   ExchangeRiskMoveTest();
 }
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

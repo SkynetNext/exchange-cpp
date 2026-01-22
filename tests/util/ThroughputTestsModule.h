@@ -19,13 +19,9 @@
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
-#include "ExchangeTestContainer.h"
 #include "TestDataParameters.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * ThroughputTestsModule - module for throughput performance testing
@@ -48,7 +44,4 @@ public:
     int iterations);
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

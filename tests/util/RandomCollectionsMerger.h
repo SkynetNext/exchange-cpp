@@ -19,10 +19,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * RandomCollectionsMerger - merges multiple collections using weighted random
@@ -41,19 +38,13 @@ public:
   static std::vector<T> MergeCollections(std::vector<std::vector<T>>& chunks, int64_t seed);
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util
 
 // Template implementation
 #include <algorithm>
 #include <random>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 template <typename T>
 std::vector<T> RandomCollectionsMerger::MergeCollections(std::vector<std::vector<T>>& chunks,
@@ -66,10 +57,10 @@ std::vector<T> RandomCollectionsMerger::MergeCollections(std::vector<std::vector
   // Use reference to avoid copying non-copyable types
   struct ChunkInfo {
     std::vector<T>* data;  // Pointer to allow moving
-    size_t currentIndex;
+    size_t currentIndex{};
     size_t size;
 
-    ChunkInfo(std::vector<T>& chunk) : data(&chunk), currentIndex(0), size(chunk.size()) {}
+    explicit ChunkInfo(std::vector<T>& chunk) : data(&chunk), size(chunk.size()) {}
   };
 
   std::vector<ChunkInfo> activeChunks;
@@ -136,7 +127,4 @@ std::vector<T> RandomCollectionsMerger::MergeCollections(std::vector<std::vector
   return mergedResult;
 }
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

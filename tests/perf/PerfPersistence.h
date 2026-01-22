@@ -18,10 +18,7 @@
 
 #include <gtest/gtest.h>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace perf {
+namespace exchange::core::tests::perf {
 
 class PerfPersistence : public ::testing::Test {
 public:
@@ -64,7 +61,4 @@ public:
   void TestPersistenceMultiSymbolHuge();
 };
 
-}  // namespace perf
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::perf

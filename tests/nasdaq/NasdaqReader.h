@@ -18,10 +18,7 @@
 
 #include <cstdint>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace nasdaq {
+namespace exchange::core::tests::nasdaq {
 
 /**
  * NasdaqReader - utility class for reading NASDAQ ITCH50 data files
@@ -46,7 +43,4 @@ public:
   static int64_t ConvertTime(int32_t high, int64_t low);
 };
 
-}  // namespace nasdaq
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::nasdaq

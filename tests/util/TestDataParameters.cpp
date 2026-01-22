@@ -17,10 +17,7 @@
 #include "TestDataParameters.h"
 #include "TestConstants.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 TestDataParameters TestDataParameters::SinglePairMargin() {
   TestDataParameters params;
@@ -87,7 +84,4 @@ TestDataParameters TestDataParameters::Huge() {
   return params;
 }
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

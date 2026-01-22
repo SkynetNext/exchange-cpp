@@ -25,10 +25,7 @@
 
 using namespace exchange::core::tests::util;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace steps {
+namespace exchange::core::tests::steps {
 
 exchange::core::common::config::PerformanceConfiguration OrderStepdefs::testPerformanceConfiguration =
   exchange::core::common::config::PerformanceConfiguration::Default();
@@ -545,7 +542,4 @@ std::map<int64_t, exchange::core::common::Order> OrderStepdefs::FetchIndexedOrde
   return result;
 }
 
-}  // namespace steps
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::steps

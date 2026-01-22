@@ -19,10 +19,7 @@
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include "TestDataParameters.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * PersistenceTestsModule - module for persistence performance testing
@@ -41,7 +38,4 @@ public:
     int iterations);
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

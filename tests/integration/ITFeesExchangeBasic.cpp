@@ -17,19 +17,13 @@
 #include "ITFeesExchangeBasic.h"
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
-ITFeesExchangeBasic::ITFeesExchangeBasic() : ITFeesExchange() {}
+ITFeesExchangeBasic::ITFeesExchangeBasic() = default;
 
 exchange::core::common::config::PerformanceConfiguration
 ITFeesExchangeBasic::GetPerformanceConfiguration() {
   return exchange::core::common::config::PerformanceConfiguration::Default();
 }
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

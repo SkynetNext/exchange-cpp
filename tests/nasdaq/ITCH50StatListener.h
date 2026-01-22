@@ -21,10 +21,7 @@
 #include <string>
 #include <unordered_map>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace nasdaq {
+namespace exchange::core::tests::nasdaq {
 
 /**
  * StockDescr - stock description
@@ -51,7 +48,7 @@ struct StockStat {
   bool priceSample = false;
   std::unordered_map<uint8_t, int32_t> counters;
 
-  StockStat(int32_t locate) : stockLocate(locate) {}
+  explicit StockStat(int32_t locate) : stockLocate(locate) {}
 
   std::string ToString() const;
 };
@@ -87,7 +84,4 @@ private:
   void UpdateStat(uint8_t msgType, int32_t stockLocate, int64_t longPrice);
 };
 
-}  // namespace nasdaq
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::nasdaq

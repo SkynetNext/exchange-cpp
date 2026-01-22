@@ -19,10 +19,7 @@
 #include <cstdint>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * LatencyTools - utility class for latency measurement and formatting
@@ -40,7 +37,4 @@ public:
   // Will be implemented when needed for performance tests
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

@@ -19,10 +19,7 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 L2MarketDataHelper::L2MarketDataHelper() = default;
 
@@ -247,7 +244,4 @@ int L2MarketDataHelper::MaxWidth(int minWidth,
   return maxLen;
 }
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

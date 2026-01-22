@@ -23,10 +23,7 @@ using namespace exchange::core::common;
 using namespace exchange::core::orderbook;
 using namespace exchange::core::tests::util;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace orderbook {
+namespace exchange::core::tests::orderbook {
 
 class OrderBookNaiveImplMarginTest : public OrderBookBaseTest {
 protected:
@@ -181,7 +178,4 @@ TEST_F(OrderBookNaiveImplMarginTest, ShouldMoveOrderMatchesAllLiquidity) {
   TestShouldMoveOrderMatchesAllLiquidity();
 }
 
-}  // namespace orderbook
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::orderbook

@@ -19,10 +19,7 @@
 #include <functional>
 #include <string>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * ExecutionTime - RAII class for measuring execution time
@@ -65,7 +62,4 @@ private:
   mutable bool timeCalculated_;
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

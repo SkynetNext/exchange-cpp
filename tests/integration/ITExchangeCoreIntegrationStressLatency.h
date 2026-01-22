@@ -18,10 +18,7 @@
 
 #include "ITExchangeCoreIntegrationStress.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
 /**
  * ITExchangeCoreIntegrationStressLatency - stress tests with latency
@@ -34,7 +31,4 @@ public:
   exchange::core::common::config::PerformanceConfiguration GetPerformanceConfiguration() override;
 };
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

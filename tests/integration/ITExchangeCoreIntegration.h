@@ -19,10 +19,7 @@
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <gtest/gtest.h>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
 /**
  * ITExchangeCoreIntegration - abstract base class for integration tests
@@ -71,7 +68,4 @@ public:
   void ExchangeRiskMoveTest();
 };
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

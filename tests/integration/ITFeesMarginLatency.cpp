@@ -17,12 +17,9 @@
 #include "ITFeesMarginLatency.h"
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
-ITFeesMarginLatency::ITFeesMarginLatency() : ITFeesMargin() {}
+ITFeesMarginLatency::ITFeesMarginLatency() = default;
 
 exchange::core::common::config::PerformanceConfiguration
 ITFeesMarginLatency::GetPerformanceConfiguration() {
@@ -33,7 +30,4 @@ ITFeesMarginLatency::GetPerformanceConfiguration() {
   return cfg;
 }
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

@@ -24,10 +24,7 @@
 #include <memory>
 #include <vector>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace orderbook {
+namespace exchange::core::tests::orderbook {
 
 class OrdersBucketTest : public ::testing::Test {
 protected:
@@ -50,7 +47,4 @@ protected:
   EventChainToList(exchange::core::common::MatcherTradeEvent* head);
 };
 
-}  // namespace orderbook
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::orderbook

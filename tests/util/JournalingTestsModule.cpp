@@ -25,10 +25,7 @@
 #include "ExchangeTestContainer.h"
 #include "LatencyTools.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 void JournalingTestsModule::JournalingTestImpl(
   const exchange::core::common::config::PerformanceConfiguration& performanceCfg,
@@ -265,7 +262,4 @@ void JournalingTestsModule::JournalingTestImpl(
   }
 }
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

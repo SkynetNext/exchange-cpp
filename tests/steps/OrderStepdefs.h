@@ -39,21 +39,12 @@
 #include <string>
 #include <vector>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 class ExchangeTestContainer;
 class L2MarketDataHelper;
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace steps {
+namespace exchange::core::tests::steps {
 
 /**
  * OrderStepdefs - Step definitions for order-related BDD tests
@@ -201,7 +192,4 @@ private:
   std::map<std::string, int64_t> users_;
 };
 
-}  // namespace steps
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::steps

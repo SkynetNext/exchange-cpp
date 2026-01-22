@@ -19,11 +19,9 @@
 #include <exchange/core/utils/Logger.h>
 #include <numeric>
 #include <vector>
+#include "ExchangeTestContainer.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 void ThroughputTestsModule::ThroughputTestImpl(
   const exchange::core::common::config::PerformanceConfiguration& performanceCfg,
@@ -202,7 +200,4 @@ void ThroughputTestsModule::ThroughputTestImpl(
   }
 }
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

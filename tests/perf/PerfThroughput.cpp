@@ -27,10 +27,7 @@ using namespace exchange::core::tests::util;
 
 using namespace exchange::core::tests::util;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace perf {
+namespace exchange::core::tests::perf {
 
 void PerfThroughput::TestThroughputMargin() {
   auto perfCfg =
@@ -156,7 +153,4 @@ TEST_F(PerfThroughput, DISABLED_TestThroughputMultiSymbolHuge) {
   TestThroughputMultiSymbolHuge();
 }
 
-}  // namespace perf
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::perf

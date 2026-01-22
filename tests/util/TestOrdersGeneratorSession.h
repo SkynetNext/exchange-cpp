@@ -23,10 +23,7 @@
 #include <vector>
 #include "JavaRandom.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * TestOrdersGeneratorSession - session state for generating test orders
@@ -102,7 +99,4 @@ public:
                              int seed);
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

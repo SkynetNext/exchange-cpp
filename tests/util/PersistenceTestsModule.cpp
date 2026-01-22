@@ -19,13 +19,11 @@
 #include <exchange/core/common/config/InitialStateConfiguration.h>
 #include <exchange/core/common/config/SerializationConfiguration.h>
 #include <exchange/core/utils/FastNanoTime.h>
+#include <array>
 #include <thread>
 #include "ExchangeTestContainer.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 void PersistenceTestsModule::PersistenceTestImpl(
   const exchange::core::common::config::PerformanceConfiguration& performanceCfg,
@@ -37,10 +35,10 @@ void PersistenceTestsModule::PersistenceTestImpl(
 
     const long stateId = exchange::core::utils::FastNanoTime::NowMillis() * 1000 + iteration;
 
-    char exchangeIdBuffer[32];
-    snprintf(exchangeIdBuffer, sizeof(exchangeIdBuffer), "%012llX",
+    std::array<char, 32> exchangeIdBuffer{};
+    snprintf(exchangeIdBuffer.data(), exchangeIdBuffer.size(), "%012llX",
              static_cast<unsigned long long>(exchange::core::utils::FastNanoTime::NowMillis()));
-    std::string exchangeId(exchangeIdBuffer);
+    std::string exchangeId(exchangeIdBuffer.data());
 
     auto firstStartConfig =
       exchange::core::common::config::InitialStateConfiguration::CleanStart(exchangeId);
@@ -201,7 +199,4 @@ void PersistenceTestsModule::PersistenceTestImpl(
   }
 }
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

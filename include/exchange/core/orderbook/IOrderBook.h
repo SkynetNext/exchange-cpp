@@ -53,7 +53,7 @@ enum class OrderBookImplType : uint8_t { NAIVE = 0, DIRECT = 2 };
  */
 class IOrderBook : public common::StateHash, public common::WriteBytesMarshallable {
 public:
-  virtual ~IOrderBook() = default;
+  ~IOrderBook() override = default;
 
   /**
    * Process new order

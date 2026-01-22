@@ -32,10 +32,7 @@
 
 using namespace exchange::core::tests::util;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
 void ITExchangeCoreIntegrationStress::ManyOperations(
   const exchange::core::common::CoreSymbolSpecification& symbolSpec) {
@@ -198,7 +195,4 @@ TEST_F(ITExchangeCoreIntegrationStressBasic, ManyOperationsExchange) {
   ManyOperations(TestConstants::SYMBOLSPEC_ETH_XBT());
 }
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration

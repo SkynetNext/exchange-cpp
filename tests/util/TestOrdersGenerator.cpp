@@ -47,10 +47,7 @@ using namespace exchange::core::common;
 using namespace exchange::core::common::cmd;
 using namespace exchange::core::orderbook;
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 // Constants matching Java implementation
 static constexpr double CENTRAL_MOVE_ALPHA = 0.01;
@@ -626,12 +623,12 @@ TestOrdersGenerator::GenerateMultipleSymbols(const TestOrdersGeneratorConfig& co
     // Match Java: orderBookSizeTarget = (int) (targetOrderBookOrdersTotal *
     // distribution[i] + 0.5)
     int orderBookSizeTarget =
-      static_cast<int>(config.targetOrderBookOrdersTotal * distribution[i] + 0.5);
+      static_cast<int>(lround(config.targetOrderBookOrdersTotal * distribution[i]));
 
     // Match Java: commandsNum = (i != 0) ? (int) (totalTransactionsNumber *
     // distribution[i] + 0.5) : Math.max(quotaLeft, 1)
     int commandsNum = (i != 0)
-                        ? static_cast<int>(config.totalTransactionsNumber * distribution[i] + 0.5)
+                        ? static_cast<int>(lround(config.totalTransactionsNumber * distribution[i]))
                         : std::max(quotaLeft, 1);
     quotaLeft -= commandsNum;
 
@@ -843,7 +840,4 @@ TestOrdersGenerator::MultiSymbolGenResult::GetApiCommandsBenchmark() const {
   return future;
 }
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

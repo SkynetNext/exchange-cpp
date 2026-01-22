@@ -21,10 +21,7 @@
 #include <exchange/core/common/config/SerializationConfiguration.h>
 #include "TestDataParameters.h"
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace util {
+namespace exchange::core::tests::util {
 
 /**
  * LatencyTestsModule - module for latency performance testing
@@ -77,7 +74,4 @@ public:
     int warmupCycles);
 };
 
-}  // namespace util
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::util

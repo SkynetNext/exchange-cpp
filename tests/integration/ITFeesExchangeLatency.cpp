@@ -17,12 +17,9 @@
 #include "ITFeesExchangeLatency.h"
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 
-namespace exchange {
-namespace core {
-namespace tests {
-namespace integration {
+namespace exchange::core::tests::integration {
 
-ITFeesExchangeLatency::ITFeesExchangeLatency() : ITFeesExchange() {}
+ITFeesExchangeLatency::ITFeesExchangeLatency() = default;
 
 exchange::core::common::config::PerformanceConfiguration
 ITFeesExchangeLatency::GetPerformanceConfiguration() {
@@ -33,7 +30,4 @@ ITFeesExchangeLatency::GetPerformanceConfiguration() {
   return cfg;
 }
 
-}  // namespace integration
-}  // namespace tests
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::tests::integration
