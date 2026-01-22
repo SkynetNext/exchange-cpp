@@ -173,9 +173,15 @@ void OrderBookDirectImplTest::TestMultipleCommandsCompare() {
 
     cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
     IOrderBook::ProcessCommand(orderBook_.get(), &cmd);
+    // Clean up matcher events created during command processing
+    MatcherTradeEvent::DeleteChain(cmd.matcherEvent);
+    cmd.matcherEvent = nullptr;
 
     cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
     CommandResultCode commandResultCode = IOrderBook::ProcessCommand(orderBookRef.get(), &cmd);
+    // Clean up matcher events created during command processing
+    MatcherTradeEvent::DeleteChain(cmd.matcherEvent);
+    cmd.matcherEvent = nullptr;
 
     ASSERT_EQ(commandResultCode, CommandResultCode::SUCCESS);
 

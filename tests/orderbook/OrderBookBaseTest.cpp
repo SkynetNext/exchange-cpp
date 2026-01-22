@@ -116,6 +116,9 @@ void OrderBookBaseTest::ClearOrderBook() {
   auto cmdAsk = OrderCommand::NewOrder(OrderType::IOC, 100000000000L, -1, MAX_PRICE, MAX_PRICE,
                                        askSum, OrderAction::BID);
   IOrderBook::ProcessCommand(orderBook_.get(), &cmdAsk);
+  // Clean up matcher events created during command processing
+  MatcherTradeEvent::DeleteChain(cmdAsk.matcherEvent);
+  cmdAsk.matcherEvent = nullptr;
 
   orderBook_->ValidateInternalState();
 
@@ -125,6 +128,9 @@ void OrderBookBaseTest::ClearOrderBook() {
   auto cmdBid =
     OrderCommand::NewOrder(OrderType::IOC, 100000000001L, -2, 1, 0, bidSum, OrderAction::ASK);
   IOrderBook::ProcessCommand(orderBook_.get(), &cmdBid);
+  // Clean up matcher events created during command processing
+  MatcherTradeEvent::DeleteChain(cmdBid.matcherEvent);
+  cmdBid.matcherEvent = nullptr;
 
   auto finalSnapshot = orderBook_->GetL2MarketDataSnapshot(INT32_MAX);
   ASSERT_EQ(finalSnapshot->askSize, 0);
@@ -136,13 +142,17 @@ void OrderBookBaseTest::ClearOrderBook() {
   // - NaiveImpl: Orders are deleted in OrdersBucket::Match when fully matched,
   //              and remaining orders are cleaned up in OrdersBucket destructor
   // - DirectImpl: Orders are returned to ObjectsPool when matched
-  // No manual deletion needed here.
+  // MatcherTradeEvent chains must be manually deleted in tests since they're
+  // not processed by GroupingProcessor in test environment.
 }
 
 void OrderBookBaseTest::ProcessAndValidate(OrderCommand& cmd, CommandResultCode expectedCmdState) {
   CommandResultCode resultCode = IOrderBook::ProcessCommand(orderBook_.get(), &cmd);
   ASSERT_EQ(resultCode, expectedCmdState);
   orderBook_->ValidateInternalState();
+  // Clean up matcher events created during command processing
+  MatcherTradeEvent::DeleteChain(cmd.matcherEvent);
+  cmd.matcherEvent = nullptr;
 }
 
 void OrderBookBaseTest::CheckEventTrade(const MatcherTradeEvent* event,
@@ -192,11 +202,15 @@ void OrderBookBaseTest::TestShouldInitializeWithoutErrors() {
 void OrderBookBaseTest::TestShouldAddGtcOrders() {
   auto cmd93 = OrderCommand::NewOrder(OrderType::GTC, 93, UID_1, 81598, 0, 1, OrderAction::ASK);
   IOrderBook::ProcessCommand(orderBook_.get(), &cmd93);
+  MatcherTradeEvent::DeleteChain(cmd93.matcherEvent);
+  cmd93.matcherEvent = nullptr;
   expectedState_->InsertAsk(0, 81598, 1);
 
   auto cmd94 = OrderCommand::NewOrder(OrderType::GTC, 94, UID_1, 81594, MAX_PRICE, 9'000'000'000L,
                                       OrderAction::BID);
   IOrderBook::ProcessCommand(orderBook_.get(), &cmd94);
+  MatcherTradeEvent::DeleteChain(cmd94.matcherEvent);
+  cmd94.matcherEvent = nullptr;
   expectedState_->InsertBid(0, 81594, 9'000'000'000L);
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(25);
@@ -206,11 +220,15 @@ void OrderBookBaseTest::TestShouldAddGtcOrders() {
   auto cmd95 =
     OrderCommand::NewOrder(OrderType::GTC, 95, UID_1, 130000, 0, 13'000'000'000L, OrderAction::ASK);
   IOrderBook::ProcessCommand(orderBook_.get(), &cmd95);
+  MatcherTradeEvent::DeleteChain(cmd95.matcherEvent);
+  cmd95.matcherEvent = nullptr;
   expectedState_->InsertAsk(3, 130000, 13'000'000'000L);
 
   auto cmd96 =
     OrderCommand::NewOrder(OrderType::GTC, 96, UID_1, 1000, MAX_PRICE, 4, OrderAction::BID);
   IOrderBook::ProcessCommand(orderBook_.get(), &cmd96);
+  MatcherTradeEvent::DeleteChain(cmd96.matcherEvent);
+  cmd96.matcherEvent = nullptr;
   expectedState_->InsertBid(6, 1000, 4);
 
   snapshot = orderBook_->GetL2MarketDataSnapshot(25);
@@ -763,6 +781,9 @@ void OrderBookBaseTest::TestMultipleCommandsKeepInternalState() {
     cmd.orderId += 100;  // TODO set start id
     CommandResultCode commandResultCode = IOrderBook::ProcessCommand(localOrderBook.get(), &cmd);
     ASSERT_EQ(commandResultCode, CommandResultCode::SUCCESS);
+    // Clean up matcher events created during command processing
+    MatcherTradeEvent::DeleteChain(cmd.matcherEvent);
+    cmd.matcherEvent = nullptr;
     localOrderBook->ValidateInternalState();
   }
 }
