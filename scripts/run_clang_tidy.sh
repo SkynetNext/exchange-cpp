@@ -176,7 +176,7 @@ if [ -n "$FILES_SPECIFIED" ]; then
 else
   # Find all .cpp, .hpp, .h files (exclude third_party and reference)
   echo -e "${GREEN}=== Finding source files ===${NC}"
-  FILES=$(find include tests examples benchmarks -name "*.cpp" -o -name "*.hpp" -o -name "*.h" 2>/dev/null | \
+  FILES=$(find include tests examples benchmarks -name "*.cpp" 2>/dev/null | \
     grep -v third_party | \
     grep -v reference || true)
   
