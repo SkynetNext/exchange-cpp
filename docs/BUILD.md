@@ -39,9 +39,10 @@ cmake --build . -j$(nproc)
 ### Ubuntu 24.04+
 
 ```bash
-sudo apt install gcc-15 g++-15
+sudo apt install gcc-15 g++-15 gdb-15
 sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
 sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
+sudo update-alternatives --install /usr/bin/gdb gdb /usr/bin/gdb-15 100
 ```
 
 ### Ubuntu 22.04 (Build from Source)
@@ -63,6 +64,10 @@ sudo update-alternatives --install /usr/bin/gcc gcc /usr/local/gcc-15.2.0/bin/gc
 sudo update-alternatives --install /usr/bin/g++ g++ /usr/local/gcc-15.2.0/bin/g++-15.2.0 100
 sudo update-alternatives --set gcc /usr/local/gcc-15.2.0/bin/gcc-15.2.0
 sudo update-alternatives --set g++ /usr/local/gcc-15.2.0/bin/g++-15.2.0
+
+# Note: GDB is a separate project and not included in GCC source build.
+# Use system GDB or install separately:
+# sudo apt install gdb
 
 # Add to library path
 echo 'export LD_LIBRARY_PATH=/usr/local/gcc-15.2.0/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc

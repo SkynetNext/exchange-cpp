@@ -233,7 +233,7 @@ void OrderBookBaseTest::TestShouldIgnoredDuplicateOrder() {
     OrderCommand::NewOrder(OrderType::GTC, 1, UID_1, 81600, 0, 100, OrderAction::ASK);
   ProcessAndValidate(orderCommand, CommandResultCode::SUCCESS);
   MatcherTradeEventGuard guard(orderCommand);  // Takes ownership, auto-cleanup
-  auto events = orderCommand.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 1U);
 }
 
@@ -248,7 +248,7 @@ void OrderBookBaseTest::TestShouldRemoveBidOrder() {
 
   ASSERT_EQ(cmd.action, OrderAction::BID);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 1U);
   CheckEventReduce(events[0], 20L, 81590, true, nullptr);
 }
@@ -264,7 +264,7 @@ void OrderBookBaseTest::TestShouldRemoveAskOrder() {
 
   ASSERT_EQ(cmd.action, OrderAction::ASK);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 1U);
   CheckEventReduce(events[0], 50L, 81599L, true, nullptr);
 }
@@ -280,7 +280,7 @@ void OrderBookBaseTest::TestShouldReduceBidOrder() {
 
   ASSERT_EQ(cmd.action, OrderAction::BID);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 1U);
   CheckEventReduce(events[0], 3L, 81590L, false, nullptr);
 }
@@ -296,7 +296,7 @@ void OrderBookBaseTest::TestShouldReduceAskOrder() {
 
   ASSERT_EQ(cmd.action, OrderAction::ASK);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 1U);
   CheckEventReduce(events[0], 100L, 81600L, true, nullptr);
 }
@@ -308,7 +308,7 @@ void OrderBookBaseTest::TestShouldRemoveOrderAndEmptyBucket() {
 
   ASSERT_EQ(cmdCancel2.action, OrderAction::ASK);
 
-  auto events = cmdCancel2.ExtractEvents();
+  auto events = guard2.ExtractEvents();
   ASSERT_EQ(events.size(), 1U);
   CheckEventReduce(events[0], 50L, 81599L, true, nullptr);
 
@@ -322,7 +322,7 @@ void OrderBookBaseTest::TestShouldRemoveOrderAndEmptyBucket() {
   auto snapshot = orderBook_->GetL2MarketDataSnapshot();
   ASSERT_EQ(*expected, *snapshot);
 
-  events = cmdCancel3.ExtractEvents();
+  events = guard3.ExtractEvents();
   ASSERT_EQ(events.size(), 1U);
   CheckEventReduce(events[0], 25L, 81599L, true, nullptr);
 }
@@ -335,7 +335,7 @@ void OrderBookBaseTest::TestShouldReturnErrorWhenDeletingUnknownOrder() {
   auto snapshot = orderBook_->GetL2MarketDataSnapshot();
   ASSERT_EQ(*expectedState_->Build(), *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 0U);
 }
 
@@ -371,7 +371,7 @@ void OrderBookBaseTest::TestShouldReturnErrorWhenUpdatingUnknownOrder() {
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   ASSERT_EQ(*expectedState_->Build(), *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 0U);
 }
 
@@ -423,7 +423,7 @@ void OrderBookBaseTest::TestShouldMoveOrderExistingBucket() {
   auto expected = expectedState_->SetBidVolume(1, 41).IncrementBidOrdersNum(1).RemoveBid(2).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 0U);
 }
 
@@ -437,7 +437,7 @@ void OrderBookBaseTest::TestShouldMoveOrderNewBucket() {
   auto expected = expectedState_->RemoveBid(2).InsertBid(0, 81594, 20).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 0U);
 }
 
@@ -450,7 +450,7 @@ void OrderBookBaseTest::TestShouldMatchIocOrderPartialBBO() {
   auto expected = expectedState_->SetBidVolume(0, 30).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 1U);
   CheckEventTrade(events[0], 4L, 81593, 10L);
 }
@@ -464,7 +464,7 @@ void OrderBookBaseTest::TestShouldMatchIocOrderFullBBO() {
   auto expected = expectedState_->RemoveBid(0).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 1U);
   CheckEventTrade(events[0], 4L, 81593, 40L);
 }
@@ -478,7 +478,7 @@ void OrderBookBaseTest::TestShouldMatchIocOrderWithTwoLimitOrdersPartial() {
   auto expected = expectedState_->RemoveBid(0).SetBidVolume(0, 20).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 2U);
   CheckEventTrade(events[0], 4L, 81593, 40L);
   CheckEventTrade(events[1], 5L, 81590, 1L);
@@ -497,7 +497,7 @@ void OrderBookBaseTest::TestShouldMatchIocOrderFullLiquidity() {
   auto expected = expectedState_->RemoveAsk(0).RemoveAsk(0).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 3U);
   CheckEventTrade(events[0], 2L, 81599L, 50L);
   CheckEventTrade(events[1], 3L, 81599L, 25L);
@@ -518,7 +518,7 @@ void OrderBookBaseTest::TestShouldMatchIocOrderWithRejection() {
   auto expected = expectedState_->RemoveAllAsks().Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 7U);
 
   int64_t bidderHoldPrice = MAX_PRICE + 1;
@@ -538,7 +538,7 @@ void OrderBookBaseTest::TestShouldRejectFokBidOrderOutOfBudget() {
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   ASSERT_EQ(*expectedState_->Build(), *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 1U);
 
   CheckEventRejection(events[0], size, buyBudget, &buyBudget);
@@ -558,7 +558,7 @@ void OrderBookBaseTest::TestShouldMatchFokBidOrderExactBudget() {
   auto expected = expectedState_->RemoveAsk(0).RemoveAsk(0).SetAskVolume(0, 5).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 4U);
   CheckEventTrade(events[0], 2L, 81599, 50L);
   CheckEventTrade(events[1], 3L, 81599, 25L);
@@ -580,7 +580,7 @@ void OrderBookBaseTest::TestShouldMatchFokBidOrderExtraBudget() {
   auto expected = expectedState_->RemoveAsk(0).RemoveAsk(0).SetAskVolume(0, 9).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 4U);
   CheckEventTrade(events[0], 2L, 81599, 50L);
   CheckEventTrade(events[1], 3L, 81599, 25L);
@@ -601,7 +601,7 @@ void OrderBookBaseTest::TestShouldRejectFokAskOrderBelowExpectation() {
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   ASSERT_EQ(*expectedState_->Build(), *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 1U);
   CheckEventRejection(events[0], size, sellExpectation, &sellExpectation);
 }
@@ -620,7 +620,7 @@ void OrderBookBaseTest::TestShouldMatchFokAskOrderExactExpectation() {
   auto expected = expectedState_->RemoveBid(0).SetBidVolume(0, 1).DecrementBidOrdersNum(0).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 2U);
   CheckEventTrade(events[0], 4L, 81593L, 40L);
   CheckEventTrade(events[1], 5L, 81590L, 20L);
@@ -640,7 +640,7 @@ void OrderBookBaseTest::TestShouldMatchFokAskOrderExtraBudget() {
   auto expected = expectedState_->RemoveBid(0).RemoveBid(0).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 3U);
   CheckEventTrade(events[0], 4L, 81593L, 40L);
   CheckEventTrade(events[1], 5L, 81590L, 20L);
@@ -657,7 +657,7 @@ void OrderBookBaseTest::TestShouldFullyMatchMarketableGtcOrder() {
   auto expected = expectedState_->SetAskVolume(0, 74).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 1U);
   CheckEventTrade(events[0], 2L, 81599, 1L);
 }
@@ -672,7 +672,7 @@ void OrderBookBaseTest::TestShouldPartiallyMatchMarketableGtcOrderAndPlace() {
   auto expected = expectedState_->RemoveAsk(0).InsertBid(0, 81599, 2).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 2U);
 
   CheckEventTrade(events[0], 2L, 81599, 50L);
@@ -689,7 +689,7 @@ void OrderBookBaseTest::TestShouldFullyMatchMarketableGtcOrder2Prices() {
   auto expected = expectedState_->RemoveAsk(0).SetAskVolume(0, 98).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 3U);
 
   CheckEventTrade(events[0], 2L, 81599, 50L);
@@ -707,7 +707,7 @@ void OrderBookBaseTest::TestShouldFullyMatchMarketableGtcOrderWithAllLiquidity()
   auto expected = expectedState_->RemoveAllAsks().InsertBid(0, 220000, 755).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard.ExtractEvents();
   ASSERT_EQ(events.size(), 6U);
 
   CheckEventTrade(events[0], 2L, 81599, 50L);
@@ -724,7 +724,7 @@ void OrderBookBaseTest::TestShouldMoveOrderFullyMatchAsMarketable() {
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
   MatcherTradeEventGuard guard1(cmd);  // Takes ownership, auto-cleanup
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard1.ExtractEvents();
   ASSERT_EQ(events.size(), 0U);
 
   auto expected = expectedState_->SetBidVolume(2, 40).IncrementBidOrdersNum(2).Build();
@@ -740,7 +740,7 @@ void OrderBookBaseTest::TestShouldMoveOrderFullyMatchAsMarketable() {
   snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   ASSERT_EQ(*expected, *snapshot);
 
-  events = cmd.ExtractEvents();
+  events = guard2.ExtractEvents();
   ASSERT_EQ(events.size(), 1U);
   CheckEventTrade(events[0], 2L, 81599, 20L);
 }
@@ -751,7 +751,7 @@ void OrderBookBaseTest::TestShouldMoveOrderFullyMatchAsMarketable2Prices() {
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
   MatcherTradeEventGuard guard1(cmd);  // Takes ownership, auto-cleanup
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard1.ExtractEvents();
   ASSERT_EQ(events.size(), 0U);
 
   cmd = OrderCommand::Update(83, UID_2, 81600);
@@ -763,7 +763,7 @@ void OrderBookBaseTest::TestShouldMoveOrderFullyMatchAsMarketable2Prices() {
   auto expected = expectedState_->RemoveAsk(0).SetAskVolume(0, 75).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  events = cmd.ExtractEvents();
+  events = guard2.ExtractEvents();
   ASSERT_EQ(events.size(), 3U);
   CheckEventTrade(events[0], 2L, 81599, 50L);
   CheckEventTrade(events[1], 3L, 81599, 25L);
@@ -785,7 +785,7 @@ void OrderBookBaseTest::TestShouldMoveOrderMatchesAllLiquidity() {
   auto expected = expectedState_->RemoveAllAsks().InsertBid(0, 201000, 1).Build();
   ASSERT_EQ(*expected, *snapshot);
 
-  auto events = cmd.ExtractEvents();
+  auto events = guard2.ExtractEvents();
   ASSERT_EQ(events.size(), 6U);
   CheckEventTrade(events[0], 2L, 81599, 50L);
   CheckEventTrade(events[1], 3L, 81599, 25L);

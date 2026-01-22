@@ -18,6 +18,7 @@
 
 #include <exchange/core/common/MatcherTradeEvent.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
+#include <vector>
 
 namespace exchange::core::tests::util {
 
@@ -29,7 +30,7 @@ namespace exchange::core::tests::util {
  *   OrderCommand cmd = ...;
  *   ProcessAndValidate(cmd, ...);
  *   MatcherTradeEventGuard guard(cmd);  // Takes ownership
- *   auto events = cmd.ExtractEvents();
+ *   auto events = guard.ExtractEvents();  // Get events from guard, not cmd
  *   // ... verify events ...
  *   // guard automatically deletes chain on scope exit
  */
@@ -82,6 +83,14 @@ public:
    */
   common::MatcherTradeEvent* Get() const noexcept {
     return eventChain_;
+  }
+
+  /**
+   * Extract events as a vector (for verification purposes).
+   * The chain will still be deleted when the guard is destroyed.
+   */
+  std::vector<common::MatcherTradeEvent*> ExtractEvents() const {
+    return common::MatcherTradeEvent::AsList(eventChain_);
   }
 
   /**
