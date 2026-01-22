@@ -101,119 +101,195 @@ Gateway → Grouping → Risk(R1) → Matching → Risk(R2) → Results
 
 ---
 
-## 四、个人成长与技术敏感度
+## 四、C++ 现代化演进
 
-### 4.1 C++23 最有价值的特性（业界反馈）
+### 4.1 C++23：稳定与打磨
 
-**业界共识**: C++23 是"打磨版"发布，稳定 C++20 主要特性，同时为库作者和系统开发者提供显著的生活质量改进。
+C++23 是"打磨版"发布，稳定 C++20 主要特性，为库作者和系统开发者提供实用改进。
 
-#### 核心语言特性（最高价值）
+#### 语言特性
 
-| 特性 | 业界反馈 | 实际工程价值 | 应用场景 |
-|------|----------|--------------|----------|
-| **Deducing `this`** | ⭐⭐⭐⭐⭐ | 简化 CRTP，减少 50%+ 模板样板代码 | 简化 CRTP 实现，减少模板样板代码 |
-| **`if consteval`** | ⭐⭐⭐⭐ | 更直观的编译期分支，替代 `std::is_constant_evaluated()` | 编译期优化分支，配置表预生成 |
-| **多维下标运算符** | ⭐⭐⭐⭐ | 科学计算、矩阵库标准支持 | 市场数据处理、多维数组视图 |
-| **扩展 `constexpr`** | ⭐⭐⭐⭐⭐ | 更多标准库容器/算法编译期可用 | 配置表预生成，消除运行时错误 |
+| 特性 | 工程价值 | 本项目应用 |
+|------|----------|------------|
+| **Deducing `this`** | 简化 CRTP，减少 50%+ 模板样板代码 | 静态多态场景 |
+| **`if consteval`** | `constexpr` 函数内判断编译期/运行期，选择不同算法 | 配置预计算 |
 
-#### 标准库特性（最高价值）
-
-| 特性 | 业界反馈 | 实际工程价值 | 应用场景 |
-|------|----------|--------------|----------|
-| **`std::expected`** | ⭐⭐⭐⭐⭐ | 异常替代，热路径零开销错误处理 | 替代异常处理，热路径错误码返回 |
-| **`std::mdspan`** | ⭐⭐⭐⭐ | 多维数组视图标准，性能优于原始指针 | 多维数组视图，市场数据处理 |
-| **`std::flat_map`/`std::flat_set`** | ⭐⭐⭐⭐ | 内存高效、缓存友好，1.5-2x 性能提升 | 替代 `std::map`/`std::set` 在特定场景 |
-| **Range 改进** | ⭐⭐⭐ | `views::enumerate`, `views::zip` 简化代码 | 数据转换、调试输出 |
-
-#### 业界实际应用反馈
-
-1. **构建性能**: Modules 从"实验性玩具"变为生产就绪，显著减少构建复杂度和"头文件地狱"，编译时间减少 30-50%
-2. **模板调试**: Concepts 成为编写模板代码的默认方式，错误消息更清晰，节省数天调试时间
-3. **系统安全**: 通过 `constexpr` 和 `std::expected`，消除整类运行时错误，构建更安全的系统
-4. **编译器支持**: 主要特性（`deducing this`, `if consteval`, 多维下标）在 GCC 13+, Clang 17+, MSVC 2022+ 已有稳定支持
-
-### 4.2 C++26 最有价值的特性（业界反馈）
-
-**业界共识**: C++26 被视为与 C++11 相当的重大进化，开启"第二波现代化浪潮"。高频交易公司（如 Citadel Securities）已在生产环境集成草案特性。
-
-#### 容器特性（最高价值）
-
-| 特性 | 业界反馈 | 实际工程价值 | 应用场景 | 优先级 |
-|------|----------|--------------|----------|--------|
-| **`std::inplace_vector`** | ⭐⭐⭐⭐⭐ | 固定容量栈分配，零堆分配延迟 | `VectorBytesOut` 小缓冲区，避免堆分配 | 🔥 立即考虑 |
-| **`std::hive`** | ⭐⭐⭐⭐ | 稳定指针、对象池、无重新分配 | 对象池、事件缓冲区，无重新分配 | 📋 中期考虑 |
-| **`std::hazard_pointer`** | ⭐⭐⭐⭐ | 基于 Facebook `folly`（2017 年生产使用） | 自定义无锁数据结构，解决 ABA 问题 | 🔍 按需使用 |
-
-**`std::inplace_vector` 应用示例**:
+**Deducing `this` 简化 CRTP**：
 ```cpp
-// 当前：可能触发堆分配
-std::vector<uint8_t> data;
-data.resize(100);  // 可能分配堆内存
+// 传统 CRTP (C++20)：需要模板参数 + static_cast
+template<typename Derived>
+struct Base {
+    void interface() {
+        static_cast<Derived*>(this)->impl();
+    }
+};
+struct Derived : Base<Derived> { void impl() { /*...*/ } };
 
-// 使用 inplace_vector：小数据栈分配
-std::inplace_vector<uint8_t, 256> data;  // 256字节内栈分配
-data.resize(100);  // 无堆分配，零延迟
+// Deducing this (C++23)：自动推导，无需模板和转型
+struct Base {
+    void interface(this auto&& self) {
+        self.impl();
+    }
+};
+struct Derived : Base { void impl() { /*...*/ } };
+```
+| **`constexpr` 扩展** | 更多容器/算法编译期可用 | 常量配置校验 |
+| **`std::print`** | 类型安全格式化输出，替代 `printf`/`iostream` | 日志输出 |
+
+**`if consteval` 示例**：
+```cpp
+constexpr uint64_t ipow(uint64_t base, uint8_t exp) {
+    if consteval {
+        // 编译期：用整数循环算法
+        uint64_t res = 1;
+        while (exp--) res *= base;
+        return res;
+    } else {
+        // 运行期：用硬件优化的 std::pow
+        return std::pow(base, exp);
+    }
+}
 ```
 
-**适用场景**:
-- `VectorBytesOut`: 序列化缓冲区（通常 < 256 字节）
-- 临时缓冲区: 避免频繁堆分配
-- 性能收益: 减少内存分配延迟，提升热路径性能
+#### 标准库特性
 
-**`std::hive` 特性**:
-- 稳定指针：元素插入/删除后指针仍有效
-- 内存重用：自动重用已删除元素的内存
-- 迭代效率：自动移除空块，保持迭代性能
-- 适用场景：游戏编程、对象池、事件缓冲区
+| 特性 | 工程价值 | 本项目应用 |
+|------|----------|------------|
+| **`std::expected<T, E>`** | 零开销错误处理，替代异常 | 热路径返回值 |
+| **`std::mdspan`** | 多维数组视图 | 市场数据处理 |
+| **`std::flat_map`** | 缓存友好有序容器 | ⚠️ **仅适合只读或批量构建**，随机插入 O(N) |
 
-#### 并发与执行特性（最高价值）
+**`std::flat_map` 注意事项**：
+```cpp
+// ❌ 错误用法：随机插入 O(N²)，大数据集会卡死
+std::flat_map<int, int> fm;
+for (int i : random_keys) fm[i] = i;  // 每次插入都要移动元素
 
-| 特性 | 业界反馈 | 实际工程价值 | 应用场景 |
-|------|----------|--------------|----------|
-| **`std::execution`** | ⭐⭐⭐⭐⭐ | Citadel Securities 已用于消息基础设施 | 异步执行、任务调度、消息处理 |
-| **`std::hazard_pointer`** | ⭐⭐⭐⭐ | Facebook `folly` 生产验证（2017+） | 无锁数据结构、ABA 问题解决 |
+// ✅ 正确用法：批量构建后只读查询
+std::vector<std::pair<int, int>> data = ...;
+std::ranges::sort(data);
+std::flat_map<int, int> fm(std::from_range, data);  // O(1) 查询，缓存友好
+```
 
-**业界实际应用**:
-- **Citadel Securities**: 使用 `std::execution` 作为消息基础设施和资产类别交易的基础
-- **Facebook `folly`**: `hazard_pointer` 自 2017 年起在生产环境使用，性能稳定
+#### 编译器支持
 
-#### 中等价值特性
+| 特性 | GCC | Clang | MSVC |
+|------|-----|-------|------|
+| `deducing this` | 14+ | 18+ | 19.32+ |
+| `if consteval` | 12+ | 14+ | 19.31+ |
+| `std::expected` | 12+ | 16+ | 19.33+ |
+| `std::print` | 14+ | 18+ | 19.37+ |
 
-| 特性 | 价值 | 应用场景 | 备注 |
-|------|------|----------|------|
-| **`std::simd`** | ⭐⭐⭐ | 批量数据处理、数据转换 | 需要明确热点场景 |
-| **`std::rcu`** | ⭐⭐ | 配置读取（读多写少） | 项目主要是写密集型 |
+---
 
-#### 低价值特性（不太相关）
+### 4.2 C++26：第二波现代化
 
-| 特性 | 价值 | 原因 |
-|------|------|------|
-| **`std::contracts`** | ⭐⭐ | 调试有用，但可能影响性能 |
-| **`std::linalg`** | ⭐ | 线性代数库，项目不涉及 |
-| **`std::text_encoding`** | ⭐ | 文本编码，项目主要是二进制协议 |
-| **`std::debugging`** | ⭐⭐ | 调试工具，生产环境通常不需要 |
+C++26 被视为继 C++11 后的重大进化。部分库特性已有生产验证（如 `folly::hazard_pointer`）。
 
-#### 业界最关注的 C++26 特性（综合评估）
+#### 已确认特性（cppreference 收录）
 
-1. **Reflection（反射）**: 元编程、序列化、代码生成（✅ 已确定进入 C++26，2025年6月 Sofia 会议投票，P2996；⚠️ 编译器支持：GCC 实验性 `-freflection`，Clang 仅在 Bloomberg fork，MSVC 不支持）
-2. **Contracts（契约）**: 系统安全性、调试能力（✅ 已确定进入 C++26，2025年2月 Hagenberg 会议投票，P2900R14；⚠️ 编译器支持：GCC/Clang 仅在 fork 中，MSVC 不支持）
-3. **`std::execution`**: 异步执行、性能优化（✅ 已确定进入 C++26）
-4. **`std::inplace_vector`**: 零分配热路径优化（✅ 已确定进入 C++26）
-5. **`std::hive`**: 对象池、稳定指针场景（✅ 已确定进入 C++26）
+**容器**：
 
-**注意**: `std::hazard_pointer` 主要用于解决 ABA 问题，但项目使用的 Disruptor 已内部处理，当前可能不需要。不过，如果未来需要自定义无锁数据结构，这是标准库提供的可靠选择。
+| 特性 | 工程价值 | 本项目应用 |
+|------|----------|------------|
+| **`std::inplace_vector<T, N>`** | 固定容量栈分配，零堆分配 | 序列化缓冲区 (< 256B) |
+| **`std::hive`** | 稳定指针、自动内存重用 | 对象池替代方案 |
 
-### 4.3 关注的开源项目
+```cpp
+// std::inplace_vector：小数据零堆分配
+std::inplace_vector<uint8_t, 256> buf;
+buf.resize(100);  // 栈分配，零延迟
 
-| 项目 | 原因 |
-|------|------|
-| **LMAX Disruptor** | 参考架构，C++ 实现对标 |
-| **mimalloc** | 已集成，性能最优分配器 |
-| **folly** | Meta 高性能库，学习并发原语设计 |
-| **abseil** | Google 通用库，高质量 API 设计参考 |
-| **seastar** | 无共享架构，未来网关层参考 |
+// std::hive：稳定指针
+std::hive<Order> orders;
+auto it = orders.insert(order);
+orders.erase(other_it);  // it 仍然有效
+```
 
-### 4.4 实质性行动
+**并发**：
+
+| 特性 | 工程价值 | 本项目应用 |
+|------|----------|------------|
+| **`std::execution`** (P2300) | 标准化异步执行框架 | 已有 Disruptor，暂不需要 |
+| **`std::hazard_pointer`** | 无锁数据结构 ABA 问题解决 | Disruptor 已内部处理，按需使用 |
+| **`std::rcu`** | 读多写少场景 | 配置热更新 |
+
+**语言**：
+
+| 特性 | 工程价值 | 编译器支持 |
+|------|----------|------------|
+| **Contracts** (P2900R14) | 前置/后置条件检查 | ❌ 无主流编译器支持 |
+| **`constexpr` 异常** (P3068R6) | 编译期异常处理 | ❌ 无主流编译器支持 |
+| **Pack indexing** (P2662R3) | `T...[I]` 语法访问参数包 | GCC 15+, Clang 19+ |
+
+#### Reflection (P2996)
+
+| 状态 | 编译器支持 |
+|------|------------|
+| ⚠️ 未列入 cppreference C++26，但已有实验性支持 | GCC 14+ `-freflection`, Clang (p2996 fork) |
+
+**实际应用**：已用于 JSON 自动序列化/反序列化（见 `JsonReflection.h`）
+
+```cpp
+// C++26 反射自动生成 JSON 解析
+template <typename T>
+void from_json_auto(const nlohmann::json& j, T& obj) {
+    template for (const auto member : ^^T.nonstatic_data_members) {
+        constexpr auto member_name = [:member.name():];
+        using member_type = [:member.type():];
+        if (j.contains(member_name)) {
+            obj.[:member:] = j[member_name].get<member_type>();
+        }
+    }
+}
+```
+
+**编译要求**：`-std=c++26 -freflection` (GCC 14+)
+
+#### 编译器支持现状（2026-01）
+
+| 特性 | GCC | Clang | MSVC |
+|------|-----|-------|------|
+| `std::inplace_vector` | ❌ | ❌ | ❌ |
+| `std::hive` | ❌ | ❌ | ❌ |
+| `std::execution` | ❌ | ❌ | ❌ |
+| Contracts | ❌ | ❌ | ❌ |
+
+*注：C++26 库特性尚无主流编译器实现，语言特性部分已有支持。*
+
+---
+
+### 4.3 本项目应用策略
+
+| 优先级 | 特性 | 行动 |
+|--------|------|------|
+| 🔥 **立即可用** | `std::expected`, `std::print`, `if consteval` | 逐步替换异常处理和日志 |
+| ✅ **已在使用** | Reflection (P2996) | JSON 自动序列化 (`-freflection`) |
+| 📋 **跟踪关注** | `std::inplace_vector`, Contracts | 编译器支持后评估引入 |
+| 🔍 **按需评估** | `std::hive`, `std::execution` | 已有 ObjectsPool/Disruptor，非刚需 |
+| ⏸️ **暂不考虑** | `std::linalg` | 项目不涉及线性代数 |
+
+---
+
+### 4.4 使用的开源项目
+
+| 项目 | 用途 | 性能收益 |
+|------|------|----------|
+| **disruptor-cpp** | Lock-free Ring Buffer | 无锁流水线核心 |
+| **mimalloc** | 全局内存分配器 | 减少 50%+ 分配开销 |
+| **ankerl::unordered_dense** | Hash Map | 2-3x 快于 `std::unordered_map` |
+| **moodycamel::ConcurrentQueue** | 并发队列 | 14ns 延迟，70M ops/s |
+| **oneTBB** | `concurrent_hash_map` | Lock-free 并发哈希表 |
+| **lz4** | 压缩 | 快速压缩/解压 |
+
+### 4.5 关注的开源项目
+
+| 项目 | 关注点 |
+|------|--------|
+| **LMAX Disruptor** | 参考架构，本项目 C++ 实现对标 |
+| **Boost.Decimal** | 定点数/十进制算术，`sqrt` 优化贡献中 (cppalliance/decimal#1311) |
+
+### 4.6 实质性行动
 
 1. **完整翻译** exchange-core Java → C++，含 ART Tree、ObjectsPool
 2. **性能调优**: 通过 perf + flamegraph 定位瓶颈，优化 `orderIdIndex_`
