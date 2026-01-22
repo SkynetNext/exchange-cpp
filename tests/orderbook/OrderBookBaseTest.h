@@ -63,6 +63,10 @@ protected:
   void ProcessAndValidate(exchange::core::common::cmd::OrderCommand& cmd,
                           exchange::core::common::cmd::CommandResultCode expectedCmdState);
 
+  // Process command, validate, and cleanup events (for SetUp initialization)
+  void ProcessAndCleanup(exchange::core::common::cmd::OrderCommand& cmd,
+                         exchange::core::common::cmd::CommandResultCode expectedCmdState);
+
   void CheckEventTrade(const exchange::core::common::MatcherTradeEvent* event,
                        int64_t matchedId,
                        int64_t price,

@@ -86,6 +86,19 @@ public:
     return objectsPool_;
   }
 
+  void RecycleTree() override {
+    // Recursively recycle child nodes first
+    if (nodeLevel_ != 0) {
+      for (int i = 0; i < 48; i++) {
+        if (nodes_[i] != nullptr) {
+          static_cast<IArtNode<V>*>(nodes_[i])->RecycleTree();
+        }
+      }
+    }
+    // Then recycle this node
+    RecycleNodeToPool<V>(this);
+  }
+
   void InitFromNode16(ArtNode16<V>* node16, uint8_t subKey, void* newElement);
   void InitFromNode256(ArtNode256<V>* node256);
 

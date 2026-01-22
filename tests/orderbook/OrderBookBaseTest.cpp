@@ -33,59 +33,60 @@ void OrderBookBaseTest::SetUp() {
   orderBook_ = CreateNewOrderBook();
   orderBook_->ValidateInternalState();
 
+  // Use ProcessAndCleanup for SetUp initialization - events are cleaned up immediately
   auto cmd0 =
     OrderCommand::NewOrder(OrderType::GTC, 0L, UID_2, INITIAL_PRICE, 0L, 13L, OrderAction::ASK);
-  ProcessAndValidate(cmd0, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmd0, CommandResultCode::SUCCESS);
 
   auto cmdCancel0 = OrderCommand::Cancel(0L, UID_2);
-  ProcessAndValidate(cmdCancel0, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmdCancel0, CommandResultCode::SUCCESS);
 
   auto cmd1 = OrderCommand::NewOrder(OrderType::GTC, 1L, UID_1, 81600L, 0L, 100L, OrderAction::ASK);
-  ProcessAndValidate(cmd1, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmd1, CommandResultCode::SUCCESS);
 
   auto cmd2 = OrderCommand::NewOrder(OrderType::GTC, 2L, UID_1, 81599L, 0L, 50L, OrderAction::ASK);
-  ProcessAndValidate(cmd2, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmd2, CommandResultCode::SUCCESS);
 
   auto cmd3 = OrderCommand::NewOrder(OrderType::GTC, 3L, UID_1, 81599L, 0L, 25L, OrderAction::ASK);
-  ProcessAndValidate(cmd3, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmd3, CommandResultCode::SUCCESS);
 
   auto cmd8 = OrderCommand::NewOrder(OrderType::GTC, 8L, UID_1, 201000L, 0L, 28L, OrderAction::ASK);
-  ProcessAndValidate(cmd8, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmd8, CommandResultCode::SUCCESS);
 
   auto cmd9 = OrderCommand::NewOrder(OrderType::GTC, 9L, UID_1, 201000L, 0L, 32L, OrderAction::ASK);
-  ProcessAndValidate(cmd9, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmd9, CommandResultCode::SUCCESS);
 
   auto cmd10 =
     OrderCommand::NewOrder(OrderType::GTC, 10L, UID_1, 200954L, 0L, 10L, OrderAction::ASK);
-  ProcessAndValidate(cmd10, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmd10, CommandResultCode::SUCCESS);
 
   auto cmd4 =
     OrderCommand::NewOrder(OrderType::GTC, 4L, UID_1, 81593L, 82000L, 40L, OrderAction::BID);
-  ProcessAndValidate(cmd4, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmd4, CommandResultCode::SUCCESS);
 
   auto cmd5 =
     OrderCommand::NewOrder(OrderType::GTC, 5L, UID_1, 81590L, 82000L, 20L, OrderAction::BID);
-  ProcessAndValidate(cmd5, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmd5, CommandResultCode::SUCCESS);
 
   auto cmd6 =
     OrderCommand::NewOrder(OrderType::GTC, 6L, UID_1, 81590L, 82000L, 1L, OrderAction::BID);
-  ProcessAndValidate(cmd6, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmd6, CommandResultCode::SUCCESS);
 
   auto cmd7 =
     OrderCommand::NewOrder(OrderType::GTC, 7L, UID_1, 81200L, 82000L, 20L, OrderAction::BID);
-  ProcessAndValidate(cmd7, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmd7, CommandResultCode::SUCCESS);
 
   auto cmd11 =
     OrderCommand::NewOrder(OrderType::GTC, 11L, UID_1, 10000L, 12000L, 12L, OrderAction::BID);
-  ProcessAndValidate(cmd11, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmd11, CommandResultCode::SUCCESS);
 
   auto cmd12 =
     OrderCommand::NewOrder(OrderType::GTC, 12L, UID_1, 10000L, 12000L, 1L, OrderAction::BID);
-  ProcessAndValidate(cmd12, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmd12, CommandResultCode::SUCCESS);
 
   auto cmd13 =
     OrderCommand::NewOrder(OrderType::GTC, 13L, UID_1, 9136L, 12000L, 2L, OrderAction::BID);
-  ProcessAndValidate(cmd13, CommandResultCode::SUCCESS);
+  ProcessAndCleanup(cmd13, CommandResultCode::SUCCESS);
 
   // Create expected state
   std::vector<int64_t> askPrices = {81599, 81600, 200954, 201000};
@@ -147,6 +148,12 @@ void OrderBookBaseTest::ProcessAndValidate(OrderCommand& cmd, CommandResultCode 
   CommandResultCode resultCode = IOrderBook::ProcessCommand(orderBook_.get(), &cmd);
   ASSERT_EQ(resultCode, expectedCmdState);
   orderBook_->ValidateInternalState();
+}
+
+void OrderBookBaseTest::ProcessAndCleanup(OrderCommand& cmd, CommandResultCode expectedCmdState) {
+  ProcessAndValidate(cmd, expectedCmdState);
+  // Immediately cleanup events - for SetUp initialization where we don't need to verify events
+  MatcherTradeEventGuard guard(cmd);
   // Note: Events are not deleted here to allow ExtractEvents() to work.
   // Callers must clean up events after verification using MatcherTradeEvent::DeleteChain().
 }

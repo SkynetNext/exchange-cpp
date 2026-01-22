@@ -134,6 +134,12 @@ public:
   virtual objpool::ObjectsPool* GetObjectsPool() = 0;
 
   /**
+   * Recursively return all nodes to the object pool
+   * Called by LongAdaptiveRadixTreeMap::Clear() and destructor
+   */
+  virtual void RecycleTree() = 0;
+
+  /**
    * Get node type for object pool recycling
    * @return Node type constant (ObjectsPool::ART_NODE_4/16/48/256)
    * Non-virtual for performance - returns stored nodeType_ member

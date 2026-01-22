@@ -259,7 +259,10 @@ void LongAdaptiveRadixTreeMap<V>::Remove(int64_t key) {
 
 template <typename V>
 void LongAdaptiveRadixTreeMap<V>::Clear() {
-  root_ = nullptr;
+  if (root_ != nullptr) {
+    root_->RecycleTree();
+    root_ = nullptr;
+  }
 }
 
 template <typename V>
