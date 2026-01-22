@@ -65,9 +65,20 @@ sudo update-alternatives --install /usr/bin/g++ g++ /usr/local/gcc-15.2.0/bin/g+
 sudo update-alternatives --set gcc /usr/local/gcc-15.2.0/bin/gcc-15.2.0
 sudo update-alternatives --set g++ /usr/local/gcc-15.2.0/bin/g++-15.2.0
 
-# Note: GDB is a separate project and not included in GCC source build.
-# Use system GDB or install separately:
-# sudo apt install gdb
+# Build and install GDB 15.2.0 (separate from GCC)
+cd ..
+sudo apt install texinfo python3-dev libncurses5-dev libreadline-dev -y
+wget http://ftp.gnu.org/gnu/gdb/gdb-15.2.tar.gz
+tar -xf gdb-15.2.tar.gz
+cd gdb-15.2
+./configure --prefix=/usr/local/gdb-15.2.0 --with-python=python3 \
+    --program-suffix=-15.2.0
+make -j$(nproc)
+sudo make install
+
+# Set GDB as default
+sudo update-alternatives --install /usr/bin/gdb gdb /usr/local/gdb-15.2.0/bin/gdb-15.2.0 100
+sudo update-alternatives --set gdb /usr/local/gdb-15.2.0/bin/gdb-15.2.0
 
 # Add to library path
 echo 'export LD_LIBRARY_PATH=/usr/local/gcc-15.2.0/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
