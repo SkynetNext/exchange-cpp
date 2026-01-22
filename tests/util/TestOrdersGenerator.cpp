@@ -37,6 +37,7 @@
 #include <memory>
 #include <unordered_map>
 #include "ExecutionTime.h"
+#include "MatcherTradeEventGuard.h"
 #include "RandomCollectionsMerger.h"
 #include "TestConstants.h"
 #include "TestOrdersGeneratorConfig.h"
@@ -524,10 +525,8 @@ TestOrdersGenerator::GenerateCommands(int benchmarkTransactionsNumber,
           MatcherTradeEventEventHandler(&session, ev, &cmd);
         }
       });
-      // Delete event chain to prevent memory leak
-      // Use MatcherTradeEvent::DeleteChain for safe cleanup
-      common::MatcherTradeEvent::DeleteChain(cmd.matcherEvent);
-      cmd.matcherEvent = nullptr;
+      // Use RAII guard for automatic cleanup
+      MatcherTradeEventGuard guard(cmd);
     }
 
     if (i >= nextSizeCheck) {

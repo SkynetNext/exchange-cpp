@@ -17,6 +17,7 @@
 #include "OrderBookBaseTest.h"
 #include <exchange/core/utils/Logger.h>
 #include <numeric>
+#include "../util/MatcherTradeEventGuard.h"
 #include "../util/TestOrdersGenerator.h"
 
 using namespace exchange::core::common;
@@ -116,9 +117,7 @@ void OrderBookBaseTest::ClearOrderBook() {
   auto cmdAsk = OrderCommand::NewOrder(OrderType::IOC, 100000000000L, -1, MAX_PRICE, MAX_PRICE,
                                        askSum, OrderAction::BID);
   IOrderBook::ProcessCommand(orderBook_.get(), &cmdAsk);
-  // Clean up matcher events created during command processing
-  MatcherTradeEvent::DeleteChain(cmdAsk.matcherEvent);
-  cmdAsk.matcherEvent = nullptr;
+  MatcherTradeEventGuard guardAsk(cmdAsk);  // Auto-cleanup
 
   orderBook_->ValidateInternalState();
 
@@ -128,9 +127,7 @@ void OrderBookBaseTest::ClearOrderBook() {
   auto cmdBid =
     OrderCommand::NewOrder(OrderType::IOC, 100000000001L, -2, 1, 0, bidSum, OrderAction::ASK);
   IOrderBook::ProcessCommand(orderBook_.get(), &cmdBid);
-  // Clean up matcher events created during command processing
-  MatcherTradeEvent::DeleteChain(cmdBid.matcherEvent);
-  cmdBid.matcherEvent = nullptr;
+  MatcherTradeEventGuard guardBid(cmdBid);  // Auto-cleanup
 
   auto finalSnapshot = orderBook_->GetL2MarketDataSnapshot(INT32_MAX);
   ASSERT_EQ(finalSnapshot->askSize, 0);
@@ -150,9 +147,8 @@ void OrderBookBaseTest::ProcessAndValidate(OrderCommand& cmd, CommandResultCode 
   CommandResultCode resultCode = IOrderBook::ProcessCommand(orderBook_.get(), &cmd);
   ASSERT_EQ(resultCode, expectedCmdState);
   orderBook_->ValidateInternalState();
-  // Clean up matcher events created during command processing
-  MatcherTradeEvent::DeleteChain(cmd.matcherEvent);
-  cmd.matcherEvent = nullptr;
+  // Note: Events are not deleted here to allow ExtractEvents() to work.
+  // Callers must clean up events after verification using MatcherTradeEvent::DeleteChain().
 }
 
 void OrderBookBaseTest::CheckEventTrade(const MatcherTradeEvent* event,
@@ -202,15 +198,13 @@ void OrderBookBaseTest::TestShouldInitializeWithoutErrors() {
 void OrderBookBaseTest::TestShouldAddGtcOrders() {
   auto cmd93 = OrderCommand::NewOrder(OrderType::GTC, 93, UID_1, 81598, 0, 1, OrderAction::ASK);
   IOrderBook::ProcessCommand(orderBook_.get(), &cmd93);
-  MatcherTradeEvent::DeleteChain(cmd93.matcherEvent);
-  cmd93.matcherEvent = nullptr;
+  MatcherTradeEventGuard guard93(cmd93);  // Auto-cleanup
   expectedState_->InsertAsk(0, 81598, 1);
 
   auto cmd94 = OrderCommand::NewOrder(OrderType::GTC, 94, UID_1, 81594, MAX_PRICE, 9'000'000'000L,
                                       OrderAction::BID);
   IOrderBook::ProcessCommand(orderBook_.get(), &cmd94);
-  MatcherTradeEvent::DeleteChain(cmd94.matcherEvent);
-  cmd94.matcherEvent = nullptr;
+  MatcherTradeEventGuard guard94(cmd94);  // Auto-cleanup
   expectedState_->InsertBid(0, 81594, 9'000'000'000L);
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(25);
@@ -220,15 +214,13 @@ void OrderBookBaseTest::TestShouldAddGtcOrders() {
   auto cmd95 =
     OrderCommand::NewOrder(OrderType::GTC, 95, UID_1, 130000, 0, 13'000'000'000L, OrderAction::ASK);
   IOrderBook::ProcessCommand(orderBook_.get(), &cmd95);
-  MatcherTradeEvent::DeleteChain(cmd95.matcherEvent);
-  cmd95.matcherEvent = nullptr;
+  MatcherTradeEventGuard guard95(cmd95);  // Auto-cleanup
   expectedState_->InsertAsk(3, 130000, 13'000'000'000L);
 
   auto cmd96 =
     OrderCommand::NewOrder(OrderType::GTC, 96, UID_1, 1000, MAX_PRICE, 4, OrderAction::BID);
   IOrderBook::ProcessCommand(orderBook_.get(), &cmd96);
-  MatcherTradeEvent::DeleteChain(cmd96.matcherEvent);
-  cmd96.matcherEvent = nullptr;
+  MatcherTradeEventGuard guard96(cmd96);  // Auto-cleanup
   expectedState_->InsertBid(6, 1000, 4);
 
   snapshot = orderBook_->GetL2MarketDataSnapshot(25);
@@ -240,6 +232,7 @@ void OrderBookBaseTest::TestShouldIgnoredDuplicateOrder() {
   auto orderCommand =
     OrderCommand::NewOrder(OrderType::GTC, 1, UID_1, 81600, 0, 100, OrderAction::ASK);
   ProcessAndValidate(orderCommand, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(orderCommand);  // Takes ownership, auto-cleanup
   auto events = orderCommand.ExtractEvents();
   ASSERT_EQ(events.size(), 1U);
 }
@@ -247,6 +240,7 @@ void OrderBookBaseTest::TestShouldIgnoredDuplicateOrder() {
 void OrderBookBaseTest::TestShouldRemoveBidOrder() {
   auto cmd = OrderCommand::Cancel(5, UID_1);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   expectedState_->SetBidVolume(1, 1).DecrementBidOrdersNum(1);
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(25);
@@ -262,6 +256,7 @@ void OrderBookBaseTest::TestShouldRemoveBidOrder() {
 void OrderBookBaseTest::TestShouldRemoveAskOrder() {
   auto cmd = OrderCommand::Cancel(2, UID_1);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   expectedState_->SetAskVolume(0, 25).DecrementAskOrdersNum(0);
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(25);
@@ -277,6 +272,7 @@ void OrderBookBaseTest::TestShouldRemoveAskOrder() {
 void OrderBookBaseTest::TestShouldReduceBidOrder() {
   auto cmd = OrderCommand::Reduce(5, UID_1, 3);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   expectedState_->DecrementBidVolume(1, 3);
   auto snapshot = orderBook_->GetL2MarketDataSnapshot();
@@ -292,6 +288,7 @@ void OrderBookBaseTest::TestShouldReduceBidOrder() {
 void OrderBookBaseTest::TestShouldReduceAskOrder() {
   auto cmd = OrderCommand::Reduce(1, UID_1, 300);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   expectedState_->RemoveAsk(1);
   auto snapshot = orderBook_->GetL2MarketDataSnapshot();
@@ -307,6 +304,7 @@ void OrderBookBaseTest::TestShouldReduceAskOrder() {
 void OrderBookBaseTest::TestShouldRemoveOrderAndEmptyBucket() {
   auto cmdCancel2 = OrderCommand::Cancel(2, UID_1);
   ProcessAndValidate(cmdCancel2, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard2(cmdCancel2);  // Takes ownership, auto-cleanup
 
   ASSERT_EQ(cmdCancel2.action, OrderAction::ASK);
 
@@ -316,6 +314,7 @@ void OrderBookBaseTest::TestShouldRemoveOrderAndEmptyBucket() {
 
   auto cmdCancel3 = OrderCommand::Cancel(3, UID_1);
   ProcessAndValidate(cmdCancel3, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard3(cmdCancel3);  // Takes ownership, auto-cleanup
 
   ASSERT_EQ(cmdCancel3.action, OrderAction::ASK);
 
@@ -331,6 +330,7 @@ void OrderBookBaseTest::TestShouldRemoveOrderAndEmptyBucket() {
 void OrderBookBaseTest::TestShouldReturnErrorWhenDeletingUnknownOrder() {
   auto cmd = OrderCommand::Cancel(5291, UID_1);
   ProcessAndValidate(cmd, CommandResultCode::MATCHING_UNKNOWN_ORDER_ID);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot();
   ASSERT_EQ(*expectedState_->Build(), *snapshot);
@@ -346,6 +346,7 @@ void OrderBookBaseTest::TestShouldReturnErrorWhenDeletingOtherUserOrder() {
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot();
   ASSERT_EQ(*expectedState_->Build(), *snapshot);
+  // No cleanup needed - matcherEvent is already nullptr
 }
 
 void OrderBookBaseTest::TestShouldReturnErrorWhenUpdatingOtherUserOrder() {
@@ -359,11 +360,13 @@ void OrderBookBaseTest::TestShouldReturnErrorWhenUpdatingOtherUserOrder() {
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot();
   ASSERT_EQ(*expectedState_->Build(), *snapshot);
+  // No cleanup needed - matcherEvent is already nullptr
 }
 
 void OrderBookBaseTest::TestShouldReturnErrorWhenUpdatingUnknownOrder() {
   auto cmd = OrderCommand::Update(2433, UID_1, 300);
   ProcessAndValidate(cmd, CommandResultCode::MATCHING_UNKNOWN_ORDER_ID);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   ASSERT_EQ(*expectedState_->Build(), *snapshot);
@@ -379,6 +382,7 @@ void OrderBookBaseTest::TestShouldReturnErrorWhenReducingUnknownOrder() {
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot();
   ASSERT_EQ(*expectedState_->Build(), *snapshot);
+  // No cleanup needed - matcherEvent is already nullptr
 }
 
 void OrderBookBaseTest::TestShouldReturnErrorWhenReducingByZeroOrNegativeSize() {
@@ -396,6 +400,7 @@ void OrderBookBaseTest::TestShouldReturnErrorWhenReducingByZeroOrNegativeSize() 
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot();
   ASSERT_EQ(*expectedState_->Build(), *snapshot);
+  // No cleanup needed - matcherEvent is already nullptr
 }
 
 void OrderBookBaseTest::TestShouldReturnErrorWhenReducingOtherUserOrder() {
@@ -405,11 +410,13 @@ void OrderBookBaseTest::TestShouldReturnErrorWhenReducingOtherUserOrder() {
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot();
   ASSERT_EQ(*expectedState_->Build(), *snapshot);
+  // No cleanup needed - matcherEvent is already nullptr
 }
 
 void OrderBookBaseTest::TestShouldMoveOrderExistingBucket() {
   auto cmd = OrderCommand::Update(7, UID_1, 81590);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
 
@@ -423,6 +430,7 @@ void OrderBookBaseTest::TestShouldMoveOrderExistingBucket() {
 void OrderBookBaseTest::TestShouldMoveOrderNewBucket() {
   auto cmd = OrderCommand::Update(7, UID_1, 81594);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
 
@@ -436,6 +444,7 @@ void OrderBookBaseTest::TestShouldMoveOrderNewBucket() {
 void OrderBookBaseTest::TestShouldMatchIocOrderPartialBBO() {
   auto cmd = OrderCommand::NewOrder(OrderType::IOC, 123, UID_2, 1, 0, 10, OrderAction::ASK);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   auto expected = expectedState_->SetBidVolume(0, 30).Build();
@@ -449,6 +458,7 @@ void OrderBookBaseTest::TestShouldMatchIocOrderPartialBBO() {
 void OrderBookBaseTest::TestShouldMatchIocOrderFullBBO() {
   auto cmd = OrderCommand::NewOrder(OrderType::IOC, 123, UID_2, 1, 0, 40, OrderAction::ASK);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   auto expected = expectedState_->RemoveBid(0).Build();
@@ -462,6 +472,7 @@ void OrderBookBaseTest::TestShouldMatchIocOrderFullBBO() {
 void OrderBookBaseTest::TestShouldMatchIocOrderWithTwoLimitOrdersPartial() {
   auto cmd = OrderCommand::NewOrder(OrderType::IOC, 123, UID_2, 1, 0, 41, OrderAction::ASK);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   auto expected = expectedState_->RemoveBid(0).SetBidVolume(0, 20).Build();
@@ -480,6 +491,7 @@ void OrderBookBaseTest::TestShouldMatchIocOrderFullLiquidity() {
   auto cmd =
     OrderCommand::NewOrder(OrderType::IOC, 123, UID_2, MAX_PRICE, MAX_PRICE, 175, OrderAction::BID);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   auto expected = expectedState_->RemoveAsk(0).RemoveAsk(0).Build();
@@ -500,6 +512,7 @@ void OrderBookBaseTest::TestShouldMatchIocOrderWithRejection() {
   auto cmd = OrderCommand::NewOrder(OrderType::IOC, 123, UID_2, MAX_PRICE, MAX_PRICE + 1, 270,
                                     OrderAction::BID);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   auto expected = expectedState_->RemoveAllAsks().Build();
@@ -520,6 +533,7 @@ void OrderBookBaseTest::TestShouldRejectFokBidOrderOutOfBudget() {
   auto cmd = OrderCommand::NewOrder(OrderType::FOK_BUDGET, 123L, UID_2, buyBudget, buyBudget, size,
                                     OrderAction::BID);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   ASSERT_EQ(*expectedState_->Build(), *snapshot);
@@ -538,6 +552,7 @@ void OrderBookBaseTest::TestShouldMatchFokBidOrderExactBudget() {
   auto cmd = OrderCommand::NewOrder(OrderType::FOK_BUDGET, 123L, UID_2, buyBudget, buyBudget, size,
                                     OrderAction::BID);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   auto expected = expectedState_->RemoveAsk(0).RemoveAsk(0).SetAskVolume(0, 5).Build();
@@ -559,6 +574,7 @@ void OrderBookBaseTest::TestShouldMatchFokBidOrderExtraBudget() {
   auto cmd = OrderCommand::NewOrder(OrderType::FOK_BUDGET, 123L, UID_2, buyBudget, buyBudget, size,
                                     OrderAction::BID);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   auto expected = expectedState_->RemoveAsk(0).RemoveAsk(0).SetAskVolume(0, 9).Build();
@@ -580,6 +596,7 @@ void OrderBookBaseTest::TestShouldRejectFokAskOrderBelowExpectation() {
   auto cmd = OrderCommand::NewOrder(OrderType::FOK_BUDGET, 123L, UID_2, sellExpectation,
                                     sellExpectation, size, OrderAction::ASK);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   ASSERT_EQ(*expectedState_->Build(), *snapshot);
@@ -597,6 +614,7 @@ void OrderBookBaseTest::TestShouldMatchFokAskOrderExactExpectation() {
   auto cmd = OrderCommand::NewOrder(OrderType::FOK_BUDGET, 123L, UID_2, sellExpectation,
                                     sellExpectation, size, OrderAction::ASK);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   auto expected = expectedState_->RemoveBid(0).SetBidVolume(0, 1).DecrementBidOrdersNum(0).Build();
@@ -616,6 +634,7 @@ void OrderBookBaseTest::TestShouldMatchFokAskOrderExtraBudget() {
   auto cmd = OrderCommand::NewOrder(OrderType::FOK_BUDGET, 123L, UID_2, sellExpectation,
                                     sellExpectation, size, OrderAction::ASK);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   auto expected = expectedState_->RemoveBid(0).RemoveBid(0).Build();
@@ -632,6 +651,7 @@ void OrderBookBaseTest::TestShouldFullyMatchMarketableGtcOrder() {
   auto cmd =
     OrderCommand::NewOrder(OrderType::GTC, 123, UID_2, 81599, MAX_PRICE, 1, OrderAction::BID);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   auto expected = expectedState_->SetAskVolume(0, 74).Build();
@@ -646,6 +666,7 @@ void OrderBookBaseTest::TestShouldPartiallyMatchMarketableGtcOrderAndPlace() {
   auto cmd =
     OrderCommand::NewOrder(OrderType::GTC, 123, UID_2, 81599, MAX_PRICE, 77, OrderAction::BID);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   auto expected = expectedState_->RemoveAsk(0).InsertBid(0, 81599, 2).Build();
@@ -662,6 +683,7 @@ void OrderBookBaseTest::TestShouldFullyMatchMarketableGtcOrder2Prices() {
   auto cmd =
     OrderCommand::NewOrder(OrderType::GTC, 123, UID_2, 81600, MAX_PRICE, 77, OrderAction::BID);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   auto expected = expectedState_->RemoveAsk(0).SetAskVolume(0, 98).Build();
@@ -679,6 +701,7 @@ void OrderBookBaseTest::TestShouldFullyMatchMarketableGtcOrderWithAllLiquidity()
   auto cmd =
     OrderCommand::NewOrder(OrderType::GTC, 123, UID_2, 220000, MAX_PRICE, 1000, OrderAction::BID);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
   auto expected = expectedState_->RemoveAllAsks().InsertBid(0, 220000, 755).Build();
@@ -699,6 +722,7 @@ void OrderBookBaseTest::TestShouldMoveOrderFullyMatchAsMarketable() {
   auto cmd =
     OrderCommand::NewOrder(OrderType::GTC, 83, UID_2, 81200, MAX_PRICE, 20, OrderAction::BID);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard1(cmd);  // Takes ownership, auto-cleanup
 
   auto events = cmd.ExtractEvents();
   ASSERT_EQ(events.size(), 0U);
@@ -709,6 +733,7 @@ void OrderBookBaseTest::TestShouldMoveOrderFullyMatchAsMarketable() {
 
   cmd = OrderCommand::Update(83, UID_2, 81602);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard2(cmd);  // Takes ownership, auto-cleanup
 
   expected =
     expectedState_->SetBidVolume(2, 20).DecrementBidOrdersNum(2).SetAskVolume(0, 55).Build();
@@ -724,12 +749,14 @@ void OrderBookBaseTest::TestShouldMoveOrderFullyMatchAsMarketable2Prices() {
   auto cmd =
     OrderCommand::NewOrder(OrderType::GTC, 83, UID_2, 81594, MAX_PRICE, 100, OrderAction::BID);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard1(cmd);  // Takes ownership, auto-cleanup
 
   auto events = cmd.ExtractEvents();
   ASSERT_EQ(events.size(), 0U);
 
   cmd = OrderCommand::Update(83, UID_2, 81600);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard2(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
 
@@ -747,9 +774,11 @@ void OrderBookBaseTest::TestShouldMoveOrderMatchesAllLiquidity() {
   auto cmd =
     OrderCommand::NewOrder(OrderType::GTC, 83, UID_2, 81594, MAX_PRICE, 246, OrderAction::BID);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard1(cmd);  // Takes ownership, auto-cleanup
 
   cmd = OrderCommand::Update(83, UID_2, 201000);
   ProcessAndValidate(cmd, CommandResultCode::SUCCESS);
+  MatcherTradeEventGuard guard2(cmd);  // Takes ownership, auto-cleanup
 
   auto snapshot = orderBook_->GetL2MarketDataSnapshot(10);
 
@@ -781,9 +810,7 @@ void OrderBookBaseTest::TestMultipleCommandsKeepInternalState() {
     cmd.orderId += 100;  // TODO set start id
     CommandResultCode commandResultCode = IOrderBook::ProcessCommand(localOrderBook.get(), &cmd);
     ASSERT_EQ(commandResultCode, CommandResultCode::SUCCESS);
-    // Clean up matcher events created during command processing
-    MatcherTradeEvent::DeleteChain(cmd.matcherEvent);
-    cmd.matcherEvent = nullptr;
+    MatcherTradeEventGuard guard(cmd);  // Auto-cleanup
     localOrderBook->ValidateInternalState();
   }
 }

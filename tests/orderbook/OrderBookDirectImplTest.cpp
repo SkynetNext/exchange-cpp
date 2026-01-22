@@ -26,6 +26,7 @@
 #include <exchange/core/orderbook/OrderBookNaiveImpl.h>
 #include <exchange/core/utils/Logger.h>
 #include <unordered_map>
+#include "../util/MatcherTradeEventGuard.h"
 #include "../util/TestOrdersGenerator.h"
 
 using namespace exchange::core::common;
@@ -170,15 +171,11 @@ void OrderBookDirectImplTest::TestMultipleCommandsCompare() {
 
     cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
     IOrderBook::ProcessCommand(orderBook_.get(), &cmd);
-    // Clean up matcher events created during command processing
-    MatcherTradeEvent::DeleteChain(cmd.matcherEvent);
-    cmd.matcherEvent = nullptr;
+    MatcherTradeEventGuard guard1(cmd);  // Auto-cleanup
 
     cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;
     CommandResultCode commandResultCode = IOrderBook::ProcessCommand(orderBookRef.get(), &cmd);
-    // Clean up matcher events created during command processing
-    MatcherTradeEvent::DeleteChain(cmd.matcherEvent);
-    cmd.matcherEvent = nullptr;
+    MatcherTradeEventGuard guard2(cmd);  // Auto-cleanup
 
     ASSERT_EQ(commandResultCode, CommandResultCode::SUCCESS);
 
