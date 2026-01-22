@@ -144,12 +144,13 @@ public:
   friend class ArtNode16;
 
 private:
-  std::array<uint8_t, 4> keys_{};
-  std::array<void*, 4> nodes_{};
-  ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;
-  int64_t nodeKey_ = 0;
-  int nodeLevel_ = 0;
-  uint8_t numChildren_ = 0;
+  // Member layout optimized for minimal padding (64-bit alignment)
+  std::array<void*, 4> nodes_{};                                      // 32 bytes, 8-byte aligned
+  ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;  // 8 bytes
+  int64_t nodeKey_ = 0;                                               // 8 bytes
+  std::array<uint8_t, 4> keys_{};                                     // 4 bytes
+  int nodeLevel_ = 0;                                                 // 4 bytes
+  uint8_t numChildren_ = 0;                                           // 1 byte + 7 bytes padding
 
   void RemoveElementAtPos(int pos) {
     const int copyLength = numChildren_ - (pos + 1);

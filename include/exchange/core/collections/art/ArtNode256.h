@@ -100,11 +100,12 @@ public:
   friend class ArtNode48;
 
 private:
-  std::array<void*, 256> nodes_{};
-  ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;
-  int64_t nodeKey_ = 0;
-  int nodeLevel_ = 0;
-  uint16_t numChildren_ = 0;
+  // Member layout optimized for minimal padding (64-bit alignment)
+  std::array<void*, 256> nodes_{};                                    // 2048 bytes, 8-byte aligned
+  ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;  // 8 bytes
+  int64_t nodeKey_ = 0;                                               // 8 bytes
+  int nodeLevel_ = 0;                                                 // 4 bytes
+  uint16_t numChildren_ = 0;                                          // 2 bytes + 2 bytes padding
 
   std::vector<uint8_t> CreateKeysArray() {
     std::vector<uint8_t> keys;

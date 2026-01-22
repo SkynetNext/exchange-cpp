@@ -108,13 +108,14 @@ public:
   friend class ArtNode256;
 
 private:
-  std::array<int8_t, 256> indexes_{};
-  std::array<void*, 48> nodes_{};
-  ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;
-  int64_t nodeKey_ = 0;
-  int nodeLevel_ = 0;
-  uint8_t numChildren_ = 0;
-  int64_t freeBitMask_ = 0;
+  // Member layout optimized for minimal padding (64-bit alignment)
+  std::array<int8_t, 256> indexes_{};                                 // 256 bytes
+  std::array<void*, 48> nodes_{};                                     // 384 bytes, 8-byte aligned
+  ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;  // 8 bytes
+  int64_t nodeKey_ = 0;                                               // 8 bytes
+  int64_t freeBitMask_ = 0;  // 8 bytes (moved here for alignment)
+  int nodeLevel_ = 0;        // 4 bytes
+  uint8_t numChildren_ = 0;  // 1 byte + 3 bytes padding
 
   std::vector<uint8_t> CreateKeysArray() {
     std::vector<uint8_t> keys;
