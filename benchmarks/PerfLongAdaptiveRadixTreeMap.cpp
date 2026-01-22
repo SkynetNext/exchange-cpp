@@ -365,12 +365,12 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, GetHit)(benchmark::State& state) {
     end = std::chrono::high_resolution_clock::now();
     auto flatTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     ReportCounters(state, artTime, bstTime, uoTime, deTime, flatTime);
-    state.counters["sum"] = benchmark::Counter(
-      artSum + bstSum + uoSum + deSum + flatSum, benchmark::Counter::kAvgIterations);
+    state.counters["sum"] = benchmark::Counter(artSum + bstSum + uoSum + deSum + flatSum,
+                                               benchmark::Counter::kAvgIterations);
 #else
     ReportCounters(state, artTime, bstTime, uoTime, deTime);
-    state.counters["sum"] = benchmark::Counter(
-      artSum + bstSum + uoSum + deSum, benchmark::Counter::kAvgIterations);
+    state.counters["sum"] =
+      benchmark::Counter(artSum + bstSum + uoSum + deSum, benchmark::Counter::kAvgIterations);
 #endif
   }
 }
@@ -455,12 +455,12 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, GetMiss)(benchmark::State& state) {
     end = std::chrono::high_resolution_clock::now();
     auto flatTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
     ReportCounters(state, artTime, bstTime, uoTime, deTime, flatTime);
-    state.counters["miss"] = benchmark::Counter(
-      artMiss + bstMiss + uoMiss + deMiss + flatMiss, benchmark::Counter::kAvgIterations);
+    state.counters["miss"] = benchmark::Counter(artMiss + bstMiss + uoMiss + deMiss + flatMiss,
+                                                benchmark::Counter::kAvgIterations);
 #else
     ReportCounters(state, artTime, bstTime, uoTime, deTime);
-    state.counters["miss"] = benchmark::Counter(
-      artMiss + bstMiss + uoMiss + deMiss, benchmark::Counter::kAvgIterations);
+    state.counters["miss"] =
+      benchmark::Counter(artMiss + bstMiss + uoMiss + deMiss, benchmark::Counter::kAvgIterations);
 #endif
   }
 }
@@ -627,9 +627,9 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, ForEach)(benchmark::State& state) {
       benchmark::Counter::kAvgIterations);
 #else
     ReportCounters(state, artTime, bstTime, uoTime, deTime);
-    state.counters["cnt"] = benchmark::Counter(
-      artConsumer.keys.size() + bstKeys.size() + uoKeys.size() + deKeys.size(),
-      benchmark::Counter::kAvgIterations);
+    state.counters["cnt"] =
+      benchmark::Counter(artConsumer.keys.size() + bstKeys.size() + uoKeys.size() + deKeys.size(),
+                         benchmark::Counter::kAvgIterations);
 #endif
   }
 }
@@ -789,8 +789,7 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Higher)(benchmark::State& state) {
     state.counters["2_bst"] = benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
     state.counters["vs_bst%"] = benchmark::Counter(
       PercentImprovement(bstTime, artTime) * kNumIterations, benchmark::Counter::kAvgIterations);
-    state.counters["sum"] =
-      benchmark::Counter(artSum + bstSum, benchmark::Counter::kAvgIterations);
+    state.counters["sum"] = benchmark::Counter(artSum + bstSum, benchmark::Counter::kAvgIterations);
 #endif
   }
 }
@@ -870,8 +869,7 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Lower)(benchmark::State& state) {
     state.counters["2_bst"] = benchmark::Counter(bstTime, benchmark::Counter::kAvgIterations);
     state.counters["vs_bst%"] = benchmark::Counter(
       PercentImprovement(bstTime, artTime) * kNumIterations, benchmark::Counter::kAvgIterations);
-    state.counters["sum"] =
-      benchmark::Counter(artSum + bstSum, benchmark::Counter::kAvgIterations);
+    state.counters["sum"] = benchmark::Counter(artSum + bstSum, benchmark::Counter::kAvgIterations);
 #endif
   }
 }
