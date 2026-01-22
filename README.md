@@ -2,7 +2,7 @@
 
 A high-performance, low-latency cryptocurrency exchange matching engine written in C++, 1:1 ported from [exchange-core](https://github.com/exchange-core/exchange-core).
 
-**Key Performance**: P50: 0.50µs, P99: 0.73µs @ 1M TPS | Up to 9M TPS | P99 latency 2.5x-6.4x better than Java
+**Key Performance**: P50: 0.49µs, P99: 0.72µs @ 1M TPS | Up to 9.4M TPS | P99 latency 3.6x-6.5x better than Java
 
 ## Performance
 
@@ -20,19 +20,37 @@ Our test configuration matches the original Java `exchange-core` reference imple
 
 | Metric | C++ | Java | Winner |
 |--------|-----|------|--------|
-| **Max Stable TPS** | 9M TPS | 6M TPS | ✅ C++ (1.50x) |
-| **P50 @ 1M TPS** | 0.50µs | 0.51µs | ✅ C++ (1.02x) |
-| **P99 @ 1M TPS** | 0.73µs | 4.7µs | ✅ C++ (6.4x) |
-| **P50 @ 4M TPS** | 0.82µs | 0.6µs | ✅ Java (1.37x) |
-| **P99 @ 4M TPS** | 1.6µs | 8.0µs | ✅ C++ (5.0x) |
-| **P50 @ 6M TPS** | 1.25µs | 1.37µs | ✅ C++ (1.10x) |
-| **P99 @ 6M TPS** | 4.6µs | 11.5µs | ✅ C++ (2.50x) |
-| **P50 @ 8M TPS** | 3.8µs | N/A | ✅ C++ |
-| **P99 @ 8M TPS** | 15.2µs | N/A | ✅ C++ |
+| **Max Stable TPS** | 9.4M TPS | 6M TPS | ✅ C++ (1.57x) |
+| **P50 @ 1M TPS** | 0.49µs | 0.51µs | ✅ C++ (1.04x) |
+| **P99 @ 1M TPS** | 0.72µs | 4.7µs | ✅ C++ (6.5x) |
+| **P50 @ 4M TPS** | 0.79µs | 0.6µs | ✅ Java (1.32x) |
+| **P99 @ 4M TPS** | 1.44µs | 8.0µs | ✅ C++ (5.6x) |
+| **P50 @ 6M TPS** | 1.15µs | 1.37µs | ✅ C++ (1.19x) |
+| **P99 @ 6M TPS** | 3.2µs | 11.5µs | ✅ C++ (3.6x) |
+| **P50 @ 8M TPS** | 3.2µs | N/A | ✅ C++ |
+| **P99 @ 8M TPS** | 12µs | N/A | ✅ C++ |
 
-**Summary**: C++ shows dramatically better P99 latency (tail latency) across all TPS rates, with improvements of 2.5-6.4x. After optimizing `orderIdIndex_` from ART to `ankerl::unordered_dense::map` (2026-01-16), C++ now achieves better P50 at 6M TPS and maintains stable performance up to 9M TPS. Maximum stable throughput improved from 8M to 9M TPS.
+**Summary**: C++ shows dramatically better P99 latency (tail latency) across all TPS rates, with improvements of 3.6-6.5x. After optimizing `orderIdIndex_` from ART to `ankerl::unordered_dense::map` (2026-01-16) and `keys_` from `int16_t` to `uint8_t` (2026-01-22), C++ now achieves better P50 at 6M TPS and maintains stable performance up to 9.4M TPS. Maximum stable throughput improved from 9M to 9.4M TPS (+4.4%).
 
-For detailed performance data, see [PERFORMANCE_BENCHMARK_COMPARISON.md](docs/PERFORMANCE_BENCHMARK_COMPARISON.md) and [LOW_LATENCY_CORE.md](docs/LOW_LATENCY_CORE.md).
+### Industry Standards Comparison
+
+Measures end-to-end order processing: `Order Submission → Ring Buffer → Grouping → Risk → Matching → Results`
+
+| Metric | Tier 1 Standard | C++ @ 200K TPS | C++ @ 1M TPS | C++ @ 2M TPS | C++ @ 4M TPS | Status |
+|--------|----------------|----------------|--------------|--------------|--------------|--------|
+| **Median (P50)** | < 1µs | **0.51µs** | **0.49µs** | **0.48µs** | **0.79µs** | ✅ **Exceeds** |
+| **P99** | < 5µs | 0.86µs | 0.72µs | 0.71µs | 1.44µs | ✅ **Exceeds** |
+| **P99.9** | < 20µs | 5.2µs | 6.3µs | 7.1µs | 9.4µs | ✅ **Exceeds** |
+| **Stable TPS** | > 1M TPS | ✅ | ✅ | ✅ | ✅ | ✅ **9.4x** |
+
+**Examples**: CME, NASDAQ, ICE (co-located)
+
+✅ **Median latency (0.48-0.79µs) significantly exceeds Tier 1 exchange standards** (< 1µs) up to 4M TPS  
+✅ **P99 latency (0.72-1.44µs) significantly exceeds Tier 1 exchange standards** (< 5µs) up to 4M TPS  
+✅ **Stable throughput (9.4M TPS) exceeds industry standard** (1M TPS) by 9.4x  
+✅ **P99.9 latency (5.2-9.4µs) significantly exceeds Tier 1 exchange standards** (< 20µs) up to 4M TPS
+
+For detailed performance data, see [PERFORMANCE_BENCHMARK_COMPARISON.md](docs/PERFORMANCE_BENCHMARK_COMPARISON.md).
 
 ## Features
 
