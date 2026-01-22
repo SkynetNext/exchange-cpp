@@ -24,13 +24,9 @@
 #include <cstdint>
 #include <map>
 
-// std::flat_map (C++23) - conditionally include if available
-#if __has_include(<flat_map>)
-#  include <flat_map>
-#  define HAS_STD_FLAT_MAP 1
-#else
-#  define HAS_STD_FLAT_MAP 0
-#endif
+// std::flat_map (C++23) - disabled due to O(n²) insertion performance
+// which causes benchmarks to hang with large datasets
+#define HAS_STD_FLAT_MAP 0
 // On Windows, mimalloc-static doesn't automatically override C++ new/delete,
 // so we need to include mimalloc-new-delete.h explicitly.
 // On Linux/Unix, mimalloc-static automatically overrides via linking.
