@@ -258,8 +258,9 @@ jobs:
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
           sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main" -y
           sudo apt-get update
-          # Install libc++ for better C++23/26 support (std::expected, etc.)
-          sudo apt-get install -y clang-19 clang-tools-19 clang-tidy-19 libc++-19-dev libc++abi-19-dev
+          # Use libstdc++ (not libc++) because disruptor-cpp requires std::atomic<std::shared_ptr>
+          # which is not fully supported in libc++. Third-party header errors are filtered via .clang-tidy
+          sudo apt-get install -y clang-19 clang-tools-19 clang-tidy-19
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
           sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-19 100
