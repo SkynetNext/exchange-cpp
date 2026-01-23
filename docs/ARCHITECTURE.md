@@ -63,7 +63,8 @@ graph TD
     ME --> R2
     ME --> E
     J --> E
-    R2 --> E
+    %% Note: R2 and E both depend on ME and process in parallel
+    %% R1 synchronously calls R2.handlingCycle, but E does not wait for R2
     E --> Out
 
     %% Styling
@@ -241,16 +242,21 @@ Grouping (G) - Sequence G
     │       ↓
     │   Matching Engine (ME) - Sequence ME (depends on R1)
     │       ├─→ Risk Release (R2) - Sequence R2 (depends on ME)
-    │       └─→ Results Handler (E) - Sequence E (depends on ME)
+    │       │   └─ Note: R1 Master synchronously calls R2.handlingCycle
+    │       │
+    │       └─→ Results Handler (E) - Sequence E (depends on ME, or ME+J)
+    │           └─ Note: E processes in parallel with R2 (no Sequence Barrier dependency)
     │
     └─→ Journaling (J) - Sequence J (depends on G)
             ↓
-        Results Handler (E) - Sequence E (depends on J)
+        Results Handler (E) - Sequence E (depends on ME+J if J enabled)
 ```
 
 **Key Points**:
-- **E depends on both ME and J**: Must wait for both to complete
-- **R2 depends on ME**: Can process in parallel with E
+- **E depends on both ME and J**: Must wait for both to complete (if J enabled)
+- **R2 depends on ME**: Processes after ME completes
+- **R2 and E are parallel**: Both depend on ME, process independently (no Sequence Barrier dependency between them)
+- **R1 synchronously calls R2**: R1 Master waits for R2.handlingCycle to complete, but this does not affect E
 - **R1 depends on G**: Serial path (trading chain)
 - **J depends on G**: Parallel path (journaling)
 
@@ -782,7 +788,7 @@ private:
 - Profit/loss release
 - Balance updates
 
-**Note**: R2 uses only `TwoStepSlaveProcessor` (no Master). It processes events after ME completes, triggered by the Master-Slave link from R1.
+**Note**: R2 uses only `TwoStepSlaveProcessor` (no Master). It processes events after ME completes, triggered **synchronously** by R1 Master via `R1.handlingCycle()` call. R1 Master waits for R2 to complete before proceeding to the next group. However, R2's Sequence Barrier depends on ME, not R1, so R2 waits for ME completion inside its `handlingCycle` method.
 
 ### Stage 6: Results Handler (E)
 
@@ -798,6 +804,8 @@ private:
 - Process results via `ExchangeApi::ProcessResult`
 
 **Note**: ResultsHandler does not explicitly "merge" results. It waits for both ME and J sequences to reach the required point, then processes each command sequentially. The Sequence Barrier ensures both dependencies are satisfied before processing.
+
+**Important**: ResultsHandler (E) does **not** depend on R2's Sequence Barrier. E and R2 both depend on ME and process in parallel. R1 Master synchronously calls R2.handlingCycle, but this does not affect E's execution. E can send trade notifications before R2 completes settlement, which may require additional synchronization if atomic settlement is required.
 
 ```cpp
 // ResultsHandler - simple callback wrapper
@@ -983,13 +991,16 @@ The Two-Step Processor pattern enables **pipeline parallelism** through group-ba
        └─> Update Sequence J: 100
 
 6. Risk Release (R2) - Shard by UID
-   ├─> Wait for Sequence ME >= 100
+   ├─> Triggered synchronously by R1 Master (via handlingCycle call)
+   ├─> Wait for Sequence ME >= 100 (inside handlingCycle)
    ├─> Final settlement
    ├─> Deduct fees
-   └─> Update balance
+   ├─> Update balance
+   └─> Return to R1 Master (R1 waits for R2 completion)
 
 7. Results Handler (E)
    ├─> Wait for Sequence ME >= 100 AND Sequence J >= 100 (if J enabled)
+   ├─> Note: E processes in parallel with R2 (no Sequence Barrier dependency on R2)
    ├─> Call resultsConsumer(cmd, 100)
    └─> Call api_->ProcessResult(100, cmd)
 ```
@@ -1010,8 +1021,9 @@ T2      | 102 | 97  | 92  | 87  | 97  | 82  | 77  |
 - **G**: Close behind RB (fast single-threaded)
 - **R1, ME**: Serial chain, each waits for previous
 - **J**: Parallel to R1/ME chain (depends only on G)
-- **E**: Waits for both ME and J (slowest)
-- **R2**: Parallel to E (depends only on ME)
+- **R2**: Depends on ME, triggered synchronously by R1 Master
+- **E**: Waits for ME (and J if enabled), processes in parallel with R2
+- **Note**: R2 and E both depend on ME but are independent - E does not wait for R2's Sequence Barrier
 
 ### Zero-Copy Memory Model
 
