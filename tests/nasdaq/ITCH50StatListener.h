@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 #include <map>
 #include <string>

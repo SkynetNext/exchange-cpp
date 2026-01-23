@@ -171,14 +171,16 @@ CMAKE_ARGS+=(
   -DCMAKE_CXX_COMPILER=clang++
 )
 
-# Linux: Clang uses libstdc++ (GCC's standard library) - matches CI configuration
+# Linux: Use libc++ (LLVM's standard library) for better C++23/26 support
+# libstdc++ (GCC's library) has incomplete std::expected support in some versions
 # Windows: Clang uses MSVC's standard library, so no -stdlib flag needed
 if [ "$IS_WINDOWS" = "false" ]; then
   CMAKE_ARGS+=(
-    -DCMAKE_CXX_FLAGS="-stdlib=libstdc++"
+    -DCMAKE_CXX_FLAGS="-stdlib=libc++"
+    -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -lc++abi"
   )
   if [ -z "$QUIET" ]; then
-    echo -e "${GREEN}Using Clang with libstdc++ (GCC's standard library)${NC}"
+    echo -e "${GREEN}Using Clang with libc++ (LLVM's standard library for C++23/26 support)${NC}"
   fi
 else
   if [ -z "$QUIET" ]; then
