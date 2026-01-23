@@ -4,9 +4,19 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - "LICENSE"
+      - ".gitignore"
   pull_request:
     branches:
       - master
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+      - "LICENSE"
+      - ".gitignore"
   workflow_dispatch:
   # Run on schedule (weekly) to catch regressions
   schedule:
@@ -258,11 +268,15 @@ jobs:
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
           sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main" -y
           sudo apt-get update
-          sudo apt-get install -y clang-19 clang-tools-19 libc++-19-dev libc++abi-19-dev
+          # Use libstdc++ (not libc++) because disruptor-cpp requires std::atomic<std::shared_ptr>
+          # which is not fully supported in libc++. Third-party header errors are filtered via .clang-tidy
+          sudo apt-get install -y clang-19 clang-tools-19 clang-tidy-19
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
+          sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-19 100
           sudo update-alternatives --set clang /usr/bin/clang-19
           sudo update-alternatives --set clang++ /usr/bin/clang++-19
+          sudo update-alternatives --set clang-tidy /usr/bin/clang-tidy-19
           clang++ --version
           clang-tidy --version
 

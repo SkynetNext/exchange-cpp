@@ -171,7 +171,9 @@ CMAKE_ARGS+=(
   -DCMAKE_CXX_COMPILER=clang++
 )
 
-# Linux: Clang uses libstdc++ (GCC's standard library) - matches CI configuration
+# Linux: Use libstdc++ (GCC's standard library) for std::atomic<std::shared_ptr> support
+# Note: libc++ has better std::expected support but lacks std::atomic<std::shared_ptr>
+# which is used by disruptor-cpp. We use libstdc++ and filter out third_party errors.
 # Windows: Clang uses MSVC's standard library, so no -stdlib flag needed
 if [ "$IS_WINDOWS" = "false" ]; then
   CMAKE_ARGS+=(
