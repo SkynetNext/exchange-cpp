@@ -86,7 +86,7 @@
 │  │  • slot → shard 映射                                                                │   │
 │  │  • shard → {leader, followers} 映射                                                 │   │
 │  │  • 币对 → 撮合集群映射                                                               │   │
-│  │  • 版本号 (epoch) 管理                                                               │   │
+│  │  • 版本号 (Raft Term) 管理                                                          │   │
 │  └─────────────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                             │
 │  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐                 │
@@ -244,7 +244,7 @@ int getShard(int slot) {
 
 - **分片映射**: slot → shard，shard → nodes
 - **集群发现**: 币对 → 撮合集群
-- **版本管理**: epoch 递增，防止脑裂
+- **版本管理**: 使用 Raft Term 作为版本号，防止脑裂
 - **健康检查**: 节点存活状态
 
 #### 3.3.2 数据模型
@@ -256,7 +256,7 @@ struct ShardInfo {
     std::vector<int> slots;  // 负责的 slot 范围
     NodeInfo leader;
     std::vector<NodeInfo> followers;
-    int64_t epoch;  // 版本号
+    int64_t leadership_term;  // Raft Leader 任期（参考 Aeron Cluster）
 };
 
 // 撮合集群信息
@@ -264,7 +264,7 @@ struct MatchingClusterInfo {
     std::string symbol;
     NodeInfo leader;
     std::vector<NodeInfo> followers;
-    int64_t epoch;
+    int64_t leadership_term;  // Raft Leader 任期
 };
 
 // Coordinator 状态
@@ -278,8 +278,7 @@ class Coordinator {
     // 币对 → 撮合集群
     std::unordered_map<std::string, MatchingClusterInfo> matching_clusters_;
     
-    // 全局 epoch (每次拓扑变更递增)
-    std::atomic<int64_t> global_epoch_{0};
+    // 注：不需要全局 epoch，各分片使用自己的 Raft Term
 };
 ```
 
@@ -542,38 +541,39 @@ struct RaftConfig {
 | **网络分区 (多数派)** | 正常运行 | 少数派自动降级 | 0 | 0 |
 | **磁盘故障** | I/O 错误 | 从快照恢复 | 分钟级 | 0 |
 | **内存损坏** | 校验和失败 | 重启并从日志恢复 | 秒级 | 0 |
-| **脑裂** | epoch 检查 | 旧 Leader 自动降级 | < 500ms | 0 |
+| **脑裂** | Term 检查 | 旧 Leader 自动降级 | < 500ms | 0 |
 
 ### 5.4 脑裂防护
 
 ```cpp
-// 每个请求携带 epoch
+// 每个请求携带 leadership_term（参考 Aeron Cluster 的 logLeadershipTermId）
 struct RequestHeader {
-    int64_t epoch;        // 客户端缓存的 epoch
+    int shard_id;
+    int64_t leadership_term;  // 客户端缓存的 Raft Term
     int64_t request_id;
 };
 
-// Leader 处理请求时检查 epoch
+// Leader 处理请求时检查 term
 void handleRequest(const RequestHeader& header, const Request& req) {
-    if (header.epoch < current_epoch_) {
-        // 客户端使用过期的路由信息
-        return sendRedirect(current_leader_, current_epoch_);
+    if (header.leadership_term < current_term_) {
+        // 客户端使用过期的路由信息（类似 Aeron Cluster 的 NewLeadershipTerm）
+        return sendRedirect(current_leader_, current_term_);
     }
     
     if (!isLeader()) {
         // 本节点不再是 Leader
-        return sendRedirect(current_leader_, current_epoch_);
+        return sendRedirect(current_leader_, current_term_);
     }
     
     // 正常处理请求
     processRequest(req);
 }
 
-// Leader 变更时递增 epoch
-void onBecomeLeader() {
-    current_epoch_ = global_epoch_.fetch_add(1) + 1;
+// Raft 选举成功后，新 Leader 上报元数据
+void onBecomeLeader(int64_t new_term) {
+    current_term_ = new_term;  // Raft 保证 Term 单调递增
     // 通知 Coordinator 更新元数据
-    coordinator_.updateLeader(shard_id_, node_id_, current_epoch_);
+    coordinator_.updateLeader(shard_id_, node_id_, new_term);
 }
 ```
 
@@ -594,7 +594,7 @@ Client              │                  │                  │           重�
                     │                  │                  │                  │           连接到 B
                     │                  │                  │                  │                  │
 Coordinator         │                  │                  │           收到 B 的通知       更新元数据
-                    │                  │                  │           epoch++              广播给客户端
+                    │                  │                  │           term=N+1            广播给客户端
                     │                  │                  │                  │                  │
 
 详细时序:
@@ -602,8 +602,8 @@ Coordinator         │                  │                  │           收�
 ├─ T0+150ms:  Follower B, C 检测到心跳超时 (heartbeat_interval × 3)
 ├─ T0+200ms:  B 发起选举 (election_timeout 随机化)
 ├─ T0+250ms:  B 收到 C 的投票，获得多数票
-├─ T0+300ms:  B 成为新 Leader，递增 epoch
-├─ T0+320ms:  B 通知 Coordinator 更新元数据
+├─ T0+300ms:  B 成为新 Leader (Raft Term = N+1)
+├─ T0+320ms:  B 通知 Coordinator 更新元数据 (leadership_term = N+1)
 ├─ T0+350ms:  B 开始处理请求
 └─ 总耗时:    < 500ms
 ```
@@ -656,7 +656,7 @@ Coordinator         │                  │                  │           收�
 快照内容:
 ├─ 账户状态: balance, frozen, positions
 ├─ 订单簿状态: bids, asks, order_index
-├─ 元数据: last_applied_index, term, epoch
+├─ 元数据: last_applied_index, leadership_term
 └─ 校验和: CRC32
 ```
 
