@@ -26,8 +26,8 @@ stages = [
     'Raft同步'
 ]
 
-dpdk_values = [0.5, 0.5, 9.0, 1.8, 9.0, 0.5, 36.0]   # 总计 57.3μs
-rdma_values = [0.5, 0.5, 1.5, 1.8, 1.5, 0.5, 3.0]    # 总计 9.3μs
+dpdk_values = [0.5, 0.5, 9.0, 1.0, 9.0, 0.5, 36.0]   # 总计 56.5μs
+rdma_values = [0.5, 0.5, 1.5, 1.0, 1.5, 0.5, 3.0]    # 总计 8.5μs
 
 # ============================================================
 # ColorBrewer 配色方案 - Set2 (qualitative, colorblind-safe)
@@ -85,7 +85,7 @@ def create_waterfall_chart():
         if val >= 5:
             ax1.text(cumulative + val/2, i, f'{val:.1f}μs', 
                     ha='center', va='center', fontsize=10, fontweight='bold', color='white')
-        elif val >= 1.5:
+        elif val >= 1.0:
             ax1.text(cumulative + val/2, i, f'{val:.1f}', 
                     ha='center', va='center', fontsize=9, fontweight='bold', color='white')
         else:
@@ -111,6 +111,9 @@ def create_waterfall_chart():
         if val >= 1.5:
             ax2.text(cumulative + val/2, i, f'{val:.1f}', 
                     ha='center', va='center', fontsize=9, fontweight='bold', color='white')
+        elif val >= 1.0:
+            ax2.text(cumulative + val/2, i, f'{val:.1f}', 
+                    ha='center', va='center', fontsize=9, fontweight='bold', color='#333')
         else:
             ax2.text(cumulative + val + 0.2, i, f'{val:.1f}', 
                     ha='left', va='center', fontsize=8, color='#666')
