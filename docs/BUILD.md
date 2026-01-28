@@ -59,11 +59,13 @@ cd gcc-15.2.0
 make -j$(nproc)
 sudo make install
 
-# Set as default
+# Set as default (WSL/Linux: CMake uses `c++`, so set it too)
 sudo update-alternatives --install /usr/bin/gcc gcc /usr/local/gcc-15.2.0/bin/gcc-15.2.0 100
 sudo update-alternatives --install /usr/bin/g++ g++ /usr/local/gcc-15.2.0/bin/g++-15.2.0 100
+sudo update-alternatives --install /usr/bin/c++ c++ /usr/local/gcc-15.2.0/bin/g++-15.2.0 100
 sudo update-alternatives --set gcc /usr/local/gcc-15.2.0/bin/gcc-15.2.0
 sudo update-alternatives --set g++ /usr/local/gcc-15.2.0/bin/g++-15.2.0
+sudo update-alternatives --set c++ /usr/local/gcc-15.2.0/bin/g++-15.2.0
 
 # Add to library path
 echo 'export LD_LIBRARY_PATH=/usr/local/gcc-15.2.0/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
