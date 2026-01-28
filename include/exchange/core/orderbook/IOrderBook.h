@@ -104,21 +104,22 @@ public:
   /**
    * Get implementation type
    */
-  virtual OrderBookImplType GetImplementationType() const = 0;
+  [[nodiscard]] virtual OrderBookImplType GetImplementationType() const = 0;
 
   /**
    * Get symbol specification
    */
-  virtual const common::CoreSymbolSpecification* GetSymbolSpec() const = 0;
+  [[nodiscard]] virtual const common::CoreSymbolSpecification* GetSymbolSpec() const = 0;
 
   /**
    * Get L2 Market Data snapshot
    * Returns shared_ptr to allow sharing between OrderCommands (matching Java
    * behavior)
    */
-  virtual std::shared_ptr<common::L2MarketData> GetL2MarketDataSnapshot(int32_t size) = 0;
+  [[nodiscard]] virtual std::shared_ptr<common::L2MarketData>
+  GetL2MarketDataSnapshot(int32_t size) = 0;
 
-  virtual std::shared_ptr<common::L2MarketData> GetL2MarketDataSnapshot() {
+  [[nodiscard]] virtual std::shared_ptr<common::L2MarketData> GetL2MarketDataSnapshot() {
     return GetL2MarketDataSnapshot(INT32_MAX);
   }
 

@@ -45,7 +45,7 @@ public:
   /**
    * @return report type code (integer)
    */
-  virtual int32_t GetReportTypeCode() const = 0;
+  [[nodiscard]] virtual int32_t GetReportTypeCode() const = 0;
 
   /**
    * Type-erased Process method for MatchingEngineRouter
