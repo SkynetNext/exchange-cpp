@@ -91,19 +91,23 @@ LongAdaptiveRadixTreeMap<DirectOrder> orderIdIndex_;  // ⚠️ → unordered_de
 
 ## Java vs C++ Comparison
 
+C++ `perf_long_adaptive_radix_tree_map`, Java `PerfLongAdaptiveRadixTreeMap#shouldLoadManyItems`. Both 3-run avg, same workload (5M keys).
+
 | Operation | Java ART | C++ ART | Speedup |
 |-----------|----------|---------|---------|
-| **Put** | 3971 ms | 263 ms | **15.1x** |
-| **GetHit** | 2201 ms | 298 ms | **7.4x** |
-| **Remove** | 4012 ms | 502 ms | **8.0x** |
-| **Higher** | 3365 ms | 595 ms | **5.7x** |
-| **Lower** | 4010 ms | 602 ms | **6.7x** |
+| **Put** | 1962 ms | 827 ms | **2.4x** |
+| **GetHit** | 1483 ms | 759 ms | **2.0x** |
+| **Remove** | 2136 ms | 1241 ms | **1.7x** |
+| **ForEach** | 0.78 ms | 0.19 ms | **4.1x** |
+| **ForEachDesc** | 0.46 ms | 0.42 ms | **1.1x** |
+| **Higher** | 2033 ms | 1446 ms | **1.4x** |
+| **Lower** | 2005 ms | 1476 ms | **1.4x** |
 
-C++ ART is **6-15x faster** than Java ART due to native compilation, zero GC overhead, and better cache efficiency.
+C++ ART **1.1x–4.1x** faster than Java ART.
 
 ---
 
-**Last Updated**: 2026-01-22  
+**Last Updated**: 2026-01-28  
 **Version**: v3 (uint8_t keys, mimalloc)
 
 ---
