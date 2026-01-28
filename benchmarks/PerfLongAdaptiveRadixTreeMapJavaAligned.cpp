@@ -26,9 +26,9 @@
 #include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <algorithm>
 #include <chrono>
+#include <climits>
 #include <cstdint>
 #include <cstdio>
-#include <climits>
 #include <cstdlib>
 #include <functional>
 #include <map>
@@ -42,6 +42,7 @@
 
 #ifdef _MSC_VER
 #  include <intrin.h>
+
 inline int CountLeadingZeros64(uint64_t x) {
   unsigned long index;
   return _BitScanReverse64(&index, x) ? (63 - static_cast<int>(index)) : 64;
@@ -72,8 +73,8 @@ enum class Bm {
   ART_LOWER,
 };
 
-static void ExecuteInRandomOrder(std::mt19937& rng, std::function<void()> a,
-                                 std::function<void()> b) {
+static void
+ExecuteInRandomOrder(std::mt19937& rng, std::function<void()> a, std::function<void()> b) {
   if (rng() % 2 == 0) {
     a();
     b();
@@ -104,7 +105,8 @@ static std::vector<int64_t> GenerateList(std::mt19937& rng, int num, int64_t off
 }
 
 static int PercentImprovement(int64_t bstNs, int64_t artNs) {
-  if (artNs == 0) return 0;
+  if (artNs == 0)
+    return 0;
   return static_cast<int>(100.0 * (static_cast<double>(bstNs) / static_cast<double>(artNs) - 1.0));
 }
 
@@ -135,14 +137,14 @@ int main(int argc, char** argv) {
   std::mt19937 rng(1);
   std::map<Bm, std::vector<int64_t>> times;
 
-  auto addTime = [&times](Bm b, int64_t ns) {
-    times[b].push_back(ns);
-  };
+  auto addTime = [&times](Bm b, int64_t ns) { times[b].push_back(ns); };
   auto avgNs = [&times](Bm b) -> int64_t {
     auto& v = times[b];
-    if (v.empty()) return 0;
+    if (v.empty())
+      return 0;
     int64_t sum = 0;
-    for (int64_t x : v) sum += x;
+    for (int64_t x : v)
+      sum += x;
     return sum / static_cast<int64_t>(v.size());
   };
 
@@ -161,39 +163,53 @@ int main(int argc, char** argv) {
     }
 
     // Put (random order)
-    ExecuteInRandomOrder(rng, [&] {
-      auto t0 = std::chrono::high_resolution_clock::now();
-      for (int64_t x : list) bst[x] = x;
-      addTime(Bm::BST_PUT, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - t0).count());
-    }, [&] {
-      auto t0 = std::chrono::high_resolution_clock::now();
-      for (size_t i = 0; i < list.size(); i++) art->Put(list[i], values[i]);
-      addTime(Bm::ART_PUT, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - t0).count());
-    });
+    ExecuteInRandomOrder(
+      rng,
+      [&] {
+        auto t0 = std::chrono::high_resolution_clock::now();
+        for (int64_t x : list)
+          bst[x] = x;
+        addTime(Bm::BST_PUT, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                               std::chrono::high_resolution_clock::now() - t0)
+                               .count());
+      },
+      [&] {
+        auto t0 = std::chrono::high_resolution_clock::now();
+        for (size_t i = 0; i < list.size(); i++)
+          art->Put(list[i], values[i]);
+        addTime(Bm::ART_PUT, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                               std::chrono::high_resolution_clock::now() - t0)
+                               .count());
+      });
 
     std::shuffle(list.begin(), list.end(), rng);
 
     // GetHit (random order)
-    ExecuteInRandomOrder(rng, [&] {
-      int64_t sum = 0;
-      auto t0 = std::chrono::high_resolution_clock::now();
-      for (int64_t x : list) sum += bst.at(x);
-      addTime(Bm::BST_GET_HIT, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - t0).count());
-      (void)sum;
-    }, [&] {
-      int64_t sum = 0;
-      auto t0 = std::chrono::high_resolution_clock::now();
-      for (int64_t x : list) {
-        int64_t* v = art->Get(x);
-        if (v) sum += *v;
-      }
-      addTime(Bm::ART_GET_HIT, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - t0).count());
-      (void)sum;
-    });
+    ExecuteInRandomOrder(
+      rng,
+      [&] {
+        int64_t sum = 0;
+        auto t0 = std::chrono::high_resolution_clock::now();
+        for (int64_t x : list)
+          sum += bst.at(x);
+        addTime(Bm::BST_GET_HIT, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                   std::chrono::high_resolution_clock::now() - t0)
+                                   .count());
+        (void)sum;
+      },
+      [&] {
+        int64_t sum = 0;
+        auto t0 = std::chrono::high_resolution_clock::now();
+        for (int64_t x : list) {
+          int64_t* v = art->Get(x);
+          if (v)
+            sum += *v;
+        }
+        addTime(Bm::ART_GET_HIT, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                   std::chrono::high_resolution_clock::now() - t0)
+                                   .count());
+        (void)sum;
+      });
 
     art->ValidateInternalState();
     CheckStreamsEqual(*art, bst);
@@ -201,50 +217,64 @@ int main(int argc, char** argv) {
     std::shuffle(list.begin(), list.end(), rng);
 
     // Higher (random order): first = ART, second = BST (same as Java)
-    ExecuteInRandomOrder(rng, [&] {
-      int64_t sum = 0;
-      auto t0 = std::chrono::high_resolution_clock::now();
-      for (int64_t x : list) {
-        int64_t* v = art->GetHigherValue(x);
-        if (v) sum += *v;
-      }
-      addTime(Bm::ART_HIGHER, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - t0).count());
-      (void)sum;
-    }, [&] {
-      int64_t sum = 0;
-      auto t0 = std::chrono::high_resolution_clock::now();
-      for (int64_t x : list) {
-        auto it = bst.upper_bound(x);
-        if (it != bst.end()) sum += it->second;
-      }
-      addTime(Bm::BST_HIGHER, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - t0).count());
-      (void)sum;
-    });
+    ExecuteInRandomOrder(
+      rng,
+      [&] {
+        int64_t sum = 0;
+        auto t0 = std::chrono::high_resolution_clock::now();
+        for (int64_t x : list) {
+          int64_t* v = art->GetHigherValue(x);
+          if (v)
+            sum += *v;
+        }
+        addTime(Bm::ART_HIGHER, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                  std::chrono::high_resolution_clock::now() - t0)
+                                  .count());
+        (void)sum;
+      },
+      [&] {
+        int64_t sum = 0;
+        auto t0 = std::chrono::high_resolution_clock::now();
+        for (int64_t x : list) {
+          auto it = bst.upper_bound(x);
+          if (it != bst.end())
+            sum += it->second;
+        }
+        addTime(Bm::BST_HIGHER, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                  std::chrono::high_resolution_clock::now() - t0)
+                                  .count());
+        (void)sum;
+      });
 
     // Lower (random order)
-    ExecuteInRandomOrder(rng, [&] {
-      int64_t sum = 0;
-      auto t0 = std::chrono::high_resolution_clock::now();
-      for (int64_t x : list) {
-        int64_t* v = art->GetLowerValue(x);
-        if (v) sum += *v;
-      }
-      addTime(Bm::ART_LOWER, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - t0).count());
-      (void)sum;
-    }, [&] {
-      int64_t sum = 0;
-      auto t0 = std::chrono::high_resolution_clock::now();
-      for (int64_t x : list) {
-        auto it = bst.lower_bound(x);
-        if (it != bst.begin()) sum += (--it)->second;
-      }
-      addTime(Bm::BST_LOWER, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - t0).count());
-      (void)sum;
-    });
+    ExecuteInRandomOrder(
+      rng,
+      [&] {
+        int64_t sum = 0;
+        auto t0 = std::chrono::high_resolution_clock::now();
+        for (int64_t x : list) {
+          int64_t* v = art->GetLowerValue(x);
+          if (v)
+            sum += *v;
+        }
+        addTime(Bm::ART_LOWER, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                 std::chrono::high_resolution_clock::now() - t0)
+                                 .count());
+        (void)sum;
+      },
+      [&] {
+        int64_t sum = 0;
+        auto t0 = std::chrono::high_resolution_clock::now();
+        for (int64_t x : list) {
+          auto it = bst.lower_bound(x);
+          if (it != bst.begin())
+            sum += (--it)->second;
+        }
+        addTime(Bm::BST_LOWER, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                 std::chrono::high_resolution_clock::now() - t0)
+                                 .count());
+        (void)sum;
+      });
 
     // validate getHigher / getLower
     for (int64_t x : list) {
@@ -252,14 +282,16 @@ int main(int argc, char** argv) {
       auto it = bst.upper_bound(x);
       int64_t v2 = (it != bst.end()) ? it->second : 0;
       int64_t a1 = v1 ? *v1 : 0;
-      if (a1 != v2) throw std::runtime_error("getHigherValue mismatch");
+      if (a1 != v2)
+        throw std::runtime_error("getHigherValue mismatch");
     }
     for (int64_t x : list) {
       int64_t* v1 = art->GetLowerValue(x);
       auto it = bst.lower_bound(x);
       int64_t v2 = (it != bst.begin()) ? (--it)->second : 0;
       int64_t a1 = v1 ? *v1 : 0;
-      if (a1 != v2) throw std::runtime_error("getLowerValue mismatch");
+      if (a1 != v2)
+        throw std::runtime_error("getLowerValue mismatch");
     }
 
     // ForEach (random order) + validate
@@ -272,25 +304,31 @@ int main(int argc, char** argv) {
       artKeys.push_back(k);
       artVals.push_back(v ? *v : 0);
     };
-    ExecuteInRandomOrder(rng, [&] {
-      auto t0 = std::chrono::high_resolution_clock::now();
-      int n = 0;
-      for (const auto& e : bst) {
-        if (n >= forEachSize) break;
-        bstKeys.push_back(e.first);
-        bstVals.push_back(e.second);
-        n++;
-      }
-      addTime(Bm::BST_FOREACH, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - t0).count());
-    }, [&] {
-      artKeys.clear();
-      artVals.clear();
-      auto t0 = std::chrono::high_resolution_clock::now();
-      art->ForEach(artConsumer, forEachSize);
-      addTime(Bm::ART_FOREACH, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - t0).count());
-    });
+    ExecuteInRandomOrder(
+      rng,
+      [&] {
+        auto t0 = std::chrono::high_resolution_clock::now();
+        int n = 0;
+        for (const auto& e : bst) {
+          if (n >= forEachSize)
+            break;
+          bstKeys.push_back(e.first);
+          bstVals.push_back(e.second);
+          n++;
+        }
+        addTime(Bm::BST_FOREACH, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                   std::chrono::high_resolution_clock::now() - t0)
+                                   .count());
+      },
+      [&] {
+        artKeys.clear();
+        artVals.clear();
+        auto t0 = std::chrono::high_resolution_clock::now();
+        art->ForEach(artConsumer, forEachSize);
+        addTime(Bm::ART_FOREACH, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                   std::chrono::high_resolution_clock::now() - t0)
+                                   .count());
+      });
     if (artKeys != bstKeys || artVals != bstVals)
       throw std::runtime_error("forEach validate mismatch");
     artKeys.clear();
@@ -299,38 +337,50 @@ int main(int argc, char** argv) {
     bstVals.clear();
 
     // ForEachDesc (random order) + validate
-    ExecuteInRandomOrder(rng, [&] {
-      auto t0 = std::chrono::high_resolution_clock::now();
-      int n = 0;
-      for (auto it = bst.rbegin(); it != bst.rend() && n < forEachSize; ++it, n++) {
-        bstKeys.push_back(it->first);
-        bstVals.push_back(it->second);
-      }
-      addTime(Bm::BST_FOREACH_DESC, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - t0).count());
-    }, [&] {
-      artKeys.clear();
-      artVals.clear();
-      auto t0 = std::chrono::high_resolution_clock::now();
-      art->ForEachDesc(artConsumer, forEachSize);
-      addTime(Bm::ART_FOREACH_DESC, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - t0).count());
-    });
+    ExecuteInRandomOrder(
+      rng,
+      [&] {
+        auto t0 = std::chrono::high_resolution_clock::now();
+        int n = 0;
+        for (auto it = bst.rbegin(); it != bst.rend() && n < forEachSize; ++it, n++) {
+          bstKeys.push_back(it->first);
+          bstVals.push_back(it->second);
+        }
+        addTime(Bm::BST_FOREACH_DESC, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                        std::chrono::high_resolution_clock::now() - t0)
+                                        .count());
+      },
+      [&] {
+        artKeys.clear();
+        artVals.clear();
+        auto t0 = std::chrono::high_resolution_clock::now();
+        art->ForEachDesc(artConsumer, forEachSize);
+        addTime(Bm::ART_FOREACH_DESC, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                        std::chrono::high_resolution_clock::now() - t0)
+                                        .count());
+      });
     if (artKeys != bstKeys || artVals != bstVals)
       throw std::runtime_error("forEachDesc validate mismatch");
 
     // Remove (random order)
-    ExecuteInRandomOrder(rng, [&] {
-      auto t0 = std::chrono::high_resolution_clock::now();
-      for (int64_t x : list) bst.erase(x);
-      addTime(Bm::BST_REMOVE, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - t0).count());
-    }, [&] {
-      auto t0 = std::chrono::high_resolution_clock::now();
-      for (int64_t x : list) art->Remove(x);
-      addTime(Bm::ART_REMOVE, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - t0).count());
-    });
+    ExecuteInRandomOrder(
+      rng,
+      [&] {
+        auto t0 = std::chrono::high_resolution_clock::now();
+        for (int64_t x : list)
+          bst.erase(x);
+        addTime(Bm::BST_REMOVE, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                  std::chrono::high_resolution_clock::now() - t0)
+                                  .count());
+      },
+      [&] {
+        auto t0 = std::chrono::high_resolution_clock::now();
+        for (int64_t x : list)
+          art->Remove(x);
+        addTime(Bm::ART_REMOVE, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                  std::chrono::high_resolution_clock::now() - t0)
+                                  .count());
+      });
 
     art->ValidateInternalState();
     CheckStreamsEqual(*art, bst);
@@ -338,7 +388,8 @@ int main(int argc, char** argv) {
     // Java: remove oldest half every 2 iters (then log AVERAGE this iter)
     if (iter % 2 == 1) {
       for (auto& kv : times) {
-        if (!kv.second.empty()) kv.second.erase(kv.second.begin());
+        if (!kv.second.empty())
+          kv.second.erase(kv.second.begin());
       }
     }
 
@@ -350,22 +401,23 @@ int main(int argc, char** argv) {
     int64_t bstFd = avgNs(Bm::BST_FOREACH_DESC), artFd = avgNs(Bm::ART_FOREACH_DESC);
     int64_t bstHi = avgNs(Bm::BST_HIGHER), artHi = avgNs(Bm::ART_HIGHER);
     int64_t bstLo = avgNs(Bm::BST_LOWER), artLo = avgNs(Bm::ART_LOWER);
-    std::printf("AVERAGE PUT    BST %.3fms ADT %.3fms (%d%%)\n",
-                NanoToMs(bstPut), NanoToMs(artPut), PercentImprovement(bstPut, artPut));
-    std::printf("AVERAGE GETHIT BST %.3fms ADT %.3fms (%d%%)\n",
-                NanoToMs(bstGet), NanoToMs(artGet), PercentImprovement(bstGet, artGet));
-    std::printf("AVERAGE REMOVE BST %.3fms ADT %.3fms (%d%%)\n",
-                NanoToMs(bstRm), NanoToMs(artRm), PercentImprovement(bstRm, artRm));
-    std::printf("AVERAGE FOREACH BST %.3fms ADT %.3fms (%d%%)\n",
-                NanoToMs(bstFe), NanoToMs(artFe), PercentImprovement(bstFe, artFe));
-    std::printf("AVERAGE FOREACH DESC BST %.3fms ADT %.3fms (%d%%)\n",
-                NanoToMs(bstFd), NanoToMs(artFd), PercentImprovement(bstFd, artFd));
-    std::printf("AVERAGE HIGHER BST %.3fms ADT %.3fms (%d%%)\n",
-                NanoToMs(bstHi), NanoToMs(artHi), PercentImprovement(bstHi, artHi));
-    std::printf("AVERAGE LOWER BST %.3fms ADT %.3fms (%d%%)\n",
-                NanoToMs(bstLo), NanoToMs(artLo), PercentImprovement(bstLo, artLo));
+    std::printf("AVERAGE PUT    BST %.3fms ADT %.3fms (%d%%)\n", NanoToMs(bstPut), NanoToMs(artPut),
+                PercentImprovement(bstPut, artPut));
+    std::printf("AVERAGE GETHIT BST %.3fms ADT %.3fms (%d%%)\n", NanoToMs(bstGet), NanoToMs(artGet),
+                PercentImprovement(bstGet, artGet));
+    std::printf("AVERAGE REMOVE BST %.3fms ADT %.3fms (%d%%)\n", NanoToMs(bstRm), NanoToMs(artRm),
+                PercentImprovement(bstRm, artRm));
+    std::printf("AVERAGE FOREACH BST %.3fms ADT %.3fms (%d%%)\n", NanoToMs(bstFe), NanoToMs(artFe),
+                PercentImprovement(bstFe, artFe));
+    std::printf("AVERAGE FOREACH DESC BST %.3fms ADT %.3fms (%d%%)\n", NanoToMs(bstFd),
+                NanoToMs(artFd), PercentImprovement(bstFd, artFd));
+    std::printf("AVERAGE HIGHER BST %.3fms ADT %.3fms (%d%%)\n", NanoToMs(bstHi), NanoToMs(artHi),
+                PercentImprovement(bstHi, artHi));
+    std::printf("AVERAGE LOWER BST %.3fms ADT %.3fms (%d%%)\n", NanoToMs(bstLo), NanoToMs(artLo),
+                PercentImprovement(bstLo, artLo));
 
-    for (int64_t* v : values) delete v;
+    for (int64_t* v : values)
+      delete v;
     delete art;
     delete pool;
   }
