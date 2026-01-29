@@ -12,9 +12,11 @@ from diagrams.onprem.compute import Server
 from diagrams.onprem.monitoring import Grafana
 from diagrams.onprem.network import Gunicorn
 
+# 提高 DPI 使 PNG 文字更清晰（Graphviz 默认 96，文档用 200–300 为宜）
 graph_attr = {
+    "dpi": "200",
     "fontsize": "20",
-    "bgcolor": "white"
+    "bgcolor": "white",
 }
 
 def main():
