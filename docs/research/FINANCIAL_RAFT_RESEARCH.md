@@ -997,6 +997,173 @@ W = 单命令处理时间
 
 ---
 
-*文档版本: 4.3 | 创建日期: 2026-01-28 | 更新: 2026-01-29 重构为"案例→结论→举证"结构*
-*数据来源: aeron.io 官方文档、AWS/Azure/GCP 官方文档、Aeron Case Studies*
-*聚焦: Raft金融落地 + 硬件故障应对*
+## 附录 B：主流云商 RDMA 能力调研（交易所适用性）
+
+> **调研背景**：AI 大模型时代，云商 RDMA 主要面向 GPU 分布式训练。交易所级 Raft 共识需要 **CPU 侧 one-sided RDMA**（如 Mu 论文的 Pull-Score 微秒级检测），且通常需跨 AZ 容灾。本文调研各云商 RDMA 的**交易所适用性**。
+
+### B.1 结论总览
+
+| 云商 | RDMA 技术 | CPU 纯算力实例 | One-Sided RDMA Write | 跨 AZ 支持 | 交易所适用性 |
+|------|------------|----------------|----------------------|------------|--------------|
+| **AWS** | EFA (SRD 自研) | ✅ Hpc7a/Hpc6a/m8i/c8i | ⚠️ **Hpc7a 仅 Read**，Hpc6a/Nitro v6 支持 Write | ❌ **同 AZ 仅** | **受限** |
+| **Azure** | **NVIDIA InfiniBand** | ✅ HBv3/HBv4/HBv5 | ✅ 原生支持 | ❌ **同 AZ 仅** | **高性能首选** |
+| **GCP** | Falcon (自研) | ✅ H4D | ✅ 支持 | ❌ **同 Zone 仅** | **可选** |
+| **阿里云** | eRDMA (自研) | ✅ g8ae/c8ae 等 | ✅ RC 连接 | ⚠️ **同 VPC，待确认跨 AZ** | **国内首选** |
+| **Oracle** | RoCEv2 + ConnectX | ✅ BM.HPC2.36 | ✅ 支持 | ❌ 集群内 | **可选** |
+
+**关键发现**：
+1. **所有云商 RDMA 均不支持跨 AZ**：这是 RDMA 技术的根本限制，非单一云商问题
+2. **Azure HB 系列**：唯一提供真 **NVIDIA InfiniBand**（非 RoCE）的主流云商，性能最优
+3. **AWS EFA**：Nitro v4 架构的 **Hpc7a 不支持 RDMA Write**（仅 Read），需选择 Hpc6a 或 Nitro v6 实例
+4. **阿里云 eRDMA**：复用 VPC 网络，**免费**，国内最易获取的云上 RDMA 能力
+
+### B.2 技术对比：InfiniBand vs RoCE vs 自研协议
+
+| 技术 | 代表云商 | 硬件基础 | One-Sided RDMA | 典型延迟 | 交易所适配 |
+|------|----------|----------|----------------|----------|------------|
+| **NVIDIA InfiniBand** | Azure HB/ND | ConnectX + Quantum 交换机 | ✅ 原生支持 | **亚微秒级** | ✅ 最佳 |
+| **RoCE v2** | Oracle | ConnectX 以太网模式 | ✅ 支持 | **1-3µs** | ✅ 可用 |
+| **AWS EFA (SRD)** | AWS | Nitro 自研芯片 | ✅ FI_RMA (Libfabric) | **低微秒级** | ⚠️ 同 AZ 限制 |
+| **阿里 eRDMA** | 阿里云 | 神龙架构 + 自研 CC | ✅ RC 连接 | **低微秒级** | ✅ 可用 |
+| **GCP Falcon** | GCP | Titanium + 自研协议 | ✅ IRDMA | **低微秒级** | ⚠️ 同 Zone |
+
+> **One-Sided RDMA**：Mu 等微秒级共识依赖 Leader 直接 Write 到 Follower 内存，无需 Follower CPU 参与。需硬件支持 RDMA Write 操作。
+
+### B.3 各云商详情
+
+#### B.3.1 AWS
+
+| 项目 | 说明 |
+|------|------|
+| **技术** | Elastic Fabric Adapter (EFA)，基于 **SRD (Scalable Reliable Datagram)** 自研协议 |
+| **HPC 实例** | **Hpc7a**（300 Gbps，Nitro v4）、**Hpc6a**（100 Gbps，Nitro v4）、**Hpc7g**（200 Gbps，Nitro v5） |
+| **通用实例** | **m8i/c8i/r8i**（Nitro v6）、**m6i/c6i/r6i**（Nitro v4）等均支持 EFA |
+| **RDMA Write** | ⚠️ **Hpc7a 仅支持 RDMA Read**；**Hpc6a、Nitro v6 实例支持 Read+Write** |
+| **跨 AZ** | ❌ **EFA 流量不能跨 AZ、不能跨 VPC**，仅同 AZ 内有效 |
+| **定价** | EFA 无额外费用 |
+| **交易所结论** | 跨 AZ 容灾不可行；单 AZ 内需选择 **Hpc6a 或 Nitro v6 实例**（支持 RDMA Write） |
+
+> **参考**：[AWS EFA 官方文档](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html) | [EFA 支持的实例类型](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html#efa-instance-types)
+
+#### B.3.2 Azure
+
+| 项目 | 说明 |
+|------|------|
+| **技术** | **NVIDIA InfiniBand**（HDR/NDR），真 InfiniBand 交换网络，非 RoCE |
+| **HBv5** | 800 Gb/s（4×200G CX-7），368 核 AMD EPYC + 432GB HBM，2025 年推出 |
+| **HBv4** | 400 Gb/s NDR，176 核 AMD EPYC 9V33X（Genoa-X + 3D V-Cache），768GB RAM |
+| **HBv3** | 200 Gb/s HDR，120 核 AMD EPYC 7V73X（Milan-X），448GB RAM |
+| **跨 AZ** | ❌ **InfiniBand 不支持跨可用区通信**，启用 InfiniBand 的池无法配置 zonal 策略 |
+| **官方用例** | HB 系列明确包含 "financial risk analysis"、CFD、分子动力学等 |
+| **交易所结论** | **单 AZ 内性能最优**：真 InfiniBand + CPU 纯算力 + 金融用例验证 |
+
+> **参考**：[Azure HBv4 系列](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/high-performance-compute/hbv4-series) | [Azure HBv5 系列](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/high-performance-compute/hbv5-series) | [Azure InfiniBand 跨 AZ 限制](https://docs.azure.cn/en-us/reliability/reliability-batch)
+
+#### B.3.3 GCP
+
+| 项目 | 说明 |
+|------|------|
+| **技术** | **Falcon**（自研硬件传输协议），通过 Open Compute Project 开源 |
+| **H4D 实例** | 200 Gbps Falcon RDMA，192 vCPU（5th Gen AMD EPYC），首个支持 Cloud RDMA 的 CPU 实例 |
+| **性能** | 相比 C3D 提升 1.8x，相比 C2D 提升 5.8x（OSS-HPL 基准） |
+| **网络配置** | 需创建 **Falcon RDMA 网络 Profile**，实例需配置双 vNIC（IRDMA + gVNIC） |
+| **跨 Zone** | ❌ **RDMA 网络 Profile 为 Zonal**，所有 RDMA 实例必须在同一 Zone |
+| **交易所结论** | H4D 可用于单 Zone 内 Raft 集群，需注意网络配置复杂度 |
+
+> **参考**：[GCP H4D 发布公告](https://www.hpcwire.com/off-the-wire/google-cloud-launches-h4d-vms-to-accelerate-hpc-workloads-with-amd-epyc-and-cloud-rdma/) | [GCP RDMA 网络 Profile](https://cloud.google.com/vpc/docs/rdma-network-profiles) | [Falcon 协议介绍](https://cloud.google.com/blog/topics/systems/introducing-falcon-a-reliable-low-latency-hardware-transport)
+
+#### B.3.4 阿里云
+
+| 项目 | 说明 |
+|------|------|
+| **技术** | **eRDMA**（弹性 RDMA），自研，基于神龙架构，复用 VPC 网络 |
+| **核心特性** | 零拷贝、内核旁路、自研拥塞控制算法（容忍有损网络） |
+| **支持实例** | 第八代 ECS（g8ae/c8ae/r8ae 等），购买时勾选「弹性 RDMA 接口」 |
+| **QP 类型** | **RC (Reliable Connection)**，支持 RDMA Write/Read/Atomic |
+| **定价** | **免费**，无额外费用 |
+| **跨 AZ** | ⚠️ 底层复用 VPC，理论上同 VPC 内可通信，**跨 AZ 性能待官方确认** |
+| **交易所结论** | **国内首选**：免费、易用、通用实例可用，但跨 AZ 能力需与阿里云确认 |
+
+> **参考**：[阿里云 eRDMA 概述](https://help.aliyun.com/zh/ecs/user-guide/elastic-rdma-erdma/) | [eRDMA 使用指南](https://www.alibabacloud.com/help/en/ecs/user-guide/erdma-usage/)
+
+#### B.3.5 Oracle Cloud
+
+| 项目 | 说明 |
+|------|------|
+| **技术** | **RoCE v2** + NVIDIA ConnectX-5（100 Gbps），裸金属集群网络 |
+| **实例** | BM.HPC2.36、BM.Optimized3.36、BM.GPU.A100-v2.8、BM.GPU.H100.8 等 |
+| **延迟** | **1.7µs**（64 字节包），单数微秒级 |
+| **规模** | 集群可扩展至 20,000 核 |
+| **成本** | 官方宣称比其他云商 HPC 成本低 44% |
+| **交易所结论** | 裸金属 + RoCE 可用，需评估可用区覆盖与定价 |
+
+> **参考**：[Oracle Cloud 集群网络](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/managingclusternetworks.htm) | [OCI HPC 白皮书](https://www.oracle.com/a/ocom/docs/cloud/hpc-brief.pdf)
+
+### B.4 关键限制：RDMA 跨 AZ 不可行
+
+**重要结论**：经调研，**所有主流云商的 RDMA 均不支持跨可用区通信**，这是 RDMA 技术的根本限制：
+
+| 云商 | 跨 AZ RDMA | 官方说明 |
+|------|------------|----------|
+| AWS | ❌ | "EFA traffic can't cross Availability Zones or VPCs" |
+| Azure | ❌ | "InfiniBand does not support inter-zone communication" |
+| GCP | ❌ | "RDMA network profile is zonal and limited to specific zones" |
+| 阿里云 | ⚠️ | 复用 VPC，理论可跨 AZ，但官方未明确保证 RDMA 性能 |
+| Oracle | ❌ | 集群网络限于同一集群内 |
+
+**交易所跨 AZ 容灾方案**：
+1. **RDMA 用于同 AZ 内 Raft 复制**（微秒级）
+2. **跨 AZ 使用传统 TCP/IP**（毫秒级），作为异步复制或灾备
+3. **或采用自建机房 + 专线**，实现跨数据中心 RDMA
+
+### B.5 交易所选型建议
+
+```
+交易所 Raft + RDMA 选型决策树：
+
+┌─ 部署区域？
+│
+├─ 国内
+│   └─ 首选：阿里云 eRDMA（免费、易用、通用实例）
+│
+├─ 海外
+│   ├─ 追求极致性能 → Azure HBv4/HBv5（真 InfiniBand）
+│   ├─ AWS 生态 → Hpc6a 或 Nitro v6 实例（注意：Hpc7a 不支持 RDMA Write）
+│   └─ GCP 生态 → H4D + Falcon RDMA
+│
+└─ 跨 AZ 容灾需求？
+    ├─ 同 AZ 内：使用 RDMA 实现微秒级 Raft 复制
+    └─ 跨 AZ：RDMA 不可用，需 TCP/IP 异步复制或自建机房
+```
+
+### B.6 注意事项
+
+1. **RDMA Write 支持**：Mu 级共识必需 RDMA Write，选型时务必确认实例支持
+   - AWS：避免 Hpc7a（仅 Read），选择 Hpc6a 或 Nitro v6 实例
+   - 其他云商：普遍支持
+
+2. **跨 AZ 是根本限制**：所有云商 RDMA 均不支持跨 AZ，这是技术限制而非产品缺陷
+
+3. **GPU 捆绑问题**：AI 实例（P5、A100、H100）多为 GPU 捆绑，交易所若仅需 CPU 共识，应选择：
+   - Azure HB 系列
+   - AWS Hpc6a / 通用型 Nitro v6
+   - GCP H4D
+   - 阿里云 g8ae/c8ae
+
+4. **网络配置复杂度**：
+   - GCP 需配置双 vNIC（IRDMA + gVNIC）
+   - AWS 需确认 EFA 安全组规则
+   - 阿里云相对简单（勾选 eRDMA 选项即可）
+
+---
+
+*文档版本: 4.5 | 创建日期: 2026-01-28 | 更新: 2026-01-29 重构云商 RDMA 调研，修正跨 AZ 限制描述*
+
+**数据来源**：
+- [AWS EFA 官方文档](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html)
+- [Azure HB 系列文档](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/high-performance-compute/hbv4-series)
+- [GCP RDMA 网络 Profile](https://cloud.google.com/vpc/docs/rdma-network-profiles)
+- [阿里云 eRDMA 文档](https://help.aliyun.com/zh/ecs/user-guide/elastic-rdma-erdma/)
+- [Oracle Cloud 集群网络](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/managingclusternetworks.htm)
+
+*聚焦: Raft 金融落地 + 硬件故障应对 + RDMA 云上选型*
