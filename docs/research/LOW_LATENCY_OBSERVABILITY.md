@@ -114,54 +114,36 @@ RDMA NIC（如 NVIDIA ConnectX）支持 **RoCE Time-Stamping**：
 ### 3.2 整体架构
 
 ```mermaid
-graph TD
-    subgraph Application_Layer [应用层 - 零感知]
+flowchart LR
+    subgraph TRACE["追踪层"]
+        subgraph GW["Gateway + Trading + Clearing (同进程)"]
+            direction TB
+            T1["T1 收"] --> T2["T2 出"]
+            T5["T5 收"] --> T6["T6 出"]
+        end
+        subgraph ME["Matching"]
+            T3["T3 收"] --> T4["T4 出"]
+        end
+        T2 -->|Aeron| T3
+        T4 -->|Aeron| T5
+    end
+
+    T6 -.上报.-> AGG
+
+    subgraph COLLECT["采集层"]
         direction LR
-        GTW["Gateway + Trading + Clearing<br/>(同进程)"]
-        ME["Matching Engine"]
+        A1["Agent G"]
+        A2["Agent M"]
+        AGG["Aggregator"]
+        A1 --> AGG
+        A2 --> AGG
     end
 
-    subgraph Tracing_Layer [追踪层 - 嵌入通信层]
-        direction TB
-        subgraph Node_A [Gateway 侧]
-            T1["T1: Gateway 收包"]
-            T2["T2: Trading 出包"]
-            T5["T5: Clearing 收包"]
-            T6["T6: Gateway 出包"]
-            T1 --> T2
-            T5 --> T6
-        end
-
-        subgraph Node_B [Matching Engine]
-            T3["T3: ME 收包"]
-            T4["T4: ME 出包"]
-            T3 --> T4
-        end
-
-        T2 -- "Aeron (UDP/IPC)" --> T3
-        T4 -- "Aeron (UDP/IPC)" --> T5
-    end
-
-    subgraph Collection_Layer [采集层 - 异步旁路]
-        direction TB
-        AgentA["Local Agent<br/>(Gateway 侧)"]
-        AgentB["Local Agent<br/>(Matching 侧)"]
-        Agg["Aggregator<br/>(延迟计算)"]
-
-        Node_A -. "Shared Memory" .-> AgentA
-        Node_B -. "Shared Memory" .-> AgentB
-        AgentA --> Agg
-        AgentB --> Agg
-    end
-
-    %% 样式美化
-    style Application_Layer fill:#f9f9f9,stroke:#333,stroke-dasharray: 5 5
-    style Tracing_Layer fill:#e1f5fe,stroke:#01579b
-    style Collection_Layer fill:#f1f8e9,stroke:#33691e
-    style GTW fill:#fff,stroke:#333
-    style ME fill:#fff,stroke:#333
-    style Agg fill:#fff,stroke:#333,stroke-width:2px
+    GW -.共享内存.-> A1
+    ME -.共享内存.-> A2
 ```
+
+**说明**：上为追踪层 Gateway + Trading (同进程) (T1→T2) → Aeron → Matching (T3→T4) → Aeron → Gateway + + Clearing (T5→T6)；下为采集层两节点经共享内存上报 Aggregator。
 
 ### 3.3 消息头扩展设计
 
