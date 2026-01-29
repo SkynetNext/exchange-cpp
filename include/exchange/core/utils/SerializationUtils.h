@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <stdexcept>
 #include <vector>
 #include "../common/BytesIn.h"
@@ -232,7 +233,8 @@ public:
   }
 
   /**
-   * Read long->Object hash map
+   * Read long->Object hash map.
+   * Uses unique_ptr internally so that if creator() throws, already-allocated values are freed.
    */
   template <typename T>
   static ankerl::unordered_dense::map<int64_t, T*>
@@ -241,12 +243,17 @@ public:
     if (length < 0 || length > kMaxDeserializedMapOrArraySize) {
       throw std::runtime_error("SerializationUtils: ReadLongHashMap length out of range");
     }
-    ankerl::unordered_dense::map<int64_t, T*> hashMap;
-    hashMap.reserve(static_cast<size_t>(length));
+    ankerl::unordered_dense::map<int64_t, std::unique_ptr<T>> owned;
+    owned.reserve(static_cast<size_t>(length));
     for (int i = 0; i < length; i++) {
       int64_t key = bytes.ReadLong();
       T* value = creator(bytes);
-      hashMap[key] = value;
+      owned[key] = std::unique_ptr<T>(value);
+    }
+    ankerl::unordered_dense::map<int64_t, T*> hashMap;
+    hashMap.reserve(owned.size());
+    for (auto& p : owned) {
+      hashMap[p.first] = p.second.release();
     }
     return hashMap;
   }
