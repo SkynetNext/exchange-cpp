@@ -19,6 +19,7 @@
 #include <exchange/core/common/api/binary/BatchAddAccountsCommand.h>
 #include <exchange/core/common/api/binary/BinaryDataCommandFactory.h>
 #include <exchange/core/utils/SerializationUtils.h>
+#include <memory>
 
 namespace exchange::core::common::api::binary {
 
@@ -39,11 +40,11 @@ BatchAddAccountsCommand::BatchAddAccountsCommand(BytesIn& bytes) {
       });
 
   // Convert from map<int64_t, map<int32_t, int64_t>*> to map<int64_t,
-  // map<int32_t, int64_t>>
+  // map<int32_t, int64_t>>; use unique_ptr so we don't leak if the copy throws
   for (const auto& pair : tempMap) {
-    if (pair.second != nullptr) {
-      users[pair.first] = *pair.second;
-      delete pair.second;
+    std::unique_ptr<ankerl::unordered_dense::map<int32_t, int64_t>> guard(pair.second);
+    if (guard) {
+      users[pair.first] = *guard;
     }
   }
 }
