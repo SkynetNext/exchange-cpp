@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.30)
-project(exchange-cpp VERSION 0.1.0 LANGUAGES CXX)
+# C required for FindThreads (pthread) detection when using Clang-only CI
+project(exchange-cpp VERSION 0.1.0 LANGUAGES C CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 26)
@@ -49,7 +50,8 @@ else()
     message(WARNING "  LTO requires CMake 3.9+ and a compatible compiler (GCC 4.9+, Clang 3.9+)")
 endif()
 
-# Find dependencies
+# Find dependencies (prefer -pthread for Clang/GCC so FindThreads succeeds on CI)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 # Enable testing support (required for CTest)
@@ -59,6 +61,12 @@ enable_testing()
 option(BUILD_TESTING "Build tests" ON)
 option(BUILD_BENCHMARKS "Build benchmarks" ON)
 option(BUILD_EXAMPLES "Build examples" ON)
+option(BUILD_FUZZ "Build libFuzzer fuzz targets (requires Clang)" OFF)
+
+# Windows + fuzz: use static CRT (/MT) so fuzz targets match clang_rt sanitizer (MT_StaticRelease)
+if(BUILD_FUZZ AND WIN32)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded" CACHE STRING "Static CRT for fuzz+sanitizer" FORCE)
+endif()
 
 # Include third-party dependencies (add disruptor-cpp first as it may provide googletest/benchmark)
 
@@ -358,8 +366,10 @@ install(DIRECTORY include/exchange
     FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
 )
 
-# Tests
+# Tests (and fuzz targets when BUILD_FUZZ=ON)
 if(BUILD_TESTING AND GTest_FOUND)
+    add_subdirectory(tests)
+elseif(BUILD_FUZZ)
     add_subdirectory(tests)
 endif()
 

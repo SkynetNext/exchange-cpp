@@ -551,3 +551,50 @@ if(BUILD_TESTING AND GTest_FOUND)
     add_dependencies(all_tests exchange-cpp)
 endif()
 
+# =============================================================================
+# LibFuzzer fuzz targets (optional: -DBUILD_FUZZ=ON, requires Clang)
+# =============================================================================
+if(BUILD_FUZZ AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    # Windows/Clang: use fuzzer+UBSan only (no ASan) to avoid stl_asan.lib and
+    # annotate_string mismatch with exchange-cpp; ASan remains on Linux
+    if(WIN32)
+        set(FUZZ_SANITIZERS "fuzzer,undefined")
+        set(FUZZ_ITERATOR_DEBUG_DEF "_ITERATOR_DEBUG_LEVEL=0")
+        # Disable LTO so __sancov_lowest_stack from compiler-rt links correctly
+        set(FUZZ_EXTRA_COMPILE "-fno-lto")
+        set(FUZZ_EXTRA_LINK "-fno-lto")
+    else()
+        set(FUZZ_SANITIZERS "fuzzer,address,undefined")
+        set(FUZZ_ITERATOR_DEBUG_DEF "")
+        set(FUZZ_EXTRA_COMPILE "")
+        set(FUZZ_EXTRA_LINK "")
+    endif()
+
+    add_executable(fuzz_batch_add_accounts
+        fuzz/fuzz_batch_add_accounts.cpp
+    )
+    target_link_libraries(fuzz_batch_add_accounts PRIVATE exchange-cpp)
+    target_compile_options(fuzz_batch_add_accounts PRIVATE
+        -fsanitize=${FUZZ_SANITIZERS}
+        -fno-omit-frame-pointer
+        ${FUZZ_EXTRA_COMPILE}
+    )
+    target_link_options(fuzz_batch_add_accounts PRIVATE -fsanitize=${FUZZ_SANITIZERS} ${FUZZ_EXTRA_LINK})
+    if(FUZZ_ITERATOR_DEBUG_DEF)
+        target_compile_definitions(fuzz_batch_add_accounts PRIVATE ${FUZZ_ITERATOR_DEBUG_DEF})
+    endif()
+
+    add_executable(fuzz_binary_command_factory
+        fuzz/fuzz_binary_command_factory.cpp
+    )
+    target_link_libraries(fuzz_binary_command_factory PRIVATE exchange-cpp)
+    target_compile_options(fuzz_binary_command_factory PRIVATE
+        -fsanitize=${FUZZ_SANITIZERS}
+        -fno-omit-frame-pointer
+        ${FUZZ_EXTRA_COMPILE}
+    )
+    target_link_options(fuzz_binary_command_factory PRIVATE -fsanitize=${FUZZ_SANITIZERS} ${FUZZ_EXTRA_LINK})
+    if(FUZZ_ITERATOR_DEBUG_DEF)
+        target_compile_definitions(fuzz_binary_command_factory PRIVATE ${FUZZ_ITERATOR_DEBUG_DEF})
+    endif()
+endif()

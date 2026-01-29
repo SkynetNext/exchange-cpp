@@ -106,8 +106,11 @@ void SerializationUtils::MarshallLongArray(const std::vector<int64_t>& longs,
 
 std::vector<int64_t> SerializationUtils::ReadLongArray(common::BytesIn& bytes) {
   const int length = bytes.ReadInt();
+  if (length < 0 || length > kMaxDeserializedMapOrArraySize) {
+    throw std::runtime_error("SerializationUtils: ReadLongArray length out of range");
+  }
   std::vector<int64_t> array;
-  array.reserve(length);
+  array.reserve(static_cast<size_t>(length));
   for (int i = 0; i < length; i++) {
     array.push_back(bytes.ReadLong());
   }
@@ -127,8 +130,11 @@ void SerializationUtils::MarshallIntLongHashMap(
 ankerl::unordered_dense::map<int32_t, int64_t>
 SerializationUtils::ReadIntLongHashMap(common::BytesIn& bytes) {
   int length = bytes.ReadInt();
+  if (length < 0 || length > kMaxDeserializedMapOrArraySize) {
+    throw std::runtime_error("SerializationUtils: ReadIntLongHashMap length out of range");
+  }
   ankerl::unordered_dense::map<int32_t, int64_t> hashMap;
-  hashMap.reserve(length);
+  hashMap.reserve(static_cast<size_t>(length));
   for (int i = 0; i < length; i++) {
     int32_t k = bytes.ReadInt();
     int64_t v = bytes.ReadLong();
