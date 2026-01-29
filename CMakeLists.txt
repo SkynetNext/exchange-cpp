@@ -59,6 +59,12 @@ enable_testing()
 option(BUILD_TESTING "Build tests" ON)
 option(BUILD_BENCHMARKS "Build benchmarks" ON)
 option(BUILD_EXAMPLES "Build examples" ON)
+option(BUILD_FUZZ "Build libFuzzer fuzz targets (requires Clang)" OFF)
+
+# Windows + fuzz: use static CRT (/MT) so fuzz targets match clang_rt sanitizer (MT_StaticRelease)
+if(BUILD_FUZZ AND WIN32)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded" CACHE STRING "Static CRT for fuzz+sanitizer" FORCE)
+endif()
 
 # Include third-party dependencies (add disruptor-cpp first as it may provide googletest/benchmark)
 
@@ -358,8 +364,10 @@ install(DIRECTORY include/exchange
     FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
 )
 
-# Tests
+# Tests (and fuzz targets when BUILD_FUZZ=ON)
 if(BUILD_TESTING AND GTest_FOUND)
+    add_subdirectory(tests)
+elseif(BUILD_FUZZ)
     add_subdirectory(tests)
 endif()
 

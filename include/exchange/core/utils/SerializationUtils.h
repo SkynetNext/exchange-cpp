@@ -20,14 +20,13 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <stdexcept>
 #include <vector>
 #include "../common/BytesIn.h"
 #include "../common/BytesOut.h"
 #include "../common/Wire.h"
 
-namespace exchange {
-namespace core {
-namespace utils {
+namespace exchange::core::utils {
 
 /**
  * SerializationUtils - serialization utility functions
@@ -35,6 +34,9 @@ namespace utils {
  */
 class SerializationUtils {
 public:
+  /** Max map/array size when deserializing; prevents OOM from malicious length fields */
+  static constexpr int kMaxDeserializedMapOrArraySize = 65536;
+
   /**
    * Merge sum of two maps (currency -> amount)
    */
@@ -201,8 +203,11 @@ public:
   static ankerl::unordered_dense::map<int32_t, T*>
   ReadIntHashMap(common::BytesIn& bytes, std::function<T*(common::BytesIn&)> creator) {
     int length = bytes.ReadInt();
+    if (length < 0 || length > kMaxDeserializedMapOrArraySize) {
+      throw std::runtime_error("SerializationUtils: ReadIntHashMap length out of range");
+    }
     ankerl::unordered_dense::map<int32_t, T*> hashMap;
-    hashMap.reserve(length);
+    hashMap.reserve(static_cast<size_t>(length));
     for (int i = 0; i < length; i++) {
       int32_t key = bytes.ReadInt();
       T* value = creator(bytes);
@@ -233,8 +238,11 @@ public:
   static ankerl::unordered_dense::map<int64_t, T*>
   ReadLongHashMap(common::BytesIn& bytes, std::function<T*(common::BytesIn&)> creator) {
     int length = bytes.ReadInt();
+    if (length < 0 || length > kMaxDeserializedMapOrArraySize) {
+      throw std::runtime_error("SerializationUtils: ReadLongHashMap length out of range");
+    }
     ankerl::unordered_dense::map<int64_t, T*> hashMap;
-    hashMap.reserve(length);
+    hashMap.reserve(static_cast<size_t>(length));
     for (int i = 0; i < length; i++) {
       int64_t key = bytes.ReadLong();
       T* value = creator(bytes);
@@ -357,6 +365,4 @@ public:
   }
 };
 
-}  // namespace utils
-}  // namespace core
-}  // namespace exchange
+}  // namespace exchange::core::utils

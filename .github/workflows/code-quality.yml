@@ -301,6 +301,50 @@ jobs:
           chmod +x scripts/run_clang_tidy.sh
           scripts/run_clang_tidy.sh --quiet
 
+  # Fuzz: libFuzzer + ASan + UBSan (Binary API deserialization)
+  fuzz:
+    name: Fuzz - Binary API (libFuzzer)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Clang
+        run: |
+          sudo apt-get update
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main" -y
+          sudo apt-get update
+          sudo apt-get install -y clang-19
+          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100
+          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
+          sudo update-alternatives --set clang /usr/bin/clang-19
+          sudo update-alternatives --set clang++ /usr/bin/clang++-19
+          clang++ --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            ninja-build \
+            liblz4-dev \
+            libpthread-stubs0-dev
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: "3.30"
+
+      - name: Build and run fuzz (short)
+        shell: bash
+        run: |
+          chmod +x scripts/run_fuzz.sh
+          scripts/run_fuzz.sh -runs=5000
+
   # Static Analysis: cppcheck
   static-analysis-cppcheck:
     name: Static Analysis - cppcheck

@@ -2,6 +2,7 @@
 build/
 _build/
 cmake-build-*/
+build_fuzz/
 
 # CMake
 CMakeCache.txt
