@@ -27,7 +27,8 @@ stages = [
 ]
 
 dpdk_values = [0.5, 0.5, 9.0, 1.0, 9.0, 0.5, 36.0]   # 总计 56.5μs
-rdma_values = [0.5, 0.5, 1.5, 1.0, 1.5, 0.5, 3.0]    # 总计 8.5μs
+rdma_values = [0.5, 0.5, 1.5, 1.0, 1.5, 0.5, 3.0]    # 总计 8.5μs (通用 RDMA Two-sided)
+erdma_values = [0.5, 0.5, 2.5, 1.0, 2.5, 0.5, 5.0]  # 总计 12.5μs (阿里云 eRDMA, 官方 ≤5μs RTT)
 
 # ============================================================
 # ColorBrewer 配色方案 - Set2 (qualitative, colorblind-safe)
@@ -66,13 +67,14 @@ category_colors = {
 
 def create_waterfall_chart():
     """创建瀑布图风格的延迟分解对比 - 上下排列便于直接对比"""
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8), sharex=True)
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 11), sharex=True)
     
     bar_height = 0.6
     y_pos = np.arange(len(stages))
     
     dpdk_total = sum(dpdk_values)
     rdma_total = sum(rdma_values)
+    erdma_total = sum(erdma_values)
     max_x = dpdk_total * 1.08
     
     # === 上图: DPDK ===
@@ -122,12 +124,38 @@ def create_waterfall_chart():
     ax2.set_xlim(0, max_x)
     ax2.set_yticks(y_pos)
     ax2.set_yticklabels(stages, fontsize=10)
-    ax2.set_xlabel('延迟 (μs)', fontsize=11)
-    ax2.set_title(f'RDMA Two-sided  —  总计: {rdma_total:.1f}μs', fontsize=12, fontweight='bold', loc='left', pad=10)
+    ax2.set_title(f'RDMA Two-sided (通用)  —  总计: {rdma_total:.1f}μs', fontsize=12, fontweight='bold', loc='left', pad=10)
     ax2.grid(axis='x', alpha=0.3, linestyle='--')
     ax2.axvline(x=rdma_total, color='#2ca02c', linestyle='--', linewidth=2, alpha=0.7)
     ax2.text(rdma_total + 0.5, 3, f'{rdma_total:.1f}μs', color='#2ca02c', fontsize=10, fontweight='bold', va='center')
     ax2.invert_yaxis()
+    
+    # === 第三图: 阿里云 eRDMA (RoCE v2) ===
+    cumulative = 0
+    for i, (stage, val) in enumerate(zip(stages, erdma_values)):
+        ax3.barh(i, val, left=cumulative, height=bar_height,
+                color=stage_colors[stage], edgecolor='white', linewidth=0.5)
+        
+        if val >= 2.0:
+            ax3.text(cumulative + val/2, i, f'{val:.1f}', 
+                    ha='center', va='center', fontsize=9, fontweight='bold', color='white')
+        elif val >= 1.0:
+            ax3.text(cumulative + val/2, i, f'{val:.1f}', 
+                    ha='center', va='center', fontsize=9, fontweight='bold', color='#333')
+        else:
+            ax3.text(cumulative + val + 0.2, i, f'{val:.1f}', 
+                    ha='left', va='center', fontsize=8, color='#666')
+        cumulative += val
+    
+    ax3.set_xlim(0, max_x)
+    ax3.set_yticks(y_pos)
+    ax3.set_yticklabels(stages, fontsize=10)
+    ax3.set_xlabel('延迟 (μs)', fontsize=11)
+    ax3.set_title(f'阿里云 eRDMA (RoCE v2)  —  总计: {erdma_total:.1f}μs  (官方 ≤5μs RTT)', fontsize=12, fontweight='bold', loc='left', pad=10)
+    ax3.grid(axis='x', alpha=0.3, linestyle='--')
+    ax3.axvline(x=erdma_total, color='#9467bd', linestyle='--', linewidth=2, alpha=0.7)
+    ax3.text(erdma_total + 0.5, 3, f'{erdma_total:.1f}μs', color='#9467bd', fontsize=10, fontweight='bold', va='center')
+    ax3.invert_yaxis()
     
     # === 图例 (右上角) ===
     legend_elements = [
@@ -139,9 +167,10 @@ def create_waterfall_chart():
     ax1.legend(handles=legend_elements, loc='upper right', ncol=4, fontsize=9, framealpha=0.95)
     
     # === 性能提升标注 ===
-    improvement = dpdk_total / rdma_total
-    fig.suptitle(f'端到端延迟分解对比 (P99, 含 Raft)    性能提升: {improvement:.1f}x', 
-                fontsize=14, fontweight='bold', y=0.98)
+    improvement_rdma = dpdk_total / rdma_total
+    improvement_erdma = dpdk_total / erdma_total
+    fig.suptitle(f'端到端延迟分解对比 (P99, 含 Raft)    DPDK→RDMA: {improvement_rdma:.1f}x | DPDK→阿里云eRDMA: {improvement_erdma:.1f}x', 
+                fontsize=13, fontweight='bold', y=0.98)
     
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     

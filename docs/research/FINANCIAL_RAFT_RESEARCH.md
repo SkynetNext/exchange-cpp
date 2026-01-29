@@ -1157,13 +1157,200 @@ W = 单命令处理时间
 
 ---
 
-*文档版本: 4.5 | 创建日期: 2026-01-28 | 更新: 2026-01-29 重构云商 RDMA 调研，修正跨 AZ 限制描述*
+## 附录 C：云商 RDMA 延迟数据汇总
+
+> **数据说明**：本附录汇总各云商 RDMA 的端到端延迟数据。优先采用官方公布数据，标注数据来源和统计指标。
+> 
+> **延迟计算方式**：
+> - **Two-Sided RTT**：Send/Recv 往返延迟，直接可用
+> - **One-Sided × 2**：RDMA Write/Read 单向延迟 × 2，近似 RTT
+
+### C.1 各云商 RDMA 端到端延迟总览
+
+| 云商 | 技术 | 端到端延迟 (RTT) | 统计指标 | 数据来源 | 备注 |
+|------|------|-----------------|----------|----------|------|
+| **Azure** | InfiniBand (EDR) | **1.27 µs** | 官方 | [Azure HB 性能文档](https://learn.microsoft.com/en-us/azure/virtual-machines/hb-series-performance) | HB 系列，perftest 测试 |
+| **Oracle** | RoCE v2 | **1.7 µs** | 官方 | [OCI 集群网络](https://blogs.oracle.com/cloud-infrastructure/running-applications-on-oracle-cloud-using-cluster-networking) | 64-byte 包，ConnectX-5 |
+| **阿里云** | eRDMA | **≤5 µs** | 官方宣传上限 | [神龙4.0发布](https://m.c114.com.cn/w4049-1177555.html) | 可作为 P99 参考 |
+| **GCP** | Falcon (IRDMA) | **~8 µs** | 官方 | [GCP MPI 优化](https://cloud.google.com/blog/products/compute/how-to-reduce-mpi-latency-for-hpc-workloads-on-google-cloud) | H4D 实例，单向延迟，优化后 |
+| **AWS** | EFA (SRD) | **~10 µs** | 第三方 | [aws-efa-rdma-benchmark](https://github.com/AntoniBertel/aws-efa-rdma-benchmark) | m7g.16xlarge，MPI PingPong |
+
+> **重要说明**：
+> - Azure/Oracle 数据为**官方公布**，可信度高
+> - 阿里云 **≤5µs** 为官方宣传上限，可作为 P99 保守估计
+> - GCP **~8µs** 为官方优化后的单向延迟，RTT 约 **~16µs**
+> - AWS 无官方延迟数据，采用第三方开源测试结果
+
+### C.2 Azure InfiniBand - 官方性能数据
+
+**来源**：[Azure HB-series VM size performance](https://learn.microsoft.com/en-us/azure/virtual-machines/hb-series-performance)
+
+| 指标 | 数值 | 说明 |
+|------|------|------|
+| **RDMA 延迟** | **1.27 µs** | 官方公布 |
+| **RDMA 带宽** | 99.1 Gb/s | EDR InfiniBand |
+| **测试工具** | Mellanox perftest (ib_send_lat) | 官方推荐 |
+
+**实例系列演进**：
+
+| 系列 | InfiniBand | 带宽 | 延迟预期 |
+|------|------------|------|----------|
+| HB (已退役) | EDR | 100 Gb/s | 1.27 µs (官方) |
+| HBv3 | HDR | 200 Gb/s | <1.27 µs |
+| HBv4 | NDR | 400 Gb/s | <1 µs (预期) |
+| HBv5 | NDR 800G | 800 Gb/s | <1 µs (预期) |
+
+> **参考**：[Azure HBv4 系列](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/high-performance-compute/hbv4-series)
+
+### C.3 Oracle Cloud RoCE v2 - 官方性能数据
+
+**来源**：[Oracle Cloud 集群网络](https://blogs.oracle.com/cloud-infrastructure/running-applications-on-oracle-cloud-using-cluster-networking)
+
+| 指标 | 数值 | 说明 |
+|------|------|------|
+| **RDMA 延迟** | **1.7 µs** | 官方公布，64-byte 包 |
+| **网卡** | NVIDIA ConnectX-5 | 100 Gbps RoCE v2 |
+| **验证** | Exabyte.io 第三方确认 | 云商最低延迟 |
+
+**集群规模**：支持扩展至 20,000 核
+
+> **参考**：[OCI HPC 白皮书](https://www.oracle.com/a/ocom/docs/cloud/hpc-brief.pdf)
+
+### C.4 阿里云 eRDMA - 官方宣传数据
+
+**来源**：[阿里云神龙4.0发布](https://m.c114.com.cn/w4049-1177555.html)、[eRDMA 解读](https://www.dostor.com/p/79075.html)
+
+| 指标 | 数值 | 说明 |
+|------|------|------|
+| **延迟上限** | **≤5 µs** | 官方宣传，可作为 P99 参考 |
+| **对比传统 VPC** | 25 µs → 5 µs | 降低 80% |
+| **对比 AWS EFA** | 优于 15.5 µs | 官方对标 |
+
+**注意**：
+- 阿里云未公布具体测试方法和统计指标
+- **≤5µs 作为官方宣传上限，可保守用作 P99 估计**
+
+> **参考**：[阿里云 eRDMA 文档](https://help.aliyun.com/zh/ecs/user-guide/elastic-rdma-erdma/)
+
+### C.5 GCP Falcon RDMA - 官方性能数据
+
+**来源**：[GCP MPI 延迟优化](https://cloud.google.com/blog/products/compute/how-to-reduce-mpi-latency-for-hpc-workloads-on-google-cloud)
+
+| 指标 | 数值 | 说明 |
+|------|------|------|
+| **单向延迟（优化后）** | **8 µs** | 官方公布 |
+| **单向延迟（优化前）** | 28 µs | 基线 |
+| **RTT 估算** | **~16 µs** | 单向 × 2 |
+| **实例** | H4D | 首个支持 Cloud RDMA 的 CPU 实例 |
+
+**优化路径**：28µs → 8µs（单向），通过 Intel MPI 配置优化
+
+> **参考**：[GCP RDMA 网络 Profile](https://cloud.google.com/vpc/docs/rdma-network-profiles)
+
+### C.6 AWS EFA - 第三方测试数据
+
+**来源**：[aws-efa-rdma-benchmark](https://github.com/AntoniBertel/aws-efa-rdma-benchmark)
+
+**测试环境**：m7g.16xlarge (Graviton3 + EFA 2.0)，OpenMPI PingPong
+
+| 消息大小 | RTT 延迟 | 统计指标 |
+|----------|----------|----------|
+| 4 bytes | **10.26 µs** | Average |
+| 64 bytes | **10.62 µs** | Average |
+| 1 KB | **10.74 µs** | Average |
+
+**注意**：
+- AWS **未公布官方 RDMA 延迟数据**
+- 上述数据来自第三方开源项目，为 Average 而非 P99
+- P99 预估：**~15-20 µs**（基于 Average × 1.5-2x 经验值）
+
+### C.7 延迟对比与 Aeron 基准
+
+| 技术 | 端到端延迟 | 统计指标 | 与 Aeron DPDK 对比 |
+|------|-----------|----------|-------------------|
+| **Azure InfiniBand** | 1.27 µs | 官方 | **14x 更快** |
+| **Oracle RoCE v2** | 1.7 µs | 官方 | **10x 更快** |
+| **阿里云 eRDMA** | ≤5 µs | 官方上限 | **3.6x 更快** |
+| **GCP Falcon** | ~16 µs (RTT) | 官方推算 | **相当** |
+| **AWS EFA** | ~10 µs | 第三方 | **1.8x 更快** |
+| **Aeron Transport (DPDK)** | 18 µs | P99 | 基准 |
+| **Aeron Cluster (DPDK)** | 36 µs | P99 | 含复制+持久化 |
+
+### C.8 架构预测：Aeron-Cluster + RoCE v2
+
+基于上述数据，预测 Aeron-Cluster 迁移到 RoCE v2 Two-Sided 的延迟：
+
+```
+当前 Aeron Cluster (DPDK) P99:  36 µs
+  ├─ 网络传输:                  ~18 µs (Aeron Transport)
+  ├─ Raft 复制开销:             ~10 µs
+  └─ 持久化:                    ~8 µs
+
+迁移到 RoCE v2 后（以阿里云 eRDMA 为例）:
+  ├─ 网络传输:                  ~5 µs (官方上限)
+  ├─ Raft 复制开销:             ~10 µs (不变)
+  └─ 持久化:                    ~8 µs (不变)
+  ─────────────────────────────────────
+  预测 P99:                     ~23 µs
+  改善:                         ~35%
+```
+
+**结论**：迁移到 RoCE v2 预计可将 P99 从 36µs 降至 **~23-28µs**，改善约 **20-35%**。
+
+### C.9 测试工具与方法
+
+#### perftest 工具集
+
+| RDMA 操作 | 带宽测试 | 延迟测试 | 输出指标 |
+|-----------|----------|----------|----------|
+| Send (Two-Sided) | ib_send_bw | ib_send_lat | Min/Median/Max |
+| RDMA Read | ib_read_bw | ib_read_lat | Min/Median/Max |
+| RDMA Write | ib_write_bw | ib_write_lat | Min/Median/Max |
+
+**项目地址**：[linux-rdma/perftest](https://github.com/linux-rdma/perftest)
+
+#### 延迟测试命令示例
+
+```bash
+# Two-Sided Send 延迟测试
+# Server
+ib_send_lat -a -d mlx5_0
+
+# Client
+ib_send_lat -a -d mlx5_0 <server_ip>
+
+# One-Sided Write 延迟测试
+# Server
+ib_write_lat -a -d mlx5_0
+
+# Client
+ib_write_lat -a -d mlx5_0 <server_ip>
+```
+
+### C.10 参考链接
+
+**官方文档**：
+- [Azure HB 系列性能](https://learn.microsoft.com/en-us/azure/virtual-machines/hb-series-performance)
+- [Oracle Cloud 集群网络](https://blogs.oracle.com/cloud-infrastructure/running-applications-on-oracle-cloud-using-cluster-networking)
+- [阿里云 eRDMA 文档](https://help.aliyun.com/zh/ecs/user-guide/elastic-rdma-erdma/)
+- [GCP MPI 延迟优化](https://cloud.google.com/blog/products/compute/how-to-reduce-mpi-latency-for-hpc-workloads-on-google-cloud)
+- [AWS EFA 文档](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html)
+
+**第三方测试**：
+- [aws-efa-rdma-benchmark](https://github.com/AntoniBertel/aws-efa-rdma-benchmark)
+- [Aeron Google Cloud 性能测试](https://aeron.io/other/aeron-google-cloud-performance-testing)
+
+---
+
+*文档版本: 4.7 | 创建日期: 2026-01-28 | 更新: 2026-01-29 重构附录C，聚焦官方RDMA端到端延迟数据*
 
 **数据来源**：
-- [AWS EFA 官方文档](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html)
-- [Azure HB 系列文档](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/high-performance-compute/hbv4-series)
-- [GCP RDMA 网络 Profile](https://cloud.google.com/vpc/docs/rdma-network-profiles)
-- [阿里云 eRDMA 文档](https://help.aliyun.com/zh/ecs/user-guide/elastic-rdma-erdma/)
-- [Oracle Cloud 集群网络](https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/managingclusternetworks.htm)
+- [Azure HB 系列性能文档](https://learn.microsoft.com/en-us/azure/virtual-machines/hb-series-performance)
+- [Oracle Cloud 集群网络](https://blogs.oracle.com/cloud-infrastructure/running-applications-on-oracle-cloud-using-cluster-networking)
+- [阿里云神龙4.0发布](https://m.c114.com.cn/w4049-1177555.html)
+- [GCP MPI 延迟优化](https://cloud.google.com/blog/products/compute/how-to-reduce-mpi-latency-for-hpc-workloads-on-google-cloud)
+- [AWS EFA 文档](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa.html)
+- [aws-efa-rdma-benchmark](https://github.com/AntoniBertel/aws-efa-rdma-benchmark)
+- [Aeron Google Cloud 性能测试](https://aeron.io/other/aeron-google-cloud-performance-testing)
 
 *聚焦: Raft 金融落地 + 硬件故障应对 + RDMA 云上选型*
