@@ -318,11 +318,13 @@ jobs:
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
           sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-19 main" -y
           sudo apt-get update
-          sudo apt-get install -y clang-19
+          sudo apt-get install -y clang-19 clang-tools-19
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 100
+          sudo update-alternatives --install /usr/bin/clang-scan-deps clang-scan-deps /usr/bin/clang-scan-deps-19 100
           sudo update-alternatives --set clang /usr/bin/clang-19
           sudo update-alternatives --set clang++ /usr/bin/clang++-19
+          sudo update-alternatives --set clang-scan-deps /usr/bin/clang-scan-deps-19
           clang++ --version
 
       - name: Install dependencies
