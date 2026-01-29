@@ -49,7 +49,8 @@ else()
     message(WARNING "  LTO requires CMake 3.9+ and a compatible compiler (GCC 4.9+, Clang 3.9+)")
 endif()
 
-# Find dependencies
+# Find dependencies (prefer -pthread for Clang/GCC so FindThreads succeeds on CI)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 # Enable testing support (required for CTest)
