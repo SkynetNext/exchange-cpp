@@ -100,7 +100,7 @@ RDMA NIC（如 NVIDIA ConnectX）支持 **RoCE Time-Stamping**：
 
 ---
 
-## 3. 可落地的低延迟追踪方案设计
+## 3. 低延迟追踪方案设计
 
 ### 3.1 设计原则
 
@@ -113,40 +113,54 @@ RDMA NIC（如 NVIDIA ConnectX）支持 **RoCE Time-Stamping**：
 
 ### 3.2 整体架构
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           应用层 (零感知)                                │
-│   Gateway    Trading Service          Matching Engine          Clearing │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         追踪层 (嵌入通信层)                              │
-│  Gateway 生成 traceId、打 T1、决定是否采样；下游仅透传并打 T2/T3/T4       │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                 │
-│  │ TraceHeader │    │ TraceHeader │    │ TraceHeader │                 │
-│  │ + TraceID   │───►│ + TraceID   │───►│ + TraceID   │                 │
-│  │ + HopCount  │    │ + HopCount  │    │ + HopCount  │                 │
-│  │ + T1        │    │ + T2/T3     │    │ + T4        │                 │
-│  └─────────────┘    └─────────────┘    └─────────────┘                 │
-│  Aeron Publication      Aeron Subscription      Aeron Publication       │
-└─────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         采集层 (异步旁路)                                │
-│                                                                         │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│  │ Local Agent │    │ Local Agent │    │ Local Agent │    │ Local Agent │
-│  │ (Gateway)   │    │ (共享内存)   │    │ (共享内存)   │    │ (共享内存)   │
-│  └──────┬──────┘    └──────┬──────┘    └──────┬──────┘    └──────┬──────┘
-│         │                  │                  │                  │
-│         └──────────────────┴──────────────────┴──────────────────┘
-│                                            ▼
-│                    ┌───────────────┐                                    │
-│                    │  Aggregator   │                                    │
-│                    │  (延迟计算)    │                                    │
-│                    └───────────────┘                                    │
-└─────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Application_Layer [应用层 - 零感知]
+        direction LR
+        GTW["Gateway + Trading + Clearing<br/>(同进程)"]
+        ME["Matching Engine"]
+    end
+
+    subgraph Tracing_Layer [追踪层 - 嵌入通信层]
+        direction TB
+        subgraph Node_A [Gateway 侧]
+            T1["T1: Gateway 收包"]
+            T2["T2: Trading 出包"]
+            T5["T5: Clearing 收包"]
+            T6["T6: Gateway 出包"]
+            T1 --> T2
+            T5 --> T6
+        end
+
+        subgraph Node_B [Matching Engine]
+            T3["T3: ME 收包"]
+            T4["T4: ME 出包"]
+            T3 --> T4
+        end
+
+        T2 -- "Aeron (UDP/IPC)" --> T3
+        T4 -- "Aeron (UDP/IPC)" --> T5
+    end
+
+    subgraph Collection_Layer [采集层 - 异步旁路]
+        direction TB
+        AgentA["Local Agent<br/>(Gateway 侧)"]
+        AgentB["Local Agent<br/>(Matching 侧)"]
+        Agg["Aggregator<br/>(延迟计算)"]
+
+        Node_A -. "Shared Memory" .-> AgentA
+        Node_B -. "Shared Memory" .-> AgentB
+        AgentA --> Agg
+        AgentB --> Agg
+    end
+
+    %% 样式美化
+    style Application_Layer fill:#f9f9f9,stroke:#333,stroke-dasharray: 5 5
+    style Tracing_Layer fill:#e1f5fe,stroke:#01579b
+    style Collection_Layer fill:#f1f8e9,stroke:#33691e
+    style GTW fill:#fff,stroke:#333
+    style ME fill:#fff,stroke:#333
+    style Agg fill:#fff,stroke:#333,stroke-width:2px
 ```
 
 ### 3.3 消息头扩展设计
@@ -170,56 +184,51 @@ RDMA NIC（如 NVIDIA ConnectX）支持 **RoCE Time-Stamping**：
 
 ### 3.4 时间戳采集点
 
+按跳划分：每跳「收包 → 出包」打两个时间戳。典型为双节点：**Gateway 侧**（Gateway + Trading + Clearing 同进程）与 **Matching**。
+
 ```
-发起方 (Client/Gateway)              接收方 (Service)
-        │                                   │
-        │  ┌─────────────────────────────┐  │
-        │  │        Network              │  │
-   T1 ──┼──┤  ───────────────────────►   ├──┼── T2
-        │  │                             │  │
-        │  │                             │  │  Local Processing
-        │  │                             │  │  (T3 - T2)
-        │  │                             │  │
-   T4 ──┼──┤  ◄───────────────────────   ├──┼── T3
-        │  │                             │  │
-        │  └─────────────────────────────┘  │
-        │                                   │
+Gateway(T1收) → Trading(T2出)     Matching Engine (T3收 T4出)     Clearing(T5收) → Gateway(T6出)
+     │                                    │                              │
+  T1 收包                                 T3 收包                      T5 收包
+     │                                    │                              │
+  T2 出包 (Aeron Pub)  ─────────────►   T4 出包  ─────────────►   T6 出包 (回包)
+     ↑ 同进程内角色：Gateway → Trading → … → Clearing → Gateway        ↑
 ```
 
 | 时间戳 | 采集点 | 说明 |
 |--------|--------|------|
-| **T1** | 发起方发送前 | `rdtsc_ns()` 或硬件时间戳 |
-| **T2** | 接收方收到后 | 同上 |
-| **T3** | 接收方发送响应前 | 同上 |
-| **T4** | 发起方收到响应后 | 同上 |
+| **T1** | Gateway 收包（入口） | `rdtsc_ns()` 或硬件时间戳 |
+| **T2** | Trading 出包（Aeron Publication 前） | 同上 |
+| **T3** | Matching Engine 收包（Aeron Subscription 后） | 同上 |
+| **T4** | Matching Engine 出包 | 同上 |
+| **T5** | Clearing 收包 | 同上（与 Gateway/Trading 同进程） |
+| **T6** | Gateway 出包（回包） | 同上 |
 
 ### 3.5 无偏延迟计算（消差算法）
 
-**问题**：跨节点时钟存在偏差 Δ（1-10µs），直接计算 `T2 - T1` 不准确。
+**问题**：跨节点时钟存在偏差 Δ（1-10µs），跨跳直接相减（如 `T3 - T2`）会带偏差。
 
-**解决方案**：NTP 消差公式
+**每跳本地处理（同节点、同时钟，精确）**：
+- 同进程内 Gateway→Trading：`T2 - T1`
+- Matching Engine：`T4 - T3`
+- 同进程内 Clearing→Gateway：`T6 - T5`
+
+**单程往返（请求从 Gateway 发出、响应回到 Gateway）**：NTP 消差公式
 
 ```
-设时钟偏差为 Δ（接收方比发起方快 Δ）
+设时钟偏差为 Δ（下游节点比 Gateway 快 Δ）
 
-实际测量值：
-  T2' = T2 + Δ  (接收方时钟)
-  T3' = T3 + Δ  (接收方时钟)
-  T1, T4        (发起方时钟，无偏差)
+单程往返：Gateway(T1收) → Trading(T2出) → ME(T3收 T4出) → Clearing(T5收) → Gateway(T6出)
+端到端 = T6 − T1  ✓ (Gateway 收包到 Gateway 出回包，同一进程，精确)
 
-计算：
-  本地处理耗时: Local = T3' - T2' = T3 - T2  ✓ (Δ 抵消，精确)
-  
-  往返时间: RTT = T4 - T1  ✓ (同一时钟，精确)
-  
-  单向网络延迟: Net = (RTT - Local) / 2
-                    = [(T4 - T1) - (T3 - T2)] / 2  ✓ (Δ 完全抵消)
+任一下游跳（如第二跳）本地处理: Local = T4' - T3' = T4 - T3  ✓ (Δ 抵消)
+跳间单向网络（近似）: (T3 - T2) 等，需消差时用该跳往返与本地处理反推。
 ```
 
 **关键结论**：
-- **本地处理耗时**：`T3 - T2`，绝对精确
-- **单向网络延迟**：`[(T4 - T1) - (T3 - T2)] / 2`，时钟偏差完全抵消
-- **端到端延迟**：`T4 - T1`，发起方单机测量，绝对精确
+- **每跳本地处理**：`T2-T1`、`T4-T3`、`T6-T5`…，同节点打戳，绝对精确
+- **端到端延迟**：`T6 − T1`（Gateway 收包到 Gateway 出回包），同进程内精确
+- **跳间网络**：结合 RTT 与各跳本地处理用消差公式，或同钟下近似为 `T3−T2`、`T5−T4`…
 
 ### 3.6 高精度时间戳采集
 
@@ -279,20 +288,17 @@ inline uint64_t rdtsc_ns() {
 │  Trace ID: 0x1234567890ABCDEF                                   │
 │  Total Latency: 45.2 µs                                         │
 │                                                                 │
-│  Hop 0: Gateway → Trading Service                               │
-│    ├─ Network (T1→T2): 8.3 µs                                   │
-│    ├─ Local Processing: 2.1 µs                                  │
-│    └─ Network (T3→T4): 7.9 µs                                   │
+│  Gateway→Trading (同进程)                                        │
+│    ├─ Local (T2−T1): 2.1 µs                                     │
+│    └─ Network (T2→T3): 8.3 µs                                   │
 │                                                                 │
-│  Hop 1: Trading Service → Matching Engine                       │
-│    ├─ Network (T1→T2): 5.2 µs                                   │
-│    ├─ Local Processing: 6.8 µs  ⚠️ P99 异常                     │
-│    └─ Network (T3→T4): 5.1 µs                                   │
+│  Hop 1: Matching Engine                                         │
+│    ├─ Local (T4−T3): 6.8 µs  ⚠️ P99 异常                         │
+│    └─ Network (T4→T5): 5.1 µs                                   │
 │                                                                 │
-│  Hop 2: Matching Engine → Clearing Service                      │
-│    ├─ Network (T1→T2): 4.9 µs                                   │
-│    ├─ Local Processing: 1.2 µs                                  │
-│    └─ Network (T3→T4): 4.7 µs                                   │
+│  Clearing→Gateway (同进程)                                      │
+│    ├─ Local (T6−T5): 1.2 µs                                     │
+│    └─ 端到端 = T6 − T1 (Gateway 收包到 Gateway 出回包)             │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -309,17 +315,17 @@ inline uint64_t rdtsc_ns() {
 
 | 操作 | 开销 | 说明 |
 |------|------|------|
-| TraceHeader 序列化 | ~50ns | 24 字节内存拷贝 |
-| `clock_gettime()` | ~20-50ns | vDSO 优化后 |
-| 采样决策 | ~5ns | 取模运算 |
+| TraceHeader 序列化 | ~30ns | 13 字节 SBE 拷贝 |
+| `rdtsc_ns()` | ~5-10ns | RDTSC 校准后 |
+| 采样决策 | ~5ns | Gateway 侧 |
 | 无锁队列写入 | ~50-100ns | SPSC 无竞争 |
-| **总计** | **~150-250ns** | **远小于 1µs** |
+| **总计** | **~100-150ns** | **远小于 1µs** |
 
 ### 4.2 带宽开销
 
-- TraceHeader: 24 字节
+- TraceHeader: 13 字节
 - 典型消息: 100-500 字节
-- 开销比例: 5-24%
+- 开销比例: 3-13%
 
 对于低延迟场景，带宽通常不是瓶颈（10Gbps+ 网络），可接受。
 
