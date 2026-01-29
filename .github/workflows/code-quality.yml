@@ -332,8 +332,7 @@ jobs:
             build-essential \
             ninja-build \
             liblz4-dev \
-            libpthread-stubs0-dev \
-            libpthread-dev
+            libpthread-stubs0-dev
 
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
