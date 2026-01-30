@@ -200,7 +200,7 @@ def main():
     # ========================================================================
     # 标题
     # ========================================================================
-    fig.suptitle("Low Latency Observability Architecture", fontsize=TITLE_SIZE, fontweight="bold", y=0.97, color="#232f3e")
+    fig.suptitle("NanoTrace - Low Latency Observability Architecture", fontsize=TITLE_SIZE, fontweight="bold", y=0.97, color="#232f3e")
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     plt.savefig(out_path + ".png", dpi=DPI, bbox_inches="tight", facecolor=BG_COLOR)
