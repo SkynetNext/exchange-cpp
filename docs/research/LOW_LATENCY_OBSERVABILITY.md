@@ -118,8 +118,11 @@ RDMA NIC（如 NVIDIA ConnectX）支持 **RoCE Time-Stamping**：
 ![低延迟可观测性架构](../images/observability_architecture.png)
 
 **说明**：
-- **Tracing Layer**：Gateway Process（同主机）包含 Gateway (T1 in) → Trading (T2 out) 与 Clearing (T5 in) → Gateway (T6 out)，通过 Aeron 与 Matching Process 双向通信。
-- **Collection Layer**：Agent G 采集 Gateway Process、Agent M 采集 Matching Process，均通过共享内存；两 Agent 上报至 Aggregator。
+- **Tracing Layer**：三进程架构，同机部署 Gateway 与 Trading+Clearing（Aeron IPC 通信），Matching Engine 独立进程（Aeron 通信）。
+  - Gateway 进程：T1 in / T6 out
+  - Trading + Clearing 进程：T2 out / T5 in
+  - Matching Engine 进程：T3 in / T4 out
+- **Collection Layer**：Agent G 采集同机两进程、Agent M 采集 Matching，均通过共享内存；两 Agent 上报至 Aggregator。
 - 图由 `docs/scripts/generate_observability_diagram.py` 生成（风格参考 AWS 架构图，DPI=250）。
 
 ### 3.3 消息头扩展设计
@@ -143,24 +146,23 @@ RDMA NIC（如 NVIDIA ConnectX）支持 **RoCE Time-Stamping**：
 
 ### 3.4 时间戳采集点
 
-按跳划分：每跳「收包 → 出包」打两个时间戳。典型为双节点：**Gateway 侧**（Gateway + Trading + Clearing 同进程）与 **Matching**。
+按跳划分：每跳「收包 → 出包」打两个时间戳。三进程架构：**Gateway 进程** | **Trading+Clearing 进程**（同机 Aeron IPC）| **Matching 进程**（Aeron）。
 
 ```
-Gateway(T1收) → Trading(T2出)     Matching Engine (T3收 T4出)     Clearing(T5收) → Gateway(T6出)
-     │                                    │                              │
-  T1 收包                                 T3 收包                      T5 收包
-     │                                    │                              │
-  T2 出包 (Aeron Pub)  ─────────────►   T4 出包  ─────────────►   T6 出包 (回包)
-     ↑ 同进程内角色：Gateway → Trading → … → Clearing → Gateway        ↑
+Gateway(T1/T6)  ◄─Aeron IPC─►  Trading+Clearing(T2/T5)  ◄─Aeron─►  Matching(T3/T4)
+     │                                  │                              │
+  T1 收包                            T2 出包                        T3 收包
+  T6 出包                            T5 收包                        T4 出包
+     └──────────── 同机部署 ────────────┘
 ```
 
 | 时间戳 | 采集点 | 说明 |
 |--------|--------|------|
 | **T1** | Gateway 收包（入口） | `rdtsc_ns()` 或硬件时间戳 |
-| **T2** | Trading 出包（Aeron Publication 前） | 同上 |
-| **T3** | Matching Engine 收包（Aeron Subscription 后） | 同上 |
+| **T2** | Trading 出包（Aeron IPC Pub 前） | 同上 |
+| **T3** | Matching Engine 收包（Aeron Sub 后） | 同上 |
 | **T4** | Matching Engine 出包 | 同上 |
-| **T5** | Clearing 收包 | 同上（与 Gateway/Trading 同进程） |
+| **T5** | Clearing 收包（Aeron Sub 后） | 同上（与 Gateway 同机不同进程） |
 | **T6** | Gateway 出包（回包） | 同上 |
 
 ### 3.5 无偏延迟计算（消差算法）
