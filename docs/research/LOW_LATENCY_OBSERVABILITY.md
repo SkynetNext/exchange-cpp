@@ -139,7 +139,7 @@ RDMA NIC（如 NVIDIA ConnectX）支持 **RoCE Time-Stamping**：
 ```
 
 **设计要点**：
-- `traceId`：**Gateway 生成**，全链路不变；**采样决策在 Gateway 完成**（是否写入 TraceHeader、是否上报），下游仅透传并按同一规则判断是否上报
+- `traceId`：**Gateway 生成**，全链路不变；采样则填充 TraceHeader，否则不带；下游仅看有无头
 - `timestampNs`：纳秒时间戳，用于延迟计算
 - `hopCount`：每经过一个节点自增，用于快速定位瓶颈跳
 - 总开销：13 字节 / 消息，对于典型 100-500 字节消息，开销 3-13%
@@ -226,7 +226,7 @@ inline uint64_t rdtsc_ns() {
 
 ### 3.7 采样策略
 
-**采样决策仅在 Gateway**：Gateway 按配置的**采样间隔**（时间间隔）决定是否采样——例如「每 100ms 最多采样 1 条」；满足间隔时生成非零 traceId 并写入 TraceHeader、上报，否则 traceId 置 0 或不带 TraceHeader。下游仅根据 traceId 是否非零判断是否上报。
+**采样决策仅在 Gateway**：按**采样间隔**（如每 100ms 最多 1 条）决定是否采样；满足则填充 TraceHeader，否则不带；下游仅看有无头。
 
 **默认值 100ms**：为防止多组件/多环境配置错配导致采样行为不一致，**默认采样间隔为 100ms**（即未显式配置时采用此值），需更密集采样时再显式调小。
 
