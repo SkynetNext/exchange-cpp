@@ -51,12 +51,12 @@ protected:
 TEST_F(RunCukeNaiveTests, BasicRiskCheck) {
   // Given New client Alice has a balance:
   std::vector<std::pair<std::string, int64_t>> aliceBalance;
-  aliceBalance.push_back({"XBT", 2000000L});
+  aliceBalance.emplace_back("XBT", 2000000L);
   stepdefs_->NewClientHasBalance(1440001L, aliceBalance);
 
   // And New client Bob has a balance:
   std::vector<std::pair<std::string, int64_t>> bobBalance;
-  bobBalance.push_back({"ETH", 699999L});
+  bobBalance.emplace_back("ETH", 699999L);
   stepdefs_->NewClientHasBalance(1440002L, bobBalance);
 
   // When A client Alice could not place an BID order 101 at 30000@7 (type:
@@ -66,7 +66,7 @@ TEST_F(RunCukeNaiveTests, BasicRiskCheck) {
 
   // And A balance of a client Alice:
   std::vector<std::pair<std::string, int64_t>> expectedBalance;
-  expectedBalance.push_back({"XBT", 2000000L});
+  expectedBalance.emplace_back("XBT", 2000000L);
   stepdefs_->ClientBalanceIs(1440001L, expectedBalance);
 
   // And A client Alice orders: (empty)
@@ -88,7 +88,7 @@ TEST_F(RunCukeNaiveTests, BasicRiskCheck) {
 
   // And A balance of a client Alice:
   std::vector<std::pair<std::string, int64_t>> expectedBalance2;
-  expectedBalance2.push_back({"XBT", 0L});
+  expectedBalance2.emplace_back("XBT", 0L);
   stepdefs_->ClientBalanceIs(1440001L, expectedBalance2);
 
   // And A client Alice orders:
@@ -110,7 +110,7 @@ TEST_F(RunCukeNaiveTests, BasicRiskCheck) {
 
   // Then A balance of a client Bob:
   std::vector<std::pair<std::string, int64_t>> expectedBalance3;
-  expectedBalance3.push_back({"ETH", 699999L});
+  expectedBalance3.emplace_back("ETH", 699999L);
   stepdefs_->ClientBalanceIs(1440002L, expectedBalance3);
 
   // And A client Bob does not have active orders
@@ -129,12 +129,12 @@ TEST_F(RunCukeNaiveTests, BasicRiskCheck) {
 
   // And A balance of a client Alice:
   std::vector<std::pair<std::string, int64_t>> expectedBalance4;
-  expectedBalance4.push_back({"ETH", 700000L});
+  expectedBalance4.emplace_back("ETH", 700000L);
   stepdefs_->ClientBalanceIs(1440001L, expectedBalance4);
 
   // And A balance of a client Bob:
   std::vector<std::pair<std::string, int64_t>> expectedBalance5;
-  expectedBalance5.push_back({"XBT", 2100000L});
+  expectedBalance5.emplace_back("XBT", 2100000L);
   stepdefs_->ClientBalanceIs(1440002L, expectedBalance5);
 
   // And A client Alice does not have active orders
@@ -148,7 +148,7 @@ TEST_F(RunCukeNaiveTests, BasicRiskCheck) {
 TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
   // Given New client Alice has a balance:
   std::vector<std::pair<std::string, int64_t>> aliceBalance;
-  aliceBalance.push_back({"ETH", 100000000L});
+  aliceBalance.emplace_back("ETH", 100000000L);
   stepdefs_->NewClientHasBalance(1440001L, aliceBalance);
 
   // When A client Alice could not place an ASK order 202 at 30000@1001 (type:
@@ -158,7 +158,7 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // Then A balance of a client Alice:
   std::vector<std::pair<std::string, int64_t>> expectedBalance;
-  expectedBalance.push_back({"ETH", 100000000L});
+  expectedBalance.emplace_back("ETH", 100000000L);
   stepdefs_->ClientBalanceIs(1440001L, expectedBalance);
 
   // And A client Alice does not have active orders
@@ -171,7 +171,7 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // Then A balance of a client Alice:
   std::vector<std::pair<std::string, int64_t>> expectedBalance2;
-  expectedBalance2.push_back({"ETH", 0L});
+  expectedBalance2.emplace_back("ETH", 0L);
   stepdefs_->ClientBalanceIs(1440001L, expectedBalance2);
 
   // And A client Alice orders:
@@ -224,7 +224,7 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // Given New client Bob has a balance:
   std::vector<std::pair<std::string, int64_t>> bobBalance;
-  bobBalance.push_back({"XBT", 94000000L});
+  bobBalance.emplace_back("XBT", 94000000L);
   stepdefs_->NewClientHasBalance(1440002L, bobBalance);
 
   // When A client Bob could not place an BID order 203 at 18000@500 (type:
@@ -234,7 +234,7 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // Then A balance of a client Bob:
   std::vector<std::pair<std::string, int64_t>> expectedBalance3;
-  expectedBalance3.push_back({"XBT", 94000000L});
+  expectedBalance3.emplace_back("XBT", 94000000L);
   stepdefs_->ClientBalanceIs(1440002L, expectedBalance3);
 
   // And A client Bob does not have active orders
@@ -256,7 +256,7 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // And A balance of a client Bob:
   std::vector<std::pair<std::string, int64_t>> expectedBalance4;
-  expectedBalance4.push_back({"XBT", 1500000L});
+  expectedBalance4.emplace_back("XBT", 1500000L);
   stepdefs_->ClientBalanceIs(1440002L, expectedBalance4);
 
   // And A client Bob orders:
@@ -318,8 +318,8 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // And A balance of a client Alice:
   std::vector<std::pair<std::string, int64_t>> expectedBalance5;
-  expectedBalance5.push_back({"ETH", 0L});
-  expectedBalance5.push_back({"XBT", 87500000L});
+  expectedBalance5.emplace_back("ETH", 0L);
+  expectedBalance5.emplace_back("XBT", 87500000L);
   stepdefs_->ClientBalanceIs(1440001L, expectedBalance5);
 
   // And A client Alice orders:
@@ -341,8 +341,8 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // Then A balance of a client Bob:
   std::vector<std::pair<std::string, int64_t>> expectedBalance6;
-  expectedBalance6.push_back({"XBT", 6500000L});
-  expectedBalance6.push_back({"ETH", 50000000L});
+  expectedBalance6.emplace_back("XBT", 6500000L);
+  expectedBalance6.emplace_back("ETH", 50000000L);
   stepdefs_->ClientBalanceIs(1440002L, expectedBalance6);
 
   // And A client Bob does not have active orders
@@ -353,8 +353,8 @@ TEST_F(RunCukeNaiveTests, MoveOrdersUpAndDown) {
 
   // Then A balance of a client Alice:
   std::vector<std::pair<std::string, int64_t>> expectedBalance7;
-  expectedBalance7.push_back({"ETH", 50000000L});
-  expectedBalance7.push_back({"XBT", 87500000L});
+  expectedBalance7.emplace_back("ETH", 50000000L);
+  expectedBalance7.emplace_back("XBT", 87500000L);
   stepdefs_->ClientBalanceIs(1440001L, expectedBalance7);
 
   // And A client Alice does not have active orders

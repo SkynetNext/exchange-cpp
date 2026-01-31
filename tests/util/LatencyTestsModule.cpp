@@ -121,17 +121,17 @@ static void OutputPercentileDistribution(const std::vector<int64_t>& latencies,
   percentiles.push_back(99.99);
   percentiles.push_back(100.0);
 
-  // Add more granular percentiles between 0.0 and 1.0
-  for (double p = 0.01; p < 1.0; p += 0.01) {
-    percentiles.push_back(p);
+  // Add more granular percentiles between 0.0 and 1.0 (use int to avoid float loop counter)
+  for (int i = 1; i < 100; ++i) {
+    percentiles.push_back(static_cast<double>(i) / 100.0);
   }
   // Add more granular percentiles between 1.0 and 10.0
-  for (double p = 1.1; p < 10.0; p += 0.1) {
-    percentiles.push_back(p);
+  for (int i = 11; i < 100; ++i) {
+    percentiles.push_back(static_cast<double>(i) / 10.0);
   }
   // Add more granular percentiles between 10.0 and 100.0
-  for (double p = 10.5; p < 100.0; p += 0.5) {
-    percentiles.push_back(p);
+  for (int i = 21; i <= 200; ++i) {
+    percentiles.push_back(static_cast<double>(i) / 2.0);
   }
 
   // Sort and remove duplicates

@@ -164,9 +164,8 @@ void OrderBookDirectImplTest::TestMultipleCommandsCompare() {
 
   auto& allCommands = genResult.GetCommands();
   int64_t i = 0;
-  for (size_t idx = 0; idx < allCommands.size(); idx++) {
+  for (auto& cmd : allCommands) {
     i++;
-    auto& cmd = allCommands[idx];
     cmd.orderId += 100;
 
     cmd.resultCode = CommandResultCode::VALID_FOR_MATCHING_ENGINE;

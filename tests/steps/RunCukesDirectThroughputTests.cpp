@@ -54,15 +54,15 @@ protected:
 TEST_F(RunCukesDirectThroughputTests, BasicFullCycleTest_EUR_USD) {
   // Background
   std::vector<std::pair<std::string, int64_t>> aliceBalance;
-  aliceBalance.push_back({"USD", 1000000L});
-  aliceBalance.push_back({"XBT", 100000000L});
-  aliceBalance.push_back({"ETH", 100000000L});
+  aliceBalance.emplace_back("USD", 1000000L);
+  aliceBalance.emplace_back("XBT", 100000000L);
+  aliceBalance.emplace_back("ETH", 100000000L);
   stepdefs_->NewClientHasBalance(1440001L, aliceBalance);
 
   std::vector<std::pair<std::string, int64_t>> bobBalance;
-  bobBalance.push_back({"USD", 2000000L});
-  bobBalance.push_back({"XBT", 100000000L});
-  bobBalance.push_back({"ETH", 100000000L});
+  bobBalance.emplace_back("USD", 2000000L);
+  bobBalance.emplace_back("XBT", 100000000L);
+  bobBalance.emplace_back("ETH", 100000000L);
   stepdefs_->NewClientHasBalance(1440002L, bobBalance);
 
   // When A client Alice places an ASK order 101 at 1600@7 (type: GTC, symbol:
@@ -149,15 +149,15 @@ TEST_F(RunCukesDirectThroughputTests, BasicFullCycleTest_EUR_USD) {
 TEST_F(RunCukesDirectThroughputTests, BasicFullCycleTest_ETH_XBT) {
   // Same as EUR_USD but with ETH_XBT symbol
   std::vector<std::pair<std::string, int64_t>> aliceBalance;
-  aliceBalance.push_back({"USD", 1000000L});
-  aliceBalance.push_back({"XBT", 100000000L});
-  aliceBalance.push_back({"ETH", 100000000L});
+  aliceBalance.emplace_back("USD", 1000000L);
+  aliceBalance.emplace_back("XBT", 100000000L);
+  aliceBalance.emplace_back("ETH", 100000000L);
   stepdefs_->NewClientHasBalance(1440001L, aliceBalance);
 
   std::vector<std::pair<std::string, int64_t>> bobBalance;
-  bobBalance.push_back({"USD", 2000000L});
-  bobBalance.push_back({"XBT", 100000000L});
-  bobBalance.push_back({"ETH", 100000000L});
+  bobBalance.emplace_back("USD", 2000000L);
+  bobBalance.emplace_back("XBT", 100000000L);
+  bobBalance.emplace_back("ETH", 100000000L);
   stepdefs_->NewClientHasBalance(1440002L, bobBalance);
 
   stepdefs_->ClientPlacesOrder(1440001L, "ASK", 101L, 1600L, 7L, "GTC",
@@ -222,7 +222,7 @@ TEST_F(RunCukesDirectThroughputTests, BasicFullCycleTest_ETH_XBT) {
 TEST_F(RunCukesDirectThroughputTests, CancelBidOrder) {
   // Given New client Charlie has a balance:
   std::vector<std::pair<std::string, int64_t>> charlieBalance;
-  charlieBalance.push_back({"XBT", 94000000L});
+  charlieBalance.emplace_back("XBT", 94000000L);
   stepdefs_->NewClientHasBalance(1440003L, charlieBalance);
 
   // When A client Charlie places an BID order 203 at 18500@500 (type: GTC,
@@ -232,8 +232,8 @@ TEST_F(RunCukesDirectThroughputTests, CancelBidOrder) {
 
   // Then A balance of a client Charlie:
   std::vector<std::pair<std::string, int64_t>> expectedBalance;
-  expectedBalance.push_back({"ETH", 0L});
-  expectedBalance.push_back({"XBT", 1500000L});
+  expectedBalance.emplace_back("ETH", 0L);
+  expectedBalance.emplace_back("XBT", 1500000L);
   stepdefs_->ClientBalanceIs(1440003L, expectedBalance);
 
   // And A client Charlie orders:
@@ -261,8 +261,8 @@ TEST_F(RunCukesDirectThroughputTests, CancelBidOrder) {
 
   // And A balance of a client Charlie:
   std::vector<std::pair<std::string, int64_t>> expectedBalance2;
-  expectedBalance2.push_back({"ETH", 0L});
-  expectedBalance2.push_back({"XBT", 94000000L});
+  expectedBalance2.emplace_back("ETH", 0L);
+  expectedBalance2.emplace_back("XBT", 94000000L);
   stepdefs_->ClientBalanceIs(1440003L, expectedBalance2);
 }
 

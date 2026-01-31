@@ -141,8 +141,8 @@ public:
 
     // Pre-allocate values
     values_.reserve(data_.size());
-    for (size_t i = 0; i < data_.size(); ++i) {
-      values_.push_back(new int64_t(data_[i]));
+    for (int64_t d : data_) {
+      values_.push_back(new int64_t(d));
     }
   }
 
@@ -247,24 +247,24 @@ BENCHMARK_DEFINE_F(ArtTreeBenchmark, Put)(benchmark::State& state) {
 
     // 2. Measure std::map (BST)
     start = std::chrono::high_resolution_clock::now();
-    for (size_t i = 0; i < shuffled.size(); ++i) {
-      (*bst_)[shuffled[i]] = shuffled[i];
+    for (int64_t k : shuffled) {
+      (*bst_)[k] = k;
     }
     end = std::chrono::high_resolution_clock::now();
     auto bstTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     // 3. Measure std::unordered_map
     start = std::chrono::high_resolution_clock::now();
-    for (size_t i = 0; i < shuffled.size(); ++i) {
-      (*unordered_map_)[shuffled[i]] = shuffled[i];
+    for (int64_t k : shuffled) {
+      (*unordered_map_)[k] = k;
     }
     end = std::chrono::high_resolution_clock::now();
     auto uoTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
 
     // 4. Measure ankerl::unordered_dense
     start = std::chrono::high_resolution_clock::now();
-    for (size_t i = 0; i < shuffled.size(); ++i) {
-      (*dense_map_)[shuffled[i]] = shuffled[i];
+    for (int64_t k : shuffled) {
+      (*dense_map_)[k] = k;
     }
     end = std::chrono::high_resolution_clock::now();
     auto deTime = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();

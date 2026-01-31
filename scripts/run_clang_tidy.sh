@@ -194,7 +194,6 @@ cmake "${CMAKE_ARGS[@]}" || {
 }
 echo ""
 
-# compile_commands.json is generated at configure time; no build needed for clang-tidy
 # Verify compile_commands.json exists
 if [ ! -f "$BUILD_DIR/compile_commands.json" ]; then
   echo -e "${RED}Error: compile_commands.json not found${NC}"
@@ -204,6 +203,16 @@ fi
 
 ENTRY_COUNT=$(jq length "$BUILD_DIR/compile_commands.json" 2>/dev/null || echo "unknown")
 echo -e "${GREEN}✓ compile_commands.json found ($ENTRY_COUNT entries)${NC}"
+echo ""
+
+# Build so that .o.modmap and other compile artifacts exist (clang-tidy uses them from compile_commands.json)
+if [ -z "$QUIET" ]; then
+  echo -e "${GREEN}=== Building (required for clang-tidy .modmap) ===${NC}"
+fi
+cmake --build "$BUILD_DIR" --parallel || {
+  echo -e "${RED}Error: Build failed${NC}"
+  exit 1
+}
 echo ""
 
 # Find files to check

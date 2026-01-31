@@ -51,15 +51,15 @@ protected:
 // Same tests as RunCukesDirectThroughputTests but with latency config
 TEST_F(RunCukesDirectLatencyTests, BasicFullCycleTest_EUR_USD) {
   std::vector<std::pair<std::string, int64_t>> aliceBalance;
-  aliceBalance.push_back({"USD", 1000000L});
-  aliceBalance.push_back({"XBT", 100000000L});
-  aliceBalance.push_back({"ETH", 100000000L});
+  aliceBalance.emplace_back("USD", 1000000L);
+  aliceBalance.emplace_back("XBT", 100000000L);
+  aliceBalance.emplace_back("ETH", 100000000L);
   stepdefs_->NewClientHasBalance(1440001L, aliceBalance);
 
   std::vector<std::pair<std::string, int64_t>> bobBalance;
-  bobBalance.push_back({"USD", 2000000L});
-  bobBalance.push_back({"XBT", 100000000L});
-  bobBalance.push_back({"ETH", 100000000L});
+  bobBalance.emplace_back("USD", 2000000L);
+  bobBalance.emplace_back("XBT", 100000000L);
+  bobBalance.emplace_back("ETH", 100000000L);
   stepdefs_->NewClientHasBalance(1440002L, bobBalance);
 
   stepdefs_->ClientPlacesOrder(1440001L, "ASK", 101L, 1600L, 7L, "GTC",
@@ -122,15 +122,15 @@ TEST_F(RunCukesDirectLatencyTests, BasicFullCycleTest_EUR_USD) {
 
 TEST_F(RunCukesDirectLatencyTests, BasicFullCycleTest_ETH_XBT) {
   std::vector<std::pair<std::string, int64_t>> aliceBalance;
-  aliceBalance.push_back({"USD", 1000000L});
-  aliceBalance.push_back({"XBT", 100000000L});
-  aliceBalance.push_back({"ETH", 100000000L});
+  aliceBalance.emplace_back("USD", 1000000L);
+  aliceBalance.emplace_back("XBT", 100000000L);
+  aliceBalance.emplace_back("ETH", 100000000L);
   stepdefs_->NewClientHasBalance(1440001L, aliceBalance);
 
   std::vector<std::pair<std::string, int64_t>> bobBalance;
-  bobBalance.push_back({"USD", 2000000L});
-  bobBalance.push_back({"XBT", 100000000L});
-  bobBalance.push_back({"ETH", 100000000L});
+  bobBalance.emplace_back("USD", 2000000L);
+  bobBalance.emplace_back("XBT", 100000000L);
+  bobBalance.emplace_back("ETH", 100000000L);
   stepdefs_->NewClientHasBalance(1440002L, bobBalance);
 
   stepdefs_->ClientPlacesOrder(1440001L, "ASK", 101L, 1600L, 7L, "GTC",
@@ -193,15 +193,15 @@ TEST_F(RunCukesDirectLatencyTests, BasicFullCycleTest_ETH_XBT) {
 
 TEST_F(RunCukesDirectLatencyTests, CancelBidOrder) {
   std::vector<std::pair<std::string, int64_t>> charlieBalance;
-  charlieBalance.push_back({"XBT", 94000000L});
+  charlieBalance.emplace_back("XBT", 94000000L);
   stepdefs_->NewClientHasBalance(1440003L, charlieBalance);
 
   stepdefs_->ClientPlacesOrderWithReservePrice(1440003L, "BID", 203L, 18500L, 500L, "GTC",
                                                TestConstants::SYMBOLSPEC_ETH_XBT(), 18500L);
 
   std::vector<std::pair<std::string, int64_t>> expectedBalance;
-  expectedBalance.push_back({"ETH", 0L});
-  expectedBalance.push_back({"XBT", 1500000L});
+  expectedBalance.emplace_back("ETH", 0L);
+  expectedBalance.emplace_back("XBT", 1500000L);
   stepdefs_->ClientBalanceIs(1440003L, expectedBalance);
 
   std::vector<std::map<std::string, std::string>> charlieOrders;
@@ -223,8 +223,8 @@ TEST_F(RunCukesDirectLatencyTests, CancelBidOrder) {
   stepdefs_->ClientHasNoActiveOrders(1440003L);
 
   std::vector<std::pair<std::string, int64_t>> expectedBalance2;
-  expectedBalance2.push_back({"ETH", 0L});
-  expectedBalance2.push_back({"XBT", 94000000L});
+  expectedBalance2.emplace_back("ETH", 0L);
+  expectedBalance2.emplace_back("XBT", 94000000L);
   stepdefs_->ClientBalanceIs(1440003L, expectedBalance2);
 }
 

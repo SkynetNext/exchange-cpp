@@ -111,7 +111,7 @@ static int PercentImprovement(int64_t bstNs, int64_t artNs) {
 }
 
 static float NanoToMs(int64_t ns) {
-  return static_cast<float>(ns / 1000) / 1000.0f;
+  return static_cast<float>(ns) / 1'000'000.0f;
 }
 
 // ART returns V*; we compare with BST value. EntriesList is (key, V*).
@@ -129,8 +129,9 @@ static void CheckStreamsEqual(LongAdaptiveRadixTreeMap<int64_t>& art,
     throw std::runtime_error("CheckStreamsEqual size mismatch");
 }
 
-int main(int argc, char** argv) {
-  const int numIters = (argc >= 2) ? std::atoi(argv[1]) : 3;
+int main(int argc, char* argv[]) {
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) -- argv[1] is safe when argc >= 2
+  const int numIters = (argc >= 2) ? std::stoi(std::string(argv[1])) : 3;
   const int num = 5'000'000;
   const int forEachSize = 5000;
 
@@ -158,8 +159,8 @@ int main(int argc, char** argv) {
 
     std::vector<int64_t*> values;
     values.reserve(list.size());
-    for (size_t i = 0; i < list.size(); i++) {
-      values.push_back(new int64_t(list[i]));
+    for (int64_t v : list) {
+      values.push_back(new int64_t(v));
     }
 
     // Put (random order)

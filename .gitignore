@@ -35,6 +35,7 @@ cmake_install.cmake
 test_results/
 benchmark_results/
 Testing/
+clang-tidy-report.txt
 
 # Documentation
 docs/_build/

@@ -115,7 +115,7 @@ protected:
     ASSERT_EQ(artIt, artEntries.end()) << "ART tree has more entries than expected";
   }
 
-  LongAdaptiveRadixTreeMap<std::string>* map_;
+  LongAdaptiveRadixTreeMap<std::string>* map_{nullptr};
   std::map<int64_t, std::string*> origMap_;
 };
 
