@@ -18,8 +18,10 @@
 
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
+#include <memory>
 #include <vector>
 #include "../collections/art/LongAdaptiveRadixTreeMap.h"
+#include "../collections/objpool/ObjectsPool.h"
 #include "../common/CoreSymbolSpecification.h"
 #include "../common/Order.h"
 #include "../common/config/LoggingConfiguration.h"
@@ -164,6 +166,8 @@ public:
   void WriteMarshallable(common::BytesOut& bytes) const override;
 
 private:
+  // ART node pool for ask/bid price trees (created and owned here)
+  std::unique_ptr<::exchange::core::collections::art::ArtPoolContext<Bucket>> artPoolContext_;
   // Price buckets using ART tree
   ::exchange::core::collections::art::LongAdaptiveRadixTreeMap<Bucket> askPriceBuckets_;
   ::exchange::core::collections::art::LongAdaptiveRadixTreeMap<Bucket> bidPriceBuckets_;

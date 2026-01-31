@@ -20,12 +20,13 @@
 #include <list>
 #include <string>
 
-namespace exchange::core::collections {
-namespace objpool {
-class ObjectsPool;
-}  // namespace objpool
+namespace exchange::core::collections::art {
 
-namespace art {
+// ART node type constants (for pool recycling / ReleaseNode dispatch)
+static constexpr int kArtNode4 = 8;
+static constexpr int kArtNode16 = 9;
+static constexpr int kArtNode48 = 10;
+static constexpr int kArtNode256 = 11;
 
 // Forward declarations
 template <typename V>
@@ -128,12 +129,6 @@ public:
   virtual std::list<std::pair<int64_t, V*>> Entries() = 0;
 
   /**
-   * Get objects pool
-   * @return ObjectsPool instance
-   */
-  virtual objpool::ObjectsPool* GetObjectsPool() = 0;
-
-  /**
    * Recursively return all nodes to the object pool
    * Called by LongAdaptiveRadixTreeMap::Clear() and destructor
    */
@@ -141,7 +136,7 @@ public:
 
   /**
    * Get node type for object pool recycling
-   * @return Node type constant (ObjectsPool::ART_NODE_4/16/48/256)
+   * @return Node type constant (art::kArtNode4/16/48/256)
    * Non-virtual for performance - returns stored nodeType_ member
    */
   int GetNodeType() const {
@@ -161,5 +156,4 @@ protected:
   explicit IArtNode(int nodeType) : nodeType_(nodeType) {}
 };
 
-}  // namespace art
-}  // namespace exchange::core::collections
+}  // namespace exchange::core::collections::art

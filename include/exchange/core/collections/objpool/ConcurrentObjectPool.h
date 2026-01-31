@@ -42,9 +42,13 @@ namespace exchange::core::collections::objpool {
  * - Alignment automatically inherited from T (like moodycamel MOODYCAMEL_ALIGNED_TYPE_LIKE)
  * - False sharing prevention: Block aligned to 128 bytes (L2 prefetch 2 cache lines)
  *
+ * Acquire may return nullptr on allocation failure (e.g. OOM or resource exhaustion);
+ * callers must check the return value before use.
+ *
  * @code
  *   ConcurrentObjectPool<MyStruct> pool(1024);  // 1K pre-allocated
  *   MyStruct* obj = pool.Acquire(arg1, arg2);   // constructor called (thread-safe)
+ *   if (obj == nullptr) { return; }  // handle OOM or resource exhaustion
  *   // ... use obj ...
  *   pool.Release(obj);  // destructor called, returned to pool (thread-safe)
  * @endcode
@@ -124,6 +128,10 @@ public:
    * Acquire an object from the pool, calling constructor with forwarded args
    * Thread-safe: uses atomic operations
    * Order: initial pool (atomic index) -> free list (lock-free) -> create<Block>
+   *
+   * Returns nullptr when allocation fails (e.g. initial pool exhausted, free list
+   * empty, and CreateBlock fails due to OOM or resource exhaustion). Callers
+   * must check the return value before use.
    *
    * @param args Arguments forwarded to T's constructor
    * @return Constructed object, or nullptr on allocation failure

@@ -35,8 +35,9 @@ OrderBookDirectImpl::OrderBookDirectImpl(
   ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
   OrderBookEventsHelper* eventsHelper,
   const common::config::LoggingConfiguration* loggingCfg)
-  : askPriceBuckets_(objectsPool)
-  , bidPriceBuckets_(objectsPool)
+  : artPoolContext_(::exchange::core::collections::art::ArtPoolContext<Bucket>::CreateDefaultTest())
+  , askPriceBuckets_(artPoolContext_.get())
+  , bidPriceBuckets_(artPoolContext_.get())
   , symbolSpec_(symbolSpec)
   , objectsPool_(objectsPool)
   , bestAskOrder_(nullptr)
@@ -52,8 +53,9 @@ OrderBookDirectImpl::OrderBookDirectImpl(
   ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
   OrderBookEventsHelper* eventsHelper,
   const common::config::LoggingConfiguration* loggingCfg)
-  : askPriceBuckets_(objectsPool)
-  , bidPriceBuckets_(objectsPool)
+  : artPoolContext_(::exchange::core::collections::art::ArtPoolContext<Bucket>::CreateDefaultTest())
+  , askPriceBuckets_(artPoolContext_.get())
+  , bidPriceBuckets_(artPoolContext_.get())
   , objectsPool_(objectsPool)
   , bestAskOrder_(nullptr)
   , bestBidOrder_(nullptr)
