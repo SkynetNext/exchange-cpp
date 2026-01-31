@@ -67,7 +67,7 @@ public:
     return nullptr;
   }
 
-  IArtNode<V>* Put(int64_t key, int level, V* value) override;
+  std::pair<IArtNode<V>*, bool> Put(int64_t key, int level, V* value) override;
   IArtNode<V>* Remove(int64_t key, int level) override;
   V* GetCeilingValue(int64_t key, int level) override;
   V* GetFloorValue(int64_t key, int level) override;
@@ -129,11 +129,11 @@ void ArtNode256<V>::InitFromNode48(ArtNode48<V>* node48, uint8_t subKey, void* n
 }
 
 template <typename V>
-IArtNode<V>* ArtNode256<V>::Put(int64_t key, int level, V* value) {
+std::pair<IArtNode<V>*, bool> ArtNode256<V>::Put(int64_t key, int level, V* value) {
   if (level != nodeLevel_) {
     IArtNode<V>* branch = BranchIfRequired<V>(poolContext_, key, value, nodeKey_, nodeLevel_, this);
     if (branch)
-      return branch;
+      return {branch, false};
   }
   const uint8_t idx = static_cast<uint8_t>((key >> nodeLevel_) & 0xFF);
   if (!nodes_[idx]) {
@@ -143,7 +143,7 @@ IArtNode<V>* ArtNode256<V>::Put(int64_t key, int level, V* value) {
     else {
       ArtNode4<V>* newSub = poolContext_->AcquireNode4();
       if (newSub == nullptr)
-        return nullptr;
+        return {nullptr, false};
       newSub->InitFirstKey(key, value);
       nodes_[idx] = newSub;
     }
@@ -152,14 +152,15 @@ IArtNode<V>* ArtNode256<V>::Put(int64_t key, int level, V* value) {
       nodes_[idx] = value;
     else {
       IArtNode<V>* oldSubNode = static_cast<IArtNode<V>*>(nodes_[idx]);
-      IArtNode<V>* resizedNode = oldSubNode->Put(key, nodeLevel_ - 8, value);
+      auto [resizedNode, release_old] = oldSubNode->Put(key, nodeLevel_ - 8, value);
       if (resizedNode != nullptr) {
-        poolContext_->ReleaseNode(oldSubNode);
+        if (release_old)
+          poolContext_->ReleaseNode(oldSubNode);
         nodes_[idx] = resizedNode;
       }
     }
   }
-  return nullptr;
+  return {nullptr, false};
 }
 
 template <typename V>

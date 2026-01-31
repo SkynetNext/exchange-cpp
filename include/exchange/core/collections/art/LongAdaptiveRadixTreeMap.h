@@ -279,10 +279,11 @@ void LongAdaptiveRadixTreeMap<V>::Put(int64_t key, V* value) {
     node->InitFirstKey(key, value);
     root_ = node;
   } else {
-    IArtNode<V>* upSizedNode = root_->Put(key, INITIAL_LEVEL, value);
-    if (upSizedNode != nullptr) {
-      poolContext_->ReleaseNode(root_);
-      root_ = upSizedNode;
+    auto [replacement, release_old] = root_->Put(key, INITIAL_LEVEL, value);
+    if (replacement != nullptr) {
+      if (release_old)
+        poolContext_->ReleaseNode(root_);
+      root_ = replacement;
     }
   }
 }

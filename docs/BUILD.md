@@ -15,6 +15,9 @@
 git clone --recursive <repository-url>
 cd exchange-cpp
 
+# If you already cloned without submodules (e.g. CMake fails on third_party/spdlog):
+git submodule update --init --recursive
+
 # Build
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release

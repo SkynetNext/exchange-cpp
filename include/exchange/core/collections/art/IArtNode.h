@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <list>
 #include <string>
+#include <utility>
 
 namespace exchange::core::collections::art {
 
@@ -54,9 +55,12 @@ public:
    * @param key 64-bit key
    * @param level Current level
    * @param value Value to store
-   * @return New node if resized (upsized), nullptr otherwise
+   * @return (replacement, release_old): replacement is new root for this slot
+   *         (or nullptr if no change); release_old is true only when replacement
+   *         is from upsize (caller must release old node). BranchIfRequired
+   *         returns (newNode, false) because old node is now a child of newNode.
    */
-  virtual IArtNode<V>* Put(int64_t key, int level, V* value) = 0;
+  virtual std::pair<IArtNode<V>*, bool> Put(int64_t key, int level, V* value) = 0;
 
   /**
    * Remove key-value pair

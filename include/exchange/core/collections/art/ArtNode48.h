@@ -72,7 +72,7 @@ public:
     return nullptr;
   }
 
-  IArtNode<V>* Put(int64_t key, int level, V* value) override;
+  std::pair<IArtNode<V>*, bool> Put(int64_t key, int level, V* value) override;
   IArtNode<V>* Remove(int64_t key, int level) override;
   V* GetCeilingValue(int64_t key, int level) override;
   V* GetFloorValue(int64_t key, int level) override;
@@ -161,11 +161,11 @@ void ArtNode48<V>::InitFromNode256(ArtNode256<V>* node256) {
 }
 
 template <typename V>
-IArtNode<V>* ArtNode48<V>::Put(int64_t key, int level, V* value) {
+std::pair<IArtNode<V>*, bool> ArtNode48<V>::Put(int64_t key, int level, V* value) {
   if (level != nodeLevel_) {
     IArtNode<V>* branch = BranchIfRequired<V>(poolContext_, key, value, nodeKey_, nodeLevel_, this);
     if (branch)
-      return branch;
+      return {branch, false};
   }
   const uint8_t subKey = static_cast<uint8_t>((key >> nodeLevel_) & 0xFF);
   const int8_t pos = indexes_[subKey];
@@ -174,13 +174,14 @@ IArtNode<V>* ArtNode48<V>::Put(int64_t key, int level, V* value) {
       nodes_[pos] = value;
     else {
       IArtNode<V>* oldSubNode = static_cast<IArtNode<V>*>(nodes_[pos]);
-      IArtNode<V>* resizedNode = oldSubNode->Put(key, nodeLevel_ - 8, value);
+      auto [resizedNode, release_old] = oldSubNode->Put(key, nodeLevel_ - 8, value);
       if (resizedNode != nullptr) {
-        poolContext_->ReleaseNode(oldSubNode);
+        if (release_old)
+          poolContext_->ReleaseNode(oldSubNode);
         nodes_[pos] = resizedNode;
       }
     }
-    return nullptr;
+    return {nullptr, false};
   }
   if (numChildren_ < 48) {
     const int8_t freePos = static_cast<int8_t>(__builtin_ctzll(~freeBitMask_));
@@ -190,13 +191,13 @@ IArtNode<V>* ArtNode48<V>::Put(int64_t key, int level, V* value) {
     else {
       ArtNode4<V>* newSub = poolContext_->AcquireNode4();
       if (newSub == nullptr)
-        return nullptr;
+        return {nullptr, false};
       newSub->InitFirstKey(key, value);
       nodes_[freePos] = newSub;
     }
     numChildren_++;
     freeBitMask_ |= (1LL << freePos);
-    return nullptr;
+    return {nullptr, false};
   } else {
     void* newElement;
     if (nodeLevel_ == 0)
@@ -204,15 +205,15 @@ IArtNode<V>* ArtNode48<V>::Put(int64_t key, int level, V* value) {
     else {
       ArtNode4<V>* newSub = poolContext_->AcquireNode4();
       if (newSub == nullptr)
-        return nullptr;
+        return {nullptr, false};
       newSub->InitFirstKey(key, value);
       newElement = newSub;
     }
     ArtNode256<V>* node256 = poolContext_->AcquireNode256();
     if (node256 == nullptr)
-      return nullptr;
+      return {nullptr, false};
     node256->InitFromNode48(this, subKey, newElement);
-    return node256;
+    return {node256, true};
   }
 }
 
