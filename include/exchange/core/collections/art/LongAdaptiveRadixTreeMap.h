@@ -281,6 +281,7 @@ void LongAdaptiveRadixTreeMap<V>::Put(int64_t key, V* value) {
   } else {
     IArtNode<V>* upSizedNode = root_->Put(key, INITIAL_LEVEL, value);
     if (upSizedNode != nullptr) {
+      poolContext_->ReleaseNode(root_);
       root_ = upSizedNode;
     }
   }
@@ -301,6 +302,7 @@ void LongAdaptiveRadixTreeMap<V>::Remove(int64_t key) {
   if (root_) {
     IArtNode<V>* downSizeNode = root_->Remove(key, INITIAL_LEVEL);
     if (downSizeNode != root_) {
+      poolContext_->ReleaseNode(root_);
       root_ = downSizeNode;
     }
   }

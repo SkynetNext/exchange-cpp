@@ -187,6 +187,7 @@ IArtNode<V>* ArtNode16<V>::Put(int64_t key, int level, V* value) {
         IArtNode<V>* oldSubNode = static_cast<IArtNode<V>*>(nodes_[pos]);
         IArtNode<V>* resizedNode = oldSubNode->Put(key, nodeLevel_ - 8, value);
         if (resizedNode != nullptr) {
+          poolContext_->ReleaseNode(oldSubNode);
           nodes_[pos] = resizedNode;
         }
       }
@@ -231,7 +232,6 @@ IArtNode<V>* ArtNode16<V>::Put(int64_t key, int level, V* value) {
     if (node48 == nullptr)
       return nullptr;
     node48->InitFromNode16(this, nodeIndex, newElement);
-    poolContext_->ReleaseNode(this);
     return node48;
   }
 }
@@ -252,6 +252,7 @@ IArtNode<V>* ArtNode16<V>::Remove(int64_t key, int level) {
     IArtNode<V>* oldSubNode = static_cast<IArtNode<V>*>(nodes_[pos]);
     IArtNode<V>* resizedNode = oldSubNode->Remove(key, nodeLevel_ - 8);
     if (resizedNode != oldSubNode) {
+      poolContext_->ReleaseNode(oldSubNode);
       nodes_[pos] = resizedNode;
       if (resizedNode == nullptr)
         RemoveElementAtPos(pos);
@@ -262,7 +263,6 @@ IArtNode<V>* ArtNode16<V>::Remove(int64_t key, int level) {
     if (node4 == nullptr)
       return this;
     node4->InitFromNode16(this);
-    poolContext_->ReleaseNode(this);
     return node4;
   }
   return this;
