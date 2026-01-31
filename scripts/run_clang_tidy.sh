@@ -302,9 +302,8 @@ for file in $FILES; do
   # Filter out statistical noise (warnings generated, suppressed warnings, etc.)
   # Only keep actual warnings and errors
   FILTERED_OUTPUT=$(printf '%s' "$FILE_OUTPUT" | \
-    grep -v "warnings generated" | \
+    grep -vE "[0-9]+ warning(s)? generated" | \
     grep -v "Suppressed.*warnings" | \
-    grep -v "Use -header-filter" | \
     grep -v "Use -system-headers" || true)
   
   # Only append if there are actual warnings/errors (not just statistics)
