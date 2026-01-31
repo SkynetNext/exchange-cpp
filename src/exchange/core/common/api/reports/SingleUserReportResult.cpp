@@ -97,8 +97,10 @@ SingleUserReportResult::SingleUserReportResult(BytesIn& bytes) {
   if (bytes.ReadBoolean()) {
     UserStatus status = UserStatusFromCode(bytes.ReadByte());
     userStatus = new UserStatus(status);
+    ownsUserStatus_ = true;
   } else {
     userStatus = nullptr;
+    ownsUserStatus_ = false;
   }
   bool hasAccounts = bytes.ReadBoolean();
   if (hasAccounts) {
@@ -143,6 +145,13 @@ SingleUserReportResult::SingleUserReportResult(BytesIn& bytes) {
   queryExecutionStatus = static_cast<QueryExecutionStatus>(bytes.ReadInt());
 }
 
+SingleUserReportResult::~SingleUserReportResult() {
+  if (ownsUserStatus_) {
+    delete userStatus;
+    userStatus = nullptr;
+  }
+}
+
 std::unique_ptr<SingleUserReportResult>
 SingleUserReportResult::Merge(const std::vector<BytesIn*>& pieces) {
   // Match Java: merge(final Stream<BytesIn> pieces)
@@ -160,8 +169,14 @@ SingleUserReportResult::Merge(const std::vector<BytesIn*>& pieces) {
     auto next = std::make_unique<SingleUserReportResult>(*pieces[i]);
 
     // Merge logic (matches Java reduce)
-    result->userStatus =
+    UserStatus* chosen =
       utils::SerializationUtils::PreferNotNull(result->userStatus, next->userStatus);
+    if (chosen == next->userStatus) {
+      result->userStatus = next->userStatus;
+      result->ownsUserStatus_ = next->ownsUserStatus_;
+      next->ownsUserStatus_ = false;  // next's destructor must not delete
+    }
+    // else: keep result->userStatus and result->ownsUserStatus_; next destroys its own
 
     if (result->accounts == nullptr) {
       result->accounts = std::move(next->accounts);

@@ -36,6 +36,9 @@ namespace exchange::core::orderbook {
  */
 class OrderBookNaiveImpl : public IOrderBook {
 public:
+  OrderBookNaiveImpl(const OrderBookNaiveImpl&) = delete;
+  OrderBookNaiveImpl& operator=(const OrderBookNaiveImpl&) = delete;
+
   explicit OrderBookNaiveImpl(
     const common::CoreSymbolSpecification* symbolSpec,
     ::exchange::core::collections::objpool::ObjectsPool* objectsPool = nullptr,

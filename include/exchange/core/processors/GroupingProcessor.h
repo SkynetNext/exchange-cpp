@@ -44,6 +44,9 @@ public:
     common::CoreWaitStrategy coreWaitStrategy,
     SharedPool* sharedPool);
 
+  GroupingProcessor(const GroupingProcessor&) = delete;
+  GroupingProcessor& operator=(const GroupingProcessor&) = delete;
+
   // EventProcessor interface implementation
   disruptor::Sequence& getSequence() override;
   void halt() override;

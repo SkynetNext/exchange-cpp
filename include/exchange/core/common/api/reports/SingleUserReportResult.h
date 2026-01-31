@@ -89,6 +89,9 @@ public:
   std::unique_ptr<ankerl::unordered_dense::map<int32_t, std::vector<Order*>>> orders;
   QueryExecutionStatus queryExecutionStatus;
 
+  SingleUserReportResult(const SingleUserReportResult&) = delete;
+  SingleUserReportResult& operator=(const SingleUserReportResult&) = delete;
+
   /**
    * Default constructor (for static factory methods)
    */
@@ -99,6 +102,8 @@ public:
     , positions(nullptr)
     , orders(nullptr)
     , queryExecutionStatus(QueryExecutionStatus::OK) {}
+
+  ~SingleUserReportResult() override;
 
   /**
    * Constructor from BytesIn (deserialization, matches Java private
@@ -127,6 +132,9 @@ public:
 
   // Serialization method
   void WriteMarshallable(BytesOut& bytes) const;
+
+private:
+  bool ownsUserStatus_ = false;
 };
 
 }  // namespace exchange::core::common::api::reports

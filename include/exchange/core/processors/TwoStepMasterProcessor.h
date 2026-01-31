@@ -50,6 +50,9 @@ public:
     common::CoreWaitStrategy coreWaitStrategy,
     const std::string& name);
 
+  TwoStepMasterProcessor(const TwoStepMasterProcessor&) = delete;
+  TwoStepMasterProcessor& operator=(const TwoStepMasterProcessor&) = delete;
+
   // EventProcessor interface implementation
   disruptor::Sequence& getSequence() override;
   void halt() override;

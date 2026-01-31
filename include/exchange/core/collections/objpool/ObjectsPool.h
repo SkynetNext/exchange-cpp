@@ -135,6 +135,9 @@ private:
     explicit ArrayStack(int fixedSize);
     ~ArrayStack();
 
+    ArrayStack(const ArrayStack&) = delete;
+    ArrayStack& operator=(const ArrayStack&) = delete;
+
     void* Pop();
     void Add(void* element);
 

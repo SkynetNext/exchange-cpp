@@ -44,6 +44,9 @@ public:
     DisruptorExceptionHandler<common::cmd::OrderCommand>* exceptionHandler,
     const std::string& name);
 
+  TwoStepSlaveProcessor(const TwoStepSlaveProcessor&) = delete;
+  TwoStepSlaveProcessor& operator=(const TwoStepSlaveProcessor&) = delete;
+
   // EventProcessor interface implementation
   disruptor::Sequence& getSequence() override;
   void halt() override;

@@ -112,6 +112,9 @@ public:
     void WriteMarshallable(common::BytesOut& bytes) const override;
   };
 
+  OrderBookDirectImpl(const OrderBookDirectImpl&) = delete;
+  OrderBookDirectImpl& operator=(const OrderBookDirectImpl&) = delete;
+
   OrderBookDirectImpl(const common::CoreSymbolSpecification* symbolSpec,
                       ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
                       OrderBookEventsHelper* eventsHelper,

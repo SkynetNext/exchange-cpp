@@ -40,3 +40,9 @@
 [submodule "reference/low-latency-handbook"]
 	path = reference/low-latency-handbook
 	url = https://github.com/SkynetNext/low-latency-handbook.git
+[submodule "third_party/spdlog"]
+	path = third_party/spdlog
+	url = https://github.com/gabime/spdlog.git
+[submodule "third_party/concurrentqueue"]
+	path = third_party/concurrentqueue
+	url = https://github.com/cameron314/concurrentqueue.git
