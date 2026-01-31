@@ -119,6 +119,14 @@ endif()
 
 # mimalloc: High-performance memory allocator
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mimalloc/CMakeLists.txt)
+    # MSan/ASan provide operator new/delete; mimalloc must not override (linker multiple definition)
+    if(DEFINED ENV{ENABLE_SANITIZER_MSAN} AND "$ENV{ENABLE_SANITIZER_MSAN}")
+        set(MI_OVERRIDE OFF CACHE BOOL "Disable malloc override for MemorySanitizer" FORCE)
+        message(STATUS "mimalloc: MI_OVERRIDE=OFF for MemorySanitizer build")
+    elseif(DEFINED ENV{ENABLE_SANITIZER_ASAN} AND "$ENV{ENABLE_SANITIZER_ASAN}")
+        set(MI_OVERRIDE OFF CACHE BOOL "Disable malloc override for AddressSanitizer" FORCE)
+        message(STATUS "mimalloc: MI_OVERRIDE=OFF for AddressSanitizer build")
+    endif()
     # Disable mimalloc tests and examples to avoid ctest conflicts
     set(MI_BUILD_TESTS OFF CACHE BOOL "Build mimalloc tests" FORCE)
     set(MI_BUILD_EXAMPLES OFF CACHE BOOL "Build mimalloc examples" FORCE)

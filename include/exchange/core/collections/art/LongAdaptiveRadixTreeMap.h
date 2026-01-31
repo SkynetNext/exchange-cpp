@@ -310,6 +310,7 @@ template <typename V>
 void LongAdaptiveRadixTreeMap<V>::Clear() {
   if (root_ != nullptr) {
     root_->RecycleTree();
+    poolContext_->ReleaseNode(root_);
     root_ = nullptr;
   }
 }

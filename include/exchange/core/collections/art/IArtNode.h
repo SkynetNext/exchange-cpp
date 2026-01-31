@@ -129,8 +129,9 @@ public:
   virtual std::list<std::pair<int64_t, V*>> Entries() = 0;
 
   /**
-   * Recursively return all nodes to the object pool
-   * Called by LongAdaptiveRadixTreeMap::Clear() and destructor
+   * Recursively recycle child nodes to the pool; does NOT release this node.
+   * Caller must call ArtPoolContext::ReleaseNode() on this node after
+   * RecycleTree() returns. Used by LongAdaptiveRadixTreeMap::Clear().
    */
   virtual void RecycleTree() = 0;
 

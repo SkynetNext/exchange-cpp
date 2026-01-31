@@ -81,15 +81,16 @@ public:
   std::list<std::pair<int64_t, V*>> Entries() override;
 
   void RecycleTree() override {
-    // Recursively recycle child nodes first
+    // Recursively recycle child nodes only; caller must release this node
     if (nodeLevel_ != 0) {
       for (int i = 0; i < numChildren_; i++) {
         if (nodes_[i] != nullptr) {
-          static_cast<IArtNode<V>*>(nodes_[i])->RecycleTree();
+          IArtNode<V>* child = static_cast<IArtNode<V>*>(nodes_[i]);
+          child->RecycleTree();
+          poolContext_->ReleaseNode(child);
         }
       }
     }
-    poolContext_->ReleaseNode(this);
   }
 
   void InitFirstKey(int64_t key, V* value) {
