@@ -216,25 +216,12 @@ else()
 endif()
 
 # spdlog: High-performance logging library (matches Java SLF4J+Logback)
-# Prefer submodule so third_party/ is excluded by cppcheck/clang-tidy
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog/CMakeLists.txt)
-    message(STATUS "Using spdlog from submodule")
-    set(SPDLOG_MASTER_PROJECT OFF CACHE BOOL "" FORCE)
-    set(SPDLOG_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
-    set(SPDLOG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(SPDLOG_INSTALL OFF CACHE BOOL "" FORCE)
-    add_subdirectory(third_party/spdlog)
-else()
-    include(FetchContent)
-    FetchContent_Declare(
-        spdlog
-        GIT_REPOSITORY https://github.com/gabime/spdlog.git
-        GIT_TAG        v1.12.0
-        GIT_SHALLOW    TRUE
-    )
-    FetchContent_MakeAvailable(spdlog)
-    message(STATUS "Using spdlog from FetchContent (run: git submodule add https://github.com/gabime/spdlog.git third_party/spdlog)")
-endif()
+message(STATUS "Using spdlog from third_party/spdlog")
+set(SPDLOG_MASTER_PROJECT OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(SPDLOG_INSTALL OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/spdlog)
 
 # Collect source files from subdirectories
 # Note: GLOB_RECURSE recursively searches subdirectories

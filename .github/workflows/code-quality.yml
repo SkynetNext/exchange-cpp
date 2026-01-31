@@ -301,7 +301,19 @@ jobs:
         shell: bash
         run: |
           chmod +x scripts/run_clang_tidy.sh
-          scripts/run_clang_tidy.sh --quiet
+          scripts/run_clang_tidy.sh 2>&1 | tee clang-tidy-report.txt || true
+          if grep -q "error:" clang-tidy-report.txt; then
+            echo "::error::clang-tidy reported errors (warnings do not fail the job)"
+            exit 1
+          fi
+
+      - name: Upload clang-tidy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-report
+          path: clang-tidy-report.txt
+          retention-days: 7
 
   # Fuzz: libFuzzer + ASan + UBSan (Binary API deserialization)
   fuzz:

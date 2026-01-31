@@ -194,19 +194,7 @@ cmake "${CMAKE_ARGS[@]}" || {
 }
 echo ""
 
-# Build to generate complete compile_commands.json
-echo -e "${GREEN}=== Building (to generate compile_commands.json) ===${NC}"
-if [ -z "$QUIET" ]; then
-  cmake --build "$BUILD_DIR" --parallel "$(nproc 2>/dev/null || echo 2)" || {
-    echo -e "${YELLOW}Warning: Build had some errors, but continuing...${NC}"
-  }
-else
-  cmake --build "$BUILD_DIR" --parallel "$(nproc 2>/dev/null || echo 2)" > /dev/null 2>&1 || {
-    echo -e "${YELLOW}Warning: Build had some errors, but continuing...${NC}"
-  }
-fi
-echo ""
-
+# compile_commands.json is generated at configure time; no build needed for clang-tidy
 # Verify compile_commands.json exists
 if [ ! -f "$BUILD_DIR/compile_commands.json" ]; then
   echo -e "${RED}Error: compile_commands.json not found${NC}"
@@ -316,27 +304,12 @@ for file in $FILES; do
   fi
 done
 
-# Display output (limit to first 50 lines if too long, or show summary)
+# Display output (full report so CI redirect captures all; e.g. script > report.txt)
 if [ -z "$QUIET" ]; then
-  # Show first 50 lines of actual warnings/errors (skip "warnings generated" lines)
-  WARNING_LINES=$(printf '%s' "$TIDY_OUTPUT" | grep -E "(error:|warning:)" | head -50)
-  if [ -n "$WARNING_LINES" ]; then
-    echo -e "${YELLOW}=== Sample warnings/errors (first 50) ===${NC}"
-    echo "$WARNING_LINES"
-    echo ""
-    TOTAL_WARNINGS=$(printf '%s' "$TIDY_OUTPUT" | grep -c "warning:" 2>/dev/null || echo "0")
-    TOTAL_ERRORS=$(printf '%s' "$TIDY_OUTPUT" | grep -c "error:" 2>/dev/null || echo "0")
-    # Remove any whitespace/newlines
-    TOTAL_WARNINGS=$((TOTAL_WARNINGS + 0))
-    TOTAL_ERRORS=$((TOTAL_ERRORS + 0))
-    if [ "$TOTAL_WARNINGS" -gt 50 ] || [ "$TOTAL_ERRORS" -gt 50 ]; then
-      echo -e "${YELLOW}... (showing first 50, total: $TOTAL_WARNINGS warnings, $TOTAL_ERRORS errors)${NC}"
-      echo -e "${YELLOW}Use shell redirection to save full output: ./scripts/run_clang_tidy.sh > output.txt${NC}"
-    fi
-    echo ""
-  else
-    # No warnings/errors found, show full output
+  if [ -n "$TIDY_OUTPUT" ]; then
+    echo -e "${YELLOW}=== Warnings/errors ===${NC}"
     echo "$TIDY_OUTPUT"
+    echo ""
   fi
 else
   # Quiet mode: only show errors
