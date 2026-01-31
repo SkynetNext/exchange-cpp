@@ -54,7 +54,8 @@ void ITCH50StatListener::UpdateStat(uint8_t msgType, int32_t stockLocate) {
 }
 
 void ITCH50StatListener::UpdateStat(uint8_t msgType, int32_t stockLocate, int64_t longPrice) {
-  auto& stockStat = symbolStat_[stockLocate];
+  auto [it, inserted] = symbolStat_.try_emplace(stockLocate, stockLocate);
+  auto& stockStat = it->second;
   stockStat.counter++;
   stockStat.counters[msgType]++;
 

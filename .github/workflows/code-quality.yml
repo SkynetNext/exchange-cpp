@@ -400,11 +400,6 @@ jobs:
           )
           cmake "${CMAKE_ARGS[@]}"
 
-      - name: Build (to generate complete compile_commands.json)
-        run: |
-          # Build at least some targets to ensure compile_commands.json is complete
-          cmake --build build --config Debug --parallel 2 --target disruptor_cpp_tests || true
-
       - name: Verify compile_commands.json
         run: |
           if [ -f build/compile_commands.json ]; then
