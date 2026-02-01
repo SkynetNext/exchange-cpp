@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <exchange/core/collections/objpool/ObjectPool.h>
 #include <exchange/core/common/CoreSymbolSpecification.h>
 #include <exchange/core/common/L2MarketData.h>
 #include <exchange/core/common/MatcherEventType.h>
@@ -26,8 +25,6 @@
 #include <exchange/core/common/cmd/CommandResultCode.h>
 #include <exchange/core/common/cmd/OrderCommand.h>
 #include <exchange/core/orderbook/IOrderBook.h>
-#include <exchange/core/orderbook/OrderBookDirectTypes.h>
-#include <exchange/core/orderbook/OrderBookPoolContext.h>
 #include <gtest/gtest.h>
 #include <memory>
 #include "../util/L2MarketDataHelper.h"
@@ -43,13 +40,6 @@ namespace exchange::core::tests::orderbook {
  */
 class OrderBookBaseTest : public ::testing::Test {
 protected:
-  // Pools for OrderBookDirectImpl (declared first so destroyed after orderBook_)
-  std::unique_ptr<
-    exchange::core::collections::objpool::ObjectPool<exchange::core::orderbook::DirectOrder>>
-    orderPool_;
-  std::unique_ptr<exchange::core::collections::objpool::ObjectPool<exchange::core::orderbook::Bucket>>
-    bucketPool_;
-  exchange::core::orderbook::OrderBookPoolContext poolContext_;
   std::unique_ptr<exchange::core::orderbook::IOrderBook> orderBook_;
   std::unique_ptr<exchange::core::tests::util::L2MarketDataHelper> expectedState_;
   // Store symbol spec to prevent it from being destroyed

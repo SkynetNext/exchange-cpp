@@ -139,7 +139,7 @@ void OrderBookBaseTest::ClearOrderBook() {
   // Note: Order memory management is handled by the OrderBook implementations:
   // - NaiveImpl: Orders are deleted in OrdersBucket::Match when fully matched,
   //              and remaining orders are cleaned up in OrdersBucket destructor
-  // - DirectImpl: Orders are returned to ObjectPool when matched
+  // - DirectImpl: Orders are returned to ObjectsPool when matched
   // MatcherTradeEvent chains must be manually deleted in tests since they're
   // not processed by GroupingProcessor in test environment.
 }

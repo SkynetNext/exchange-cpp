@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <array>
 #include <cstdint>
 #include <list>
@@ -27,8 +28,7 @@
 
 namespace exchange::core::collections::art {
 
-template <typename V>
-class ArtPoolContext;
+// Forward declarations
 template <typename V>
 class ArtNode4;
 template <typename V>
@@ -36,12 +36,10 @@ class ArtNode48;
 template <typename V>
 class LongAdaptiveRadixTreeMap;
 template <typename V>
-IArtNode<V>* BranchIfRequired(ArtPoolContext<V>* ctx,
-                              int64_t key,
-                              V* value,
-                              int64_t nodeKey,
-                              int nodeLevel,
-                              IArtNode<V>* caller);
+IArtNode<V>*
+BranchIfRequired(int64_t key, V* value, int64_t nodeKey, int nodeLevel, IArtNode<V>* caller);
+template <typename V>
+void RecycleNodeToPool(IArtNode<V>* oldNode);
 
 /**
  * ArtNode256 - The largest node type is simply an array of 256 pointers.
@@ -51,8 +49,9 @@ class ArtNode256 : public IArtNode<V> {
 public:
   static constexpr int NODE48_SWITCH_THRESHOLD = 37;
 
-  explicit ArtNode256(ArtPoolContext<V>* poolContext)
-    : IArtNode<V>(kArtNode256), poolContext_(poolContext) {
+  explicit ArtNode256(::exchange::core::collections::objpool::ObjectsPool* objectsPool)
+    : IArtNode<V>(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_256)
+    , objectsPool_(objectsPool) {
     nodes_.fill(nullptr);
   }
 
@@ -67,7 +66,7 @@ public:
     return nullptr;
   }
 
-  std::pair<IArtNode<V>*, bool> Put(int64_t key, int level, V* value) override;
+  IArtNode<V>* Put(int64_t key, int level, V* value) override;
   IArtNode<V>* Remove(int64_t key, int level) override;
   V* GetCeilingValue(int64_t key, int level) override;
   V* GetFloorValue(int64_t key, int level) override;
@@ -78,17 +77,21 @@ public:
   std::string PrintDiagram(const std::string& prefix, int level) override;
   std::list<std::pair<int64_t, V*>> Entries() override;
 
+  ::exchange::core::collections::objpool::ObjectsPool* GetObjectsPool() override {
+    return objectsPool_;
+  }
+
   void RecycleTree() override {
-    // Recursively recycle child nodes only; caller must release this node
+    // Recursively recycle child nodes first
     if (nodeLevel_ != 0) {
       for (int i = 0; i < 256; i++) {
         if (nodes_[i] != nullptr) {
-          IArtNode<V>* child = static_cast<IArtNode<V>*>(nodes_[i]);
-          child->RecycleTree();
-          poolContext_->ReleaseNode(child);
+          static_cast<IArtNode<V>*>(nodes_[i])->RecycleTree();
         }
       }
     }
+    // Then recycle this node
+    RecycleNodeToPool<V>(this);
   }
 
   void InitFromNode48(ArtNode48<V>* node48, uint8_t subKey, void* newElement);
@@ -98,11 +101,11 @@ public:
 
 private:
   // Member layout optimized for minimal padding (64-bit alignment)
-  std::array<void*, 256> nodes_{};  // 2048 bytes, 8-byte aligned
-  ArtPoolContext<V>* poolContext_;  // 8 bytes
-  int64_t nodeKey_ = 0;             // 8 bytes
-  int nodeLevel_ = 0;               // 4 bytes
-  uint16_t numChildren_ = 0;        // 2 bytes + 2 bytes padding
+  std::array<void*, 256> nodes_{};                                    // 2048 bytes, 8-byte aligned
+  ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;  // 8 bytes
+  int64_t nodeKey_ = 0;                                               // 8 bytes
+  int nodeLevel_ = 0;                                                 // 4 bytes
+  uint16_t numChildren_ = 0;                                          // 2 bytes + 2 bytes padding
 
   std::vector<uint8_t> CreateKeysArray() {
     std::vector<uint8_t> keys;
@@ -129,11 +132,11 @@ void ArtNode256<V>::InitFromNode48(ArtNode48<V>* node48, uint8_t subKey, void* n
 }
 
 template <typename V>
-std::pair<IArtNode<V>*, bool> ArtNode256<V>::Put(int64_t key, int level, V* value) {
+IArtNode<V>* ArtNode256<V>::Put(int64_t key, int level, V* value) {
   if (level != nodeLevel_) {
-    IArtNode<V>* branch = BranchIfRequired<V>(poolContext_, key, value, nodeKey_, nodeLevel_, this);
+    IArtNode<V>* branch = BranchIfRequired<V>(key, value, nodeKey_, nodeLevel_, this);
     if (branch)
-      return {branch, false};
+      return branch;
   }
   const uint8_t idx = static_cast<uint8_t>((key >> nodeLevel_) & 0xFF);
   if (!nodes_[idx]) {
@@ -141,9 +144,9 @@ std::pair<IArtNode<V>*, bool> ArtNode256<V>::Put(int64_t key, int level, V* valu
     if (nodeLevel_ == 0)
       nodes_[idx] = value;
     else {
-      ArtNode4<V>* newSub = poolContext_->AcquireNode4();
-      if (newSub == nullptr)
-        return {nullptr, false};
+      auto* newSub = objectsPool_->template Get<ArtNode4<V>>(
+        ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4,
+        [this]() { return new ArtNode4<V>(objectsPool_); });
       newSub->InitFirstKey(key, value);
       nodes_[idx] = newSub;
     }
@@ -152,15 +155,13 @@ std::pair<IArtNode<V>*, bool> ArtNode256<V>::Put(int64_t key, int level, V* valu
       nodes_[idx] = value;
     else {
       IArtNode<V>* oldSubNode = static_cast<IArtNode<V>*>(nodes_[idx]);
-      auto [resizedNode, release_old] = oldSubNode->Put(key, nodeLevel_ - 8, value);
+      IArtNode<V>* resizedNode = oldSubNode->Put(key, nodeLevel_ - 8, value);
       if (resizedNode != nullptr) {
-        if (release_old)
-          poolContext_->ReleaseNode(oldSubNode);
         nodes_[idx] = resizedNode;
       }
     }
   }
-  return {nullptr, false};
+  return nullptr;
 }
 
 template <typename V>
@@ -177,17 +178,17 @@ IArtNode<V>* ArtNode256<V>::Remove(int64_t key, int level) {
     IArtNode<V>* oldSubNode = static_cast<IArtNode<V>*>(nodes_[idx]);
     IArtNode<V>* resizedNode = oldSubNode->Remove(key, nodeLevel_ - 8);
     if (resizedNode != oldSubNode) {
-      poolContext_->ReleaseNode(oldSubNode);
       nodes_[idx] = resizedNode;
       if (resizedNode == nullptr)
         numChildren_--;
     }
   }
   if (numChildren_ == NODE48_SWITCH_THRESHOLD) {
-    ArtNode48<V>* node48 = poolContext_->AcquireNode48();
-    if (node48 == nullptr)
-      return this;
+    auto* node48 = objectsPool_->template Get<ArtNode48<V>>(
+      ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_48,
+      [this]() { return new ArtNode48<V>(objectsPool_); });
     node48->InitFromNode256(this);
+    RecycleNodeToPool<V>(this);
     return node48;
   }
   return this;

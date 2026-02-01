@@ -18,11 +18,11 @@
 #include <benchmark/benchmark.h>
 #include <exchange/core/collections/art/LongAdaptiveRadixTreeMap.h>
 #include <exchange/core/collections/art/LongObjConsumer.h>
+#include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <map>
-#include <memory>
 
 // std::flat_map (C++23) - disabled due to O(n²) insertion performance
 // which causes benchmarks to hang with large datasets
@@ -120,9 +120,9 @@ static double PercentImprovement(int64_t oldTime, int64_t newTime) {
 class ArtTreeBenchmark : public benchmark::Fixture {
 public:
   void SetUp(const ::benchmark::State& state) override {
-    poolContext_ = exchange::core::collections::art::ArtPoolContext<int64_t>::CreateDefaultTest();
+    objectsPool_ = ObjectsPool::CreateDefaultTestPool();
     // 1. ART
-    art_ = new LongAdaptiveRadixTreeMap<int64_t>(poolContext_.get());
+    art_ = new LongAdaptiveRadixTreeMap<int64_t>(objectsPool_);
     // 2. std::map (BST/Red-Black Tree)
     bst_ = new std::map<int64_t, int64_t>();
     // 3. std::unordered_map
@@ -160,6 +160,7 @@ public:
 #if HAS_STD_FLAT_MAP
     delete flat_map_;
 #endif
+    delete objectsPool_;
   }
 
   // Helper to report timing counters
@@ -189,7 +190,7 @@ public:
     }
   }
 
-  std::unique_ptr<exchange::core::collections::art::ArtPoolContext<int64_t>> poolContext_;
+  ObjectsPool* objectsPool_{};
   // 1. ART
   LongAdaptiveRadixTreeMap<int64_t>* art_{};
   // 2. std::map (BST)

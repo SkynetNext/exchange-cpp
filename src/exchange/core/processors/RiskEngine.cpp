@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <exchange/core/common/BalanceAdjustmentType.h>
 #include <exchange/core/common/BytesIn.h>
 #include <exchange/core/common/MatcherEventType.h>
@@ -39,6 +40,7 @@
 #include <exchange/core/utils/SerializationUtils.h>
 #include <exchange/core/utils/UnsafeUtils.h>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace exchange::core::processors {
 
@@ -83,10 +85,14 @@ RiskEngine::RiskEngine(int32_t shardId,
   logDebug_ =
     loggingCfg->Contains(common::config::LoggingConfiguration::LoggingLevel::LOGGING_RISK_DEBUG);
 
-  // Initialize object pool (matches Java: 256K SymbolPositionRecord capacity)
-  symbolPositionRecordPool_ =
-    std::make_unique<collections::objpool::ObjectPool<common::SymbolPositionRecord>>(1024 * 256,
-                                                                                     true);
+  // Initialize object pools
+  // Matches Java RiskEngine configuration (SYMBOL_POSITION_RECORD = 1024 * 256)
+  // TODO: Move to performance configuration
+  std::unordered_map<int, int> objectsPoolConfig;
+  objectsPoolConfig[::exchange::core::collections::objpool::ObjectsPool::SYMBOL_POSITION_RECORD] =
+    1024 * 256;
+  objectsPool_ = std::unique_ptr<::exchange::core::collections::objpool::ObjectsPool>(
+    new ::exchange::core::collections::objpool::ObjectsPool(objectsPoolConfig));
 
   // Try to load from snapshot
   if (journaling::ISerializationProcessor::CanLoadFromSnapshot(
@@ -395,7 +401,11 @@ common::cmd::CommandResultCode RiskEngine::PlaceOrder(common::cmd::OrderCommand*
       position = posIt->second;
     } else {
       // Create new position record
-      position = symbolPositionRecordPool_->Acquire(cmd->uid, spec->symbolId, spec->quoteCurrency);
+      position = objectsPool_->Get<common::SymbolPositionRecord>(
+        ::exchange::core::collections::objpool::ObjectsPool::SYMBOL_POSITION_RECORD, [cmd, spec]() {
+          return new common::SymbolPositionRecord(cmd->uid, spec->symbolId, spec->quoteCurrency);
+        });
+      position->Initialize(cmd->uid, spec->symbolId, spec->quoteCurrency);
       userProfile->positions[spec->symbolId] = position;
     }
 
@@ -704,7 +714,8 @@ void RiskEngine::RemovePositionRecord(common::SymbolPositionRecord* record,
                                       common::UserProfile* userProfile) {
   userProfile->accounts[record->currency] += record->profit;
   userProfile->positions.erase(record->symbol);
-  symbolPositionRecordPool_->Release(record);
+  objectsPool_->Put(::exchange::core::collections::objpool::ObjectsPool::SYMBOL_POSITION_RECORD,
+                    record);
 }
 
 // Explicit template instantiation

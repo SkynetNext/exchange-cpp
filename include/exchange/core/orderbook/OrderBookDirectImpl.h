@@ -18,16 +18,13 @@
 
 #include <ankerl/unordered_dense.h>
 #include <cstdint>
-#include <memory>
 #include <vector>
 #include "../collections/art/LongAdaptiveRadixTreeMap.h"
 #include "../common/CoreSymbolSpecification.h"
 #include "../common/Order.h"
 #include "../common/config/LoggingConfiguration.h"
 #include "IOrderBook.h"
-#include "OrderBookDirectTypes.h"
 #include "OrderBookEventsHelper.h"
-#include "OrderBookPoolContext.h"
 
 namespace exchange::core::orderbook {
 
@@ -37,11 +34,89 @@ namespace exchange::core::orderbook {
  */
 class OrderBookDirectImpl : public IOrderBook {
 public:
+  // Forward declaration
+  struct DirectOrder;
+
+  struct Bucket {
+    int64_t price = 0;  // Price level for this bucket
+    OrderBookDirectImpl::DirectOrder* lastOrder =
+      nullptr;                // Tail order (worst priority in this price level)
+    int64_t totalVolume = 0;  // Total volume of all orders at this price level
+    int32_t numOrders = 0;    // Number of orders at this price level
+  };
+
+  struct DirectOrder : public common::IOrder,
+                       public common::WriteBytesMarshallable,
+                       public common::StateHash {
+    int64_t orderId = 0;  // Unique order identifier
+    int64_t price = 0;    // Order price
+    int64_t size = 0;     // Original order size
+    int64_t filled = 0;   // Filled quantity
+    int64_t reserveBidPrice =
+      0;              // Reserved price for fast moves of GTC bid orders in exchange mode
+    int64_t uid = 0;  // User ID who placed this order
+    common::OrderAction action = common::OrderAction::ASK;  // Order side (ASK/BID)
+    int64_t timestamp = 0;                                  // Order timestamp
+
+    DirectOrder* next = nullptr;  // Next order in global price-sorted linked
+                                  // list (towards better price for matching, or
+                                  // older order within same price)
+    DirectOrder* prev = nullptr;  // Previous order in global price-sorted linked list
+                                  // (towards worse price, or newer order within same price)
+    Bucket* bucket = nullptr;     // Price bucket index entry (ART tree maps price -> bucket)
+
+    DirectOrder() = default;
+
+    /**
+     * Constructor from BytesIn (deserialization)
+     */
+    explicit DirectOrder(common::BytesIn& bytes);
+
+    // IOrder interface
+    int64_t GetOrderId() const override {
+      return orderId;
+    }
+
+    int64_t GetPrice() const override {
+      return price;
+    }
+
+    int64_t GetSize() const override {
+      return size;
+    }
+
+    int64_t GetFilled() const override {
+      return filled;
+    }
+
+    int64_t GetReserveBidPrice() const override {
+      return reserveBidPrice;
+    }
+
+    common::OrderAction GetAction() const override {
+      return action;
+    }
+
+    int64_t GetUid() const override {
+      return uid;
+    }
+
+    int64_t GetTimestamp() const override {
+      return timestamp;
+    }
+
+    // StateHash interface
+    int32_t GetStateHash() const override;
+
+    // WriteBytesMarshallable interface
+    void WriteMarshallable(common::BytesOut& bytes) const override;
+  };
+
   OrderBookDirectImpl(const OrderBookDirectImpl&) = delete;
   OrderBookDirectImpl& operator=(const OrderBookDirectImpl&) = delete;
 
   OrderBookDirectImpl(const common::CoreSymbolSpecification* symbolSpec,
-                      const OrderBookPoolContext* poolContext,
+                      ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
                       OrderBookEventsHelper* eventsHelper,
                       const common::config::LoggingConfiguration* loggingCfg);
 
@@ -49,7 +124,7 @@ public:
    * Constructor from BytesIn (deserialization)
    */
   OrderBookDirectImpl(common::BytesIn* bytes,
-                      const OrderBookPoolContext* poolContext,
+                      ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
                       OrderBookEventsHelper* eventsHelper,
                       const common::config::LoggingConfiguration* loggingCfg);
 
@@ -89,14 +164,12 @@ public:
   void WriteMarshallable(common::BytesOut& bytes) const override;
 
 private:
-  // ART node pool for ask/bid price trees (created and owned here)
-  std::unique_ptr<::exchange::core::collections::art::ArtPoolContext<Bucket>> artPoolContext_;
   // Price buckets using ART tree
   ::exchange::core::collections::art::LongAdaptiveRadixTreeMap<Bucket> askPriceBuckets_;
   ::exchange::core::collections::art::LongAdaptiveRadixTreeMap<Bucket> bidPriceBuckets_;
 
   const common::CoreSymbolSpecification* symbolSpec_;
-  const OrderBookPoolContext* poolContext_;
+  ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;
 
   // Order ID index using hash map for O(1) lookup performance
   ankerl::unordered_dense::map<int64_t, DirectOrder*> orderIdIndex_;

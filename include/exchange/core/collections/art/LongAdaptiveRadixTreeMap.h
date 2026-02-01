@@ -21,7 +21,6 @@
 #include <functional>
 #include <iomanip>
 #include <list>
-#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -29,7 +28,13 @@
 #include "IArtNode.h"
 #include "LongObjConsumer.h"
 
-namespace exchange::core::collections::art {
+namespace exchange::core::collections {
+
+namespace objpool {
+class ObjectsPool;
+}
+
+namespace art {
 
 // Forward declarations
 template <typename V>
@@ -42,19 +47,19 @@ template <typename V>
 class ArtNode48;
 template <typename V>
 class ArtNode256;
-template <typename V>
-class ArtPoolContext;
 
 /**
- * Branching utility (caller must pass ArtPoolContext; nodes hold context and pass it)
+ * Branching utility function (moved out of class to avoid circular dependency)
  */
 template <typename V>
-IArtNode<V>* BranchIfRequired(ArtPoolContext<V>* ctx,
-                              int64_t key,
-                              V* value,
-                              int64_t nodeKey,
-                              int nodeLevel,
-                              IArtNode<V>* caller);
+IArtNode<V>*
+BranchIfRequired(int64_t key, V* value, int64_t nodeKey, int nodeLevel, IArtNode<V>* caller);
+
+/**
+ * Node recycling utility
+ */
+template <typename V>
+void RecycleNodeToPool(IArtNode<V>* oldNode);
 
 /**
  * LongAdaptiveRadixTreeMap - ART tree implementation for 64-bit long keys
@@ -66,7 +71,8 @@ class LongAdaptiveRadixTreeMap {
 public:
   static constexpr int INITIAL_LEVEL = 56;
 
-  explicit LongAdaptiveRadixTreeMap(ArtPoolContext<V>* poolContext);
+  explicit LongAdaptiveRadixTreeMap(
+    ::exchange::core::collections::objpool::ObjectsPool* objectsPool);
   LongAdaptiveRadixTreeMap();
   ~LongAdaptiveRadixTreeMap();
 
@@ -118,13 +124,13 @@ public:
 
 private:
   IArtNode<V>* root_;
-  ArtPoolContext<V>* poolContext_{nullptr};
-  std::unique_ptr<ArtPoolContext<V>> ownedPoolContext_;
+  ::exchange::core::collections::objpool::ObjectsPool* objectsPool_;
 };
-}  // namespace exchange::core::collections::art
 
-// Include node headers then ObjectPool, then define ArtPoolContext
-#include <exchange/core/collections/objpool/ObjectPool.h>
+}  // namespace art
+}  // namespace exchange::core::collections
+
+// Include implementations
 #include "ArtNode16.h"
 #include "ArtNode256.h"
 #include "ArtNode4.h"
@@ -132,73 +138,11 @@ private:
 
 namespace exchange::core::collections::art {
 
-/**
- * ArtPoolContext - holds one ObjectPool per ART node type for Acquire/Release
- */
-template <typename V>
-class ArtPoolContext {
-public:
-  ArtPoolContext(size_t cap4, size_t cap16, size_t cap48, size_t cap256)
-    : pool4_(cap4), pool16_(cap16), pool48_(cap48), pool256_(cap256) {}
-
-  static std::unique_ptr<ArtPoolContext<V>> CreateDefaultTest() {
-    constexpr size_t kDefaultCap = 4096;
-    return std::make_unique<ArtPoolContext<V>>(kDefaultCap, kDefaultCap, kDefaultCap, kDefaultCap);
-  }
-
-  ArtNode4<V>* AcquireNode4() {
-    return pool4_.Acquire(this);
-  }
-
-  ArtNode16<V>* AcquireNode16() {
-    return pool16_.Acquire(this);
-  }
-
-  ArtNode48<V>* AcquireNode48() {
-    return pool48_.Acquire(this);
-  }
-
-  ArtNode256<V>* AcquireNode256() {
-    return pool256_.Acquire(this);
-  }
-
-  void ReleaseNode(IArtNode<V>* node) {
-    if (node == nullptr)
-      return;
-    switch (node->GetNodeType()) {
-      case kArtNode4:
-        pool4_.Release(static_cast<ArtNode4<V>*>(node));
-        break;
-      case kArtNode16:
-        pool16_.Release(static_cast<ArtNode16<V>*>(node));
-        break;
-      case kArtNode48:
-        pool48_.Release(static_cast<ArtNode48<V>*>(node));
-        break;
-      case kArtNode256:
-        pool256_.Release(static_cast<ArtNode256<V>*>(node));
-        break;
-      default:
-        break;
-    }
-  }
-
-private:
-  ::exchange::core::collections::objpool::ObjectPool<ArtNode4<V>> pool4_;
-  ::exchange::core::collections::objpool::ObjectPool<ArtNode16<V>> pool16_;
-  ::exchange::core::collections::objpool::ObjectPool<ArtNode48<V>> pool48_;
-  ::exchange::core::collections::objpool::ObjectPool<ArtNode256<V>> pool256_;
-};
-
-// --- BranchIfRequired Implementation ---
+// --- Global Utilities Implementation ---
 
 template <typename V>
-IArtNode<V>* BranchIfRequired(ArtPoolContext<V>* ctx,
-                              int64_t key,
-                              V* value,
-                              int64_t nodeKey,
-                              int nodeLevel,
-                              IArtNode<V>* caller) {
+IArtNode<V>*
+BranchIfRequired(int64_t key, V* value, int64_t nodeKey, int nodeLevel, IArtNode<V>* caller) {
   const int64_t keyDiff = key ^ nodeKey;
   if ((keyDiff & (-1LL << nodeLevel)) == 0) {
     return nullptr;
@@ -207,35 +151,47 @@ IArtNode<V>* BranchIfRequired(ArtPoolContext<V>* ctx,
   if (newLevel == nodeLevel) {
     return nullptr;
   }
-  ArtNode4<V>* newSubNode = ctx->AcquireNode4();
-  if (newSubNode == nullptr)
-    return nullptr;
+  auto* pool = caller->GetObjectsPool();
+  auto* newSubNode =
+    pool->template Get<ArtNode4<V>>(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4,
+                                    [pool]() { return new ArtNode4<V>(pool); });
   newSubNode->InitFirstKey(key, value);
-  ArtNode4<V>* newNode = ctx->AcquireNode4();
-  if (newNode == nullptr) {
-    ctx->ReleaseNode(newSubNode);
-    return nullptr;
-  }
+  auto* newNode =
+    pool->template Get<ArtNode4<V>>(::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4,
+                                    [pool]() { return new ArtNode4<V>(pool); });
   newNode->InitTwoKeys(nodeKey, caller, key, newSubNode, newLevel);
   return newNode;
+}
+
+template <typename V>
+void RecycleNodeToPool(IArtNode<V>* oldNode) {
+  if (oldNode == nullptr)
+    return;
+  auto* pool = oldNode->GetObjectsPool();
+  if (pool == nullptr)
+    return;
+  // Use GetNodeType() instead of dynamic_cast for better performance
+  // Note: Don't call destructor for ART nodes - they are POD types and may
+  // still be in use (e.g., during GetFloorValue recursive calls).
+  // State will be reset by Init methods when retrieved from pool.
+  pool->PutRaw(oldNode->GetNodeType(), oldNode);
 }
 
 // --- LongAdaptiveRadixTreeMap Implementation ---
 
 template <typename V>
-LongAdaptiveRadixTreeMap<V>::LongAdaptiveRadixTreeMap(ArtPoolContext<V>* poolContext)
-  : root_(nullptr), poolContext_(poolContext) {
-  if (poolContext_ == nullptr) {
-    ownedPoolContext_ = ArtPoolContext<V>::CreateDefaultTest();
-    poolContext_ = ownedPoolContext_.get();
+LongAdaptiveRadixTreeMap<V>::LongAdaptiveRadixTreeMap(
+  ::exchange::core::collections::objpool::ObjectsPool* objectsPool)
+  : root_(nullptr), objectsPool_(objectsPool) {
+  if (objectsPool_ == nullptr) {
+    objectsPool_ = ::exchange::core::collections::objpool::ObjectsPool::CreateDefaultTestPool();
   }
 }
 
 template <typename V>
-LongAdaptiveRadixTreeMap<V>::LongAdaptiveRadixTreeMap() : root_(nullptr) {
-  ownedPoolContext_ = ArtPoolContext<V>::CreateDefaultTest();
-  poolContext_ = ownedPoolContext_.get();
-}
+LongAdaptiveRadixTreeMap<V>::LongAdaptiveRadixTreeMap()
+  : root_(nullptr)
+  , objectsPool_(::exchange::core::collections::objpool::ObjectsPool::CreateDefaultTestPool()) {}
 
 template <typename V>
 LongAdaptiveRadixTreeMap<V>::~LongAdaptiveRadixTreeMap() {
@@ -244,11 +200,8 @@ LongAdaptiveRadixTreeMap<V>::~LongAdaptiveRadixTreeMap() {
 
 template <typename V>
 LongAdaptiveRadixTreeMap<V>::LongAdaptiveRadixTreeMap(LongAdaptiveRadixTreeMap&& other) noexcept
-  : root_(other.root_)
-  , poolContext_(other.poolContext_)
-  , ownedPoolContext_(std::move(other.ownedPoolContext_)) {
+  : root_(other.root_), objectsPool_(other.objectsPool_) {
   other.root_ = nullptr;
-  other.poolContext_ = nullptr;
 }
 
 template <typename V>
@@ -257,10 +210,8 @@ LongAdaptiveRadixTreeMap<V>::operator=(LongAdaptiveRadixTreeMap&& other) noexcep
   if (this != &other) {
     Clear();
     root_ = other.root_;
-    poolContext_ = other.poolContext_;
-    ownedPoolContext_ = std::move(other.ownedPoolContext_);
+    objectsPool_ = other.objectsPool_;
     other.root_ = nullptr;
-    other.poolContext_ = nullptr;
   }
   return *this;
 }
@@ -273,17 +224,15 @@ V* LongAdaptiveRadixTreeMap<V>::Get(int64_t key) const {
 template <typename V>
 void LongAdaptiveRadixTreeMap<V>::Put(int64_t key, V* value) {
   if (root_ == nullptr) {
-    ArtNode4<V>* node = poolContext_->AcquireNode4();
-    if (node == nullptr)
-      return;
+    auto* node = objectsPool_->template Get<ArtNode4<V>>(
+      ::exchange::core::collections::objpool::ObjectsPool::ART_NODE_4,
+      [this]() { return new ArtNode4<V>(objectsPool_); });
     node->InitFirstKey(key, value);
     root_ = node;
   } else {
-    auto [replacement, release_old] = root_->Put(key, INITIAL_LEVEL, value);
-    if (replacement != nullptr) {
-      if (release_old)
-        poolContext_->ReleaseNode(root_);
-      root_ = replacement;
+    IArtNode<V>* upSizedNode = root_->Put(key, INITIAL_LEVEL, value);
+    if (upSizedNode != nullptr) {
+      root_ = upSizedNode;
     }
   }
 }
@@ -303,7 +252,6 @@ void LongAdaptiveRadixTreeMap<V>::Remove(int64_t key) {
   if (root_) {
     IArtNode<V>* downSizeNode = root_->Remove(key, INITIAL_LEVEL);
     if (downSizeNode != root_) {
-      poolContext_->ReleaseNode(root_);
       root_ = downSizeNode;
     }
   }
@@ -313,7 +261,6 @@ template <typename V>
 void LongAdaptiveRadixTreeMap<V>::Clear() {
   if (root_ != nullptr) {
     root_->RecycleTree();
-    poolContext_->ReleaseNode(root_);
     root_ = nullptr;
   }
 }

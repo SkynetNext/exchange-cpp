@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <exchange/core/common/BytesIn.h>
 #include <exchange/core/common/MatcherTradeEvent.h>
 #include <exchange/core/common/config/LoggingConfiguration.h>
@@ -26,13 +27,17 @@
 
 namespace exchange::core::orderbook {
 
-OrderBookNaiveImpl::OrderBookNaiveImpl(const common::CoreSymbolSpecification* symbolSpec,
-                                       const OrderBookPoolContext* poolContext,
-                                       OrderBookEventsHelper* eventsHelper)
+OrderBookNaiveImpl::OrderBookNaiveImpl(
+  const common::CoreSymbolSpecification* symbolSpec,
+  ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
+  OrderBookEventsHelper* eventsHelper)
   : symbolSpec_(symbolSpec)
   , eventsHelper_(eventsHelper != nullptr ? eventsHelper
                                           : OrderBookEventsHelper::NonPooledEventsHelper()) {
-  (void)poolContext;  // OrderBookNaiveImpl doesn't use pool (uses std::map)
+  // Note: OrderBookNaiveImpl doesn't use ObjectsPool (uses std::map instead
+  // of ART tree), but accepts it for interface consistency with
+  // OrderBookDirectImpl
+  (void)objectsPool;  // Suppress unused parameter warning
 }
 
 void OrderBookNaiveImpl::NewOrder(common::cmd::OrderCommand* cmd) {

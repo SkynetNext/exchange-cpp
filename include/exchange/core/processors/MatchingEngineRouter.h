@@ -23,15 +23,13 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include "../collections/objpool/ObjectPool.h"
+#include "../collections/objpool/ObjectsPool.h"
 #include "../common/WriteBytesMarshallable.h"
 #include "../common/api/reports/ReportQuery.h"
 #include "../common/cmd/OrderCommand.h"
 #include "../common/config/ExchangeConfiguration.h"
 #include "../orderbook/IOrderBook.h"
-#include "../orderbook/OrderBookDirectTypes.h"
 #include "../orderbook/OrderBookEventsHelper.h"
-#include "../orderbook/OrderBookPoolContext.h"
 #include "../utils/Logger.h"
 #include "BinaryCommandsProcessor.h"
 #include "SymbolSpecificationProvider.h"
@@ -57,7 +55,7 @@ public:
   // Matches Java IOrderBook.OrderBookFactory signature
   using OrderBookFactory = std::function<std::unique_ptr<orderbook::IOrderBook>(
     const common::CoreSymbolSpecification* spec,
-    const orderbook::OrderBookPoolContext* poolContext,
+    ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
     orderbook::OrderBookEventsHelper* eventsHelper)>;
 
   MatchingEngineRouter(int32_t shardId,
@@ -130,11 +128,9 @@ private:
   SymbolSpecificationProvider* symbolSpecProvider_;
   OrderBookFactory orderBookFactory_;
 
-  // Object pools for order book operations (production config)
-  std::unique_ptr<::exchange::core::collections::objpool::ObjectPool<orderbook::DirectOrder>>
-    orderPool_;
-  std::unique_ptr<::exchange::core::collections::objpool::ObjectPool<orderbook::Bucket>> bucketPool_;
-  orderbook::OrderBookPoolContext poolContext_;
+  // Object pool for order book operations
+  // Created in constructor with production configuration
+  std::unique_ptr<::exchange::core::collections::objpool::ObjectsPool> objectsPool_;
 
   // symbol ID -> OrderBook
   // Using ankerl::unordered_dense for better performance

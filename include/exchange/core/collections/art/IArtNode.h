@@ -19,15 +19,13 @@
 #include <cstdint>
 #include <list>
 #include <string>
-#include <utility>
 
-namespace exchange::core::collections::art {
+namespace exchange::core::collections {
+namespace objpool {
+class ObjectsPool;
+}  // namespace objpool
 
-// ART node type constants (for pool recycling / ReleaseNode dispatch)
-static constexpr int kArtNode4 = 8;
-static constexpr int kArtNode16 = 9;
-static constexpr int kArtNode48 = 10;
-static constexpr int kArtNode256 = 11;
+namespace art {
 
 // Forward declarations
 template <typename V>
@@ -55,12 +53,9 @@ public:
    * @param key 64-bit key
    * @param level Current level
    * @param value Value to store
-   * @return (replacement, release_old): replacement is new root for this slot
-   *         (or nullptr if no change); release_old is true only when replacement
-   *         is from upsize (caller must release old node). BranchIfRequired
-   *         returns (newNode, false) because old node is now a child of newNode.
+   * @return New node if resized (upsized), nullptr otherwise
    */
-  virtual std::pair<IArtNode<V>*, bool> Put(int64_t key, int level, V* value) = 0;
+  virtual IArtNode<V>* Put(int64_t key, int level, V* value) = 0;
 
   /**
    * Remove key-value pair
@@ -133,15 +128,20 @@ public:
   virtual std::list<std::pair<int64_t, V*>> Entries() = 0;
 
   /**
-   * Recursively recycle child nodes to the pool; does NOT release this node.
-   * Caller must call ArtPoolContext::ReleaseNode() on this node after
-   * RecycleTree() returns. Used by LongAdaptiveRadixTreeMap::Clear().
+   * Get objects pool
+   * @return ObjectsPool instance
+   */
+  virtual objpool::ObjectsPool* GetObjectsPool() = 0;
+
+  /**
+   * Recursively return all nodes to the object pool
+   * Called by LongAdaptiveRadixTreeMap::Clear() and destructor
    */
   virtual void RecycleTree() = 0;
 
   /**
    * Get node type for object pool recycling
-   * @return Node type constant (art::kArtNode4/16/48/256)
+   * @return Node type constant (ObjectsPool::ART_NODE_4/16/48/256)
    * Non-virtual for performance - returns stored nodeType_ member
    */
   int GetNodeType() const {
@@ -161,4 +161,5 @@ protected:
   explicit IArtNode(int nodeType) : nodeType_(nodeType) {}
 };
 
-}  // namespace exchange::core::collections::art
+}  // namespace art
+}  // namespace exchange::core::collections

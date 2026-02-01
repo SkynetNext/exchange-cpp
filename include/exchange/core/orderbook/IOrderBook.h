@@ -38,9 +38,12 @@ class LoggingConfiguration;
 }
 }  // namespace common
 
+namespace collections::objpool {
+class ObjectsPool;
+}
+
 namespace orderbook {
 
-struct OrderBookPoolContext;
 class OrderBookEventsHelper;
 
 enum class OrderBookImplType : uint8_t { NAIVE = 0, DIRECT = 2 };
@@ -178,10 +181,11 @@ public:
   /**
    * Create OrderBook from BytesIn (deserialization)
    */
-  static std::unique_ptr<IOrderBook> Create(common::BytesIn* bytes,
-                                            const OrderBookPoolContext* poolContext,
-                                            OrderBookEventsHelper* eventsHelper,
-                                            const common::config::LoggingConfiguration* loggingCfg);
+  static std::unique_ptr<IOrderBook>
+  Create(common::BytesIn* bytes,
+         ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
+         OrderBookEventsHelper* eventsHelper,
+         const common::config::LoggingConfiguration* loggingCfg);
 };
 
 }  // namespace orderbook
