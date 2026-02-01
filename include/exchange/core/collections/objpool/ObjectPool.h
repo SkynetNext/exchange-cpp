@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <mimalloc.h>
+#include <exchange/core/collections/objpool/PoolAllocator.h>
 #include <cassert>
 #include <cstddef>
 #include <utility>
@@ -24,7 +24,7 @@
 namespace exchange::core::collections::objpool {
 
 /**
- * ObjectPool<T> - Single-threaded typed object pool using mimalloc
+ * ObjectPool<T> - Single-threaded typed object pool
  *
  * Design inspired by moodycamel::ConcurrentQueue's internal block pool:
  * - BLOCK_SIZE objects per block (default 32, like concurrentqueue)
@@ -34,7 +34,7 @@ namespace exchange::core::collections::objpool {
  *
  * Key properties:
  * - Single-threaded only (no atomics, no locks)
- * - Uses mimalloc for all allocations
+ * - Uses PoolAllocator (mimalloc in production, std allocator under sanitizers)
  * - Type-safe: Acquire returns T*, Release takes T*
  */
 template <typename T>
@@ -102,7 +102,7 @@ private:
   }
 
   Block* CreateBlock() {
-    void* p = mi_malloc_aligned(sizeof(Block), alignof(Block));
+    void* p = PoolAllocator::AllocAligned(sizeof(Block), alignof(Block));
     if (p == nullptr) {
       return nullptr;
     }
@@ -122,7 +122,7 @@ private:
     if (block_count == 0) {
       return;
     }
-    void* region = mi_malloc_aligned(sizeof(Block) * block_count, alignof(Block));
+    void* region = PoolAllocator::AllocAligned(sizeof(Block) * block_count, alignof(Block));
     if (region == nullptr) {
       return;
     }
@@ -151,16 +151,16 @@ public:
       Block* block = free_list_head_;
       free_list_head_ = block->freeListNext;
       if (block->dynamicallyAllocated) {
-        mi_free(block);
+        PoolAllocator::FreeAligned(block);
       }
     }
     // Free current block if dynamically allocated
     if (current_block_ != nullptr && current_block_->dynamicallyAllocated) {
-      mi_free(current_block_);
+      PoolAllocator::FreeAligned(current_block_);
     }
     // Free initial pool
     if (initial_pool_ != nullptr) {
-      mi_free(initial_pool_);
+      PoolAllocator::FreeAligned(initial_pool_);
     }
   }
 
@@ -217,7 +217,7 @@ public:
       if (!block->dynamicallyAllocated || recycle_dynamic_) {
         AddBlockToFreeList(block);
       } else {
-        mi_free(block);
+        PoolAllocator::FreeAligned(block);
       }
     }
   }

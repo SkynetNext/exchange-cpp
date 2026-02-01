@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <mimalloc.h>
+#include <exchange/core/collections/objpool/PoolAllocator.h>
 #include <atomic>
 #include <cassert>
 #include <cstddef>
@@ -26,7 +26,7 @@
 namespace exchange::core::collections::objpool {
 
 /**
- * ConcurrentObjectPool<T> - Thread-safe typed object pool using mimalloc
+ * ConcurrentObjectPool<T> - Thread-safe typed object pool
  *
  * Design aligned with moodycamel::ConcurrentQueue's FreeList<Block>:
  * - BLOCK_SIZE objects per block (default 32)
@@ -35,7 +35,7 @@ namespace exchange::core::collections::objpool {
  *
  * Key properties:
  * - Thread-safe (lock-free CAS operations)
- * - Uses mimalloc for all allocations
+ * - Uses PoolAllocator (mimalloc in production, std allocator under sanitizers)
  * - Type-safe: Acquire returns T*, Release takes T*
  */
 template <typename T>
@@ -102,7 +102,7 @@ private:
         AddBlockKnowingRefcountIsZero(block);
       }
     } else {
-      mi_free(block);
+      PoolAllocator::FreeAligned(block);
     }
   }
 
@@ -164,7 +164,7 @@ private:
   }
 
   Block* CreateBlock() {
-    void* p = mi_malloc_aligned(sizeof(Block), kBlockAlignment);
+    void* p = PoolAllocator::AllocAligned(sizeof(Block), kBlockAlignment);
     if (p == nullptr) {
       return nullptr;
     }
@@ -178,7 +178,7 @@ private:
     if (block_count == 0) {
       return;
     }
-    void* region = mi_malloc_aligned(sizeof(Block) * block_count, kBlockAlignment);
+    void* region = PoolAllocator::AllocAligned(sizeof(Block) * block_count, kBlockAlignment);
     if (region == nullptr) {
       return;
     }
@@ -206,13 +206,13 @@ public:
     while (block != nullptr) {
       Block* next = block->freeListNext.load(std::memory_order_relaxed);
       if (block->dynamicallyAllocated) {
-        mi_free(block);
+        PoolAllocator::FreeAligned(block);
       }
       block = next;
     }
     // Free initial pool
     if (initial_pool_ != nullptr) {
-      mi_free(initial_pool_);
+      PoolAllocator::FreeAligned(initial_pool_);
     }
   }
 
