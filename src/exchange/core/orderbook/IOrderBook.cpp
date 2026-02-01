@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <exchange/core/collections/objpool/ObjectsPool.h>
+#include <exchange/core/orderbook/OrderBookPoolContext.h>
 #include <exchange/core/common/BytesIn.h>
 #include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/orderbook/IOrderBook.h>
@@ -54,7 +54,7 @@ common::cmd::CommandResultCode IOrderBook::ProcessCommand(IOrderBook* orderBook,
 
 std::unique_ptr<IOrderBook>
 IOrderBook::Create(common::BytesIn* bytes,
-                   ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
+                   const OrderBookPoolContext* poolContext,
                    OrderBookEventsHelper* eventsHelper,
                    const common::config::LoggingConfiguration* loggingCfg) {
   if (bytes == nullptr) {
@@ -69,7 +69,7 @@ IOrderBook::Create(common::BytesIn* bytes,
     case OrderBookImplType::NAIVE:
       return std::make_unique<OrderBookNaiveImpl>(bytes, loggingCfg);
     case OrderBookImplType::DIRECT:
-      return std::make_unique<OrderBookDirectImpl>(bytes, objectsPool, eventsHelper, loggingCfg);
+      return std::make_unique<OrderBookDirectImpl>(bytes, poolContext, eventsHelper, loggingCfg);
     default:
       throw std::invalid_argument("Unknown OrderBook implementation type: "
                                   + std::to_string(implTypeCode));

@@ -18,53 +18,56 @@
 #include <algorithm>
 #include <sstream>
 #include <vector>
-#include "exchange/core/collections/objpool/ObjectsPool.h"
 #include "exchange/core/common/L2MarketData.h"
 #include "exchange/core/common/MatcherTradeEvent.h"
 #include "exchange/core/common/OrderAction.h"
 #include "exchange/core/common/OrderType.h"
 #include "exchange/core/common/cmd/OrderCommand.h"
+#include "exchange/core/orderbook/OrderBookDirectTypes.h"
 
 namespace exchange::core::orderbook {
 
 using namespace exchange::core::common;
 using namespace exchange::core::common::cmd;
 
-OrderBookDirectImpl::OrderBookDirectImpl(
-  const common::CoreSymbolSpecification* symbolSpec,
-  ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
-  OrderBookEventsHelper* eventsHelper,
-  const common::config::LoggingConfiguration* loggingCfg)
+OrderBookDirectImpl::OrderBookDirectImpl(const common::CoreSymbolSpecification* symbolSpec,
+                                         const OrderBookPoolContext* poolContext,
+                                         OrderBookEventsHelper* eventsHelper,
+                                         const common::config::LoggingConfiguration* loggingCfg)
   : artPoolContext_(::exchange::core::collections::art::ArtPoolContext<Bucket>::CreateDefaultTest())
   , askPriceBuckets_(artPoolContext_.get())
   , bidPriceBuckets_(artPoolContext_.get())
   , symbolSpec_(symbolSpec)
-  , objectsPool_(objectsPool)
+  , poolContext_(poolContext)
   , bestAskOrder_(nullptr)
   , bestBidOrder_(nullptr)
   , eventsHelper_(eventsHelper) {
+  if (poolContext == nullptr || poolContext->orderPool == nullptr
+      || poolContext->bucketPool == nullptr) {
+    throw std::invalid_argument("OrderBookPoolContext and its pools cannot be nullptr");
+  }
   logDebug_ = loggingCfg != nullptr
               && loggingCfg->Contains(
                 common::config::LoggingConfiguration::LoggingLevel::LOGGING_MATCHING_DEBUG);
 }
 
-OrderBookDirectImpl::OrderBookDirectImpl(
-  common::BytesIn* bytes,
-  ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
-  OrderBookEventsHelper* eventsHelper,
-  const common::config::LoggingConfiguration* loggingCfg)
+OrderBookDirectImpl::OrderBookDirectImpl(common::BytesIn* bytes,
+                                         const OrderBookPoolContext* poolContext,
+                                         OrderBookEventsHelper* eventsHelper,
+                                         const common::config::LoggingConfiguration* loggingCfg)
   : artPoolContext_(::exchange::core::collections::art::ArtPoolContext<Bucket>::CreateDefaultTest())
   , askPriceBuckets_(artPoolContext_.get())
   , bidPriceBuckets_(artPoolContext_.get())
-  , objectsPool_(objectsPool)
+  , poolContext_(poolContext)
   , bestAskOrder_(nullptr)
   , bestBidOrder_(nullptr)
   , eventsHelper_(eventsHelper) {
   if (bytes == nullptr) {
     throw std::invalid_argument("BytesIn cannot be nullptr");
   }
-  if (objectsPool == nullptr) {
-    throw std::invalid_argument("ObjectsPool cannot be nullptr");
+  if (poolContext == nullptr || poolContext->orderPool == nullptr
+      || poolContext->bucketPool == nullptr) {
+    throw std::invalid_argument("OrderBookPoolContext and its pools cannot be nullptr");
   }
   if (loggingCfg == nullptr) {
     throw std::invalid_argument("LoggingConfiguration cannot be nullptr");
@@ -80,12 +83,9 @@ OrderBookDirectImpl::OrderBookDirectImpl(
   // Read number of orders
   int32_t size = bytes->ReadInt();
 
-  // Read and insert all orders
+  // Read and insert all orders (use pool for consistency with runtime path)
   for (int32_t i = 0; i < size; i++) {
-    // Create DirectOrder from bytes (deserialization)
-    DirectOrder* order = new DirectOrder(*bytes);
-
-    // Insert order into the order book structure
+    DirectOrder* order = poolContext_->orderPool->Acquire(*bytes);
     insertOrder(order, nullptr);
     orderIdIndex_[order->orderId] = order;
   }
@@ -122,9 +122,7 @@ void OrderBookDirectImpl::NewOrder(OrderCommand* cmd) {
         return;
       }
 
-      auto* orderRecord = objectsPool_->Get<DirectOrder>(
-        ::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER,
-        []() { return new DirectOrder(); });
+      auto* orderRecord = poolContext_->orderPool->Acquire();
 
       orderRecord->orderId = orderId;
       orderRecord->price = cmd->price;
@@ -204,12 +202,11 @@ CommandResultCode OrderBookDirectImpl::CancelOrder(OrderCommand* cmd) {
 
   Bucket* freeBucket = this->RemoveOrder(order);
   if (freeBucket != nullptr) {
-    objectsPool_->Put(::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
-                      freeBucket);
+    poolContext_->bucketPool->Release(freeBucket);
   }
 
   // Release order before creating event
-  objectsPool_->Put(::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER, order);
+  poolContext_->orderPool->Release(order);
 
   // Use saved data to create event
   cmd->action = orderAction;
@@ -240,11 +237,9 @@ CommandResultCode OrderBookDirectImpl::MoveOrder(OrderCommand* cmd) {
   const int64_t filled = this->tryMatchInstantly(static_cast<common::IOrder*>(orderToMove), cmd);
   if (filled == orderToMove->size) {
     orderIdIndex_.erase(cmd->orderId);
-    objectsPool_->Put(::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER,
-                      orderToMove);
+    poolContext_->orderPool->Release(orderToMove);
     if (freeBucket)
-      objectsPool_->Put(::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
-                        freeBucket);
+      poolContext_->bucketPool->Release(freeBucket);
     return CommandResultCode::SUCCESS;
   }
 
@@ -279,11 +274,10 @@ CommandResultCode OrderBookDirectImpl::ReduceOrder(OrderCommand* cmd) {
     orderIdIndex_.erase(it);
     Bucket* freeBucket = this->RemoveOrder(order);
     if (freeBucket)
-      objectsPool_->Put(::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
-                        freeBucket);
+      poolContext_->bucketPool->Release(freeBucket);
 
     // Release order before creating event
-    objectsPool_->Put(::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER, order);
+    poolContext_->orderPool->Release(order);
 
     // Use saved data to create event
     cmd->matcherEvent =
@@ -362,8 +356,7 @@ int64_t OrderBookDirectImpl::tryMatchInstantly(common::IOrder* takerOrder,
     if (makerOrder == priceBucketTail) {
       auto& buckets = isBidAction ? askPriceBuckets_ : bidPriceBuckets_;
       buckets.Remove(makerOrder->price);
-      objectsPool_->Put(::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
-                        makerOrder->bucket);
+      poolContext_->bucketPool->Release(makerOrder->bucket);
 
       if (makerOrder->prev != nullptr) {
         priceBucketTail = makerOrder->prev->bucket->lastOrder;
@@ -371,7 +364,7 @@ int64_t OrderBookDirectImpl::tryMatchInstantly(common::IOrder* takerOrder,
     }
 
     makerOrder = makerOrder->prev;
-    objectsPool_->Put(::exchange::core::collections::objpool::ObjectsPool::DIRECT_ORDER, toRecycle);
+    poolContext_->orderPool->Release(toRecycle);
 
   } while (makerOrder != nullptr && remainingSize > 0
            && (isBidAction ? makerOrder->price <= limitPrice : makerOrder->price >= limitPrice));
@@ -389,7 +382,7 @@ int64_t OrderBookDirectImpl::tryMatchInstantly(common::IOrder* takerOrder,
   return takerOrder->GetSize() - remainingSize;
 }
 
-OrderBookDirectImpl::Bucket* OrderBookDirectImpl::RemoveOrder(DirectOrder* order) {
+Bucket* OrderBookDirectImpl::RemoveOrder(DirectOrder* order) {
   Bucket* bucket = order->bucket;
   bucket->totalVolume -= (order->size - order->filled);
   bucket->numOrders--;
@@ -425,8 +418,7 @@ void OrderBookDirectImpl::insertOrder(DirectOrder* order, Bucket* freeBucket) {
 
   if (toBucket != nullptr) {
     if (freeBucket)
-      objectsPool_->Put(::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
-                        freeBucket);
+      poolContext_->bucketPool->Release(freeBucket);
 
     toBucket->totalVolume += (order->size - order->filled);
     toBucket->numOrders++;
@@ -444,9 +436,7 @@ void OrderBookDirectImpl::insertOrder(DirectOrder* order, Bucket* freeBucket) {
   } else {
     Bucket* newBucket = freeBucket;
     if (!newBucket) {
-      newBucket = objectsPool_->Get<Bucket>(
-        ::exchange::core::collections::objpool::ObjectsPool::DIRECT_BUCKET,
-        []() { return new Bucket(); });
+      newBucket = poolContext_->bucketPool->Acquire();
     }
     newBucket->lastOrder = order;
     newBucket->totalVolume = order->size - order->filled;
@@ -574,9 +564,8 @@ OrderBookImplType OrderBookDirectImpl::GetImplementationType() const {
 
 // Helper function to collect orders from a linked list
 // Note: Java OrdersSpliterator uses prev pointer, not next
-static void CollectOrders(OrderBookDirectImpl::DirectOrder* startOrder,
-                          std::vector<OrderBookDirectImpl::DirectOrder*>& orders) {
-  OrderBookDirectImpl::DirectOrder* current = startOrder;
+static void CollectOrders(DirectOrder* startOrder, std::vector<DirectOrder*>& orders) {
+  DirectOrder* current = startOrder;
   while (current != nullptr) {
     orders.push_back(current);
     current = current->prev;
@@ -613,7 +602,7 @@ void OrderBookDirectImpl::WriteMarshallable(common::BytesOut& bytes) const {
   }
 }
 
-OrderBookDirectImpl::DirectOrder::DirectOrder(common::BytesIn& bytes) {
+DirectOrder::DirectOrder(common::BytesIn& bytes) {
   orderId = bytes.ReadLong();
   price = bytes.ReadLong();
   size = bytes.ReadLong();
@@ -627,7 +616,7 @@ OrderBookDirectImpl::DirectOrder::DirectOrder(common::BytesIn& bytes) {
   bucket = nullptr;
 }
 
-void OrderBookDirectImpl::DirectOrder::WriteMarshallable(common::BytesOut& bytes) const {
+void DirectOrder::WriteMarshallable(common::BytesOut& bytes) const {
   bytes.WriteLong(orderId);
   bytes.WriteLong(price);
   bytes.WriteLong(size);
@@ -638,7 +627,7 @@ void OrderBookDirectImpl::DirectOrder::WriteMarshallable(common::BytesOut& bytes
   bytes.WriteLong(timestamp);
 }
 
-int32_t OrderBookDirectImpl::DirectOrder::GetStateHash() const {
+int32_t DirectOrder::GetStateHash() const {
   // Match Java DirectOrder.stateHash() implementation:
   // Objects.hash(orderId, action, price, size, reserveBidPrice, filled, uid)
   // Match Order::GetStateHash() implementation for consistency

@@ -20,11 +20,11 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include "../collections/objpool/ObjectsPool.h"
 #include "../common/CoreSymbolSpecification.h"
 #include "../common/Order.h"
 #include "IOrderBook.h"
 #include "OrderBookEventsHelper.h"
+#include "OrderBookPoolContext.h"
 #include "OrdersBucket.h"
 
 namespace exchange::core::orderbook {
@@ -39,10 +39,9 @@ public:
   OrderBookNaiveImpl(const OrderBookNaiveImpl&) = delete;
   OrderBookNaiveImpl& operator=(const OrderBookNaiveImpl&) = delete;
 
-  explicit OrderBookNaiveImpl(
-    const common::CoreSymbolSpecification* symbolSpec,
-    ::exchange::core::collections::objpool::ObjectsPool* objectsPool = nullptr,
-    OrderBookEventsHelper* eventsHelper = nullptr);
+  explicit OrderBookNaiveImpl(const common::CoreSymbolSpecification* symbolSpec,
+                              const OrderBookPoolContext* poolContext = nullptr,
+                              OrderBookEventsHelper* eventsHelper = nullptr);
 
   /**
    * Constructor from BytesIn (deserialization)

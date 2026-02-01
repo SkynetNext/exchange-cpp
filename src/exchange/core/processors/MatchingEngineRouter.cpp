@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <exchange/core/common/SymbolType.h>
 #include <exchange/core/common/api/binary/BatchAddAccountsCommand.h>
 #include <exchange/core/common/api/binary/BatchAddSymbolsCommand.h>
@@ -71,11 +70,14 @@ MatchingEngineRouter::MatchingEngineRouter(
     eventsHelper_ = std::make_unique<orderbook::OrderBookEventsHelper>();
   }
 
-  // Initialize object pools
-  // Matches Java MatchingEngineRouter configuration (production pool)
-  // TODO: Move to performance configuration
-  objectsPool_ = std::unique_ptr<::exchange::core::collections::objpool::ObjectsPool>(
-    ::exchange::core::collections::objpool::ObjectsPool::CreateProductionPool());
+  // Initialize object pools (production config: 1M orders, 64K buckets)
+  // Matches Java MatchingEngineRouter configuration
+  orderPool_ =
+    std::make_unique<collections::objpool::ObjectPool<orderbook::DirectOrder>>(1024 * 1024, true);
+  bucketPool_ =
+    std::make_unique<collections::objpool::ObjectPool<orderbook::Bucket>>(1024 * 64, true);
+  poolContext_.orderPool = orderPool_.get();
+  poolContext_.bucketPool = bucketPool_.get();
 
   // Read configuration from ExchangeConfiguration
   if (exchangeCfg != nullptr) {
@@ -133,7 +135,7 @@ MatchingEngineRouter::MatchingEngineRouter(
           for (int i = 0; i < orderBooksLength; i++) {
             int32_t symbolId = bytesIn->ReadInt();
             auto orderBook = orderbook::IOrderBook::Create(
-              bytesIn, objectsPool_.get(), eventsHelper_.get(), &exchangeCfg->loggingCfg);
+              bytesIn, &poolContext_, eventsHelper_.get(), &exchangeCfg->loggingCfg);
             orderBooks_[symbolId] = std::move(orderBook);
           }
         });
@@ -248,12 +250,12 @@ void MatchingEngineRouter::AddSymbol(const common::CoreSymbolSpecification* spec
 
   // Create new order book using factory
   if (orderBookFactory_) {
-    auto orderBook = orderBookFactory_(spec, objectsPool_.get(), eventsHelper_.get());
+    auto orderBook = orderBookFactory_(spec, &poolContext_, eventsHelper_.get());
     orderBooks_[spec->symbolId] = std::move(orderBook);
   } else {
     // Fallback to naive implementation
-    auto orderBook = std::make_unique<orderbook::OrderBookNaiveImpl>(spec, objectsPool_.get(),
-                                                                     eventsHelper_.get());
+    auto orderBook =
+      std::make_unique<orderbook::OrderBookNaiveImpl>(spec, nullptr, eventsHelper_.get());
     orderBooks_[spec->symbolId] = std::move(orderBook);
   }
 
