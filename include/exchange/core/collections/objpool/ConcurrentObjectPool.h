@@ -17,7 +17,6 @@
 #pragma once
 
 #include <mimalloc.h>
-#include <array>
 #include <atomic>
 #include <cassert>
 #include <cstddef>
@@ -29,250 +28,102 @@ namespace exchange::core::collections::objpool {
 /**
  * ConcurrentObjectPool<T> - Thread-safe typed object pool using mimalloc
  *
- * Design directly adapted from moodycamel::ConcurrentQueue's internal block pool:
- * - Lock-free FreeList with reference counting (FreeListNode pattern)
- * - Atomic initial pool index for thread-safe acquisition from pre-allocated region
- * - Single block fallback allocation (like requisition_block)
+ * Design aligned with moodycamel::ConcurrentQueue's FreeList<Block>:
+ * - BLOCK_SIZE objects per block (default 32)
+ * - Lock-free FreeList using REFS_MASK/SHOULD_BE_ON_FREELIST technique
+ * - Block is recycled to freeList only when completely empty (slotsInUse == 0)
  *
  * Key properties:
  * - Thread-safe (lock-free CAS operations)
- * - Uses mimalloc for all allocations (mi_malloc_aligned / mi_free)
+ * - Uses mimalloc for all allocations
  * - Type-safe: Acquire returns T*, Release takes T*
- * - Automatic construction/destruction: Acquire calls constructor, Release calls destructor
- * - Alignment automatically inherited from T (like moodycamel MOODYCAMEL_ALIGNED_TYPE_LIKE)
- * - False sharing prevention: Block aligned to 128 bytes (L2 prefetch 2 cache lines)
- *
- * Acquire may return nullptr on allocation failure (e.g. OOM or resource exhaustion);
- * callers must check the return value before use.
- *
- * @code
- *   ConcurrentObjectPool<MyStruct> pool(1024);  // 1K pre-allocated
- *   MyStruct* obj = pool.Acquire(arg1, arg2);   // constructor called (thread-safe)
- *   if (obj == nullptr) { return; }  // handle OOM or resource exhaustion
- *   // ... use obj ...
- *   pool.Release(obj);  // destructor called, returned to pool (thread-safe)
- * @endcode
  */
 template <typename T>
 class ConcurrentObjectPool {
+public:
+  static constexpr size_t BLOCK_SIZE = 32;
+  static constexpr size_t kDefaultInitialCapacity = 32 * BLOCK_SIZE;  // 1024
+
 private:
-  // Cache line size for false sharing prevention
-  // Use 128 bytes to account for L2 prefetch (2 cache lines)
   static constexpr size_t kCacheLineSize = 128;
 
-  // Reference counting constants (from moodycamel)
+  // Lock-free free list constants (from moodycamel::FreeList)
   static constexpr std::uint32_t REFS_MASK = 0x7FFFFFFF;
   static constexpr std::uint32_t SHOULD_BE_ON_FREELIST = 0x80000000;
 
-  // Block struct - mirrors moodycamel Block with FreeListNode fields
-  // freeListRefs: lower 31 bits = refcount, bit 31 = should-be-on-freelist flag
-  //
-  // False sharing prevention: freeListRefs/freeListNext are hot atomics accessed
-  // concurrently by multiple threads during free list operations. Align to cache
-  // line to prevent false sharing with atomics in adjacent Blocks.
-  struct Block {
-    // Hot atomics - aligned to prevent false sharing between Blocks
-    alignas(kCacheLineSize) std::atomic<std::uint32_t> freeListRefs{0};
-    std::atomic<Block*> freeListNext{nullptr};
-    bool dynamicallyAllocated{true};
-    // Storage alignment automatically inherits from T
-    alignas(T) std::array<char, sizeof(T)> storage{};
+  struct Block;
+
+  // Slot: backPtr + storage for T
+  struct Slot {
+    Block* backPtr;
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+    alignas(T) char value[sizeof(T)];
   };
 
-  // Block alignment: max of cache line size (for false sharing prevention between Blocks)
-  // and T's alignment requirement
-  static constexpr size_t kBlockAlignment = kCacheLineSize > alignof(T) ? kCacheLineSize
-                                                                        : alignof(T);
+  // Block: like moodycamel Block with FreeListNode fields
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+  struct Block {
+    // FreeList fields (from moodycamel::FreeListNode)
+    alignas(kCacheLineSize) std::atomic<std::uint32_t> freeListRefs{0};
+    std::atomic<Block*> freeListNext{nullptr};
+    // Block metadata
+    bool dynamicallyAllocated{true};
+    std::atomic<size_t> slotsInUse{0};
+    std::atomic<size_t> freeSlotHead{BLOCK_SIZE};  // BLOCK_SIZE = no free slot
+    // Storage for BLOCK_SIZE slots (initialized by InitBlockFreeList)
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+    alignas(Slot) char storage[sizeof(Slot) * BLOCK_SIZE];
+  };
 
-public:
-  /**
-   * Construct concurrent object pool
-   *
-   * @param initial_capacity Number of objects to pre-allocate
-   * @param recycle_dynamic If true, dynamically allocated blocks go to free list on release
-   */
-  explicit ConcurrentObjectPool(size_t initial_capacity, bool recycle_dynamic = true)
-    : initial_capacity_(initial_capacity), recycle_dynamic_(recycle_dynamic) {
-    PopulateInitialBlockList(initial_capacity_);
+  static constexpr size_t kBlockAlignment = kCacheLineSize > alignof(Block) ? kCacheLineSize
+                                                                            : alignof(Block);
+
+  static Slot* SlotAt(Block* block, size_t index) noexcept {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    return reinterpret_cast<Slot*>(block->storage) + index;
   }
 
-  /**
-   * Destructor
-   *
-   * IMPORTANT: All acquired objects MUST be released before destroying the pool.
-   * Destroying the pool while objects are still acquired results in undefined behavior.
-   * This is the same contract as moodycamel::ConcurrentQueue.
-   */
-  ~ConcurrentObjectPool() {
-    // Destroy free list: traverse and mi_free dynamically allocated blocks
-    Block* block = free_list_head_.load(std::memory_order_relaxed);
-    while (block != nullptr) {
-      Block* next = block->freeListNext.load(std::memory_order_relaxed);
-      if (block->dynamicallyAllocated) {
-        mi_free(block);
-      }
-      block = next;
+  // Initialize block's internal free list
+  static void InitBlockFreeList(Block* block) noexcept {
+    block->freeSlotHead.store(0, std::memory_order_relaxed);
+    block->slotsInUse.store(0, std::memory_order_relaxed);
+    for (size_t i = 0; i < BLOCK_SIZE - 1; ++i) {
+      *reinterpret_cast<size_t*>(SlotAt(block, i)) = i + 1;
     }
-    // Destroy initial pool
-    if (initial_block_pool_ != nullptr) {
-      mi_free(initial_block_pool_);
-    }
+    *reinterpret_cast<size_t*>(SlotAt(block, BLOCK_SIZE - 1)) = BLOCK_SIZE;
   }
 
-  ConcurrentObjectPool(const ConcurrentObjectPool&) = delete;
-  ConcurrentObjectPool& operator=(const ConcurrentObjectPool&) = delete;
-  ConcurrentObjectPool(ConcurrentObjectPool&&) = delete;
-  ConcurrentObjectPool& operator=(ConcurrentObjectPool&&) = delete;
+  // === Lock-free FreeList operations (from moodycamel::FreeList) ===
 
-  /**
-   * Acquire an object from the pool, calling constructor with forwarded args
-   * Thread-safe: uses atomic operations
-   * Order: initial pool (atomic index) -> free list (lock-free) -> create<Block>
-   *
-   * Returns nullptr when allocation fails (e.g. initial pool exhausted, free list
-   * empty, and CreateBlock fails due to OOM or resource exhaustion). Callers
-   * must check the return value before use.
-   *
-   * @param args Arguments forwarded to T's constructor
-   * @return Constructed object, or nullptr on allocation failure
-   */
-  template <typename... Args>
-  T* Acquire(Args&&... args) {
-    Block* block = TryGetBlockFromInitialPool();
-    if (block == nullptr) {
-      block = TryGetBlockFromFreeList();
-    }
-    if (block == nullptr) {
-      block = CreateBlock();
-    }
-    if (block == nullptr) {
-      return nullptr;
-    }
-    // Placement new: construct T in block's storage
-    return new (static_cast<void*>(block->storage.data())) T(std::forward<Args>(args)...);
-  }
-
-  /**
-   * Release an object back to the pool, calling destructor
-   * Thread-safe: uses lock-free free list
-   *
-   * @param ptr Object previously returned by Acquire()
-   */
-  void Release(T* ptr) {
-    if (ptr == nullptr) {
-      return;
-    }
-    // Call destructor
-    ptr->~T();
-    // Get Block from object pointer
-    Block* block = ToBlock(ptr);
+  void AddBlockToFreeList(Block* block) noexcept {
     if (!block->dynamicallyAllocated || recycle_dynamic_) {
-      AddBlockToFreeList(block);
+      // Set SHOULD_BE_ON_FREELIST flag; if refcount was 0, we can add immediately
+      if (block->freeListRefs.fetch_add(SHOULD_BE_ON_FREELIST, std::memory_order_acq_rel) == 0) {
+        AddBlockKnowingRefcountIsZero(block);
+      }
     } else {
       mi_free(block);
     }
   }
 
-  /**
-   * Check if ptr was allocated from the initial pool (for debug/stats)
-   */
-  bool IsFromInitialPool(const T* ptr) const noexcept {
-    if (initial_block_pool_ == nullptr || initial_block_pool_size_ == 0) {
-      return false;
-    }
-    const char* p = reinterpret_cast<const char*>(ptr);
-    const char* start = reinterpret_cast<const char*>(initial_block_pool_);
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    const char* end = start + sizeof(Block) * initial_block_pool_size_;
-    return p >= start && p < end;
-  }
-
-  size_t initial_capacity() const noexcept {
-    return initial_capacity_;
-  }
-
-  /**
-   * Block alignment (automatically derived, includes cache line padding)
-   */
-  static constexpr size_t block_alignment() noexcept {
-    return kBlockAlignment;
-  }
-
-private:
-  static Block* ToBlock(T* obj) noexcept {
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    return reinterpret_cast<Block*>(reinterpret_cast<char*>(obj) - offsetof(Block, storage));
-  }
-
-  void PopulateInitialBlockList(size_t block_count) {
-    if (block_count == 0) {
-      return;
-    }
-    initial_block_pool_size_ = block_count;
-    // Alignment automatically derived from Block (includes cache line alignment)
-    void* region = mi_malloc_aligned(sizeof(Block) * block_count, kBlockAlignment);
-    if (region != nullptr) {
-      initial_block_pool_ = static_cast<Block*>(region);
-      for (size_t i = 0; i < initial_block_pool_size_; ++i) {
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        Block* block = initial_block_pool_ + i;
-        // Placement new to initialize atomics
-        new (block) Block();
-        block->dynamicallyAllocated = false;  // from initial pool
-      }
-    } else {
-      initial_block_pool_size_ = 0;
-    }
-  }
-
-  /**
-   * Lock-free add to free list (adapted from moodycamel FreeList::add)
-   * Uses reference counting to handle concurrent access
-   */
-  void AddBlockToFreeList(Block* block) noexcept {
-    // We know that the should-be-on-freelist bit is 0 at this point, so it's safe to
-    // set it using a fetch_add
-    if (block->freeListRefs.fetch_add(SHOULD_BE_ON_FREELIST, std::memory_order_acq_rel) == 0) {
-      // Oh look! We were the last ones referencing this node, and we know
-      // we want to add it to the free list, so let's do it!
-      AddBlockKnowingRefcountIsZero(block);
-    }
-  }
-
-  /**
-   * Actually add block to free list when refcount is zero
-   * (adapted from moodycamel FreeList::add_knowing_refcount_is_zero)
-   */
   void AddBlockKnowingRefcountIsZero(Block* block) noexcept {
-    // Since the refcount is zero, and nobody can increase it once it's zero (except us, and we run
-    // only one copy of this method per node at a time, i.e. the single thread case), then we know
-    // we can safely change the next pointer of the node; however, once the refcount is back above
-    // zero, then other threads could increase it (happens under heavy contention, when the refcount
-    // goes to zero in between a load and a refcount increment of a node in try_get, then back up to
-    // something non-zero, then the refcount increment is done by the other thread) -- so, if the
-    // CAS to add the node to the actual list fails, decrease the refcount and leave the add
-    // operation to the next thread who puts the refcount back at zero (which could be us, hence the
-    // loop).
     auto head = free_list_head_.load(std::memory_order_relaxed);
     while (true) {
       block->freeListNext.store(head, std::memory_order_relaxed);
       block->freeListRefs.store(1, std::memory_order_release);
-      if (!free_list_head_.compare_exchange_strong(head, block, std::memory_order_release,
-                                                   std::memory_order_relaxed)) {
-        // Hmm, the add failed, but we can only try again when the refcount goes back to zero
-        if (block->freeListRefs.fetch_add(SHOULD_BE_ON_FREELIST - 1, std::memory_order_release)
-            == 1) {
-          continue;
-        }
+      if (free_list_head_.compare_exchange_strong(head, block, std::memory_order_release,
+                                                  std::memory_order_relaxed)) {
+        return;
+      }
+      // CAS failed, try again if refcount goes back to zero
+      if (block->freeListRefs.fetch_add(SHOULD_BE_ON_FREELIST - 1, std::memory_order_release)
+          == 1) {
+        continue;
       }
       return;
     }
   }
 
-  /**
-   * Lock-free get from free list (adapted from moodycamel FreeList::try_get)
-   * Uses reference counting to safely remove from head
-   */
   Block* TryGetBlockFromFreeList() noexcept {
     auto head = free_list_head_.load(std::memory_order_acquire);
     while (head != nullptr) {
@@ -284,54 +135,32 @@ private:
         head = free_list_head_.load(std::memory_order_acquire);
         continue;
       }
-
-      // Good, reference count has been incremented (it wasn't at zero), which means we can read the
-      // next and not worry about it changing between now and the time we do the CAS
+      // Got reference, try to remove from list
       auto next = head->freeListNext.load(std::memory_order_relaxed);
       if (free_list_head_.compare_exchange_strong(head, next, std::memory_order_acquire,
                                                   std::memory_order_relaxed)) {
-        // Yay, got the node. This means it was on the list, which means shouldBeOnFreeList must be
-        // false no matter the refcount (because nobody else knows it's been taken off yet, it can't
-        // have been put back on).
-        assert((head->freeListRefs.load(std::memory_order_relaxed) & SHOULD_BE_ON_FREELIST) == 0);
-
-        // Decrease refcount twice, once for our ref, and once for the list's ref
+        // Success: decrease refcount by 2 (our ref + list's ref)
         head->freeListRefs.fetch_sub(2, std::memory_order_release);
         return head;
       }
-
-      // OK, the head must have changed on us, but we still need to decrease the refcount we
-      // increased. Note that we don't need to release any memory effects, but we do need to ensure
-      // that the reference count decrement happens-after the CAS on the head.
+      // CAS failed, release our reference
       refs = prevHead->freeListRefs.fetch_sub(1, std::memory_order_acq_rel);
       if (refs == SHOULD_BE_ON_FREELIST + 1) {
         AddBlockKnowingRefcountIsZero(prevHead);
       }
     }
-
     return nullptr;
   }
 
-  /**
-   * Thread-safe get from initial pool (atomic index increment)
-   * Fast path check before fetch_add (like moodycamel)
-   */
+  // === Block acquisition ===
+
   Block* TryGetBlockFromInitialPool() noexcept {
-    if (initial_block_pool_ == nullptr) {
-      return nullptr;
-    }
-    // Fast path: check if pool is exhausted (like moodycamel)
-    // This avoids unnecessary fetch_add when pool is empty
-    if (initial_block_pool_index_.load(std::memory_order_relaxed) >= initial_block_pool_size_) {
-      return nullptr;
-    }
-    // Atomic fetch_add ensures each thread gets unique index
-    size_t index = initial_block_pool_index_.fetch_add(1, std::memory_order_relaxed);
-    if (index >= initial_block_pool_size_) {
+    size_t index = initial_pool_index_.fetch_add(1, std::memory_order_relaxed);
+    if (index >= initial_pool_size_) {
       return nullptr;
     }
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    return initial_block_pool_ + index;
+    return initial_pool_ + index;
   }
 
   Block* CreateBlock() {
@@ -339,22 +168,159 @@ private:
     if (p == nullptr) {
       return nullptr;
     }
-    // Placement new to initialize atomics
     Block* block = new (p) Block();
     block->dynamicallyAllocated = true;
+    InitBlockFreeList(block);
     return block;
   }
 
-  size_t initial_capacity_;
+  void PopulateInitialPool(size_t block_count) {
+    if (block_count == 0) {
+      return;
+    }
+    void* region = mi_malloc_aligned(sizeof(Block) * block_count, kBlockAlignment);
+    if (region == nullptr) {
+      return;
+    }
+    initial_pool_ = static_cast<Block*>(region);
+    initial_pool_size_ = block_count;
+    for (size_t i = 0; i < block_count; ++i) {
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      Block* block = new (initial_pool_ + i) Block();
+      block->dynamicallyAllocated = false;
+      InitBlockFreeList(block);
+    }
+  }
+
+public:
+  explicit ConcurrentObjectPool(size_t initial_capacity = kDefaultInitialCapacity,
+                                bool recycle_dynamic = true)
+    : recycle_dynamic_(recycle_dynamic) {
+    size_t block_count = (initial_capacity + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    PopulateInitialPool(block_count);
+  }
+
+  ~ConcurrentObjectPool() {
+    // Free dynamically allocated blocks from free list
+    Block* block = free_list_head_.load(std::memory_order_relaxed);
+    while (block != nullptr) {
+      Block* next = block->freeListNext.load(std::memory_order_relaxed);
+      if (block->dynamicallyAllocated) {
+        mi_free(block);
+      }
+      block = next;
+    }
+    // Free initial pool
+    if (initial_pool_ != nullptr) {
+      mi_free(initial_pool_);
+    }
+  }
+
+  ConcurrentObjectPool(const ConcurrentObjectPool&) = delete;
+  ConcurrentObjectPool& operator=(const ConcurrentObjectPool&) = delete;
+  ConcurrentObjectPool(ConcurrentObjectPool&&) = delete;
+  ConcurrentObjectPool& operator=(ConcurrentObjectPool&&) = delete;
+
+  template <typename... Args>
+  T* Acquire(Args&&... args) {
+    // Try to get a block with free slots
+    Block* block = nullptr;
+    size_t slotIndex = BLOCK_SIZE;
+
+    // First try initial pool, then free list, then create new
+    block = TryGetBlockFromInitialPool();
+    if (block == nullptr) {
+      block = TryGetBlockFromFreeList();
+    }
+    if (block == nullptr) {
+      block = CreateBlock();
+    }
+    if (block == nullptr) {
+      return nullptr;
+    }
+
+    // Try to acquire a slot from this block
+    for (;;) {
+      slotIndex = block->freeSlotHead.load(std::memory_order_acquire);
+      if (slotIndex == BLOCK_SIZE) {
+        // Block is full, try another
+        block = TryGetBlockFromInitialPool();
+        if (block == nullptr) {
+          block = TryGetBlockFromFreeList();
+        }
+        if (block == nullptr) {
+          block = CreateBlock();
+        }
+        if (block == nullptr) {
+          return nullptr;
+        }
+        continue;
+      }
+      size_t nextFree = *reinterpret_cast<size_t*>(SlotAt(block, slotIndex));
+      if (block->freeSlotHead.compare_exchange_strong(
+            slotIndex, nextFree, std::memory_order_acq_rel, std::memory_order_relaxed)) {
+        break;
+      }
+    }
+
+    block->slotsInUse.fetch_add(1, std::memory_order_relaxed);
+    Slot* slot = SlotAt(block, slotIndex);
+    slot->backPtr = block;
+    return new (static_cast<void*>(slot->value)) T(std::forward<Args>(args)...);
+  }
+
+  void Release(T* ptr) {
+    if (ptr == nullptr) {
+      return;
+    }
+    // Get slot and block from ptr
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    Slot* slot = reinterpret_cast<Slot*>(reinterpret_cast<char*>(ptr) - offsetof(Slot, value));
+    Block* block = slot->backPtr;
+
+    // Call destructor
+    ptr->~T();
+
+    // Return slot to block's free list (lock-free)
+    size_t slotIndex = static_cast<size_t>(slot - SlotAt(block, 0));
+    size_t oldHead = block->freeSlotHead.load(std::memory_order_relaxed);
+    for (;;) {
+      *reinterpret_cast<size_t*>(slot) = oldHead;
+      if (block->freeSlotHead.compare_exchange_weak(oldHead, slotIndex, std::memory_order_acq_rel,
+                                                    std::memory_order_relaxed)) {
+        break;
+      }
+    }
+
+    // Decrement slotsInUse; if block becomes empty, recycle it
+    size_t prev = block->slotsInUse.fetch_sub(1, std::memory_order_acq_rel);
+    if (prev == 1) {
+      // Block is now empty, reinitialize and add to free list
+      InitBlockFreeList(block);
+      AddBlockToFreeList(block);
+    }
+  }
+
+  bool IsFromInitialPool(const T* ptr) const noexcept {
+    if (initial_pool_ == nullptr) {
+      return false;
+    }
+    const char* p = reinterpret_cast<const char*>(ptr);
+    const char* start = reinterpret_cast<const char*>(initial_pool_);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    const char* end = start + sizeof(Block) * initial_pool_size_;
+    return p >= start && p < end;
+  }
+
+private:
   bool recycle_dynamic_;
 
-  // Initial pool: array of Blocks
-  Block* initial_block_pool_{nullptr};
-  size_t initial_block_pool_size_{0};
+  // Initial pool
+  Block* initial_pool_{nullptr};
+  size_t initial_pool_size_{0};
+  alignas(kCacheLineSize) std::atomic<size_t> initial_pool_index_{0};
 
-  // Hot atomics - aligned to prevent false sharing between each other
-  // These are accessed concurrently by multiple threads
-  alignas(kCacheLineSize) std::atomic<size_t> initial_block_pool_index_{0};
+  // Lock-free free list of empty blocks (like moodycamel::FreeList<Block>)
   alignas(kCacheLineSize) std::atomic<Block*> free_list_head_{nullptr};
 };
 
