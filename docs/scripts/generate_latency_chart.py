@@ -18,17 +18,18 @@ plt.rcParams['axes.unicode_minus'] = False
 # 数据定义 (单位: 微秒) - 按执行顺序，包含全部阶段
 stages = [
     'Token验证',
-    '冻结检查', 
+    '冻结检查',
+    'Raft同步(冻结)',
     '网络→ME',
     '撮合执行',
+    'Raft同步(撮合)',
     '网络←ME',
-    '清算处理',
-    'Raft同步'
+    '清算处理'
 ]
 
-dpdk_values = [0.5, 0.5, 9.0, 1.0, 9.0, 0.5, 36.0]   # 总计 56.5μs
-rdma_values = [0.5, 0.5, 1.5, 1.0, 1.5, 0.5, 3.0]    # 总计 8.5μs (通用 RDMA Two-sided)
-erdma_values = [0.5, 0.5, 2.5, 1.0, 2.5, 0.5, 5.0]  # 总计 12.5μs (阿里云 eRDMA, 官方 ≤5μs RTT)
+dpdk_values = [0.5, 0.5, 36.0, 9.0, 1.0, 36.0, 9.0, 0.5]   # 总计 92.5μs
+rdma_values = [0.5, 0.5, 3.0, 1.5, 1.0, 3.0, 1.5, 0.5]     # 总计 11.5μs (通用 RDMA Two-sided)
+erdma_values = [0.5, 0.5, 5.0, 2.5, 1.0, 5.0, 2.5, 0.5]    # 总计 17.5μs (阿里云 eRDMA, 官方 ≤5μs RTT)
 
 # ============================================================
 # ColorBrewer 配色方案 - Set2 (qualitative, colorblind-safe)
@@ -50,11 +51,12 @@ CB_PINK = '#e78ac3'      # 粉色 - Raft同步 (一致性)
 stage_colors = {
     'Token验证': CB_TEAL,
     '冻结检查': CB_TEAL,
+    'Raft同步(冻结)': CB_PINK,
     '网络→ME': CB_ORANGE,
     '撮合执行': CB_PURPLE,
+    'Raft同步(撮合)': CB_PINK,
     '网络←ME': CB_ORANGE,
-    '清算处理': CB_TEAL,
-    'Raft同步': CB_PINK
+    '清算处理': CB_TEAL
 }
 
 # 类别颜色 (用于图例)
