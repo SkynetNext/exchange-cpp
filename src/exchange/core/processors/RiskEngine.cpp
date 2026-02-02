@@ -85,8 +85,7 @@ RiskEngine::RiskEngine(int32_t shardId,
 
   // Initialize object pool (matches Java: 256K SymbolPositionRecord capacity)
   symbolPositionRecordPool_ =
-    std::make_unique<collections::objpool::ObjectPool<common::SymbolPositionRecord>>(1024 * 256,
-                                                                                     true);
+    std::make_unique<collections::objpool::ObjectPool<common::SymbolPositionRecord>>(1024 * 256);
 
   // Try to load from snapshot
   if (journaling::ISerializationProcessor::CanLoadFromSnapshot(

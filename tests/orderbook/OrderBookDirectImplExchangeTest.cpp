@@ -30,8 +30,8 @@ namespace exchange::core::tests::orderbook {
 class OrderBookDirectImplExchangeTest : public OrderBookDirectImplTest {
 protected:
   std::unique_ptr<IOrderBook> CreateNewOrderBook() override {
-    orderPool_ = std::make_unique<ObjectPool<DirectOrder>>(262144, true);
-    bucketPool_ = std::make_unique<ObjectPool<Bucket>>(8192, true);
+    orderPool_ = std::make_unique<ObjectPool<DirectOrder>>(262144);
+    bucketPool_ = std::make_unique<ObjectPool<Bucket>>(8192);
     poolContext_.orderPool = orderPool_.get();
     poolContext_.bucketPool = bucketPool_.get();
     auto eventsHelper = OrderBookEventsHelper::NonPooledEventsHelper();
