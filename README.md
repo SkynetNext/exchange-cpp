@@ -4,15 +4,17 @@ A high-performance, low-latency cryptocurrency exchange matching engine written 
 
 ## Performance
 
-| Metric | C++ | Java | Improvement |
-|--------|-----|------|-------------|
-| **Max Stable TPS** | 9.4M | 6M | 1.57x |
-| **P50 @ 1M TPS** | 0.49µs | 0.51µs | 1.04x |
-| **P99 @ 1M TPS** | 0.72µs | 4.7µs | **6.5x** |
+Benchmarked against the Java reference implementation on the same hardware:
+
+| Metric | C++ | Java | vs Java |
+|--------|-----|------|---------|
+| **Max Stable TPS** | 10.2M | 6M | **1.7x** |
+| **P50 @ 1M TPS** | 0.50µs | 0.51µs | ~1x |
+| **P99 @ 1M TPS** | 0.71µs | 4.7µs | **6.6x** |
 | **P99 @ 4M TPS** | 1.44µs | 8.0µs | **5.6x** |
 | **P99 @ 6M TPS** | 3.2µs | 11.5µs | **3.6x** |
 
-**Highlights**: P99 latency 3.6-6.5x better than Java | Stable up to 9.4M TPS | Exceeds Tier 1 exchange standards (CME, NASDAQ, ICE)
+P99 tail latency is 3.6–6.6× lower than Java; stable throughput reaches 10.2M TPS.
 
 For detailed benchmarks, see [PERFORMANCE_BENCHMARK_COMPARISON.md](docs/PERFORMANCE_BENCHMARK_COMPARISON.md).
 
