@@ -15,7 +15,6 @@
  */
 
 #include <disruptor/dsl/ThreadFactory.h>
-#include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/common/config/PerformanceConfiguration.h>
 #include <exchange/core/orderbook/OrderBookDirectImpl.h>
@@ -44,12 +43,9 @@ PerformanceConfiguration PerformanceConfiguration::Default() {
     false,      // sendL2ForEveryCmd
     8,          // l2RefreshDepth
     CoreWaitStrategy::BLOCKING, std::make_shared<SimpleThreadFactory>(),
-    [](const CoreSymbolSpecification* spec,
-       ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
+    [](const CoreSymbolSpecification* spec, const orderbook::OrderBookPoolContext* poolContext,
        orderbook::OrderBookEventsHelper* eventsHelper) {
-      // OrderBookNaiveImpl doesn't use ObjectsPool, but accepts it for
-      // interface consistency
-      return std::make_unique<orderbook::OrderBookNaiveImpl>(spec, objectsPool, eventsHelper);
+      return std::make_unique<orderbook::OrderBookNaiveImpl>(spec, poolContext, eventsHelper);
     });
 }
 
@@ -67,11 +63,10 @@ PerformanceConfiguration PerformanceConfiguration::LatencyPerformanceBuilder() {
     CoreWaitStrategy::BUSY_SPIN,
     std::make_shared<utils::AffinityThreadFactory>(
       utils::ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE),
-    [](const CoreSymbolSpecification* spec,
-       ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
+    [](const CoreSymbolSpecification* spec, const orderbook::OrderBookPoolContext* poolContext,
        orderbook::OrderBookEventsHelper* eventsHelper) {
       static const auto defaultLoggingCfg = LoggingConfiguration::Default();
-      return std::make_unique<orderbook::OrderBookDirectImpl>(spec, objectsPool, eventsHelper,
+      return std::make_unique<orderbook::OrderBookDirectImpl>(spec, poolContext, eventsHelper,
                                                               &defaultLoggingCfg);
     });
 }
@@ -90,11 +85,10 @@ PerformanceConfiguration PerformanceConfiguration::ThroughputPerformanceBuilder(
     CoreWaitStrategy::BUSY_SPIN,
     std::make_shared<utils::AffinityThreadFactory>(
       utils::ThreadAffinityMode::THREAD_AFFINITY_ENABLE_PER_LOGICAL_CORE),
-    [](const CoreSymbolSpecification* spec,
-       ::exchange::core::collections::objpool::ObjectsPool* objectsPool,
+    [](const CoreSymbolSpecification* spec, const orderbook::OrderBookPoolContext* poolContext,
        orderbook::OrderBookEventsHelper* eventsHelper) {
       static const auto defaultLoggingCfg = LoggingConfiguration::Default();
-      return std::make_unique<orderbook::OrderBookDirectImpl>(spec, objectsPool, eventsHelper,
+      return std::make_unique<orderbook::OrderBookDirectImpl>(spec, poolContext, eventsHelper,
                                                               &defaultLoggingCfg);
     });
 }

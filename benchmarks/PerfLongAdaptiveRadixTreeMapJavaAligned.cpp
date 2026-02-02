@@ -23,7 +23,6 @@
 
 #include <exchange/core/collections/art/LongAdaptiveRadixTreeMap.h>
 #include <exchange/core/collections/art/LongObjConsumer.h>
-#include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <algorithm>
 #include <chrono>
 #include <climits>
@@ -150,8 +149,9 @@ int main(int argc, char* argv[]) {
   };
 
   for (int iter = 0; iter < numIters; iter++) {
-    ObjectsPool* pool = ObjectsPool::CreateDefaultTestPool();
-    auto* art = new LongAdaptiveRadixTreeMap<int64_t>(pool);
+    auto poolContext =
+      exchange::core::collections::art::ArtPoolContext<int64_t>::CreateDefaultTest();
+    auto* art = new LongAdaptiveRadixTreeMap<int64_t>(poolContext.get());
     std::map<int64_t, int64_t> bst;
 
     int64_t offset = 1'000'000'000LL + (rng() % 1'000'000);
@@ -420,7 +420,6 @@ int main(int argc, char* argv[]) {
     for (int64_t* v : values)
       delete v;
     delete art;
-    delete pool;
   }
 
   std::printf("---------------------------------------\n");

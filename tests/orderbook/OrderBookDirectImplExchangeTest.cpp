@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <exchange/core/collections/objpool/ObjectsPool.h>
 #include <exchange/core/common/config/LoggingConfiguration.h>
 #include <exchange/core/orderbook/OrderBookDirectImpl.h>
 #include <exchange/core/orderbook/OrderBookEventsHelper.h>
@@ -31,10 +30,13 @@ namespace exchange::core::tests::orderbook {
 class OrderBookDirectImplExchangeTest : public OrderBookDirectImplTest {
 protected:
   std::unique_ptr<IOrderBook> CreateNewOrderBook() override {
-    // Use member variable symbolSpec_ from base class
-    auto pool = ObjectsPool::CreateDefaultTestPool();
+    orderPool_ = std::make_unique<ObjectPool<DirectOrder>>(262144, true);
+    bucketPool_ = std::make_unique<ObjectPool<Bucket>>(8192, true);
+    poolContext_.orderPool = orderPool_.get();
+    poolContext_.bucketPool = bucketPool_.get();
     auto eventsHelper = OrderBookEventsHelper::NonPooledEventsHelper();
-    return std::make_unique<OrderBookDirectImpl>(&symbolSpec_, pool, eventsHelper, nullptr);
+    return std::make_unique<OrderBookDirectImpl>(&symbolSpec_, &poolContext_, eventsHelper,
+                                                 nullptr);
   }
 
   CoreSymbolSpecification GetCoreSymbolSpec() override {

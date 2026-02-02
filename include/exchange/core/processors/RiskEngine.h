@@ -22,8 +22,9 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include "../collections/objpool/ObjectsPool.h"
+#include "../collections/objpool/ObjectPool.h"
 #include "../common/BalanceAdjustmentType.h"
+#include "../common/SymbolPositionRecord.h"
 #include "../common/WriteBytesMarshallable.h"
 #include "../common/api/binary/BinaryDataCommand.h"
 #include "../common/api/reports/ReportQuery.h"
@@ -204,9 +205,9 @@ private:
 
   journaling::ISerializationProcessor* serializationProcessor_;
 
-  // Object pool for risk engine operations
-  // Created in constructor with configuration matching Java version
-  std::unique_ptr<::exchange::core::collections::objpool::ObjectsPool> objectsPool_;
+  // Object pool for risk engine operations (matches Java: 256K capacity)
+  std::unique_ptr<::exchange::core::collections::objpool::ObjectPool<common::SymbolPositionRecord>>
+    symbolPositionRecordPool_;
 
   // symbol -> LastPriceCacheRecord
   ankerl::unordered_dense::map<int32_t, LastPriceCacheRecord> lastPriceCache_;
