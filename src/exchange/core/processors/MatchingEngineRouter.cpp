@@ -74,10 +74,11 @@ MatchingEngineRouter::MatchingEngineRouter(
   // Matches Java MatchingEngineRouter configuration
   orderPool_ =
     std::make_unique<collections::objpool::ObjectPool<orderbook::DirectOrder>>(1024 * 1024);
-  bucketPool_ =
-    std::make_unique<collections::objpool::ObjectPool<orderbook::Bucket>>(1024 * 64);
+  bucketPool_ = std::make_unique<collections::objpool::ObjectPool<orderbook::Bucket>>(1024 * 64);
   poolContext_.orderPool = orderPool_.get();
   poolContext_.bucketPool = bucketPool_.get();
+  // ART node pools: Production matches old ObjectsPool::CreateProductionPool() (32K/16K/8K/4K)
+  poolContext_.artPoolProfile = orderbook::ArtPoolProfile::Production;
 
   // Read configuration from ExchangeConfiguration
   if (exchangeCfg != nullptr) {

@@ -22,6 +22,20 @@
 namespace exchange::core::orderbook {
 
 /**
+ * ART pool profile: selects ArtPoolContext preset (matches old ObjectsPool configs).
+ */
+enum class ArtPoolProfile {
+  /** Small capacity, fast startup (unit tests). */
+  DefaultTest,
+  /** Production: 32K/16K/8K/4K nodes (matches old CreateProductionPool). */
+  Production,
+  /** High load: 64K/32K/16K/8K nodes (matches old CreateHighLoadPool). */
+  HighLoad,
+  /** Large test: 262K/131K/65K/32K nodes (matches old CreateDefaultTestPool ART). */
+  DefaultTestPool
+};
+
+/**
  * OrderBookPoolContext - Aggregates ObjectPools for OrderBookDirectImpl
  * Defined at orderbook level (not in OrderBookDirectImpl) to avoid
  * IOrderBook depending on concrete implementation.
@@ -29,6 +43,8 @@ namespace exchange::core::orderbook {
 struct OrderBookPoolContext {
   ::exchange::core::collections::objpool::ObjectPool<DirectOrder>* orderPool = nullptr;
   ::exchange::core::collections::objpool::ObjectPool<Bucket>* bucketPool = nullptr;
+  /** Which ART node pool preset to use (DefaultTest = 4K each; Production/HighLoad = old configs). */
+  ArtPoolProfile artPoolProfile = ArtPoolProfile::DefaultTest;
 };
 
 }  // namespace exchange::core::orderbook

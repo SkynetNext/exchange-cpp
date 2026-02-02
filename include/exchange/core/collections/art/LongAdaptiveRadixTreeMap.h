@@ -141,9 +141,37 @@ public:
   ArtPoolContext(size_t cap4, size_t cap16, size_t cap48, size_t cap256)
     : pool4_(cap4), pool16_(cap16), pool48_(cap48), pool256_(cap256) {}
 
+  /** Small capacity for fast startup (unit tests, minimal benchmarks). */
   static std::unique_ptr<ArtPoolContext<V>> CreateDefaultTest() {
     constexpr size_t kDefaultCap = 4096;
     return std::make_unique<ArtPoolContext<V>>(kDefaultCap, kDefaultCap, kDefaultCap, kDefaultCap);
+  }
+
+  /** Production config: matches old ObjectsPool::CreateProductionPool() ART node sizes. */
+  static std::unique_ptr<ArtPoolContext<V>> CreateProduction() {
+    constexpr size_t k4 = 1024 * 32;   // 32K
+    constexpr size_t k16 = 1024 * 16;  // 16K
+    constexpr size_t k48 = 1024 * 8;   // 8K
+    constexpr size_t k256 = 1024 * 4;  // 4K
+    return std::make_unique<ArtPoolContext<V>>(k4, k16, k48, k256);
+  }
+
+  /** High-load config: matches old ObjectsPool::CreateHighLoadPool() ART node sizes. */
+  static std::unique_ptr<ArtPoolContext<V>> CreateHighLoad() {
+    constexpr size_t k4 = 1024 * 64;   // 64K
+    constexpr size_t k16 = 1024 * 32;  // 32K
+    constexpr size_t k48 = 1024 * 16;  // 16K
+    constexpr size_t k256 = 1024 * 8;  // 8K
+    return std::make_unique<ArtPoolContext<V>>(k4, k16, k48, k256);
+  }
+
+  /** Large test config: matches old ObjectsPool::CreateDefaultTestPool() ART (e.g. 100K items). */
+  static std::unique_ptr<ArtPoolContext<V>> CreateDefaultTestPool() {
+    constexpr size_t k4 = 262144;
+    constexpr size_t k16 = 131072;
+    constexpr size_t k48 = 65536;
+    constexpr size_t k256 = 32768;
+    return std::make_unique<ArtPoolContext<V>>(k4, k16, k48, k256);
   }
 
   ArtNode4<V>* AcquireNode4() {

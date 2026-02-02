@@ -30,11 +30,29 @@ namespace exchange::core::orderbook {
 using namespace exchange::core::common;
 using namespace exchange::core::common::cmd;
 
+namespace {
+std::unique_ptr<::exchange::core::collections::art::ArtPoolContext<Bucket>>
+CreateArtPoolFromProfile(::exchange::core::orderbook::ArtPoolProfile profile) {
+  using namespace ::exchange::core::collections::art;
+  switch (profile) {
+    case ::exchange::core::orderbook::ArtPoolProfile::Production:
+      return ArtPoolContext<Bucket>::CreateProduction();
+    case ::exchange::core::orderbook::ArtPoolProfile::HighLoad:
+      return ArtPoolContext<Bucket>::CreateHighLoad();
+    case ::exchange::core::orderbook::ArtPoolProfile::DefaultTestPool:
+      return ArtPoolContext<Bucket>::CreateDefaultTestPool();
+    case ::exchange::core::orderbook::ArtPoolProfile::DefaultTest:
+    default:
+      return ArtPoolContext<Bucket>::CreateDefaultTest();
+  }
+}
+}  // namespace
+
 OrderBookDirectImpl::OrderBookDirectImpl(const common::CoreSymbolSpecification* symbolSpec,
                                          const OrderBookPoolContext* poolContext,
                                          OrderBookEventsHelper* eventsHelper,
                                          const common::config::LoggingConfiguration* loggingCfg)
-  : artPoolContext_(::exchange::core::collections::art::ArtPoolContext<Bucket>::CreateDefaultTest())
+  : artPoolContext_(CreateArtPoolFromProfile(poolContext->artPoolProfile))
   , askPriceBuckets_(artPoolContext_.get())
   , bidPriceBuckets_(artPoolContext_.get())
   , symbolSpec_(symbolSpec)
@@ -55,7 +73,7 @@ OrderBookDirectImpl::OrderBookDirectImpl(common::BytesIn* bytes,
                                          const OrderBookPoolContext* poolContext,
                                          OrderBookEventsHelper* eventsHelper,
                                          const common::config::LoggingConfiguration* loggingCfg)
-  : artPoolContext_(::exchange::core::collections::art::ArtPoolContext<Bucket>::CreateDefaultTest())
+  : artPoolContext_(CreateArtPoolFromProfile(poolContext->artPoolProfile))
   , askPriceBuckets_(artPoolContext_.get())
   , bidPriceBuckets_(artPoolContext_.get())
   , poolContext_(poolContext)
