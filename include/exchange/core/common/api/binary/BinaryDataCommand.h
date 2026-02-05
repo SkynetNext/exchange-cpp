@@ -32,7 +32,7 @@ public:
   /**
    * Get binary command type code
    */
-  virtual int32_t GetBinaryCommandTypeCode() const = 0;
+  [[nodiscard]] virtual int32_t GetBinaryCommandTypeCode() const = 0;
 };
 
 }  // namespace exchange::core::common::api::binary

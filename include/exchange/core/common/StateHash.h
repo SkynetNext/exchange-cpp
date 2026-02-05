@@ -23,7 +23,8 @@ namespace exchange::core::common {
 class StateHash {
 public:
   virtual ~StateHash() = default;
-  virtual int32_t GetStateHash() const = 0;
+
+  [[nodiscard]] virtual int32_t GetStateHash() const = 0;
 };
 
 }  // namespace exchange::core::common

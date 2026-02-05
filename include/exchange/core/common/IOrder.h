@@ -28,14 +28,14 @@ class IOrder {
 public:
   virtual ~IOrder() = default;
 
-  virtual int64_t GetPrice() const = 0;
-  virtual int64_t GetSize() const = 0;
-  virtual int64_t GetFilled() const = 0;
-  virtual int64_t GetUid() const = 0;
-  virtual OrderAction GetAction() const = 0;
-  virtual int64_t GetOrderId() const = 0;
-  virtual int64_t GetTimestamp() const = 0;
-  virtual int64_t GetReserveBidPrice() const = 0;
+  [[nodiscard]] virtual int64_t GetPrice() const = 0;
+  [[nodiscard]] virtual int64_t GetSize() const = 0;
+  [[nodiscard]] virtual int64_t GetFilled() const = 0;
+  [[nodiscard]] virtual int64_t GetUid() const = 0;
+  [[nodiscard]] virtual OrderAction GetAction() const = 0;
+  [[nodiscard]] virtual int64_t GetOrderId() const = 0;
+  [[nodiscard]] virtual int64_t GetTimestamp() const = 0;
+  [[nodiscard]] virtual int64_t GetReserveBidPrice() const = 0;
 };
 
 }  // namespace exchange::core::common
